@@ -43,7 +43,9 @@ def _fmt(v: float, nd: int = 1) -> str:
 def _load(path: Path):
     import trimesh
 
-    mesh = trimesh.load(str(path), force="mesh", process=True)
+    # An OFF from OpenSCAD carries the exact shared vertices; merging by position would only add
+    # errors. STL has no shared vertices, so it is merged.
+    mesh = trimesh.load(str(path), force="mesh", process=Path(path).suffix.lower() != ".off")
     if not isinstance(mesh, trimesh.Trimesh):
         raise ValueError("no mesh in file")
     return mesh

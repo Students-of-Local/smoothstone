@@ -1,0 +1,280 @@
+{
+ "name": "panel",
+ "title": "Faceplate panel",
+ "summary": "Flat faceplate with a row of square, rounded or round cutouts, screw holes and an optional raised or engraved label.",
+ "tags": [
+  "panel",
+  "faceplate",
+  "face",
+  "plate",
+  "cover",
+  "cutout",
+  "switch",
+  "keystone",
+  "port",
+  "mount",
+  "bracket",
+  "label",
+  "blank"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "w",
+   "type": "number",
+   "default": 60,
+   "min": 10,
+   "max": 250,
+   "unit": "mm",
+   "help": "width along X"
+  },
+  {
+   "name": "d",
+   "type": "number",
+   "default": 40,
+   "min": 10,
+   "max": 250,
+   "unit": "mm",
+   "help": "height along Y"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 3,
+   "min": 1.2,
+   "max": 12,
+   "unit": "mm",
+   "help": "plate thickness"
+  },
+  {
+   "name": "corner_r",
+   "type": "number",
+   "default": 3,
+   "min": 0,
+   "max": 40,
+   "unit": "mm",
+   "help": "outer corner radius"
+  },
+  {
+   "name": "cutouts",
+   "type": "int",
+   "default": 2,
+   "min": 0,
+   "max": 12,
+   "help": "number of cutouts in a row"
+  },
+  {
+   "name": "cut_shape",
+   "type": "choice",
+   "default": "square",
+   "choices": [
+    "square",
+    "rounded",
+    "round"
+   ],
+   "help": "cutout shape"
+  },
+  {
+   "name": "cut_w",
+   "type": "number",
+   "default": 16,
+   "min": 2,
+   "max": 240,
+   "unit": "mm",
+   "help": "cutout width (diameter if round)"
+  },
+  {
+   "name": "cut_h",
+   "type": "number",
+   "default": 16,
+   "min": 2,
+   "max": 240,
+   "unit": "mm",
+   "help": "cutout height"
+  },
+  {
+   "name": "cut_pitch",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 240,
+   "unit": "mm",
+   "help": "distance between cutout centers, 0 = auto"
+  },
+  {
+   "name": "cut_y",
+   "type": "number",
+   "default": 0,
+   "min": -120,
+   "max": 120,
+   "unit": "mm",
+   "help": "cutout row position along Y"
+  },
+  {
+   "name": "holes",
+   "type": "choice",
+   "default": "ends",
+   "choices": [
+    "ends",
+    "top_bottom",
+    "corners",
+    "none"
+   ],
+   "help": "screw holes: ends (left and right), top_bottom, corners or none"
+  },
+  {
+   "name": "hole_d",
+   "type": "number",
+   "default": 3.4,
+   "min": 1.5,
+   "max": 12,
+   "unit": "mm",
+   "help": "screw hole diameter (3.4 fits M3)"
+  },
+  {
+   "name": "hole_inset",
+   "type": "number",
+   "default": 5,
+   "min": 2,
+   "max": 50,
+   "unit": "mm",
+   "help": "hole center distance from the edge"
+  },
+  {
+   "name": "countersink",
+   "type": "bool",
+   "default": false,
+   "help": "countersink the holes for flat head screws"
+  },
+  {
+   "name": "label",
+   "type": "text",
+   "default": "",
+   "help": "text on the plate, empty for none"
+  },
+  {
+   "name": "label_size",
+   "type": "number",
+   "default": 5,
+   "min": 4,
+   "max": 40,
+   "unit": "mm",
+   "help": "text height"
+  },
+  {
+   "name": "label_y",
+   "type": "number",
+   "default": -99,
+   "min": -99,
+   "max": 120,
+   "unit": "mm",
+   "help": "text position along Y, -99 = auto"
+  },
+  {
+   "name": "label_style",
+   "type": "choice",
+   "default": "raised",
+   "choices": [
+    "raised",
+    "engraved"
+   ],
+   "help": "raised or engraved text"
+  },
+  {
+   "name": "edge",
+   "type": "number",
+   "default": 0.8,
+   "min": 0,
+   "max": 3,
+   "unit": "mm",
+   "help": "top edge rounding"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 96,
+   "min": 32,
+   "max": 256,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "w",
+  "y": "d"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "thickness",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "w",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "keystone_4",
+   "params": {
+    "w": 110,
+    "d": 44,
+    "cutouts": 4,
+    "cut_w": 14.9,
+    "cut_h": 20.5,
+    "cut_shape": "square",
+    "holes": "ends",
+    "label": "NETWORK",
+    "label_size": 5
+   }
+  },
+  {
+   "name": "gauges",
+   "params": {
+    "w": 120,
+    "d": 60,
+    "cutouts": 3,
+    "cut_shape": "round",
+    "cut_w": 30,
+    "cut_pitch": 38,
+    "cut_y": 5,
+    "holes": "corners",
+    "countersink": true,
+    "label": "TEMP  VOLTS  AMPS",
+    "label_size": 4.5
+   }
+  },
+  {
+   "name": "blank_engraved",
+   "params": {
+    "w": 70,
+    "d": 115,
+    "cutouts": 0,
+    "holes": "top_bottom",
+    "label": "OFFICE",
+    "label_size": 10,
+    "label_y": 0,
+    "label_style": "engraved",
+    "corner_r": 6,
+    "hole_inset": 15.85
+   }
+  },
+  {
+   "name": "switch",
+   "params": {
+    "w": 70,
+    "d": 115,
+    "cutouts": 1,
+    "cut_shape": "rounded",
+    "cut_w": 34,
+    "cut_h": 67,
+    "holes": "top_bottom",
+    "countersink": true,
+    "thickness": 4,
+    "hole_inset": 15.85
+   }
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+BOSL2 vendored from https://github.com/BelfrySCAD/BOSL2 at ca677d0cf7a70fdd302dcbdb622e074ac2eaa5b3 (2026-11-14), BSD-2-Clause, see LICENSE. Tests, examples, images and tutorials removed.

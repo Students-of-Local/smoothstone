@@ -67,7 +67,11 @@ def _shorten(line: str, n: int = 160) -> str:
 
 
 def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadRun:
-    cmd = _base_cmd(binary) + ["-o", str(out_stl)] + d_flags(recipe, params) + [str(recipe.scad)]
+    """Build the recipe to <out_stl>.off (exact mesh, used by the checks) and <out_stl> (binary STL
+    written from that mesh). ASCII STL from OpenSCAD rounds coordinates, which merges vertices that
+    are distinct in the real mesh and makes good parts read as open."""
+    out_off = out_stl.with_suffix(".off")
+    cmd = _base_cmd(binary) + ["-o", str(out_off)] + d_flags(recipe, params) + [str(recipe.scad)]
     try:
         proc = subprocess.run(
             cmd,
@@ -84,6 +88,13 @@ def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadR
         return ScadRun(False, None, f"$ {' '.join(cmd)}\n{e}", f"cannot run OpenSCAD: {e}")
     log = "$ " + " ".join(cmd) + "\n" + (proc.stdout or "") + (proc.stderr or "")
     err = first_error(log)
+    if proc.returncode == 0 and out_off.is_file() and out_off.stat().st_size > 0:
+        try:
+            import trimesh
+
+            trimesh.load(str(out_off), force="mesh", process=False).export(str(out_stl))
+        except Exception as e:  # a broken OFF means a broken build; report it, do not crash
+            log += f"\nOFF to STL failed: {type(e).__name__}: {e}"
     ok = proc.returncode == 0 and out_stl.is_file() and out_stl.stat().st_size > 0 and not (
         err.startswith("ERROR") or "Assertion" in err
     )

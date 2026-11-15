@@ -1,0 +1,189 @@
+{
+ "name": "cable_comb",
+ "title": "Cable comb",
+ "summary": "Bar with a row of slots that hold cables side by side, with lead-in chamfers and an optional click-in grip.",
+ "tags": [
+  "cable",
+  "comb",
+  "wire",
+  "cord",
+  "organizer",
+  "holder",
+  "management",
+  "slot",
+  "harness",
+  "clip",
+  "tidy"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "length",
+   "type": "number",
+   "default": 100,
+   "min": 15,
+   "max": 250,
+   "unit": "mm",
+   "help": "bar length along X"
+  },
+  {
+   "name": "depth",
+   "type": "number",
+   "default": 12,
+   "min": 4,
+   "max": 60,
+   "unit": "mm",
+   "help": "bar depth along Y; slots open on +Y"
+  },
+  {
+   "name": "height",
+   "type": "number",
+   "default": 6,
+   "min": 2,
+   "max": 40,
+   "unit": "mm",
+   "help": "bar height"
+  },
+  {
+   "name": "slots",
+   "type": "int",
+   "default": 8,
+   "min": 1,
+   "max": 40,
+   "help": "number of slots"
+  },
+  {
+   "name": "slot_w",
+   "type": "number",
+   "default": 6.2,
+   "min": 1,
+   "max": 40,
+   "unit": "mm",
+   "help": "slot width: cable diameter plus 0.2 to 0.5"
+  },
+  {
+   "name": "slot_depth",
+   "type": "number",
+   "default": 8,
+   "min": 1,
+   "max": 55,
+   "unit": "mm",
+   "help": "how deep each slot goes"
+  },
+  {
+   "name": "pitch",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 100,
+   "unit": "mm",
+   "help": "distance between slot centers, 0 = auto"
+  },
+  {
+   "name": "lead_in",
+   "type": "number",
+   "default": 0.8,
+   "min": 0,
+   "max": 4,
+   "unit": "mm",
+   "help": "chamfer at each slot mouth"
+  },
+  {
+   "name": "grip",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 2,
+   "unit": "mm",
+   "help": "narrower mouth so cables click in"
+  },
+  {
+   "name": "round_bottom",
+   "type": "bool",
+   "default": true,
+   "help": "round the inner end of each slot"
+  },
+  {
+   "name": "edge",
+   "type": "number",
+   "default": 0.8,
+   "min": 0,
+   "max": 3,
+   "unit": "mm",
+   "help": "top edge rounding"
+  },
+  {
+   "name": "corner_r",
+   "type": "number",
+   "default": 2,
+   "min": 0,
+   "max": 20,
+   "unit": "mm",
+   "help": "bar corner radius"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 64,
+   "min": 24,
+   "max": 256,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "length",
+  "y": "depth",
+  "z": "height"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "height",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "length",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "usb_click",
+   "params": {
+    "length": 80,
+    "slots": 6,
+    "slot_w": 3.6,
+    "grip": 0.6,
+    "depth": 14,
+    "slot_depth": 9,
+    "height": 8
+   }
+  },
+  {
+   "name": "power_cords",
+   "params": {
+    "length": 120,
+    "slots": 4,
+    "slot_w": 8.5,
+    "depth": 18,
+    "slot_depth": 12,
+    "height": 10,
+    "grip": 0.8
+   }
+  },
+  {
+   "name": "wiring_24",
+   "params": {
+    "length": 150,
+    "slots": 24,
+    "slot_w": 2.4,
+    "depth": 10,
+    "slot_depth": 6,
+    "height": 5,
+    "pitch": 5.8
+   }
+  }
+ ]
+}

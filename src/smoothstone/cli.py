@@ -553,7 +553,7 @@ def cmd_build(args, job: Job) -> Out:
     params = build_params(job, r, given)
     bd = job.build_dir
     bd.mkdir(parents=True, exist_ok=True)
-    for f in ("part.stl", "preview.png", "check.json", "openscad.log", "preview.scad"):
+    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad"):
         (bd / f).unlink(missing_ok=True)
     write_json(bd / "params.json", {"recipe": r.name, "params": params})
     st = job.status()
@@ -598,7 +598,8 @@ def cmd_build(args, job: Job) -> Out:
         return out
 
     bed = config.bed(job.root)
-    results = checks.check_stl(stl, recipe=r, params=params, bed=bed)
+    off = stl.with_suffix(".off")
+    results = checks.check_stl(off if off.is_file() else stl, recipe=r, params=params, bed=bed)
     ok = checks.passed(results)
     size = checks.measured_size(results)
     texts, nxt = plan_fix(r, params, results) if not ok else ({}, None)

@@ -129,3 +129,4 @@ def test_safe_eval():
     for bad in ("__import__('os')", "w.real", "open('x')", "[1, 2]", "lambda: 1"):
         with pytest.raises(ValueError):
             recipes.safe_eval(bad, {"w": 1})
+
