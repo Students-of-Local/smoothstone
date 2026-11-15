@@ -192,6 +192,8 @@ if TURN:
         kp.interpolation = "LINEAR"
     OUT.mkdir(parents=True, exist_ok=True)
     for f in range(TURN):
+        if (OUT / f"f_{f:04d}.png").exists():
+            continue  # a stopped run picks up where it left off
         scene.frame_set(f)
         scene.render.filepath = str(OUT / f"f_{f:04d}.png")
         bpy.ops.render.render(write_still=True)
