@@ -41,7 +41,7 @@
    "min": 8,
    "max": 120,
    "unit": "mm",
-   "help": "inside width of the curve"
+   "help": "how far it reaches, inside the curve"
   },
   {
    "name": "tip",

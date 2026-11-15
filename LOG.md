@@ -54,3 +54,19 @@
   1771baa492dc8e98365ca70cce26c9604241f52a6bb9b6cc3ed5778606040639  evals/heldout4/c7_fish.png
   f90dfa32b06494656e2e8e43f9af6740253ff369393ffda1c63fc495c3e561a0  evals/heldout4/c8_cat.png
   a9b6ca5c35d6b869df76fd7e9a89d9c7616ae98a076952dcad2d99c875e7cf33  evals/heldout4/c8_keychain.json
+- 2026-11-15 02:35 Blind set 3 results (frozen 8fdf099, before the matcher fixes). NEXT driver 3/8. LFM3-1.7B: S card
+  34/40, S card compacted at step 3 27/40, no card 31/40. Every b8 cable comb run but one set slot_w=5.0 for 5 mm
+  cables (spec wants 5.2 to 5.5, clearance); after compaction the planter runs followed NEXT part=saucer (1/5); hook
+  width 25 vs 25.4 for "one inch". The S card beat its own NEXT lines: the model fixed magnets, gear style and saucer
+  itself. All of these misses are what 2acc951 fixes; set 4 measures that. Output runs2/heldout3, runs2/heldout3.txt.
+- 2026-11-15 05:10 Blind set 4 results (frozen ad5d81a). NEXT driver 3/8. LFM3-1.7B: S card 20/40, S card compacted
+  20/40, no card 24/40. Worse than set 3 and the S card trails no card. Causes, all tool side: (1) cookie cutter,
+  S card 0/5: the model typed the path to silhouette.svg instead of image=image; the silhouette keeps the fish eye
+  hole, flange=0 left the cutter in 2 bodies, that FIX names no setting, and NEXT looped to stone show until the
+  steps ran out. (2) panel "4 arcade buttons" read as nothing, cutouts stayed 2 (0/15 runs). (3) cable comb "4 mm
+  thick" got no clearance and "snap in" no grip (0/15). (4) gear "5mm D shaft" got bore 5.0, no clearance (0/15).
+  Fixes on main: a path to any of the job picture files means image (the recipe kind); "an inch"; unquoted label
+  text after engrave/that says; counts look one word past the number; clearance unless the 2 words before or 1
+  after the number name the parameter; bore fit_add 0.2; "no flange" sets a 0-able size to 0; ches/shes/xes stems;
+  comb grip phrases; panel count words; hook reach help shortened. All 32 specs in the four sets match, 85 tests
+  pass (the cutter test fails on the old code), sheet all PASS. Set 4 is spent; a new blind set 5 measures this.

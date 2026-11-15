@@ -346,6 +346,9 @@ def coerce(p: Param, raw: str, image_paths: dict[str, Path] | None = None):
             suggest=near[0] if near else None,
         )
     if p.type == "image":
+        job_files = {Path(v).resolve() for v in (image_paths or {}).values()}
+        if raw.lower() != "image" and Path(raw).resolve() in job_files:
+            raw = "image"  # a path to one of the job's own picture files means the job image, in the kind this recipe needs
         if raw.lower() == "image":
             img = (image_paths or {}).get(p.image_kind)
             if img is None or not Path(img).exists():

@@ -69,7 +69,8 @@
    "min": 0,
    "max": 60,
    "unit": "mm",
-   "help": "shaft hole diameter, 0 = none"
+   "help": "shaft hole diameter, 0 = none",
+   "fit_add": 0.2
   },
   {
    "name": "d_flat",

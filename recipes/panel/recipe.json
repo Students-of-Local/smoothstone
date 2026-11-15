@@ -276,5 +276,47 @@
     "hole_inset": 15.85
    }
   }
- ]
+ ],
+ "counts": {
+  "button": [
+   "cutouts",
+   0
+  ],
+  "switch": [
+   "cutouts",
+   0
+  ],
+  "jack": [
+   "cutouts",
+   0
+  ],
+  "port": [
+   "cutouts",
+   0
+  ],
+  "knob": [
+   "cutouts",
+   0
+  ],
+  "socket": [
+   "cutouts",
+   0
+  ],
+  "gauge": [
+   "cutouts",
+   0
+  ],
+  "cutout": [
+   "cutouts",
+   0
+  ],
+  "opening": [
+   "cutouts",
+   0
+  ],
+  "connector": [
+   "cutouts",
+   0
+  ]
+ }
 }

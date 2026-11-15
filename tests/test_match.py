@@ -69,7 +69,7 @@ def test_sizes_in_a_row_and_phrases(recipe, request_text, want, monkeypatch):
     ("spur_gear", "a gear with thirty-six teeth", {"teeth": 36}),
     ("spur_gear", "a gear with forty two teeth", {"teeth": 42}),
     ("spur_gear", "a straight cut gear, 18 teeth, module 2, for an 8 mm axle",
-     {"style": "spur", "teeth": 18, "module_mm": 2, "bore": 8}),
+     {"style": "spur", "teeth": 18, "module_mm": 2, "bore": 8.2}),  # an axle gets clearance (blind set 4)
     ("hook", "a wall hook that sticks out two inches", {}),
     ("gridfinity_bin", "a gridfinity bin with four in a row", {}),
     ("planter", "a ribbed planter and a drip tray", {"style": "ribbed", "part": "both"}),
@@ -89,3 +89,24 @@ def test_spelled_lengths(monkeypatch):
     assert 50.8 in got.values(), got
     got = match.suggest(rc.load("gridfinity_bin"), "a gridfinity bin with four in a row")
     assert 101.6 not in got.values(), got
+
+
+@pytest.mark.parametrize("recipe, request_text, want", [
+    ("box", "a tiny box with a lid, about a centimeter tall", {"h": 10}),
+    ("box", "a box for my pens, engrave PENS on the lid", {"label": "PENS"}),
+    ("box", "a box, engrave it with my name", {}),
+    ("panel", "a plate for 6 toggle switches", {"cutouts": 6}),
+    ("cable_comb", "keep 3 cables in order, each one is 6 mm thick, make them click in",
+     {"slots": 3, "slot_w": 6.3, "grip": 0.6}),
+    ("cable_comb", "a comb with slot width 6 mm", {"slot_w": 6}),
+    ("spur_gear", "a gear for an 8 mm axle", {"bore": 8.2}),
+    ("spur_gear", "a gear with a bore of 8 mm", {"bore": 8}),
+    ("cookie_cutter", "a star cookie cutter without a flange", {"flange": 0}),
+])
+def test_set4_shapes_in_new_words(recipe, request_text, want, monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    got = match.suggest(rc.load(recipe), request_text)
+    for k, v in want.items():
+        assert got.get(k) == v, (k, got)
+    if not want:
+        assert "label" not in got, got

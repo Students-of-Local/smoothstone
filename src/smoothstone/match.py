@@ -43,6 +43,8 @@ def _stem(w: str) -> str:
     w = w.lower()
     if len(w) > 4 and w.endswith("ies"):
         return w[:-3] + "y"
+    if len(w) > 4 and w.endswith(("ches", "shes", "xes")):
+        return w[:-2]  # switches, boxes, inches
     if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
         return w[:-1]
     return w
@@ -65,7 +67,8 @@ def _param_words(p: rc.Param, aliases: list[str]) -> set[str]:
 
 def _numbers(text: str) -> list[tuple[float, str, int, int]]:
     """(value in mm or plain, unit kind, start, end) for every number in the text."""
-    t = text
+    t = re.sub(r"\ban?(?=\s+(?:inch|inches|cm|mm|centimeters?|millimeters?)\b)",
+               lambda m: "1".ljust(len(m.group(0))), text, flags=re.I)  # "an inch tall"
     for w, n in sorted(WORDS.items(), key=lambda kv: -len(kv[0])):
         t = re.sub(rf"\b{w}\b", lambda m, n=n: str(n).ljust(len(m.group(0))), t, flags=re.I)
     out = []
@@ -127,6 +130,11 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
     # quoted text -> first text parameter
     quoted = re.findall(r'["“‘\']([^"”’\']{1,40})["”’\']', request)
     texts = [p for p in r.params if p.type == "text"]
+    if not quoted:  # engrave SD on the lid, a sign that says OPEN
+        m = re.search(r"\b(?:engraved?|engraves|emboss(?:ed)?|that says|saying|reads|with the text|labell?ed)\s+"
+                      r"([A-Z0-9][A-Za-z0-9&-]{0,15})\b", request)
+        if m and m.group(1).lower() not in STOP | {"it", "on", "my", "this", "that"}:
+            quoted = [m.group(1)]
     if quoted and texts:
         out[texts[0].name] = quoted[0]
     # choice values named in the request
@@ -159,6 +167,14 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             if on != bool(p.default):
                 out[p.name] = on
             break
+    # "no flange", "without lightening holes": a number that can be 0 goes to 0
+    for p in r.params:
+        if p.type in ("number", "int") and p.min == 0 and p.default and p.name not in out:
+            first = _stem(p.name.split("_")[0])
+            for k, w in enumerate(stems):
+                if w == first and NEGATE & set(raw[max(0, k - 3):k]) and stems[k + 1:k + 2] != ["t"]:
+                    out[p.name] = 0
+                    break
     # M3, M4 ... screws: clearance hole on the first parameter about screws or holes
     m = re.search(r"\bM(\d(?:\.5)?)\b", request)
     if m and m.group(1) in SCREWS:
@@ -190,9 +206,10 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
     for i, (v, kind, s, e) in enumerate(nums):
         if i in taken:
             continue
-        nxt = [_stem(w) for w in re.findall(r"[a-zA-Z]+", request[e:e + 25])[:1]]  # the very next word
-        if kind in ("count", "word") and nxt and nxt[0] in counts:
-            name, off = counts[nxt[0]]
+        nxt = [_stem(w) for w in re.findall(r"[a-zA-Z]+", request[e:e + 30])[:2]]  # the next word, or one past it
+        hit = next((w for w in nxt if w in counts), None)
+        if kind in ("count", "word") and hit:
+            name, off = counts[hit]
             p = r.param(name)
             if p is not None and name not in out and _fits(p, v + off):
                 out[name] = int(v + off)
@@ -246,7 +263,9 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
         used_p.add(name)
         p = r.param(name)
         add = float(getattr(p, "fit_add", 0) or 0)
-        if add and _stem(name.split("_")[0]) not in _words(request[max(0, nums[i][2] - 30):nums[i][3] + 30]):
+        s_, e_ = nums[i][2], nums[i][3]
+        at = _words(request[max(0, s_ - 20):s_])[-2:] + _words(request[e_:e_ + 25])[:1]
+        if add and _stem(name.split("_")[0]) not in at:
             v = float(v) + add  # "5 mm cables": the slot gets the recipe's clearance on top
         out[name] = int(v) if float(v).is_integer() else round(float(v), 2)
         # "16 mm square": the same size for the matching _w and _h pair

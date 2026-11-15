@@ -2,12 +2,15 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 from pathlib import Path
 
 import pytest
 from PIL import Image, ImageDraw
 
 from smoothstone import cli, recipes
+
+REPO = Path(__file__).resolve().parent.parent
 
 
 def stone(*argv):
@@ -419,3 +422,23 @@ def test_status_repeats_what_is_not_placed(jobenv):
     stone("show", "_demo")
     text, code, nxt = stone("status")
     assert "Not placed yet: 7 rubber feet. Names and meanings: stone show _demo" in text, text
+
+
+def test_a_typed_out_job_picture_path_gets_the_recipes_kind(jobenv, tmp_path, recipes_root, openscad):
+    """Blind set 4, S card: LFM3 typed the path to silhouette.svg for a cookie cutter with no flange. The
+    silhouette keeps the fish's eye hole, the cutter came out in 2 pieces, and every run ran out of steps."""
+    shutil.copytree(REPO / "recipes" / "cookie_cutter", recipes_root / "cookie_cutter")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib")
+    im = Image.new("RGB", (300, 200), "white")
+    ImageDraw.Draw(im).ellipse((30, 30, 270, 170), fill="black")
+    ImageDraw.Draw(im).ellipse((200, 80, 230, 110), fill="white")  # the eye
+    f = tmp_path / "fish.png"
+    im.save(f)
+    stone("new", "a cookie cutter of this fish, 60 mm wide, no flange", "--image", str(f))
+    job = jobenv / "stone-job"
+    text, code, nxt = stone("set", "cookie_cutter", "size=60", "flange=0", "image=" + str(job / "image" / "silhouette.svg"))
+    assert code == 0, text
+    plan = json.loads((job / "plan.json").read_text())
+    assert plan["params"]["image"] == str((job / "image" / "outline.svg").resolve())
+    text, code, nxt = stone("build")
+    assert "Part ready" in text, text

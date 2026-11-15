@@ -201,5 +201,34 @@
    "thick",
    "diameter"
   ]
+ },
+ "phrases": {
+  "snap in": {
+   "grip": 0.6
+  },
+  "snap into": {
+   "grip": 0.6
+  },
+  "click in": {
+   "grip": 0.6
+  },
+  "clip in": {
+   "grip": 0.6
+  },
+  "snap them in": {
+   "grip": 0.6
+  },
+  "narrower so": {
+   "grip": 0.6
+  },
+  "a little narrower": {
+   "grip": 0.6
+  },
+  "narrower mouth": {
+   "grip": 0.6
+  },
+  "narrower opening": {
+   "grip": 0.6
+  }
  }
 }
