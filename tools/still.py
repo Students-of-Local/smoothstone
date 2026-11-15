@@ -24,6 +24,8 @@ PLA = COLORS[argv[2] if len(argv) > 2 else "orange"]
 RES = int(argv[3]) if len(argv) > 3 else 1200
 SAMPLES = int(argv[4]) if len(argv) > 4 else 96
 BACKLIT = bool(os.environ.get("STILL_BACKLIT"))
+TURN = int(os.environ.get("STILL_TURN", "0"))
+SPAN = float(os.environ.get("STILL_SPAN", "1"))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -177,6 +179,23 @@ light("key", 1.9e6 * k * k, (-S * 2.0, -S * 2.2, S * 3.0), S * 2.4, (1.0, 0.96, 
 light("fill", 0.6e6 * k * k, (S * 2.6, -S * 1.6, S * 1.4), S * 2.5, (0.75, 0.82, 1.0))
 light("rim", 3.0e6 * k * k, (S * 0.6, S * 2.6, S * 1.6), S * 1.4, (0.55, 0.68, 1.0))
 
-OUT.parent.mkdir(parents=True, exist_ok=True)
-scene.render.filepath = str(OUT)
-bpy.ops.render.render(write_still=True)
+if TURN:
+    pivot = bpy.data.objects.new("pivot", None)
+    scene.collection.objects.link(pivot)
+    obj.parent = pivot
+    pivot.rotation_euler = (0, 0, 0)
+    pivot.keyframe_insert("rotation_euler", index=2, frame=0)
+    pivot.rotation_euler = (0, 0, 2 * math.pi * SPAN)
+    pivot.keyframe_insert("rotation_euler", index=2, frame=TURN)
+    for kp in pivot.animation_data.action.layers[0].strips[0].channelbags[0].fcurves[0].keyframe_points \
+            if hasattr(pivot.animation_data.action, "layers") else pivot.animation_data.action.fcurves[0].keyframe_points:
+        kp.interpolation = "LINEAR"
+    OUT.mkdir(parents=True, exist_ok=True)
+    for f in range(TURN):
+        scene.frame_set(f)
+        scene.render.filepath = str(OUT / f"f_{f:04d}.png")
+        bpy.ops.render.render(write_still=True)
+else:
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    scene.render.filepath = str(OUT)
+    bpy.ops.render.render(write_still=True)
