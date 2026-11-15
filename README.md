@@ -4,7 +4,11 @@
 
 I wanted a small model running on my own computer to make 3D printable parts that actually look good, so I tested LFM3-1.7B writing OpenSCAD on its own and it failed every single time. Even with the best skill I could write it made a working fan guard only 2 times out of 5. smoothstone takes the hard part away from the small model, as the model never writes geometry at all. It picks a tested recipe and fills in the sizes from the request or a picture, and the stone tool builds the part, checks that it will print and keeps every step on disk, so the model can lose its whole context and still finish the part.
 
-RESULTS_GO_HERE
+## Results
+
+![Six parts LFM3-1.7B made with smoothstone on my CPU, rendered in Blender](docs/made_by_lfm3.jpg)
+
+LFM3-1.7B made every part above on my own CPU through smoothstone, and each one passed every print check. I did not want to fool myself with requests I had tuned for, so a fresh agent that never saw the code wrote new requests from the parameter list alone and I sealed them before the run. Each request ran five times. On the last blind set the model finished the right part with the right sizes 39 out of 40 times, and 38 out of 40 when I wiped its memory in the middle of the job. Writing the 3D code itself it went 0 out of 15. Every set, every failed run and every fix is in [LOG.md](LOG.md), and the sets are in [evals](evals).
 
 ## How it works
 
