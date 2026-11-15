@@ -1,0 +1,16 @@
+{
+  "id": "c6_gear",
+  "request": "gear with straight teeth, 40 teeth, module 1.5, hole for a 5mm D shaft",
+  "expect": {
+    "recipe": "spur_gear",
+    "params": {
+      "style": "spur",
+      "teeth": 40,
+      "module_mm": 1.5,
+      "bore": [
+        5.05,
+        5.5
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "c7_cookiecutter",
+  "image": "c7_fish.png",
+  "request": "can you make this fish into a cookie cutter? about 9 cm wide, no flange",
+  "expect": {
+    "recipe": "cookie_cutter",
+    "params": {
+      "size": 90,
+      "flange": 0
+    },
+    "image_used": "image"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "c4_vase",
+  "request": "a ribbed vase twenty centimeters tall, make it solid so i can print it in spiral vase mode",
+  "expect": {
+    "recipe": "vase",
+    "params": {
+      "style": "ribbed",
+      "height": 200,
+      "solid": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "c2_panel",
+  "request": "Faceplate for 4 arcade buttons. Round holes 22mm across, screw holes in all four corners.",
+  "expect": {
+    "recipe": "panel",
+    "params": {
+      "cutouts": 4,
+      "cut_shape": "round",
+      "cut_w": 22,
+      "holes": "corners"
+    }
+  }
+}

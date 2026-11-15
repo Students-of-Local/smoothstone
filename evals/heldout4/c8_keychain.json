@@ -1,0 +1,13 @@
+{
+  "id": "c8_keychain",
+  "image": "c8_cat.png",
+  "request": "keychian charm from this cat pic, 35mm across, and a bigger ring hole, 8mm",
+  "expect": {
+    "recipe": "keychain",
+    "params": {
+      "size": 35,
+      "ring_d": 8
+    },
+    "image_used": "image"
+  }
+}

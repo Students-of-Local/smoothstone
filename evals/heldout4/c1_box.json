@@ -1,0 +1,22 @@
+{
+  "id": "c1_box",
+  "request": "need a small box with a lid for my SD cards, 3 by 2 inches and about an inch tall. engrave SD on the lid",
+  "expect": {
+    "recipe": "box",
+    "params": {
+      "w": [
+        74,
+        78
+      ],
+      "d": [
+        49,
+        53
+      ],
+      "h": [
+        24,
+        27
+      ],
+      "label": "SD"
+    }
+  }
+}

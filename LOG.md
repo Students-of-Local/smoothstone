@@ -37,3 +37,20 @@
   08f08cfc0e5da1d5d7f62f93aec4076d4c1fb5a258512b06afa302c4794419bd  evals/heldout3/b7_planter_saucer.json
   c647053796f6d11059d0d5c7112eb4ee73c6d68c8e487872ff15a2905bf7864b  evals/heldout3/b8_cable_comb.json
   ffb43668cb0eac74d82520a30c7fa2cabc334e0370595f2530e22710283b953b  evals/heldout3/turtle.png
+- 2026-11-15 Matcher fixes for the misses set 3's NEXT baseline found (2acc951): spelled numbers to 99,
+  "one inch" as a length, bool switches by name with "no"/"without", gear and saucer phrases, a bare number
+  right after its parameter's name, lengths never fill a count, cable_comb adds 0.3 mm to a cable size. Set 3 is
+  spent as a measurement of these fixes: its run (frozen 8fdf099) measures the code before them. 75 tests pass.
+- 2026-11-15 Held-out set 4 sealed to measure 2acc951: 8 requests by a separate Opus subagent that read only
+  the full parameter catalog, never the matcher, tests, cards, evals or earlier wording. 2 are pictures it drew
+  (fish, cat). I have not read the requests. Nothing has run on it. SHA-256:
+  442eef802a95c7f574d26eb920ab3190e63374bae021efb3fa27b5f38cdebecb  evals/heldout4/c1_box.json
+  ad9574520f70f0128b3df328c41dd88883a568cd6481230d78236da4c56a02fa  evals/heldout4/c2_panel.json
+  bfbd6ba07819e1eea9c7cb426859d93b2446f19818d7a1a35aee739cd7686901  evals/heldout4/c3_hook.json
+  ea07cbe5bd326da37ad292bfef775f9931cf82dfabfe5c7d47fac8c8d1a7f938  evals/heldout4/c4_vase.json
+  0b19c2380eef5abb02a67332040232c16ecc779246730a61ebd17ed8b463b276  evals/heldout4/c5_cablecomb.json
+  cc0fbacc5d4cdd1330f273a9f31876f43e6bdd42c7f2469b065319e68ac7c5b0  evals/heldout4/c6_gear.json
+  535df6afb08e224c4743c05eb0e465d58a062b9f8f7c80254c899279665d3295  evals/heldout4/c7_cookiecutter.json
+  1771baa492dc8e98365ca70cce26c9604241f52a6bb9b6cc3ed5778606040639  evals/heldout4/c7_fish.png
+  f90dfa32b06494656e2e8e43f9af6740253ff369393ffda1c63fc495c3e561a0  evals/heldout4/c8_cat.png
+  a9b6ca5c35d6b869df76fd7e9a89d9c7616ae98a076952dcad2d99c875e7cf33  evals/heldout4/c8_keychain.json

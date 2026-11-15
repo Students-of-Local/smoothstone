@@ -1,0 +1,18 @@
+{
+  "id": "c5_cablecomb",
+  "request": "something to keep 5 usb cables lined up on my desk, theyre about 4 mm thick. make the slot openings a little narrower so the cables snap in",
+  "expect": {
+    "recipe": "cable_comb",
+    "params": {
+      "slots": 5,
+      "slot_w": [
+        4.1,
+        4.6
+      ],
+      "grip": [
+        0.1,
+        2
+      ]
+    }
+  }
+}
