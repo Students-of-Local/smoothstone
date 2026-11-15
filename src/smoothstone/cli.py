@@ -754,6 +754,10 @@ def cmd_image(args, job: Job) -> Out:
         out.next = f'stone new "<what to make>" --image {args.path}'
         out.code = 1
         return out
+    if not Path(args.path).expanduser().is_file() and read_json(job.image_dir / "info.json"):
+        out.add("The picture is already in the job; recipes use it with image=image.")
+        out.next = _fallback_next(job, [])
+        return out
     image_step(job, Path(args.path), out)
     return out
 
@@ -900,6 +904,20 @@ def _tidy(argv: list[str]) -> list[str]:
     return argv
 
 
+def _fallback_next(job: Job, argv: list[str]) -> str:
+    """After a slip, the one command that moves the job on: a recipe the model named, else the job's NEXT."""
+    words = [a for a in argv if not a.startswith("-")]
+    for w in words:
+        if rc.load(w.split("=", 1)[0]):
+            return f"stone show {w.split('=', 1)[0]}"
+    if not job.exists():
+        return NEW_NEXT
+    nxt = job.status().get("next")
+    if nxt and nxt != "stone status":
+        return nxt
+    return "stone build" if job.plan() else "stone recipes"
+
+
 def run(argv: list[str]) -> tuple[str, int]:
     argv = _tidy(argv)
     parser = make_parser()
@@ -915,7 +933,7 @@ def run(argv: list[str]) -> tuple[str, int]:
     except UsageError as e:
         out = Out()
         out.fix(f"{e}; commands: status new recipes show set build check image done")
-        out.next = "stone status"
+        out.next = _fallback_next(job, argv)
         out.owns_next = False
         cmd = "usage"
     except Exception as e:  # never show a traceback to the model
@@ -934,8 +952,8 @@ def run(argv: list[str]) -> tuple[str, int]:
         if out.result:
             upd["last_result"] = out.result
         early = s.get("stage") in EARLY_STAGES and not job.plan()
-        if out.owns_next or early:
-            upd["next"] = out.next
+        if (out.owns_next or early) and out.next != "stone status":
+            upd["next"] = out.next  # status never sends a model back to status
         if out.stage and (out.owns_next or early):
             upd["stage"] = out.stage
         job.update(**upd)

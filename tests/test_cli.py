@@ -295,7 +295,7 @@ def test_scad_literals():
 
 def test_usage_error_is_short(jobenv):
     text, code, nxt = stone("bogus")
-    assert code == 1 and "unknown command bogus" in text and nxt == "stone status"
+    assert code == 1 and "unknown command bogus" in text and nxt == cli.NEW_NEXT
 
 
 def test_internal_error_goes_to_log(jobenv, monkeypatch):
@@ -387,3 +387,19 @@ def test_slips_from_lfm3_runs(jobenv):
     # the recipe name written as name=value
     text, code, nxt = stone("set", "_demo=50", "w=50")
     assert nxt == "stone build", text
+
+
+def test_slips_never_send_status_back_to_itself(jobenv):
+    """Tuning sweep, no card: after a syntax slip in the image stage, status said NEXT: stone status forever."""
+    stone("new", "a plate 50 mm wide")
+    stone("recipes")
+    text, code, nxt = stone("image")  # no path
+    assert nxt == "stone show _demo" or nxt.startswith("stone show"), text
+    text, code, nxt = stone("show")  # no recipe
+    assert nxt != "stone status", text
+    stone("generate", "plate")  # unknown command
+    text, code, nxt = stone("status")
+    assert nxt != "stone status", text
+    # an unknown command that names a recipe goes to that recipe
+    text, code, nxt = stone("_demo", "50", "mm")
+    assert nxt == "stone show _demo", text
