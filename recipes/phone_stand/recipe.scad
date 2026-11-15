@@ -6,7 +6,8 @@ use <lib/stone.scad>
 width = 70;          // stand width, mm (the print height)
 angle = 65;          // back rest angle from the table, degrees
 rest = 95;           // back rest length, mm
-ledge = 14;          // room for the phone between lip and rest, mm (phone thickness plus case)
+phone_t = 0;         // phone thickness with its case, mm; the ledge is 2 mm more (0 = use ledge)
+ledge = 14;          // room for the phone between lip and rest, mm, when phone_t is 0
 lip = 9;             // front lip height, mm
 thickness = 6;       // bar thickness, mm
 cable_slot = 14;     // notch in the front lip for a charging cable, mm wide (0 = none)
@@ -15,11 +16,12 @@ quality = 48;        // circle smoothness
 
 $fn = quality;
 t = thickness;
-top = [ledge + rest * cos(angle), rest * sin(angle)];
+gap = phone_t > 0 ? phone_t + 2 : ledge;
+top = [gap + rest * cos(angle), rest * sin(angle)];
 back = [top[0] + max(18, top[1] * 0.35), 0];
-path = [[0, lip], [0, 0], back, top, [ledge, 0]];
+path = [[0, lip], [0, 0], back, top, [gap, 0]];
 
-assert(ledge > 4, "ledge must be more than 4 mm");
+assert(gap > 4, "the ledge must be more than 4 mm");
 
 module profile() { stroke2d(path, t); }
 

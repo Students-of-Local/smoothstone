@@ -74,6 +74,7 @@ class Recipe:
     examples: list[dict]
     path: Path
     aliases: dict = field(default_factory=dict)
+    counts: dict = field(default_factory=dict)  # word -> [param, offset]: "3 compartments" sets div_x = 2
 
     @property
     def scad(self) -> Path:
@@ -175,6 +176,7 @@ def _load_one(d: Path) -> Recipe:
         fix=dict(data.get("fix") or {}),
         examples=list(data.get("examples") or []),
         aliases=dict(data.get("aliases") or {}),
+        counts=dict(data.get("counts") or {}),
         path=d,
     )
 

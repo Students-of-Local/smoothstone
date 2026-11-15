@@ -147,5 +147,23 @@
     "scoop": false
    }
   }
- ]
+ ],
+ "counts": {
+  "compartment": [
+   "div_x",
+   -1
+  ],
+  "section": [
+   "div_x",
+   -1
+  ],
+  "pocket": [
+   "div_x",
+   -1
+  ],
+  "divider": [
+   "div_x",
+   0
+  ]
+ }
 }

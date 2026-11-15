@@ -117,10 +117,29 @@ def suggest(r: rc.Recipe, request: str) -> dict:
     # numbers: score every (number, param) pair by the words around the number
     nums = _numbers(request)
     has_units = any(k in ("len", "deg") for _, k, _, _ in nums)
+    # "3 compartments": a count word the recipe maps to a parameter with an offset
+    counts = {_stem(w): pv for w, pv in (getattr(r, "counts", {}) or {}).items()}
+    taken = set()
+    for i, (v, kind, s, e) in enumerate(nums):
+        nxt = _words(request[e:e + 25])[:1]
+        if kind in ("count", "word") and nxt and nxt[0] in counts:
+            name, off = counts[nxt[0]]
+            p = r.param(name)
+            if p is not None and name not in out and _fits(p, v + off):
+                out[name] = int(v + off)
+                taken.add(i)
     cands = []
     for i, (v, kind, s, e) in enumerate(nums):
-        before = _words(request[max(0, s - 40):s])[-3:]
-        after = _words(request[e:e + 40])[:3]
+        if i in taken:
+            continue
+        # the words around a number belong to it only up to the next number on each side
+        lo = nums[i - 1][3] if i > 0 else 0
+        hi = nums[i + 1][2] if i + 1 < len(nums) else len(request)
+        if i + 1 < len(nums) and not request[e:hi].strip():
+            # "two 16 mm cutouts": a count right before a size reaches past it to its noun
+            hi = nums[i + 2][2] if i + 2 < len(nums) else len(request)
+        before = _words(request[max(lo, s - 40):s])[-3:]
+        after = _words(request[e:min(hi, e + 40)])[:3]
         ctx = _expand(set(before) | set(after))
         near = _expand(set(after[:2]) | set(before[-1:]))
         for p in r.params:

@@ -43,13 +43,22 @@
    "help": "back rest length"
   },
   {
+   "name": "phone_t",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 30,
+   "unit": "mm",
+   "help": "phone thickness with its case, 0 = use ledge"
+  },
+  {
    "name": "ledge",
    "type": "number",
    "default": 14,
    "min": 6,
    "max": 40,
    "unit": "mm",
-   "help": "phone thickness plus case, plus 2"
+   "help": "room for the phone, used when phone_t is 0"
   },
   {
    "name": "lip",
@@ -129,6 +138,12 @@
     "angle": 55,
     "rest": 80,
     "lip": 12
+   }
+  },
+  {
+   "name": "thick_case",
+   "params": {
+    "phone_t": 13
    }
   }
  ],

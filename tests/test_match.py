@@ -32,3 +32,18 @@ def test_small_cases(request_text, want, monkeypatch):
     monkeypatch.delenv("STONE_RECIPES", raising=False)
     r = rc.load("fan_guard")
     assert match.suggest(r, request_text) == want
+
+
+@pytest.mark.parametrize("recipe, request_text, want", [
+    # misses seen in the held-out 1 run, written as new requests (fixed after that run)
+    ("vase", "a smooth vase, 160 mm tall, with a 40 mm opening", {"height": 160, "top_d": 40}),
+    ("gridfinity_bin", "a 2 by 1 gridfinity bin, 3 units tall, with 4 compartments",
+     {"units": 3, "div_x": 3}),
+    ("phone_stand", "a stand for a phone that is 12 mm thick", {"phone_t": 12}),
+    ("panel", "a panel with two 20 mm square cutouts", {"cutouts": 2, "cut_w": 20, "cut_h": 20}),
+])
+def test_words_belong_to_their_number(recipe, request_text, want, monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    got = match.suggest(rc.load(recipe), request_text)
+    for k, v in want.items():
+        assert got.get(k) == v, (k, got)
