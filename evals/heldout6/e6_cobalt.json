@@ -1,0 +1,12 @@
+{
+  "id": "e6_cobalt",
+  "request": "fan gaurd for an 80mm fan, honeycomb pattern, plate 2.5mm thick",
+  "expect": {
+    "recipe": "fan_guard",
+    "params": {
+      "size": 80,
+      "style": "honeycomb",
+      "thickness": 2.5
+    }
+  }
+}

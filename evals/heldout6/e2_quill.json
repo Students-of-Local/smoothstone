@@ -1,0 +1,16 @@
+{
+  "id": "e2_quill",
+  "image": "e2_pic.png",
+  "request": "can you turn this picture into a cookie cutter? about 3 inches across and twenty mm tall",
+  "expect": {
+    "recipe": "cookie_cutter",
+    "params": {
+      "size": [
+        75.5,
+        77.0
+      ],
+      "height": 20
+    },
+    "image_used": "image"
+  }
+}

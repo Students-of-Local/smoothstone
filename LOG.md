@@ -109,3 +109,20 @@ Compaction is the weak spot. After a compaction the model leans on the NEXT line
 - The model-free NEXT run on set 4 still failed the panel: 4 buttons of 22 mm do not fit the default 60 mm plate, and stone's fix put the count back to 2. Recipes can now name a grow rule for an assert, and the panel widens to fit (128 mm here).
 
 NEXT driver on every held-out set after the fixes: 29/29. 94 tests pass. Set 5 is spent; set 6 measures this cleanly.
+
+## 2026-11-15 blind set 6 sealed
+
+Same protocol as set 5: a fresh writer saw only the regenerated catalog and wrote evals/heldout6 (8 specs, 2 drawn pictures). I have not read the specs. It measures 25a0b83. Hashes:
+
+```
+457b372c391476778e32e715bcc6e8dc3eccd08b98c51a137d9417ddef446a9b  e1_marrow.json
+77529370abf98ce00655308ce86d9912b1a3396c5d58026b72ff0eeb8edc9791  e2_pic.png
+f58487d9ec8ab1d7d2d686171807fd8469f2f51f430bf3b7f9f33aa2648cd48f  e2_quill.json
+a5894e06b88f8f56a1d6127400f593be16b2343dccc8cb8922346ef15b0f5cbb  e3_lantern.json
+c15d1a94a3ccf109f7a8465fe2feba1989d10258f7c83ad32f17e56821da108d  e4_pebble.json
+235504cfe5c58054a911d09871654107b1de1522d146881b803bf05cb18632fa  e5_pic.png
+c26ada1d3dc764474e57920f6d903c7fd43dc19c1048376563fc7ecbd38758f8  e5_thistle.json
+286de16496aa69b961604ce95e8740f8cbeba6f1877834d2cd60666f946378b7  e6_cobalt.json
+4d0dfb307bdd5b22785429dad6c729781b8acec6d96767709abc84ffa80d6332  e7_juniper.json
+9c63ddb962eb2ef32c007f2b82d4bf4227456b6581ed86a110f9ca8d5271a7bb  e8_saffron.json
+```

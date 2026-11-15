@@ -1,0 +1,14 @@
+{
+  "id": "e5_thistle",
+  "image": "e5_pic.png",
+  "request": "I'd love a lithophane of this one, 120 mm wide. It doesn't have to stand up on its own, I'm going to lay it flat in a light box. Max thickness of 3 mm in the dark parts would be good.",
+  "expect": {
+    "recipe": "lithophane",
+    "params": {
+      "width": 120,
+      "stand": false,
+      "max_t": 3
+    },
+    "image_used": "image"
+  }
+}

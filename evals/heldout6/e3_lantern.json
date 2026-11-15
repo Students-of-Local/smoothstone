@@ -1,0 +1,12 @@
+{
+  "id": "e3_lantern",
+  "request": "Keychain name tag that says Marisol please, typewriter style monospace font, and make the ring hole 6 mm so my split ring fits",
+  "expect": {
+    "recipe": "keychain",
+    "params": {
+      "text": "Marisol",
+      "font": "mono",
+      "ring_d": 6
+    }
+  }
+}

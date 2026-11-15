@@ -1,0 +1,16 @@
+{
+  "id": "e1_marrow",
+  "request": "need a cable comb for my desk, 5 slots. the cables are 4mm thick each. bar should be 90mm long and no need to round off the slot bottoms, flat is fine",
+  "expect": {
+    "recipe": "cable_comb",
+    "params": {
+      "slots": 5,
+      "slot_w": [
+        4.2,
+        4.5
+      ],
+      "length": 90,
+      "round_bottom": false
+    }
+  }
+}

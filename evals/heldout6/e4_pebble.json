@@ -1,0 +1,13 @@
+{
+  "id": "e4_pebble",
+  "request": "vase pls. top opening 50mm, base 80mm, 200mm tall, ribbed",
+  "expect": {
+    "recipe": "vase",
+    "params": {
+      "top_d": 50,
+      "base_d": 80,
+      "height": 200,
+      "style": "ribbed"
+    }
+  }
+}

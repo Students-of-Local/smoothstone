@@ -1,0 +1,19 @@
+{
+  "id": "e8_saffron",
+  "request": "Hey, I'm making a little project box and need a flat faceplate for the front. It should be 2 inches tall and 4 inches wide, with three cutouts in a row, and put the screw holes in the four corners.",
+  "expect": {
+    "recipe": "panel",
+    "params": {
+      "d": [
+        50.3,
+        51.3
+      ],
+      "w": [
+        101.1,
+        102.1
+      ],
+      "cutouts": 3,
+      "holes": "corners"
+    }
+  }
+}

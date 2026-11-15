@@ -1,0 +1,13 @@
+{
+  "id": "e7_juniper",
+  "request": "Gridfinity bin three units wide and two deep. Leave off the stacking lip, and I do want the magnet pockets on the bottom.",
+  "expect": {
+    "recipe": "gridfinity_bin",
+    "params": {
+      "grid_x": 3,
+      "grid_y": 2,
+      "lip": false,
+      "magnets": true
+    }
+  }
+}
