@@ -2,7 +2,8 @@
 
 blender -b --python tools/still.py -- <part.stl> <out.png> [color] [res] [samples]
 
-color is a PLA name from COLORS. The mesh is the STL as written; it is only centered on the bed
+color is a PLA name from COLORS. STILL_BACKLIT=1 is for lithophanes: thin white PLA lit from behind,
+seen from the front. The mesh is the STL as written; it is only centered on the bed
 and framed by its own size. Cycles on the CPU (set STILL_GPU=1 for OptiX), denoised.
 """
 import math
@@ -22,6 +23,7 @@ COLORS = {"orange": (0.93, 0.30, 0.05), "teal": (0.02, 0.42, 0.42), "white": (0.
 PLA = COLORS[argv[2] if len(argv) > 2 else "orange"]
 RES = int(argv[3]) if len(argv) > 3 else 1200
 SAMPLES = int(argv[4]) if len(argv) > 4 else 96
+BACKLIT = bool(os.environ.get("STILL_BACKLIT"))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -61,9 +63,19 @@ def pla_material():
     b = n["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*PLA, 1)
     b.inputs["Roughness"].default_value = 0.45
-    b.inputs["Subsurface Weight"].default_value = 0.06
-    b.inputs["Subsurface Radius"].default_value = (1.0, 0.4, 0.2)
-    b.inputs["Subsurface Scale"].default_value = 0.6
+    b.inputs["Subsurface Weight"].default_value = 1.0 if BACKLIT else 0.06
+    b.inputs["Subsurface Radius"].default_value = (1.0, 0.85, 0.6) if BACKLIT else (1.0, 0.4, 0.2)
+    b.inputs["Subsurface Scale"].default_value = 0.5 if BACKLIT else 0.6
+    if BACKLIT:  # frosted plastic that absorbs and scatters per millimeter, so thick areas go dark (cool LED look)
+        b.inputs["Transmission Weight"].default_value = 1.0
+        b.inputs["Roughness"].default_value = 0.7
+        b.inputs["Subsurface Weight"].default_value = 0.0
+        vol = n.new("ShaderNodeVolumePrincipled")
+        vol.inputs["Color"].default_value = (1.0, 0.82, 0.6, 1)
+        vol.inputs["Density"].default_value = 1.4
+        vol.inputs["Anisotropy"].default_value = 0.5
+        vol.inputs["Absorption Color"].default_value = (0.22, 0.5, 0.85, 1)
+        l.new(vol.outputs[0], n["Material Output"].inputs["Volume"])
     bev = n.new("ShaderNodeBevel")  # shading only: the mesh is not changed
     bev.inputs["Radius"].default_value = 0.3
     l.new(bev.outputs["Normal"], b.inputs["Normal"])
@@ -135,7 +147,7 @@ cam_data.clip_start = 1
 cam_data.clip_end = 100000
 cam = bpy.data.objects.new("cam", cam_data)
 scene.collection.objects.link(cam)
-el, az = math.radians(30), math.radians(-35)
+el, az = (math.radians(10), math.radians(-18)) if BACKLIT else (math.radians(30), math.radians(-35))
 dist = S * 3.3
 target = Vector((0, 0, size.z * 0.42))
 cam.location = target + Vector((dist * math.cos(el) * math.sin(az), -dist * math.cos(el) * math.cos(az), dist * math.sin(el)))
@@ -158,6 +170,9 @@ def light(name, energy, loc, sz, color):
 
 
 k = S / 120.0
+if BACKLIT:  # a warm panel behind the picture, the room nearly dark
+    light("back", 8.0e5 * k * k, (0, S * 0.5, size.z * 0.5), S * 0.6, (1.0, 0.86, 0.66))
+    k *= 0.08
 light("key", 1.9e6 * k * k, (-S * 2.0, -S * 2.2, S * 3.0), S * 2.4, (1.0, 0.96, 0.9))
 light("fill", 0.6e6 * k * k, (S * 2.6, -S * 1.6, S * 1.4), S * 2.5, (0.75, 0.82, 1.0))
 light("rim", 3.0e6 * k * k, (S * 0.6, S * 2.6, S * 1.6), S * 1.4, (0.55, 0.68, 1.0))
