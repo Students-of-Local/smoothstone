@@ -1,0 +1,14 @@
+{
+ "id": "h2_phone_stand",
+ "request": "Make a stand for my phone. The phone is 10 mm thick with its case, and I want the stand 75 mm wide.",
+ "expect": {
+  "recipe": "phone_stand",
+  "params": {
+   "width": 75,
+   "ledge": [
+    11,
+    16
+   ]
+  }
+ }
+}

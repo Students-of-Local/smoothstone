@@ -1,0 +1,12 @@
+{
+ "id": "t5_lithophane",
+ "request": "Turn this picture into a lithophane 100 mm wide.",
+ "image": "../../examples/images/fan_guard_render.png",
+ "expect": {
+  "recipe": "lithophane",
+  "params": {
+   "width": 100
+  },
+  "image_used": "image"
+ }
+}

@@ -73,6 +73,7 @@ class Recipe:
     fix: dict
     examples: list[dict]
     path: Path
+    aliases: dict = field(default_factory=dict)
 
     @property
     def scad(self) -> Path:
@@ -173,6 +174,7 @@ def _load_one(d: Path) -> Recipe:
         min_wall=float(data.get("min_wall", 0.8)),
         fix=dict(data.get("fix") or {}),
         examples=list(data.get("examples") or []),
+        aliases=dict(data.get("aliases") or {}),
         path=d,
     )
 

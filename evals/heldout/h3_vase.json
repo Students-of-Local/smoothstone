@@ -1,0 +1,12 @@
+{
+ "id": "h3_vase",
+ "request": "A twisted vase, 180 mm tall, with a 50 mm opening at the top.",
+ "expect": {
+  "recipe": "vase",
+  "params": {
+   "style": "twisted",
+   "height": 180,
+   "top_d": 50
+  }
+ }
+}

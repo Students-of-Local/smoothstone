@@ -1,0 +1,20 @@
+{
+ "id": "t3_faceplate",
+ "request": "A faceplate 60 mm wide and 40 mm tall, 3 mm thick, with two 16 mm square cutouts and screw holes for M3 screws.",
+ "expect": {
+  "recipe": "panel",
+  "params": {
+   "w": 60,
+   "d": 40,
+   "thickness": 3,
+   "cutouts": 2,
+   "cut_w": 16,
+   "cut_h": 16,
+   "cut_shape": "square",
+   "hole_d": [
+    3.2,
+    3.6
+   ]
+  }
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "t4_name_tag",
+ "request": "A keychain name tag that says \"ALEX\".",
+ "expect": {
+  "recipe": "keychain",
+  "params": {
+   "text": "ALEX"
+  }
+ }
+}

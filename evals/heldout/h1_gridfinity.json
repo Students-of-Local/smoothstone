@@ -1,0 +1,21 @@
+{
+ "id": "h1_gridfinity",
+ "request": "I need a Gridfinity bin that is 3 grid units wide, 2 deep and 6 units tall, split into 3 compartments.",
+ "expect": {
+  "recipe": "gridfinity_bin",
+  "params": {
+   "grid_x": 3,
+   "grid_y": 2,
+   "units": 6
+  },
+  "sum": [
+   {
+    "params": [
+     "div_x",
+     "div_y"
+    ],
+    "eq": 2
+   }
+  ]
+ }
+}

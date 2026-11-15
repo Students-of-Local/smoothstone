@@ -1,0 +1,15 @@
+{
+ "id": "h5_duck_cutter",
+ "request": "A cookie cutter shaped like the duck in this picture, 90 mm wide.",
+ "image": "duck.png",
+ "expect": {
+  "recipe": "cookie_cutter",
+  "params": {
+   "size": [
+    85,
+    95
+   ]
+  },
+  "image_used": "image"
+ }
+}

@@ -12,7 +12,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import check as checks
+from . import match, check as checks
 from . import config
 from . import image as imagetool
 from . import recipes as rc
@@ -281,6 +281,13 @@ def cmd_show(args, job: Job) -> Out:
         out.add(r.summary)
     size = default_size(r)
     out.add(f"Tier {r.tier}." + (f" Default size {size}." if size else ""))
+    request = job.request() if job.exists() else ""
+    sug = match.suggest(r, request) if request else {}
+    if sug:
+        items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items()]
+        out.add(f"From the request: {' '.join(items)}")
+    elif request:
+        out.add("Nothing in the request names a parameter; the defaults make a good part.")
     out.add("Parameters (name = default):")
     room = MAX_LINES - len(out.lines) - 3
     for i, p in enumerate(r.params):
@@ -294,8 +301,11 @@ def cmd_show(args, job: Job) -> Out:
     ex = example_items(r)
     if ex:
         out.add(f"Example: stone set {r.name} {' '.join(ex)}")
-    nxt = example_items(r, limit=3)
-    out.next = f"stone set {r.name} {' '.join(nxt)}".rstrip()
+    if request:
+        out.next = f"stone set {r.name} {' '.join(items) if sug else ''}".rstrip()
+    else:
+        nxt = example_items(r, limit=3)
+        out.next = f"stone set {r.name} {' '.join(nxt)}".rstrip()
     out.result = f"showed {r.name}"
     return out
 

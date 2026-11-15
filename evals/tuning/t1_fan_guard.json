@@ -1,0 +1,11 @@
+{
+ "id": "t1_fan_guard",
+ "request": "A guard for a 120 mm PC fan, 3 mm thick.",
+ "expect": {
+  "recipe": "fan_guard",
+  "params": {
+   "size": 120,
+   "thickness": 3
+  }
+ }
+}

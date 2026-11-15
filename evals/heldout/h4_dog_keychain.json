@@ -1,0 +1,16 @@
+{
+ "id": "h4_dog_keychain",
+ "request": "Make a keychain from the dog in this picture, about 45 mm across.",
+ "image": "dog.png",
+ "expect": {
+  "recipe": "keychain",
+  "params": {
+   "text": "",
+   "size": [
+    40,
+    50
+   ]
+  },
+  "image_used": "image"
+ }
+}
