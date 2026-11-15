@@ -90,9 +90,9 @@ def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadR
     err = first_error(log)
     if proc.returncode == 0 and out_off.is_file() and out_off.stat().st_size > 0:
         try:
-            import trimesh
+            from .check import load_off
 
-            trimesh.load(str(out_off), force="mesh", process=False).export(str(out_stl))
+            load_off(out_off).export(str(out_stl))
         except Exception as e:  # a broken OFF means a broken build; report it, do not crash
             log += f"\nOFF to STL failed: {type(e).__name__}: {e}"
     ok = proc.returncode == 0 and out_stl.is_file() and out_stl.stat().st_size > 0 and not (

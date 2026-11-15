@@ -1,0 +1,213 @@
+{
+ "name": "vase",
+ "title": "Vase",
+ "summary": "Vase with a smooth belly profile and a surface style: smooth, ribbed, twisted, faceted or wave. Hollow, or solid for spiral vase mode.",
+ "tags": [
+  "vase",
+  "flower",
+  "flowers",
+  "vessel",
+  "decor",
+  "decoration",
+  "pot",
+  "jar",
+  "bottle",
+  "twisted",
+  "spiral",
+  "ribbed",
+  "faceted",
+  "centerpiece"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "height",
+   "type": "number",
+   "default": 150,
+   "min": 30,
+   "max": 250,
+   "unit": "mm",
+   "help": "height"
+  },
+  {
+   "name": "base_d",
+   "type": "number",
+   "default": 70,
+   "min": 20,
+   "max": 240,
+   "unit": "mm",
+   "help": "diameter at the bottom"
+  },
+  {
+   "name": "mid_d",
+   "type": "number",
+   "default": 105,
+   "min": 20,
+   "max": 250,
+   "unit": "mm",
+   "help": "diameter at the widest point"
+  },
+  {
+   "name": "top_d",
+   "type": "number",
+   "default": 60,
+   "min": 15,
+   "max": 250,
+   "unit": "mm",
+   "help": "diameter at the top"
+  },
+  {
+   "name": "belly_at",
+   "type": "number",
+   "default": 0.35,
+   "min": 0.1,
+   "max": 0.9,
+   "help": "where the widest point is, 0 to 1 of the height"
+  },
+  {
+   "name": "style",
+   "type": "choice",
+   "default": "twisted",
+   "choices": [
+    "smooth",
+    "ribbed",
+    "twisted",
+    "faceted",
+    "wave"
+   ],
+   "help": "surface: smooth, ribbed, twisted, faceted or wave"
+  },
+  {
+   "name": "sides",
+   "type": "int",
+   "default": -1,
+   "min": -1,
+   "max": 24,
+   "help": "polygon sides, 0 = round, -1 = set by style"
+  },
+  {
+   "name": "ribs",
+   "type": "int",
+   "default": -1,
+   "min": -1,
+   "max": 80,
+   "help": "number of ribs, 0 = none, -1 = set by style"
+  },
+  {
+   "name": "rib_depth",
+   "type": "number",
+   "default": -1,
+   "min": -1,
+   "max": 8,
+   "unit": "mm",
+   "help": "rib depth, -1 = set by style"
+  },
+  {
+   "name": "twist",
+   "type": "number",
+   "default": -1,
+   "min": -1,
+   "max": 720,
+   "unit": "deg",
+   "help": "turn from bottom to top, -1 = set by style"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 2,
+   "min": 1.2,
+   "max": 6,
+   "unit": "mm",
+   "help": "wall thickness"
+  },
+  {
+   "name": "floor",
+   "type": "number",
+   "default": 2.4,
+   "min": 1.2,
+   "max": 10,
+   "unit": "mm",
+   "help": "floor thickness"
+  },
+  {
+   "name": "solid",
+   "type": "bool",
+   "default": false,
+   "help": "solid body to print in spiral vase mode"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 180,
+   "min": 48,
+   "max": 360,
+   "help": "points around"
+  }
+ ],
+ "dims": {
+  "z": "height"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "wall",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "height",
+   "dir": "down"
+  },
+  "overhang": {
+   "param": "mid_d",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "ribbed_tall",
+   "params": {
+    "style": "ribbed",
+    "height": 200,
+    "base_d": 60,
+    "mid_d": 80,
+    "top_d": 50,
+    "belly_at": 0.5
+   }
+  },
+  {
+   "name": "faceted",
+   "params": {
+    "style": "faceted",
+    "height": 140,
+    "base_d": 80,
+    "mid_d": 100,
+    "top_d": 70
+   }
+  },
+  {
+   "name": "wave_bowl",
+   "params": {
+    "style": "wave",
+    "height": 90,
+    "base_d": 70,
+    "mid_d": 130,
+    "top_d": 140,
+    "belly_at": 0.6
+   }
+  },
+  {
+   "name": "bud_solid",
+   "params": {
+    "style": "twisted",
+    "height": 120,
+    "base_d": 50,
+    "mid_d": 75,
+    "top_d": 30,
+    "solid": true,
+    "twist": 200
+   }
+  }
+ ]
+}

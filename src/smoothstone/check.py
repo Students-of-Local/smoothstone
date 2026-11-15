@@ -40,8 +40,30 @@ def _fmt(v: float, nd: int = 1) -> str:
     return f"{v:.{nd}f}"
 
 
+def load_off(path) -> "trimesh.Trimesh":
+    """Read an OFF file as written by OpenSCAD, keeping its shared vertices. Polygons with more
+    than three corners (OpenSCAD passes polyhedron faces through untouched) become triangle fans."""
+    import trimesh
+
+    lines = [ln for ln in Path(path).read_text().splitlines() if ln.strip() and not ln.startswith("#")]
+    if not lines or not lines[0].startswith("OFF"):
+        raise ValueError("not an OFF file")
+    nv, nf = (int(w) for w in lines[1].split()[:2])
+    verts = np.array([ln.split()[:3] for ln in lines[2:2 + nv]], dtype=float).reshape(nv, 3)
+    tris = []
+    for ln in lines[2 + nv:2 + nv + nf]:
+        w = ln.split()  # count, indices, then optional face color
+        k = int(w[0])
+        idx = [int(x) for x in w[1:1 + k]]
+        tris.extend([idx[0], idx[j], idx[j + 1]] for j in range(1, k - 1))
+    return trimesh.Trimesh(verts, np.array(tris, dtype=np.int64).reshape(-1, 3), process=False)
+
+
 def _load(path: Path):
     import trimesh
+
+    if Path(path).suffix.lower() == ".off":
+        return load_off(path)
 
     # An OFF from OpenSCAD carries the exact shared vertices; merging by position would only add
     # errors. STL has no shared vertices, so it is merged.

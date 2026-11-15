@@ -1,0 +1,206 @@
+{
+ "name": "planter",
+ "title": "Planter",
+ "summary": "Plant pot with a drain hole and an optional matching saucer, in the same surface styles as the vase.",
+ "tags": [
+  "planter",
+  "plant",
+  "pot",
+  "flower",
+  "succulent",
+  "cactus",
+  "herb",
+  "garden",
+  "saucer",
+  "drain",
+  "tray"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "height",
+   "type": "number",
+   "default": 90,
+   "min": 30,
+   "max": 240,
+   "unit": "mm",
+   "help": "pot height"
+  },
+  {
+   "name": "top_d",
+   "type": "number",
+   "default": 110,
+   "min": 30,
+   "max": 230,
+   "unit": "mm",
+   "help": "diameter at the rim"
+  },
+  {
+   "name": "base_d",
+   "type": "number",
+   "default": 80,
+   "min": 30,
+   "max": 200,
+   "unit": "mm",
+   "help": "diameter at the bottom"
+  },
+  {
+   "name": "style",
+   "type": "choice",
+   "default": "faceted",
+   "choices": [
+    "smooth",
+    "ribbed",
+    "twisted",
+    "faceted",
+    "wave"
+   ],
+   "help": "surface: smooth, ribbed, twisted, faceted or wave"
+  },
+  {
+   "name": "sides",
+   "type": "int",
+   "default": -1,
+   "min": -1,
+   "max": 24,
+   "help": "polygon sides, 0 = round, -1 = set by style"
+  },
+  {
+   "name": "ribs",
+   "type": "int",
+   "default": -1,
+   "min": -1,
+   "max": 80,
+   "help": "number of ribs, 0 = none, -1 = set by style"
+  },
+  {
+   "name": "rib_depth",
+   "type": "number",
+   "default": -1,
+   "min": -1,
+   "max": 8,
+   "unit": "mm",
+   "help": "rib depth, -1 = set by style"
+  },
+  {
+   "name": "twist",
+   "type": "number",
+   "default": -1,
+   "min": -1,
+   "max": 720,
+   "unit": "deg",
+   "help": "turn from bottom to top, -1 = set by style"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 2.4,
+   "min": 1.2,
+   "max": 6,
+   "unit": "mm",
+   "help": "wall thickness"
+  },
+  {
+   "name": "floor",
+   "type": "number",
+   "default": 3,
+   "min": 1.2,
+   "max": 10,
+   "unit": "mm",
+   "help": "floor thickness"
+  },
+  {
+   "name": "drain_d",
+   "type": "number",
+   "default": 12,
+   "min": 0,
+   "max": 60,
+   "unit": "mm",
+   "help": "drain hole diameter, 0 = none"
+  },
+  {
+   "name": "part",
+   "type": "choice",
+   "default": "pot",
+   "choices": [
+    "pot",
+    "saucer",
+    "both"
+   ],
+   "help": "which part to print"
+  },
+  {
+   "name": "saucer_h",
+   "type": "number",
+   "default": 14,
+   "min": 6,
+   "max": 40,
+   "unit": "mm",
+   "help": "saucer height"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 180,
+   "min": 48,
+   "max": 360,
+   "help": "points around"
+  }
+ ],
+ "dims": {
+  "z": "height if part != 'saucer' else saucer_h"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 2,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "wall",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "top_d",
+   "dir": "down"
+  },
+  "overhang": {
+   "param": "top_d",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "ribbed",
+   "params": {
+    "style": "ribbed",
+    "height": 100,
+    "top_d": 120,
+    "base_d": 95
+   }
+  },
+  {
+   "name": "twisted_small",
+   "params": {
+    "style": "twisted",
+    "height": 70,
+    "top_d": 85,
+    "base_d": 60
+   }
+  },
+  {
+   "name": "saucer",
+   "params": {
+    "part": "saucer"
+   }
+  },
+  {
+   "name": "both_wave",
+   "params": {
+    "style": "wave",
+    "part": "both",
+    "height": 70,
+    "top_d": 90,
+    "base_d": 65
+   }
+  }
+ ]
+}
