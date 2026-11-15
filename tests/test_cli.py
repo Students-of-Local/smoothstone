@@ -403,3 +403,11 @@ def test_slips_never_send_status_back_to_itself(jobenv):
     # an unknown command that names a recipe goes to that recipe
     text, code, nxt = stone("_demo", "50", "mm")
     assert nxt == "stone show _demo", text
+
+
+def test_show_names_numbers_it_could_not_place(jobenv):
+    """Held-out 1: the S card model copied the suggested line and never added sizes the matcher missed."""
+    stone("new", "a plate 50 mm wide with 7 rubber feet")
+    text, code, nxt = stone("show", "_demo")
+    assert "From the request: w=50" in text
+    assert "Not placed yet: 7 rubber feet." in text, text
