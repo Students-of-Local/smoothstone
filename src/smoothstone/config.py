@@ -13,7 +13,8 @@ PKG_DIR = Path(__file__).resolve().parent
 # src/smoothstone -> src -> repo
 REPO_ROOT = PKG_DIR.parent.parent
 
-FALLBACK_OPENSCAD = Path("/home/baney75/lfm3-3d-skill/vendor/openscad/AppRun")
+# an extracted OpenSCAD AppImage next to the repo or inside it (vendor/openscad/AppRun)
+FALLBACK_OPENSCAD = (REPO_ROOT / "vendor" / "openscad" / "AppRun", REPO_ROOT.parent / "vendor" / "openscad" / "AppRun")
 DEFAULT_BED = (256.0, 256.0, 256.0)
 TIERS = ("S", "M", "L")
 
@@ -43,9 +44,7 @@ def find_openscad() -> str | None:
     found = shutil.which("openscad")
     if found:
         return found
-    if FALLBACK_OPENSCAD.exists():
-        return str(FALLBACK_OPENSCAD)
-    return None
+    return next((str(p) for p in FALLBACK_OPENSCAD if p.exists()), None)
 
 
 @lru_cache(maxsize=8)

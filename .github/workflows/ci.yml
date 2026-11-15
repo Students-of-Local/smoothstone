@@ -37,3 +37,15 @@ jobs:
 
       - name: Tests
         run: xvfb-run -a uv run pytest -q
+
+      - name: Every recipe and example builds and passes the print checks
+        run: xvfb-run -a uv run python tools/sheet.py all --out "$RUNNER_TEMP/sheet"
+
+      - name: The NEXT lines alone finish every tuning task
+        run: |
+          mkdir -p "$RUNNER_TEMP/next"
+          for s in evals/tuning/*.json; do
+            xvfb-run -a uv run python evals/run.py "$s" --seed 1 --driver next --out "$RUNNER_TEMP/next" | tail -1
+          done
+          uv run python evals/summary.py "$RUNNER_TEMP/next" | tee "$RUNNER_TEMP/next.txt"
+          ! grep -q "^t.* 0/1" "$RUNNER_TEMP/next.txt"
