@@ -74,7 +74,9 @@ class Recipe:
     examples: list[dict]
     path: Path
     aliases: dict = field(default_factory=dict)
-    counts: dict = field(default_factory=dict)  # word -> [param, offset]: "3 compartments" sets div_x = 2
+    counts: dict = field(default_factory=dict)
+    size_order: list = field(default_factory=list)
+    phrases: dict = field(default_factory=dict)  # "with a saucer" -> {"part": "both"}, read before single words  # params for "A by B by C"; default: from dims x, y, z  # word -> [param, offset]: "3 compartments" sets div_x = 2
 
     @property
     def scad(self) -> Path:
@@ -177,6 +179,8 @@ def _load_one(d: Path) -> Recipe:
         examples=list(data.get("examples") or []),
         aliases=dict(data.get("aliases") or {}),
         counts=dict(data.get("counts") or {}),
+        size_order=list(data.get("size_order") or []),
+        phrases=dict(data.get("phrases") or {}),
         path=d,
     )
 

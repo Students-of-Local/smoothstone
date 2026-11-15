@@ -47,3 +47,16 @@ def test_words_belong_to_their_number(recipe, request_text, want, monkeypatch):
     got = match.suggest(rc.load(recipe), request_text)
     for k, v in want.items():
         assert got.get(k) == v, (k, got)
+
+
+@pytest.mark.parametrize("recipe, request_text, want", [
+    ("gridfinity_bin", "a gridfinity bin, 2 by 1, with 4 sections", {"grid_x": 2, "grid_y": 1, "div_x": 3}),
+    ("panel", "a 60x40 mm panel, 3 mm thick", {"w": 60, "d": 40, "thickness": 3}),
+    ("box", "a box 120 by 80 by 50 mm", {"w": 120, "d": 80, "h": 50}),
+    ("box", "a box with a lid, 120 mm wide", {"w": 120}),
+    ("planter", "a twisted planter with a saucer", {"style": "twisted", "part": "both"}),
+    ("planter", "a planter without a saucer", {"part": "pot"}),
+])
+def test_sizes_in_a_row_and_phrases(recipe, request_text, want, monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    assert match.suggest(rc.load(recipe), request_text) == want

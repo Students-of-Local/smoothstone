@@ -41,7 +41,7 @@
    "min": 10,
    "max": 200,
    "unit": "mm",
-   "help": "box height without lid"
+   "help": "height of the body"
   },
   {
    "name": "wall",
@@ -171,5 +171,30 @@
   }
  ],
  "tier": "S",
- "dims_tol": 0.6
+ "dims_tol": 0.6,
+ "size_order": [
+  "w",
+  "d",
+  "h"
+ ],
+ "phrases": {
+  "just the lid": {
+   "part": "lid"
+  },
+  "only the lid": {
+   "part": "lid"
+  },
+  "lid only": {
+   "part": "lid"
+  },
+  "no lid": {
+   "part": "box"
+  },
+  "without a lid": {
+   "part": "box"
+  },
+  "without the lid": {
+   "part": "box"
+  }
+ }
 }

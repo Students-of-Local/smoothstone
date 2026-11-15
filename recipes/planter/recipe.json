@@ -202,5 +202,31 @@
     "base_d": 65
    }
   }
- ]
+ ],
+ "phrases": {
+  "with a saucer": {
+   "part": "both"
+  },
+  "and a saucer": {
+   "part": "both"
+  },
+  "and saucer": {
+   "part": "both"
+  },
+  "just the saucer": {
+   "part": "saucer"
+  },
+  "only the saucer": {
+   "part": "saucer"
+  },
+  "saucer only": {
+   "part": "saucer"
+  },
+  "no saucer": {
+   "part": "pot"
+  },
+  "without a saucer": {
+   "part": "pot"
+  }
+ }
 }

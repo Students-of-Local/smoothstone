@@ -79,6 +79,22 @@ def _numbers(text: str) -> list[tuple[float, str, int, int]]:
     return out
 
 
+UNIT = r"(mm|millimeters?|cm|centimeters?|inches|inch|in\b)?"
+BY_RE = re.compile(rf"(?<![\w.])(\d+(?:\.\d+)?)\s*{UNIT}\s*(?:by|x|\u00d7)\s*(\d+(?:\.\d+)?)\s*{UNIT}"
+                   rf"(?:\s*(?:by|x|\u00d7)\s*(\d+(?:\.\d+)?)\s*{UNIT})?", re.I)
+
+
+def _size_params(r: rc.Recipe) -> list:
+    """The parameters "A by B by C" fills: the recipe's size_order, else the first parameter in dims x, y, z."""
+    if getattr(r, "size_order", None):
+        return [r.param(n) for n in r.size_order]
+    out = []
+    for axis in ("x", "y", "z"):
+        names = re.findall(r"[A-Za-z_]\w*", str(r.dims.get(axis, "")))
+        out.append(next((r.param(n) for n in names if r.param(n) and r.param(n).type in ("number", "int")), None))
+    return out
+
+
 def _fits(p: rc.Param, v: float) -> bool:
     if p.type == "int" and abs(v - round(v)) > 1e-9:
         return False
@@ -107,11 +123,18 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
     if quoted and texts:
         out[texts[0].name] = quoted[0]
     # choice values named in the request
+    low = " ".join(request.lower().split())
+    for phrase, vals in (getattr(r, "phrases", {}) or {}).items():
+        if phrase.lower() in low:
+            for k, v in vals.items():
+                if r.param(k) is not None and k not in out:
+                    out[k] = v
     req_words = set(_words(request))
+    own = set(_words(r.name.replace("_", " ") + " " + r.title))  # "box" names the recipe, not part=box
     for p in r.params:
         if p.type == "choice":
-            for c in p.choices:
-                if _stem(str(c)) in req_words and str(c) != str(p.default):
+            for c in p.choices if p.name not in out else []:
+                if _stem(str(c)) in req_words - own and str(c) != str(p.default):
                     out[p.name] = c
                     break
     # M3, M4 ... screws: clearance hole on the first parameter about screws or holes
@@ -129,8 +152,23 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
     # "3 compartments": a count word the recipe maps to a parameter with an offset
     counts = {_stem(w): pv for w, pv in (getattr(r, "counts", {}) or {}).items()}
     taken = set()
+    # "3 by 2", "60 x 40 mm", "120 by 80 by 50 mm": the recipe's size parameters in order
+    slots = _size_params(r)
+    for m in BY_RE.finditer(request):
+        vals = [m.group(k) for k in (1, 3, 5)]
+        units = [m.group(k) for k in (2, 4, 6)]
+        last = next((u for u in reversed(units) if u), "")
+        for (raw, u), p in zip(zip(vals, units), slots):
+            if raw is None or p is None or p.name in out:
+                continue
+            v = float(raw) * UNITS.get((u or last).lower(), 1.0)
+            if _fits(p, v):
+                out[p.name] = int(v) if p.type == "int" or v.is_integer() else round(v, 2)
+        taken.update(i for i, n in enumerate(nums) if n[2] < m.end() and n[3] > m.start())
     for i, (v, kind, s, e) in enumerate(nums):
-        nxt = _words(request[e:e + 25])[:1]
+        if i in taken:
+            continue
+        nxt = [_stem(w) for w in re.findall(r"[a-zA-Z]+", request[e:e + 25])[:1]]  # the very next word
         if kind in ("count", "word") and nxt and nxt[0] in counts:
             name, off = counts[nxt[0]]
             p = r.param(name)
@@ -163,7 +201,10 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             if kind == "count" and p.type != "int" and has_units:
                 continue  # a bare number is a count when the request gives sizes with units
             pw = _param_words(p, aliases.get(p.name, []))
-            score = len(ctx & pw) + len(near & pw)
+
+            def hits(ws):  # a word that names the recipe ("box", "fan") counts half
+                return len((ws & pw) - own) + 0.5 * len(ws & pw & own)
+            score = hits(ctx) + hits(near)
             if score == 0:
                 continue  # the words around the number must name the parameter
             if "position" in pw and not {"position", "x", "y"} & ctx:
