@@ -1,0 +1,34 @@
+[project]
+name = "smoothstone"
+version = "0.1.0"
+description = "Parametric print-ready recipes driven by a small-model-friendly CLI"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Donovan Baney" }]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pillow>=10",
+    "trimesh>=4.0",
+    "scikit-image>=0.22",
+    "scipy>=1.11",
+    # fast ray casting for the wall check; rtree is the fallback where embreex has no wheel
+    "embreex>=4.3; platform_machine == 'x86_64' or platform_machine == 'AMD64' or sys_platform == 'darwin'",
+    "rtree>=1.2; platform_machine != 'x86_64' and platform_machine != 'AMD64' and sys_platform != 'darwin'",
+]
+
+[project.scripts]
+stone = "smoothstone.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/smoothstone"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

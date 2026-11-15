@@ -1,0 +1,10 @@
+stone-job*/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+recipes/*/build/
+squashfs-root/
