@@ -368,3 +368,22 @@ def test_image_goes_to_the_recipe_the_request_names(jobenv, recipes_root):
     im.save(png)
     text, code, nxt = stone("new", "Turn this picture into a lithophane", "--image", str(png))
     assert code == 0 and nxt == "stone show fake_litho"
+
+
+def test_slips_from_lfm3_runs(jobenv):
+    """Commands LFM3-1.7B sent in the round 2 tuning sweep: stone answers each with the fixed line."""
+    stone("new", "a plate 50 mm wide")
+    job = str(jobenv / "stone-job")
+    # a path after a command that takes none
+    text, code, nxt = stone("status", job)
+    assert "Request: a plate 50 mm wide" in text
+    # a synonym for a command
+    text, code, nxt = stone("list")
+    assert nxt == "stone show _demo" or nxt.startswith("stone show ")
+    # bare values: the whole line comes back with names, read from the request
+    text, code, nxt = stone("set", "_demo", "50")
+    assert code != 0 or "FIX" in text
+    assert nxt == "stone set _demo w=50", text
+    # the recipe name written as name=value
+    text, code, nxt = stone("set", "_demo=50", "w=50")
+    assert nxt == "stone build", text

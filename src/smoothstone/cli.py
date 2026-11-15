@@ -343,6 +343,8 @@ def cmd_set(args, job: Job) -> Out:
     name = None
     if items and "=" not in items[0] and ":" not in items[0]:
         name = items.pop(0)
+    elif items and "=" in items[0] and rc.load(items[0].split("=", 1)[0]):
+        name = items.pop(0).split("=", 1)[0]  # "stone set cable_comb=100 ...": the recipe name came first
     elif plan:
         name = plan["recipe"]
     if name is None:
@@ -367,9 +369,13 @@ def cmd_set(args, job: Job) -> Out:
     fixes: list[str] = []
     retry: dict[str, str] = {}
     hard = False
-    for it in loose:
-        fixes.append(f"write each change as name=value, like {it}=<value>")
-        hard = True
+    if loose:
+        # bare values: give back the whole line with names, read from the request
+        fixes.append(f"write each value with its name, like name=value (not {' '.join(loose[:3])})")
+        for k, v in match.suggest(r, job.request()).items():
+            p = r.param(k)
+            retry.setdefault(k, rc.fmt_value(p, v) if p else str(v))
+        hard = not retry
     names = [p.name for p in r.params]
     imgs = job.image_paths()
     for k, raw in pairs:
@@ -869,7 +875,33 @@ def _guess_job(argv: list[str]) -> Path:
     return config.job_dir(None)
 
 
+# words small models use for a command, and commands that take no words
+SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes", "find": "recipes",
+            "search": "recipes", "info": "show", "describe": "show", "finish": "done", "check_status": "status"}
+NO_WORDS = ("status", "build", "done")
+
+
+def _tidy(argv: list[str]) -> list[str]:
+    """Forgive the slips small models make: a synonym for a command, or a path after build."""
+    argv = list(argv)
+    i = next((k for k, a in enumerate(argv) if not a.startswith("-") and (k == 0 or argv[k - 1] not in ("--job",))), None)
+    if i is None:
+        return argv
+    argv[i] = SYNONYMS.get(argv[i].lower(), argv[i])
+    if argv[i] in NO_WORDS:
+        rest, keep, skip = argv[i + 1:], [], False
+        for a in rest:
+            if skip or a.startswith("-"):
+                keep.append(a)
+                skip = a == "--job"
+            else:
+                skip = False
+        argv = argv[:i + 1] + keep
+    return argv
+
+
 def run(argv: list[str]) -> tuple[str, int]:
+    argv = _tidy(argv)
     parser = make_parser()
     job = Job(_guess_job(argv))
     cmdline = "stone " + " ".join(argv)
