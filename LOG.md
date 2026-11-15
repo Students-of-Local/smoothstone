@@ -126,3 +126,14 @@ c26ada1d3dc764474e57920f6d903c7fd43dc19c1048376563fc7ecbd38758f8  e5_thistle.jso
 4d0dfb307bdd5b22785429dad6c729781b8acec6d96767709abc84ffa80d6332  e7_juniper.json
 9c63ddb962eb2ef32c007f2b82d4bf4227456b6581ed86a110f9ca8d5271a7bb  e8_saffron.json
 ```
+
+## 2026-11-15 blind set 6 results (25a0b83)
+
+Run from frozen/066096c, 5 seeds a condition, LFM3-1.7B on llama-server. This is the clean measurement of the set 5 fixes.
+
+- NEXT lines alone, no model: 6/8.
+- S card: 39/40.
+- S card, compacted after step 3: 38/40 (set 5 was 24/40).
+- No card: 37/40.
+
+Misses: round_bottom left on in 2 compacted runs, font sans for mono in 2 runs, and 2 no-card lithophane runs that never finished a part.
