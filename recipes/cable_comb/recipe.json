@@ -185,5 +185,20 @@
     "pitch": 5.8
    }
   }
- ]
+ ],
+ "aliases": {
+  "slots": [
+   "cable",
+   "cord",
+   "wire",
+   "hold"
+  ],
+  "slot_w": [
+   "cable",
+   "cord",
+   "wire",
+   "thick",
+   "diameter"
+  ]
+ }
 }

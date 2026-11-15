@@ -21,20 +21,35 @@ UNITS = {"mm": 1.0, "millimeter": 1.0, "millimeters": 1.0, "cm": 10.0, "centimet
 STOP = {"a", "an", "the", "for", "of", "with", "and", "that", "is", "are", "to", "in", "on", "by",
         "it", "its", "my", "i", "need", "want", "make", "me", "please", "about", "around", "x",
         "mm", "cm", "inch", "inches", "deg", "degrees", "each", "be", "should", "has", "have"}
+# request words that name a kind of size, mapped to the words recipes use for it
+SYN = {"long": ["length"], "length": ["long"], "tall": ["height"], "high": ["height"],
+       "height": ["tall"], "wide": ["width"], "width": ["wide"], "across": ["width", "diameter", "size"],
+       "diameter": ["across"], "thick": ["thickness"], "thickness": ["thick"], "deep": ["depth"],
+       "big": ["size"], "square": ["width", "height"], "opening": ["top", "diameter"]}
+# metric screw sizes -> clearance hole diameter, mm
+SCREWS = {"2": 2.4, "2.5": 2.9, "3": 3.4, "4": 4.5, "5": 5.5, "6": 6.6, "8": 9.0}
 NUM_RE = re.compile(r'(?<![\w.])(\d+(?:\.\d+)?)\s*(mm|millimeters?|cm|centimeters?|inches|inch|in\b|"|deg\b|degrees?|°)?',
                     re.I)
 
 
 def _stem(w: str) -> str:
     w = w.lower()
-    for suf in ("ness", "ing", "es", "s"):
-        if len(w) > 4 and w.endswith(suf):
-            return w[: -len(suf)]
+    if len(w) > 4 and w.endswith("ies"):
+        return w[:-3] + "y"
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
     return w
 
 
 def _words(text: str) -> list[str]:
     return [_stem(w) for w in re.findall(r"[a-zA-Z]+", text) if w.lower() not in STOP]
+
+
+def _expand(words) -> set[str]:
+    out = set(words)
+    for w in words:
+        out.update(SYN.get(w, []))
+    return out
 
 
 def _param_words(p: rc.Param, aliases: list[str]) -> set[str]:
@@ -50,6 +65,9 @@ def _numbers(text: str) -> list[tuple[float, str, int, int]]:
     for m in NUM_RE.finditer(t):
         v = float(m.group(1))
         u = (m.group(2) or "").lower()
+        if text[m.start():m.start() + 1].isalpha():
+            out.append((v, "word", m.start(), m.end()))  # "two", "eight": always a count
+            continue
         if u in ("deg", "degree", "degrees", "°"):
             kind = "deg"
         elif u:
@@ -87,14 +105,24 @@ def suggest(r: rc.Recipe, request: str) -> dict:
                 if _stem(str(c)) in req_words and str(c) != str(p.default):
                     out[p.name] = c
                     break
+    # M3, M4 ... screws: clearance hole on the first parameter about screws or holes
+    m = re.search(r"\bM(\d(?:\.5)?)\b", request)
+    if m and m.group(1) in SCREWS:
+        for p in r.params:
+            if p.type == "number" and p.unit == "mm" and {"screw", "hole"} & set(_words(p.name.replace("_", " ") + " " + p.help)) \
+                    and _fits(p, SCREWS[m.group(1)]):
+                out[p.name] = SCREWS[m.group(1)]
+                break
+        request = request[:m.start()] + request[m.end():]
     # numbers: score every (number, param) pair by the words around the number
     nums = _numbers(request)
+    has_units = any(k in ("len", "deg") for _, k, _, _ in nums)
     cands = []
     for i, (v, kind, s, e) in enumerate(nums):
         before = _words(request[max(0, s - 40):s])[-3:]
         after = _words(request[e:e + 40])[:3]
-        ctx = set(before) | set(after)
-        near = set(after[:2]) | set(before[-1:])
+        ctx = _expand(set(before) | set(after))
+        near = _expand(set(after[:2]) | set(before[-1:]))
         for p in r.params:
             if p.type not in ("number", "int") or p.name in out:
                 continue
@@ -102,12 +130,20 @@ def suggest(r: rc.Recipe, request: str) -> dict:
                 continue
             if kind == "len" and p.unit not in ("mm", ""):
                 continue
-            if kind == "count" and p.type != "int" and p.unit == "mm" and not ctx & _param_words(p, aliases.get(p.name, [])):
+            if kind == "word" and p.type != "int":
                 continue
+            if kind == "count" and p.type != "int" and has_units:
+                continue  # a bare number is a count when the request gives sizes with units
             pw = _param_words(p, aliases.get(p.name, []))
             score = len(ctx & pw) + len(near & pw)
-            if kind == "count" and p.type == "int":
+            if score == 0:
+                continue  # the words around the number must name the parameter
+            if "position" in pw and not {"position", "x", "y"} & ctx:
+                score -= 1  # placement parameters only when the request talks about placement
+            if kind in ("count", "word") and p.type == "int":
                 score += 0.5
+            if kind == "len" and any(re.search(rf"\b{p.name}\b", e) for e in r.dims.values()):
+                score += 0.5  # an overall size of the part wins a tie with a detail size
             if score > 0 and _fits(p, v):
                 cands.append((score, -i, i, p.name, v if p.type != "int" else int(round(v))))
     used_n, used_p = set(), set()
@@ -117,4 +153,11 @@ def suggest(r: rc.Recipe, request: str) -> dict:
         used_n.add(i)
         used_p.add(name)
         out[name] = int(v) if float(v).is_integer() else round(float(v), 2)
+        # "16 mm square": the same size for the matching _w and _h pair
+        s0, e0 = nums[i][2], nums[i][3]
+        if "square" in _words(request[e0:e0 + 20]) and name[-2:] in ("_w", "_h"):
+            twin = name[:-2] + ("_h" if name.endswith("_w") else "_w")
+            if r.param(twin) and twin not in out and _fits(r.param(twin), v):
+                out[twin] = out[name]
+                used_p.add(twin)
     return {p.name: out[p.name] for p in r.params if p.name in out}

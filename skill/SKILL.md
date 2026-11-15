@@ -1,0 +1,30 @@
+---
+name: smoothstone
+description: Make 3D printable parts that look designed, from a text request or a picture, by choosing and setting tested parametric recipes with the stone CLI. Works for small local models (tier S), mid models (M) and large models (L), and keeps its state on disk so it survives context compaction. Use when someone asks for a printable part, an STL, a 3D model for a printer, or something to 3D print from a photo or drawing.
+---
+
+# smoothstone
+
+stone turns a request into a print-ready STL. The model picks a recipe and sets its numbers;
+stone builds the part with OpenSCAD, checks that it prints (watertight, one piece, flat base,
+walls, overhangs, size), and keeps every step in a job folder. Every stone message ends with one
+line, NEXT: <command>, and `stone status` repeats it, so a model that loses its context goes on
+from where it was.
+
+## Pick your tier and follow that card
+
+- Tier S, about 3B parameters and under: tiers/S.md
+- Tier M, about 4B to 30B: tiers/M.md
+- Tier L, frontier models: tiers/L.md
+
+Set the tier with STONE_TIER=S|M|L or `tier = "S"` in stone.toml. stone status prints the
+card's rules on every call, so they come back after a compaction.
+
+## Pictures
+
+`stone new "<request>" --image photo.png` (or `stone image photo.png`) traces outlines for
+keychains, cookie cutters and signs, and makes a height map for lithophanes and reliefs.
+
+## Start
+
+stone status

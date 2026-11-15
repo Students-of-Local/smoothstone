@@ -46,7 +46,7 @@ def test_flow_end_to_end(jobenv, openscad):
     text, code, nxt = stone("show", "_demo")
     assert "w = 60  (number, 10..200 mm) width along X" in text
     assert "Example: stone set _demo w=40 d=30 hole_d=4" in text
-    assert nxt == "stone set _demo w=40 d=30 hole_d=4"
+    assert nxt == "stone set _demo"  # the request names no parameter, so the defaults
 
     text, code, nxt = stone("set", "_demo", "w=50")
     assert code == 0 and nxt == "stone build"

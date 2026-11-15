@@ -1,41 +1,266 @@
 {
-  "name": "fan_guard",
-  "title": "Fan guard",
-  "summary": "Grille that screws onto a square PC fan. Styles: rings with spokes, honeycomb, spiral blades, diagonal grid.",
-  "tags": ["fan", "guard", "grille", "grill", "cover", "pc", "computer", "cooling", "vent", "finger", "protector", "honeycomb", "spiral"],
-  "tier": "S",
-  "params": [
-    {"name": "size", "type": "number", "default": 120, "min": 25, "max": 200, "unit": "mm", "help": "fan size (40, 50, 60, 70, 80, 92, 120, 140)"},
-    {"name": "style", "type": "choice", "default": "rings", "choices": ["rings", "honeycomb", "spiral", "grid"], "help": "grille pattern"},
-    {"name": "thickness", "type": "number", "default": 3, "min": 1.6, "max": 10, "unit": "mm", "help": "plate thickness"},
-    {"name": "opening", "type": "number", "default": 0, "min": 0, "max": 195, "unit": "mm", "help": "round opening diameter, 0 = auto"},
-    {"name": "hole_spacing", "type": "number", "default": 0, "min": 0, "max": 190, "unit": "mm", "help": "screw hole spacing, 0 = standard for the size"},
-    {"name": "hole_d", "type": "number", "default": 0, "min": 0, "max": 8, "unit": "mm", "help": "screw hole diameter, 0 = auto"},
-    {"name": "corner_r", "type": "number", "default": 5, "min": 0, "max": 20, "unit": "mm", "help": "outer corner radius"},
-    {"name": "rings", "type": "int", "default": 3, "min": 1, "max": 10, "help": "rings style: number of rings"},
-    {"name": "ring_w", "type": "number", "default": 2, "min": 1.2, "max": 8, "unit": "mm", "help": "rings style: ring width"},
-    {"name": "ring_pitch", "type": "number", "default": 0, "min": 0, "max": 60, "unit": "mm", "help": "rings style: distance between rings, 0 = auto"},
-    {"name": "spokes", "type": "int", "default": 4, "min": 0, "max": 16, "help": "rings style: number of spokes"},
-    {"name": "spoke_w", "type": "number", "default": 3, "min": 1.2, "max": 10, "unit": "mm", "help": "rings style: spoke width"},
-    {"name": "cell", "type": "number", "default": 9, "min": 3, "max": 30, "unit": "mm", "help": "honeycomb and grid: hole size"},
-    {"name": "bar_w", "type": "number", "default": 1.6, "min": 1.2, "max": 6, "unit": "mm", "help": "honeycomb and grid: bar width"},
-    {"name": "blades", "type": "int", "default": 11, "min": 3, "max": 30, "help": "spiral style: number of blades"},
-    {"name": "blade_w", "type": "number", "default": 2.4, "min": 1.2, "max": 8, "unit": "mm", "help": "spiral style: blade width"},
-    {"name": "blade_sweep", "type": "number", "default": 70, "min": 0, "max": 180, "unit": "deg", "help": "spiral style: how far each blade curves"},
-    {"name": "hub_d", "type": "number", "default": -1, "min": -1, "max": 100, "unit": "mm", "help": "center disc, -1 = auto, 0 = none"},
-    {"name": "edge", "type": "number", "default": 0.8, "min": 0, "max": 3, "unit": "mm", "help": "top edge rounding"},
-    {"name": "quality", "type": "int", "default": 96, "min": 32, "max": 256, "help": "circle smoothness"}
-  ],
-  "dims": {"x": "size", "y": "size", "z": "thickness"},
-  "dims_tol": 0.6,
-  "max_bodies": 1,
-  "max_overhang": 0.05,
-  "fix": {"min_wall": {"param": "thickness", "dir": "up"}, "bed": {"param": "size", "dir": "down"}},
-  "examples": [
-    {"name": "spiral_120", "params": {"size": 120, "style": "spiral"}},
-    {"name": "honeycomb_80", "params": {"size": 80, "style": "honeycomb"}},
-    {"name": "grid_140", "params": {"size": 140, "style": "grid", "thickness": 3.5}},
-    {"name": "rings_92", "params": {"size": 92, "rings": 4, "spokes": 6}},
-    {"name": "spiral_40", "params": {"size": 40, "style": "spiral", "blades": 7, "blade_w": 1.6}}
+ "name": "fan_guard",
+ "title": "Fan guard",
+ "summary": "Grille that screws onto a square PC fan. Styles: rings with spokes, honeycomb, spiral blades, diagonal grid.",
+ "tags": [
+  "fan",
+  "guard",
+  "grille",
+  "grill",
+  "cover",
+  "pc",
+  "computer",
+  "cooling",
+  "vent",
+  "finger",
+  "protector",
+  "honeycomb",
+  "spiral"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "size",
+   "type": "number",
+   "default": 120,
+   "min": 25,
+   "max": 200,
+   "unit": "mm",
+   "help": "fan size (40, 50, 60, 70, 80, 92, 120, 140)"
+  },
+  {
+   "name": "style",
+   "type": "choice",
+   "default": "rings",
+   "choices": [
+    "rings",
+    "honeycomb",
+    "spiral",
+    "grid"
+   ],
+   "help": "grille pattern"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 3,
+   "min": 1.6,
+   "max": 10,
+   "unit": "mm",
+   "help": "plate thickness"
+  },
+  {
+   "name": "opening",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 195,
+   "unit": "mm",
+   "help": "round opening diameter, 0 = auto"
+  },
+  {
+   "name": "hole_spacing",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 190,
+   "unit": "mm",
+   "help": "screw hole spacing, 0 = standard for the size"
+  },
+  {
+   "name": "hole_d",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 8,
+   "unit": "mm",
+   "help": "screw hole diameter, 0 = auto"
+  },
+  {
+   "name": "corner_r",
+   "type": "number",
+   "default": 5,
+   "min": 0,
+   "max": 20,
+   "unit": "mm",
+   "help": "outer corner radius"
+  },
+  {
+   "name": "rings",
+   "type": "int",
+   "default": 3,
+   "min": 1,
+   "max": 10,
+   "help": "rings style: number of rings"
+  },
+  {
+   "name": "ring_w",
+   "type": "number",
+   "default": 2,
+   "min": 1.2,
+   "max": 8,
+   "unit": "mm",
+   "help": "rings style: ring width"
+  },
+  {
+   "name": "ring_pitch",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 60,
+   "unit": "mm",
+   "help": "rings style: distance between rings, 0 = auto"
+  },
+  {
+   "name": "spokes",
+   "type": "int",
+   "default": 4,
+   "min": 0,
+   "max": 16,
+   "help": "rings style: number of spokes"
+  },
+  {
+   "name": "spoke_w",
+   "type": "number",
+   "default": 3,
+   "min": 1.2,
+   "max": 10,
+   "unit": "mm",
+   "help": "rings style: spoke width"
+  },
+  {
+   "name": "cell",
+   "type": "number",
+   "default": 9,
+   "min": 3,
+   "max": 30,
+   "unit": "mm",
+   "help": "honeycomb and grid: hole size"
+  },
+  {
+   "name": "bar_w",
+   "type": "number",
+   "default": 1.6,
+   "min": 1.2,
+   "max": 6,
+   "unit": "mm",
+   "help": "honeycomb and grid: bar width"
+  },
+  {
+   "name": "blades",
+   "type": "int",
+   "default": 11,
+   "min": 3,
+   "max": 30,
+   "help": "spiral style: number of blades"
+  },
+  {
+   "name": "blade_w",
+   "type": "number",
+   "default": 2.4,
+   "min": 1.2,
+   "max": 8,
+   "unit": "mm",
+   "help": "spiral style: blade width"
+  },
+  {
+   "name": "blade_sweep",
+   "type": "number",
+   "default": 70,
+   "min": 0,
+   "max": 180,
+   "unit": "deg",
+   "help": "spiral style: how far each blade curves"
+  },
+  {
+   "name": "hub_d",
+   "type": "number",
+   "default": -1,
+   "min": -1,
+   "max": 100,
+   "unit": "mm",
+   "help": "center disc, -1 = auto, 0 = none"
+  },
+  {
+   "name": "edge",
+   "type": "number",
+   "default": 0.8,
+   "min": 0,
+   "max": 3,
+   "unit": "mm",
+   "help": "top edge rounding"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 96,
+   "min": 32,
+   "max": 256,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "size",
+  "y": "size",
+  "z": "thickness"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "thickness",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "size",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "spiral_120",
+   "params": {
+    "size": 120,
+    "style": "spiral"
+   }
+  },
+  {
+   "name": "honeycomb_80",
+   "params": {
+    "size": 80,
+    "style": "honeycomb"
+   }
+  },
+  {
+   "name": "grid_140",
+   "params": {
+    "size": 140,
+    "style": "grid",
+    "thickness": 3.5
+   }
+  },
+  {
+   "name": "rings_92",
+   "params": {
+    "size": 92,
+    "rings": 4,
+    "spokes": 6
+   }
+  },
+  {
+   "name": "spiral_40",
+   "params": {
+    "size": 40,
+    "style": "spiral",
+    "blades": 7,
+    "blade_w": 1.6
+   }
+  }
+ ],
+ "aliases": {
+  "size": [
+   "fan"
   ]
+ }
 }
