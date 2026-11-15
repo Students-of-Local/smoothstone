@@ -1,0 +1,13 @@
+{
+ "id": "k2_tool_box",
+ "request": "A box with a lid, 120 mm wide, 80 mm deep and 50 mm high, with \"TOOLS\" on the lid.",
+ "expect": {
+  "recipe": "box",
+  "params": {
+   "w": 120,
+   "d": 80,
+   "h": 50,
+   "label": "TOOLS"
+  }
+ }
+}

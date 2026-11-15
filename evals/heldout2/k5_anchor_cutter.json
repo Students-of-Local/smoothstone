@@ -1,0 +1,15 @@
+{
+ "id": "k5_anchor_cutter",
+ "request": "A cookie cutter shaped like this anchor, 70 mm across.",
+ "image": "anchor.png",
+ "expect": {
+  "recipe": "cookie_cutter",
+  "params": {
+   "size": [
+    65,
+    75
+   ]
+  },
+  "image_used": "image"
+ }
+}

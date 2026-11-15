@@ -1,0 +1,15 @@
+{
+ "id": "k3_hook",
+ "request": "A wall hook 30 mm wide that reaches out 50 mm, for M4 screws.",
+ "expect": {
+  "recipe": "hook",
+  "params": {
+   "width": 30,
+   "reach": 50,
+   "screw_d": [
+    4.2,
+    5.0
+   ]
+  }
+ }
+}

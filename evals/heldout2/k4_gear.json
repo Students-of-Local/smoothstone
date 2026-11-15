@@ -1,0 +1,15 @@
+{
+ "id": "k4_gear",
+ "request": "A herringbone gear with 40 teeth and an 8 mm bore.",
+ "expect": {
+  "recipe": "spur_gear",
+  "params": {
+   "teeth": 40,
+   "bore": [
+    8.0,
+    8.5
+   ],
+   "style": "herringbone"
+  }
+ }
+}

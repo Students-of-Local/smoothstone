@@ -1,0 +1,12 @@
+{
+ "id": "k1_office_sign",
+ "request": "A door sign that says \"OFFICE\", 200 mm wide and 60 mm tall.",
+ "expect": {
+  "recipe": "sign",
+  "params": {
+   "text": "OFFICE",
+   "w": 200,
+   "h": 60
+  }
+ }
+}

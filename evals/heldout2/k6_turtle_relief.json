@@ -1,0 +1,15 @@
+{
+ "id": "k6_turtle_relief",
+ "request": "Carve this turtle picture in relief on a plaque 120 mm wide.",
+ "image": "turtle.png",
+ "expect": {
+  "recipe": "relief",
+  "params": {
+   "width": [
+    115,
+    125
+   ]
+  },
+  "image_used": "image"
+ }
+}
