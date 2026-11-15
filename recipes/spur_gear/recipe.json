@@ -150,5 +150,35 @@
  ],
  "tier": "S",
  "dims_tol": 0.6,
- "min_wall": 0.5
+ "min_wall": 0.5,
+ "phrases": {
+  "straight-cut": {
+   "style": "spur"
+  },
+  "straight cut": {
+   "style": "spur"
+  },
+  "straight teeth": {
+   "style": "spur"
+  },
+  "straight-tooth": {
+   "style": "spur"
+  },
+  "straight tooth": {
+   "style": "spur"
+  },
+  "plain spur": {
+   "style": "spur"
+  }
+ },
+ "aliases": {
+  "module_mm": [
+   "module",
+   "mod"
+  ],
+  "bore": [
+   "shaft",
+   "axle"
+  ]
+ }
 }

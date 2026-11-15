@@ -59,7 +59,8 @@
    "min": 1,
    "max": 40,
    "unit": "mm",
-   "help": "slot width: cable diameter plus 0.2 to 0.5"
+   "help": "slot width: cable diameter plus 0.2 to 0.5",
+   "fit_add": 0.3
   },
   {
    "name": "slot_depth",

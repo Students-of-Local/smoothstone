@@ -227,6 +227,33 @@
   },
   "without a saucer": {
    "part": "pot"
+  },
+  "matching saucer": {
+   "part": "both"
+  },
+  "saucer too": {
+   "part": "both"
+  },
+  "saucer as well": {
+   "part": "both"
+  },
+  "plus a saucer": {
+   "part": "both"
+  },
+  "with saucer": {
+   "part": "both"
+  },
+  "and the saucer": {
+   "part": "both"
+  },
+  "with its saucer": {
+   "part": "both"
+  },
+  "with a drip tray": {
+   "part": "both"
+  },
+  "and a drip tray": {
+   "part": "both"
   }
  }
 }

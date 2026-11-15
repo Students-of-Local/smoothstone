@@ -14,8 +14,15 @@ import re
 
 from . import recipes as rc
 
-WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
-         "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "a dozen": 12, "dozen": 12}
+ONES = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+TEENS = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+TENS = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+WORDS = {w: i + 1 for i, w in enumerate(ONES)} | {w: i + 10 for i, w in enumerate(TEENS)} | {"a dozen": 12, "dozen": 12}
+for _t, _tw in enumerate(TENS):
+    WORDS[_tw] = 20 + 10 * _t
+    for _o, _ow in enumerate(ONES):
+        WORDS[f"{_tw}-{_ow}"] = WORDS[f"{_tw} {_ow}"] = 20 + 10 * _t + _o + 1
+NEGATE = {"no", "without", "not", "skip"}
 UNITS = {"mm": 1.0, "millimeter": 1.0, "millimeters": 1.0, "cm": 10.0, "centimeter": 10.0,
          "centimeters": 10.0, "in": 25.4, "inch": 25.4, "inches": 25.4, '"': 25.4}
 STOP = {"a", "an", "the", "for", "of", "with", "and", "that", "is", "are", "to", "in", "on", "by",
@@ -65,8 +72,8 @@ def _numbers(text: str) -> list[tuple[float, str, int, int]]:
     for m in NUM_RE.finditer(t):
         v = float(m.group(1))
         u = (m.group(2) or "").lower()
-        if text[m.start():m.start() + 1].isalpha():
-            out.append((v, "word", m.start(), m.end()))  # "two", "eight": always a count
+        if text[m.start():m.start() + 1].isalpha() and u in ("", "in"):
+            out.append((v, "word", m.start(), m.end()))  # "two", "eight": a count; "one inch" is a length, "four in a row" is not
             continue
         if u in ("deg", "degree", "degrees", "°"):
             kind = "deg"
@@ -137,6 +144,21 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
                 if _stem(str(c)) in req_words - own and str(c) != str(p.default):
                     out[p.name] = c
                     break
+    # switches: "with magnets" turns magnets on, "no label" turns label off
+    raw = [w.lower() for w in re.findall(r"[a-zA-Z]+", request)]
+    stems = [_stem(w) for w in raw]
+    for p in r.params:
+        if p.type != "bool" or p.name in out:
+            continue
+        for words in [[_stem(w) for w in p.name.split("_")]] + [[_stem(w) for w in a.split()] for a in aliases.get(p.name, [])]:
+            at = [k for k, w in enumerate(stems) if w == words[0]]
+            hit = next((k for k in at if stems[k:k + len(words)] == words), None)
+            if hit is None:
+                continue
+            on = not (NEGATE & set(raw[max(0, hit - 3):hit]))
+            if on != bool(p.default):
+                out[p.name] = on
+            break
     # M3, M4 ... screws: clearance hole on the first parameter about screws or holes
     m = re.search(r"\bM(\d(?:\.5)?)\b", request)
     if m and m.group(1) in SCREWS:
@@ -194,16 +216,17 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
                 continue
             if kind == "deg" and p.unit != "deg":
                 continue
-            if kind == "len" and p.unit not in ("mm", ""):
-                continue
+            if kind == "len" and (p.unit not in ("mm", "") or (p.type == "int" and not p.unit)):
+                continue  # "6 mm slots" is a width, never the number of slots
             if kind == "word" and p.type != "int":
                 continue
-            if kind == "count" and p.type != "int" and has_units:
-                continue  # a bare number is a count when the request gives sizes with units
             pw = _param_words(p, aliases.get(p.name, []))
 
             def hits(ws):  # a word that names the recipe ("box", "fan") counts half
                 return len((ws & pw) - own) + 0.5 * len(ws & pw & own)
+            if kind == "count" and p.type != "int" and has_units and float(v).is_integer() \
+                    and not hits(_expand(set(before[-1:]))):
+                continue  # a bare number is a count when the request gives sizes with units ("module 2" is not)
             score = hits(ctx) + hits(near)
             if score == 0:
                 continue  # the words around the number must name the parameter
@@ -221,6 +244,10 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             continue
         used_n.add(i)
         used_p.add(name)
+        p = r.param(name)
+        add = float(getattr(p, "fit_add", 0) or 0)
+        if add and _stem(name.split("_")[0]) not in _words(request[max(0, nums[i][2] - 30):nums[i][3] + 30]):
+            v = float(v) + add  # "5 mm cables": the slot gets the recipe's clearance on top
         out[name] = int(v) if float(v).is_integer() else round(float(v), 2)
         # "16 mm square": the same size for the matching _w and _h pair
         s0, e0 = nums[i][2], nums[i][3]

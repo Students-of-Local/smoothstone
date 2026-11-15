@@ -39,6 +39,7 @@ class Param:
     image_kind: str = "silhouette"
     required: bool = False
     required_unless: str = ""
+    fit_add: float = 0.0  # clearance added to a size read from the request ("5 mm cables" -> 5.3 mm slots)
 
     def range_text(self) -> str:
         if self.type in ("number", "int"):
@@ -161,6 +162,7 @@ def _load_one(d: Path) -> Recipe:
                 image_kind=raw.get("image_kind", "silhouette") or "silhouette",
                 required=bool(raw.get("required", False)),
                 required_unless=raw.get("required_unless", "") or "",
+                fit_add=float(raw.get("fit_add", 0) or 0),
             )
         )
     return Recipe(

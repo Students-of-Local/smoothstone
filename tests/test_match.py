@@ -60,3 +60,32 @@ def test_words_belong_to_their_number(recipe, request_text, want, monkeypatch):
 def test_sizes_in_a_row_and_phrases(recipe, request_text, want, monkeypatch):
     monkeypatch.delenv("STONE_RECIPES", raising=False)
     assert match.suggest(rc.load(recipe), request_text) == want
+
+
+@pytest.mark.parametrize("recipe, request_text, want", [
+    ("gridfinity_bin", "a gridfinity bin with magnets in the base", {"magnets": True}),
+    ("gridfinity_bin", "a gridfinity bin, no label tab please", {"label": False}),
+    ("lithophane", "a lithophane of this photo without a stand", {"stand": False}),
+    ("spur_gear", "a gear with thirty-six teeth", {"teeth": 36}),
+    ("spur_gear", "a gear with forty two teeth", {"teeth": 42}),
+    ("spur_gear", "a straight cut gear, 18 teeth, module 2, for an 8 mm axle",
+     {"style": "spur", "teeth": 18, "module_mm": 2, "bore": 8}),
+    ("hook", "a wall hook that sticks out two inches", {}),
+    ("gridfinity_bin", "a gridfinity bin with four in a row", {}),
+    ("planter", "a ribbed planter and a drip tray", {"style": "ribbed", "part": "both"}),
+    ("cable_comb", "a comb for 4 mm cables", {"slot_w": 4.3}),
+    ("cable_comb", "a cable comb with 6 mm slots", {"slot_w": 6}),
+])
+def test_switches_spelled_numbers_and_fit(recipe, request_text, want, monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    got = match.suggest(rc.load(recipe), request_text)
+    for k, v in want.items():
+        assert got.get(k) == v, (k, got)
+
+
+def test_spelled_lengths(monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    got = match.suggest(rc.load("hook"), "a wall hook that sticks out two inches")
+    assert 50.8 in got.values(), got
+    got = match.suggest(rc.load("gridfinity_bin"), "a gridfinity bin with four in a row")
+    assert 101.6 not in got.values(), got
