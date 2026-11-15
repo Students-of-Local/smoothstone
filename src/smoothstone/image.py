@@ -179,7 +179,7 @@ def _svg_contours(mask: np.ndarray, out: Path, width_mm: float, height_mm: float
 
 
 def process(src: Path, out_dir: Path) -> dict:
-    """Copy src into out_dir and write silhouette.svg, height.png, info.json."""
+    """Copy src into out_dir and write silhouette.svg, outline.svg, height.png, info.json."""
     src = Path(src)
     out_dir = Path(out_dir)
     if not src.is_file():
@@ -192,7 +192,10 @@ def process(src: Path, out_dir: Path) -> dict:
 
     # height map: grayscale, same orientation, long side at most 300 px
     lum_img = Image.fromarray(_luminance(im).clip(0, 255).astype(np.uint8), "L")
-    hm = lum_img.copy()
+    # stretched to the full 0 to 255 range, so recipes can map black and white to exact heights
+    from PIL import ImageOps
+
+    hm = ImageOps.autocontrast(lum_img, cutoff=0.5)
     hm.thumbnail((HEIGHT_PX, HEIGHT_PX), Image.LANCZOS)
     hm.save(out_dir / "height.png")
 
@@ -215,6 +218,14 @@ def process(src: Path, out_dir: Path) -> dict:
     tracer = "potrace" if _svg_potrace(crop, svg, width_mm, height_mm) else "contours"
     if tracer == "contours":
         _svg_contours(crop, svg, width_mm, height_mm)
+    # outline.svg: the same subject with every hole filled, for parts that follow only the
+    # outer edge (cookie cutters, keychain backs)
+    from scipy.ndimage import binary_fill_holes
+
+    outline = out_dir / "outline.svg"
+    filled = binary_fill_holes(crop)
+    if not _svg_potrace(filled, outline, width_mm, height_mm):
+        _svg_contours(filled, outline, width_mm, height_mm)
 
     kind = "silhouette" if (used_alpha or eta >= 0.75) and fill < 0.70 else "photo"
     info = {
@@ -232,6 +243,7 @@ def process(src: Path, out_dir: Path) -> dict:
         "svg_size_mm": [round(width_mm, 3), round(height_mm, 3)],
         "tracer": tracer,
         "silhouette": str(svg),
+        "outline": str(outline),
         "height": str(out_dir / "height.png"),
         "recipes": SILHOUETTE_RECIPES if kind == "silhouette" else PHOTO_RECIPES,
     }

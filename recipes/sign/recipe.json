@@ -1,0 +1,175 @@
+{
+ "name": "sign",
+ "title": "Sign",
+ "summary": "Plaque with raised text, a raised rim, optional picture and hanging holes. Text is sized to fit.",
+ "tags": [
+  "sign",
+  "plaque",
+  "nameplate",
+  "door",
+  "desk",
+  "text",
+  "words",
+  "label",
+  "name",
+  "house",
+  "number",
+  "office",
+  "room"
+ ],
+ "params": [
+  {
+   "name": "text",
+   "type": "text",
+   "default": "HELLO",
+   "help": "the words on the sign"
+  },
+  {
+   "name": "w",
+   "type": "number",
+   "default": 160,
+   "min": 40,
+   "max": 250,
+   "unit": "mm",
+   "help": "sign width"
+  },
+  {
+   "name": "h",
+   "type": "number",
+   "default": 50,
+   "min": 20,
+   "max": 200,
+   "unit": "mm",
+   "help": "sign height"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 4,
+   "min": 2,
+   "max": 12,
+   "unit": "mm",
+   "help": "plate thickness"
+  },
+  {
+   "name": "relief",
+   "type": "number",
+   "default": 1.6,
+   "min": 0.6,
+   "max": 5,
+   "unit": "mm",
+   "help": "how far text and rim stand up"
+  },
+  {
+   "name": "rim",
+   "type": "number",
+   "default": 2.5,
+   "min": 0,
+   "max": 10,
+   "unit": "mm",
+   "help": "raised rim width, 0 = none"
+  },
+  {
+   "name": "text_size",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 150,
+   "unit": "mm",
+   "help": "letter height, 0 = as big as fits"
+  },
+  {
+   "name": "font",
+   "type": "choice",
+   "default": "sans",
+   "choices": [
+    "sans",
+    "serif",
+    "mono"
+   ],
+   "help": "font"
+  },
+  {
+   "name": "icon",
+   "type": "image",
+   "default": "",
+   "image_kind": "silhouette",
+   "help": "picture shown left of the text"
+  },
+  {
+   "name": "holes",
+   "type": "choice",
+   "default": "top",
+   "choices": [
+    "top",
+    "none"
+   ],
+   "help": "hanging holes"
+  },
+  {
+   "name": "corner_r",
+   "type": "number",
+   "default": 6,
+   "min": 0,
+   "max": 40,
+   "unit": "mm",
+   "help": "corner radius"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 64,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "w",
+  "y": "h",
+  "z": "thickness + relief"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "relief",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "w",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "workshop",
+   "params": {
+    "text": "WORKSHOP",
+    "w": 200,
+    "h": 55,
+    "font": "serif"
+   }
+  },
+  {
+   "name": "house_number",
+   "params": {
+    "text": "1247",
+    "w": 150,
+    "h": 70,
+    "holes": "none"
+   }
+  },
+  {
+   "name": "with_tree",
+   "image": "examples/images/tree.png",
+   "params": {
+    "text": "GARDEN",
+    "w": 180,
+    "h": 60
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

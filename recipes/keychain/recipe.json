@@ -1,0 +1,140 @@
+{
+ "name": "keychain",
+ "title": "Keychain",
+ "summary": "Name tag from text, or a charm from a picture outline, with a key ring tab.",
+ "tags": [
+  "keychain",
+  "keyring",
+  "key",
+  "tag",
+  "name",
+  "charm",
+  "pendant",
+  "bag",
+  "gift",
+  "fob",
+  "label"
+ ],
+ "params": [
+  {
+   "name": "text",
+   "type": "text",
+   "default": "",
+   "help": "text for a name tag; empty uses the picture"
+  },
+  {
+   "name": "image",
+   "type": "image",
+   "default": "",
+   "image_kind": "silhouette",
+   "help": "picture outline from stone image",
+   "required": true,
+   "required_unless": "text"
+  },
+  {
+   "name": "size",
+   "type": "number",
+   "default": 50,
+   "min": 20,
+   "max": 150,
+   "unit": "mm",
+   "help": "artwork width"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 2.4,
+   "min": 1.2,
+   "max": 8,
+   "unit": "mm",
+   "help": "back plate thickness"
+  },
+  {
+   "name": "relief",
+   "type": "number",
+   "default": 1.2,
+   "min": 0.4,
+   "max": 4,
+   "unit": "mm",
+   "help": "how far the artwork stands up"
+  },
+  {
+   "name": "border",
+   "type": "number",
+   "default": 2.5,
+   "min": 1,
+   "max": 8,
+   "unit": "mm",
+   "help": "margin around the artwork"
+  },
+  {
+   "name": "ring_d",
+   "type": "number",
+   "default": 5,
+   "min": 3,
+   "max": 12,
+   "unit": "mm",
+   "help": "key ring hole"
+  },
+  {
+   "name": "font",
+   "type": "choice",
+   "default": "sans",
+   "choices": [
+    "sans",
+    "serif",
+    "mono"
+   ],
+   "help": "font for text"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "z": "thickness + relief"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "size",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "size",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "name_tag",
+   "params": {
+    "text": "DONOVAN",
+    "size": 55
+   }
+  },
+  {
+   "name": "cat_charm",
+   "image": "examples/images/cat.png",
+   "params": {
+    "size": 40
+   }
+  },
+  {
+   "name": "rabbit_serif",
+   "image": "examples/images/rabbit.png",
+   "params": {
+    "size": 45,
+    "relief": 1.6
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

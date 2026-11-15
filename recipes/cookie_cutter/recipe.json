@@ -1,0 +1,134 @@
+{
+ "name": "cookie_cutter",
+ "title": "Cookie cutter",
+ "summary": "Cookie cutter in the shape of a picture outline, with a tapered cutting edge and a flange.",
+ "tags": [
+  "cookie",
+  "cutter",
+  "baking",
+  "dough",
+  "fondant",
+  "clay",
+  "kitchen",
+  "biscuit",
+  "shape",
+  "stamp"
+ ],
+ "params": [
+  {
+   "name": "image",
+   "type": "image",
+   "default": "",
+   "image_kind": "outline",
+   "help": "picture outline from stone image",
+   "required": true
+  },
+  {
+   "name": "size",
+   "type": "number",
+   "default": 80,
+   "min": 25,
+   "max": 200,
+   "unit": "mm",
+   "help": "cutter width"
+  },
+  {
+   "name": "height",
+   "type": "number",
+   "default": 14,
+   "min": 6,
+   "max": 40,
+   "unit": "mm",
+   "help": "cutter height"
+  },
+  {
+   "name": "edge_wall",
+   "type": "number",
+   "default": 0.9,
+   "min": 0.8,
+   "max": 2,
+   "unit": "mm",
+   "help": "wall at the cutting edge"
+  },
+  {
+   "name": "base_wall",
+   "type": "number",
+   "default": 2,
+   "min": 1,
+   "max": 4,
+   "unit": "mm",
+   "help": "wall at the base"
+  },
+  {
+   "name": "flange",
+   "type": "number",
+   "default": 4,
+   "min": 0,
+   "max": 10,
+   "unit": "mm",
+   "help": "flange width"
+  },
+  {
+   "name": "flange_t",
+   "type": "number",
+   "default": 1.6,
+   "min": 0.8,
+   "max": 4,
+   "unit": "mm",
+   "help": "flange thickness"
+  },
+  {
+   "name": "smooth",
+   "type": "number",
+   "default": 1.5,
+   "min": 0,
+   "max": 6,
+   "unit": "mm",
+   "help": "drops thin strokes like whiskers"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "z": "height"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "min_wall": 0.7,
+ "fix": {
+  "min_wall": {
+   "param": "edge_wall",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "size",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "cat",
+   "image": "examples/images/cat.png",
+   "params": {
+    "size": 80,
+    "smooth": 3
+   }
+  },
+  {
+   "name": "tree",
+   "image": "examples/images/tree.png",
+   "params": {
+    "size": 70,
+    "height": 16
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

@@ -1,0 +1,131 @@
+{
+ "name": "lithophane",
+ "title": "Lithophane",
+ "summary": "A photo that shows when light shines through it, in a frame, standing on a foot or flat.",
+ "tags": [
+  "lithophane",
+  "photo",
+  "picture",
+  "light",
+  "lamp",
+  "backlit",
+  "portrait",
+  "memory",
+  "gift",
+  "window",
+  "frame"
+ ],
+ "params": [
+  {
+   "name": "image",
+   "type": "image",
+   "default": "",
+   "image_kind": "height",
+   "help": "height map from stone image",
+   "required": true
+  },
+  {
+   "name": "width",
+   "type": "number",
+   "default": 100,
+   "min": 30,
+   "max": 220,
+   "unit": "mm",
+   "help": "picture width"
+  },
+  {
+   "name": "min_t",
+   "type": "number",
+   "default": 0.8,
+   "min": 0.6,
+   "max": 2,
+   "unit": "mm",
+   "help": "thickness at white"
+  },
+  {
+   "name": "max_t",
+   "type": "number",
+   "default": 3.2,
+   "min": 1.5,
+   "max": 6,
+   "unit": "mm",
+   "help": "thickness at black"
+  },
+  {
+   "name": "frame",
+   "type": "number",
+   "default": 4,
+   "min": 0,
+   "max": 15,
+   "unit": "mm",
+   "help": "frame width"
+  },
+  {
+   "name": "frame_t",
+   "type": "number",
+   "default": 5,
+   "min": 2,
+   "max": 12,
+   "unit": "mm",
+   "help": "frame thickness"
+  },
+  {
+   "name": "stand",
+   "type": "bool",
+   "default": true,
+   "help": "upright on a foot; false prints flat"
+  },
+  {
+   "name": "foot",
+   "type": "number",
+   "default": 24,
+   "min": 10,
+   "max": 60,
+   "unit": "mm",
+   "help": "foot depth when standing"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "width + 2 * frame"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.06,
+ "min_wall": 0.6,
+ "fix": {
+  "min_wall": {
+   "param": "min_t",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "width",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "render",
+   "image": "examples/images/fan_guard_render.png",
+   "params": {
+    "width": 110
+   }
+  },
+  {
+   "name": "flat_cat",
+   "image": "examples/images/cat.png",
+   "params": {
+    "width": 70,
+    "stand": false
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

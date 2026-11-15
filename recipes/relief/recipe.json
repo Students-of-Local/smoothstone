@@ -1,0 +1,115 @@
+{
+ "name": "relief",
+ "title": "Relief plaque",
+ "summary": "A picture carved in relief on a framed plaque: bright parts high, dark parts low.",
+ "tags": [
+  "relief",
+  "plaque",
+  "emboss",
+  "carving",
+  "bas",
+  "portrait",
+  "logo",
+  "art",
+  "tile",
+  "coin",
+  "medal",
+  "wall"
+ ],
+ "params": [
+  {
+   "name": "image",
+   "type": "image",
+   "default": "",
+   "image_kind": "height",
+   "help": "height map from stone image",
+   "required": true
+  },
+  {
+   "name": "width",
+   "type": "number",
+   "default": 100,
+   "min": 30,
+   "max": 220,
+   "unit": "mm",
+   "help": "picture width"
+  },
+  {
+   "name": "depth",
+   "type": "number",
+   "default": 2.5,
+   "min": 0.6,
+   "max": 10,
+   "unit": "mm",
+   "help": "relief depth"
+  },
+  {
+   "name": "base_t",
+   "type": "number",
+   "default": 2.4,
+   "min": 1.2,
+   "max": 8,
+   "unit": "mm",
+   "help": "plaque thickness under the relief"
+  },
+  {
+   "name": "frame",
+   "type": "number",
+   "default": 5,
+   "min": 0,
+   "max": 20,
+   "unit": "mm",
+   "help": "frame width"
+  },
+  {
+   "name": "invert",
+   "type": "bool",
+   "default": false,
+   "help": "dark parts high instead"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "width + 2 * frame",
+  "z": "base_t + depth + 0.6"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.06,
+ "fix": {
+  "min_wall": {
+   "param": "base_t",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "width",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "render",
+   "image": "examples/images/fan_guard_render.png",
+   "params": {
+    "width": 100
+   }
+  },
+  {
+   "name": "rabbit_inverted",
+   "image": "examples/images/rabbit.png",
+   "params": {
+    "width": 80,
+    "invert": true,
+    "depth": 2
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

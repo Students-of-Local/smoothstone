@@ -37,6 +37,8 @@ class Param:
     unit: str = ""
     help: str = ""
     image_kind: str = "silhouette"
+    required: bool = False
+    required_unless: str = ""
 
     def range_text(self) -> str:
         if self.type in ("number", "int"):
@@ -153,6 +155,8 @@ def _load_one(d: Path) -> Recipe:
                 unit=raw.get("unit", "") or "",
                 help=raw.get("help", "") or "",
                 image_kind=raw.get("image_kind", "silhouette") or "silhouette",
+                required=bool(raw.get("required", False)),
+                required_unless=raw.get("required_unless", "") or "",
             )
         )
     return Recipe(
@@ -342,7 +346,7 @@ def coerce(p: Param, raw: str, image_paths: dict[str, Path] | None = None):
         f = Path(raw).expanduser()
         if not f.is_file():
             raise ParamError(f"{p.name}: no file at {raw}, use {p.name}=image after stone image")
-        want = ".svg" if p.image_kind == "silhouette" else ".png"
+        want = ".svg" if p.image_kind in ("silhouette", "outline") else ".png"
         if f.suffix.lower() != want:
             raise ParamError(
                 f"{p.name} needs a {want} file, run stone image {raw} then set {p.name}=image"

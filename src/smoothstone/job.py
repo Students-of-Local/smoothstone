@@ -143,6 +143,8 @@ class Job:
         png = self.image_dir / "height.png"
         if svg.is_file():
             out["silhouette"] = svg
+        if (self.image_dir / "outline.svg").is_file():
+            out["outline"] = self.image_dir / "outline.svg"
         if png.is_file():
             out["height"] = png
         return out

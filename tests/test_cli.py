@@ -332,3 +332,18 @@ def test_vendor_library_resolves(jobenv, openscad, recipes_root, tmp_path, monke
     text, code, nxt = stone("build")
     assert code == 0, text
     assert "Size: 25.0 x 25.0 x 3.0 mm" in text
+
+
+
+def test_build_without_required_picture_points_to_stone_image(jobenv, recipes_root):
+    d = recipes_root / "fake_cutter"
+    d.mkdir()
+    (d / "recipe.scad").write_text('image = "";\ncube(10);\n')
+    (d / "recipe.json").write_text(json.dumps({
+        "name": "fake_cutter", "title": "Cutter", "summary": "Needs a picture.", "tags": ["cutter"],
+        "tier": "S", "params": [{"name": "image", "type": "image", "default": "", "image_kind": "outline",
+                                 "required": True, "help": "picture"}]}))
+    stone("new", "a cookie cutter")
+    stone("set", "fake_cutter")
+    text, code, nxt = stone("build")
+    assert code == 1 and "needs a picture" in text and nxt == "stone image <path to picture>"

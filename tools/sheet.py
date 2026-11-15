@@ -21,7 +21,8 @@ def run(job, *args):
 
 def build(recipe, name, params, out):
     job = out / "jobs" / f"{recipe}-{name}"
-    run(job, "new", f"{recipe} {name}", "--force")
+    image = params.pop("_image", None)
+    run(job, "new", f"{recipe} {name}", "--force", *(["--image", str(ROOT / image)] if image else []))
     rc, txt = run(job, "set", recipe, *[f"{k}={v}" for k, v in params.items()])
     if rc == 0:
         rc, txt = run(job, "build")
@@ -42,7 +43,9 @@ def main():
     failed = 0
     for r in recipes:
         meta = json.loads((ROOT / "recipes" / r / "recipe.json").read_text())
-        shots = [build(r, "defaults", {}, out)] + [build(r, e["name"], e["params"], out) for e in meta.get("examples", [])]
+        needs_image = any(p.get("required") for p in meta["params"] if p["type"] == "image")
+        shots = ([] if needs_image else [build(r, "defaults", {}, out)]) + [build(r, e["name"], {**e["params"], **({"_image": e["image"]} if e.get("image") else {})}, out)
+                                              for e in meta.get("examples", [])]
         failed += sum(1 for s in shots if not s[2])
         tile = 450
         sheet = Image.new("RGB", (tile * len(shots), tile + 30), "#1a1b26")

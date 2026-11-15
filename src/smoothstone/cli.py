@@ -551,6 +551,16 @@ def cmd_build(args, job: Job) -> Out:
     given = {k: v for k, v in plan["params"].items() if r.param(k)}
     dropped = sorted(set(plan["params"]) - set(given))
     params = build_params(job, r, given)
+    for p in r.params:
+        if p.required and not params.get(p.name) and not (p.required_unless and params.get(p.required_unless)):
+            other = f" or set {p.required_unless}" if p.required_unless else ""
+            out.add(f"Recipe: {r.name}")
+            out.fix(f"{r.name} needs a picture: run stone image with the picture file{other}")
+            out.next = "stone image <path to picture>"
+            out.stage = "needs_image"
+            out.result = "needs a picture"
+            out.code = 1
+            return out
     bd = job.build_dir
     bd.mkdir(parents=True, exist_ok=True)
     for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad"):
