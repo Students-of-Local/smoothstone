@@ -1,0 +1,13 @@
+{
+  "id": "d2_birch",
+  "request": "gridfinity bin, three units wide by two deep, six units tall, no stacking lip please",
+  "expect": {
+    "recipe": "gridfinity_bin",
+    "params": {
+      "grid_x": 3,
+      "grid_y": 2,
+      "units": 6,
+      "lip": false
+    }
+  }
+}

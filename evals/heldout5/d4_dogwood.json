@@ -1,0 +1,17 @@
+{
+  "id": "d4_dogwood",
+  "image": "d4_pic.png",
+  "request": "make me a sign that says WORKSHOP with this little icon next to the words. 8 inches wide, without hanging holes",
+  "expect": {
+    "recipe": "sign",
+    "params": {
+      "text": "WORKSHOP",
+      "w": [
+        203,
+        204
+      ],
+      "holes": "none"
+    },
+    "image_used": "icon"
+  }
+}

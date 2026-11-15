@@ -1,0 +1,12 @@
+{
+  "id": "d5_elm",
+  "request": "Hey, can you make a phone stand for my desk? My phone is 11 mm thick with the case on, and I want the back rest tilted at 70 degrees. I don't need a cable slot.",
+  "expect": {
+    "recipe": "phone_stand",
+    "params": {
+      "phone_t": 11,
+      "angle": 70,
+      "cable_slot": 0
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "d3_cedar",
+  "image": "d3_pic.png",
+  "request": "Could you turn this picture into a relief plaque? I'd like it 150 mm wide with a four millimeter relief depth, and leave off the frame entirely.",
+  "expect": {
+    "recipe": "relief",
+    "params": {
+      "width": 150,
+      "depth": 4,
+      "frame": 0
+    },
+    "image_used": "image"
+  }
+}

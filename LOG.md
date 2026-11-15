@@ -70,3 +70,22 @@
   after the number name the parameter; bore fit_add 0.2; "no flange" sets a 0-able size to 0; ches/shes/xes stems;
   comb grip phrases; panel count words; hook reach help shortened. All 32 specs in the four sets match, 85 tests
   pass (the cutter test fails on the old code), sheet all PASS. Set 4 is spent; a new blind set 5 measures this.
+
+## 2026-11-15 blind set 5 sealed
+
+A fresh writer saw only the regenerated parameter catalog and wrote evals/heldout5 (8 specs, 2 drawn pictures, file names that hide the recipe). I have not read the specs. Hashes:
+
+```
+98a33e40147aa38c37fec45e5a2348f0f2b9a201b3320414a56e21ef60c74492  d1_alder.json
+24fe5474d3025bec7be3f32122d225e6c7c7b3fb806b8434fb119463a5d1abad  d2_birch.json
+481aad5aa2ab8f2a9dd8d190fbf18acd5c9fa244d99b4d307a37a53ec735b998  d3_cedar.json
+6caa7b03e7bf25db2e3c6a6ff93208f4d4d8fe43c6142bbc66baa743345da118  d3_pic.png
+222bd4b2b7b6e934c78fb09094d31e25e16a0edacda148a4d87d40ba31e014bc  d4_dogwood.json
+a08ff2d0d66116120cdbb37dbf0d180425dcf08460fb8a519354f6a90758426c  d4_pic.png
+dfdd89787c68a92a17343957320223e299d9bb8bb611664d05fb729113f2f9cb  d5_elm.json
+2751c94d141fe334eb72378a215683056cc6e5e8442088c3d5307c765a60c2b6  d6_fir.json
+9aac2c940b84c16998855ebc7804bfead6bef6aab915f322bea903e7e24d34e8  d7_ginkgo.json
+2e861ef5dcc1fa6642014c095bca709989387e96f7d8ad3c0759361ec95c1f25  d8_hazel.json
+```
+
+It measures c4201e0 from a frozen worktree.

@@ -1,0 +1,15 @@
+{
+  "id": "d8_hazel",
+  "request": "cable comb to hold six cables that are each 5 mm across, bar 80mm long",
+  "expect": {
+    "recipe": "cable_comb",
+    "params": {
+      "slots": 6,
+      "slot_w": [
+        5.2,
+        5.5
+      ],
+      "length": 80
+    }
+  }
+}

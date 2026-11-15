@@ -1,0 +1,12 @@
+{
+  "id": "d1_alder",
+  "request": "need a fan guard for a 92mm fan, honeycomb pattern, plate 2.5mm thick",
+  "expect": {
+    "recipe": "fan_guard",
+    "params": {
+      "size": 92,
+      "style": "honeycomb",
+      "thickness": 2.5
+    }
+  }
+}

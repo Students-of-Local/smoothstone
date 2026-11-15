@@ -1,0 +1,13 @@
+{
+  "id": "d6_fir",
+  "request": "planter, 120 tall, smooth sides, rim 140mm across, no drain hole",
+  "expect": {
+    "recipe": "planter",
+    "params": {
+      "height": 120,
+      "style": "smooth",
+      "top_d": 140,
+      "drain_d": 0
+    }
+  }
+}

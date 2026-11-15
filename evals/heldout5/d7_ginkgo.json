@@ -1,0 +1,13 @@
+{
+  "id": "d7_ginkgo",
+  "request": "I need a plain spur gear with straight teeth: 24 teeth, module 1.5, and 10 mm thick.",
+  "expect": {
+    "recipe": "spur_gear",
+    "params": {
+      "style": "spur",
+      "teeth": 24,
+      "module_mm": 1.5,
+      "thickness": 10
+    }
+  }
+}
