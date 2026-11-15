@@ -411,3 +411,11 @@ def test_show_names_numbers_it_could_not_place(jobenv):
     text, code, nxt = stone("show", "_demo")
     assert "From the request: w=50" in text
     assert "Not placed yet: 7 rubber feet." in text, text
+
+
+def test_status_repeats_what_is_not_placed(jobenv):
+    """Held-out 1: compaction right after stone show lost the sizes the matcher missed."""
+    stone("new", "a plate 50 mm wide with 7 rubber feet")
+    stone("show", "_demo")
+    text, code, nxt = stone("status")
+    assert "Not placed yet: 7 rubber feet. Names and meanings: stone show _demo" in text, text

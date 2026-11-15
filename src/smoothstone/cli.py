@@ -165,6 +165,14 @@ def cmd_status(args, job: Job) -> Out:
     else:
         out.add("Recipe: none yet")
     out.add(f"Builds: {s.get('builds', 0)}, passed: {'yes' if s.get('passed') else 'no'}")
+    # after a compaction the model has lost stone show: repeat what the request still asks for
+    nxt = s.get("next") or ""
+    pick = plan["recipe"] if plan else (nxt.split()[2] if nxt.startswith("stone set ") and len(nxt.split()) > 2 else None)
+    pr = rc.load(pick) if pick and not s.get("passed") else None
+    if pr is not None:
+        left = match.unplaced(pr, job.request())
+        if left:
+            out.add(f"Not placed yet: {'; '.join(left[:4])}. Names and meanings: stone show {pr.name}")
     if s.get("last_result"):
         out.add(f"Last: {s.get('last_command', '')} -> {s['last_result']}")
     out.add(f"Stage: {s.get('stage')}")
