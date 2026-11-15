@@ -90,6 +90,15 @@ def _fits(p: rc.Param, v: float) -> bool:
 
 
 def suggest(r: rc.Recipe, request: str) -> dict:
+    return suggest_full(r, request)[0]
+
+
+def unplaced(r: rc.Recipe, request: str) -> list[str]:
+    """Numbers in the request that no parameter took, with the words after them: "3 compartments"."""
+    return suggest_full(r, request)[1]
+
+
+def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
     aliases = getattr(r, "aliases", {}) or {}
     out: dict = {}
     # quoted text -> first text parameter
@@ -179,4 +188,10 @@ def suggest(r: rc.Recipe, request: str) -> dict:
             if r.param(twin) and twin not in out and _fits(r.param(twin), v):
                 out[twin] = out[name]
                 used_p.add(twin)
-    return {p.name: out[p.name] for p in r.params if p.name in out}
+    left = []
+    for i, (v, kind, s0, e0) in enumerate(nums):
+        if i in used_n or i in taken:
+            continue
+        tail = " ".join(re.findall(r"[a-zA-Z]+", request[e0:e0 + 30])[:2])
+        left.append((request[s0:e0].strip() + " " + tail).strip())
+    return {p.name: out[p.name] for p in r.params if p.name in out}, left

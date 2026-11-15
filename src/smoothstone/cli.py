@@ -282,10 +282,12 @@ def cmd_show(args, job: Job) -> Out:
     size = default_size(r)
     out.add(f"Tier {r.tier}." + (f" Default size {size}." if size else ""))
     request = job.request() if job.exists() else ""
-    sug = match.suggest(r, request) if request else {}
+    sug, left = match.suggest_full(r, request) if request else ({}, [])
     if sug:
         items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items()]
         out.add(f"From the request: {' '.join(items)}")
+    if left:
+        out.add(f"Not placed yet: {'; '.join(left[:4])}. If one is a size of this part, add it with its parameter name.")
     elif request:
         out.add("Nothing in the request names a parameter; the defaults make a good part.")
     out.add("Parameters (name = default):")
