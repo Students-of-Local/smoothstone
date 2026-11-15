@@ -22,7 +22,14 @@ for _t, _tw in enumerate(TENS):
     WORDS[_tw] = 20 + 10 * _t
     for _o, _ow in enumerate(ONES):
         WORDS[f"{_tw}-{_ow}"] = WORDS[f"{_tw} {_ow}"] = 20 + 10 * _t + _o + 1
-NEGATE = {"no", "without", "not", "skip"}
+NEGATE = {"no", "without", "not", "skip", "omit", "drop", "dont", "doesnt", "nothing"}
+NEGATE2 = {("leave", "off"), ("leave", "out"), ("don", "t"), ("doesn", "t"), ("won", "t"), ("no", "need")}
+
+
+def _negated(raw: list[str], k: int) -> bool:
+    """True when one of the 4 words before raw[k] says no: "no", "without", "don't need a", "leave off the"."""
+    w = raw[max(0, k - 4):k]
+    return bool(NEGATE & set(w)) or any(pair in NEGATE2 for pair in zip(w, w[1:]))
 UNITS = {"mm": 1.0, "millimeter": 1.0, "millimeters": 1.0, "cm": 10.0, "centimeter": 10.0,
          "centimeters": 10.0, "in": 25.4, "inch": 25.4, "inches": 25.4, '"': 25.4}
 STOP = {"a", "an", "the", "for", "of", "with", "and", "that", "is", "are", "to", "in", "on", "by",
@@ -163,7 +170,7 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             hit = next((k for k in at if stems[k:k + len(words)] == words), None)
             if hit is None:
                 continue
-            on = not (NEGATE & set(raw[max(0, hit - 3):hit]))
+            on = not _negated(raw, hit)
             if on != bool(p.default):
                 out[p.name] = on
             break
@@ -172,9 +179,16 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
         if p.type in ("number", "int") and p.min == 0 and p.default and p.name not in out:
             first = _stem(p.name.split("_")[0])
             for k, w in enumerate(stems):
-                if w == first and NEGATE & set(raw[max(0, k - 3):k]) and stems[k + 1:k + 2] != ["t"]:
+                if w == first and _negated(raw, k) and stems[k + 1:k + 2] != ["t"]:
                     out[p.name] = 0
                     break
+    # "without hanging holes": a choice that has a "none" value goes to it
+    for p in r.params:
+        if p.type == "choice" and "none" in [str(c) for c in p.choices] and p.name not in out \
+                and str(p.default) != "none":
+            first = _stem(p.name.split("_")[0])
+            if any(w == first and _negated(raw, k) for k, w in enumerate(stems)):
+                out[p.name] = "none"
     # M3, M4 ... screws: clearance hole on the first parameter about screws or holes
     m = re.search(r"\bM(\d(?:\.5)?)\b", request)
     if m and m.group(1) in SCREWS:
@@ -242,8 +256,8 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             def hits(ws):  # a word that names the recipe ("box", "fan") counts half
                 return len((ws & pw) - own) + 0.5 * len(ws & pw & own)
             if kind == "count" and p.type != "int" and has_units and float(v).is_integer() \
-                    and not hits(_expand(set(before[-1:]))):
-                continue  # a bare number is a count when the request gives sizes with units ("module 2" is not)
+                    and not hits(_expand(set(before[-1:]) | set(after[:1]))):
+                continue  # a bare number is a count when the request gives sizes with units ("module 2", "120 tall" are not)
             score = hits(ctx) + hits(near)
             if score == 0:
                 continue  # the words around the number must name the parameter

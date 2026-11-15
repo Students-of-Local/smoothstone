@@ -318,5 +318,11 @@
    "cutouts",
    0
   ]
+ },
+ "grow": {
+  "the cutouts do not fit across the plate": {
+   "param": "w",
+   "value": "(cutouts - 1) * (cut_pitch if cut_pitch > 0 else cut_w + 8) + cut_w + 2 * hole_inset + 6"
+  }
  }
 }

@@ -77,6 +77,7 @@ class Recipe:
     aliases: dict = field(default_factory=dict)
     counts: dict = field(default_factory=dict)
     size_order: list = field(default_factory=list)
+    grow: dict = field(default_factory=dict)  # assert text -> {"param", "value"}: "the cutouts do not fit" widens the plate
     phrases: dict = field(default_factory=dict)  # "with a saucer" -> {"part": "both"}, read before single words  # params for "A by B by C"; default: from dims x, y, z  # word -> [param, offset]: "3 compartments" sets div_x = 2
 
     @property
@@ -183,6 +184,7 @@ def _load_one(d: Path) -> Recipe:
         counts=dict(data.get("counts") or {}),
         size_order=list(data.get("size_order") or []),
         phrases=dict(data.get("phrases") or {}),
+        grow=dict(data.get("grow") or {}),
         path=d,
     )
 
@@ -346,9 +348,14 @@ def coerce(p: Param, raw: str, image_paths: dict[str, Path] | None = None):
             suggest=near[0] if near else None,
         )
     if p.type == "image":
+        if raw.lower().startswith("image="):
+            raw = raw[6:] or "image"  # icon=image=<path>
         job_files = {Path(v).resolve() for v in (image_paths or {}).values()}
-        if raw.lower() != "image" and Path(raw).resolve() in job_files:
-            raw = "image"  # a path to one of the job's own picture files means the job image, in the kind this recipe needs
+        sources = [f for d in {f.parent for f in job_files} for f in d.glob("source.*")]
+        typed = Path(raw).expanduser()
+        if raw.lower() != "image" and (typed.resolve() in job_files or typed.is_file()
+                                       and any(typed.read_bytes() == f.read_bytes() for f in sources)):
+            raw = "image"  # the picture given to stone new, or one of the job's own picture files, means the job image
         if raw.lower() == "image":
             img = (image_paths or {}).get(p.image_kind)
             if img is None or not Path(img).exists():

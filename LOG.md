@@ -89,3 +89,23 @@ dfdd89787c68a92a17343957320223e299d9bb8bb611664d05fb729113f2f9cb  d5_elm.json
 ```
 
 It measures c4201e0 from a frozen worktree.
+
+## 2026-11-15 blind set 5 results (c4201e0)
+
+Run from frozen/894a97d, 5 seeds a condition, LFM3-1.7B on llama-server.
+
+- NEXT lines alone, no model: 4/8.
+- S card: 37/40.
+- S card, compacted after step 3: 24/40.
+- No card: 34/40.
+
+Compaction is the weak spot. After a compaction the model leans on the NEXT line, so the compacted runs fail where NEXT fails. What it found, all tool side:
+
+- "leave off the frame", "I don't need a cable slot": contractions and "leave off" were not read as no. The matcher now checks the 4 words before a name and reads don't, doesn't, won't, leave off, leave out, omit, drop and no need.
+- "without hanging holes": a choice param with a none value now goes to none.
+- "120 tall" with no unit: a bare number named by the word right after it now fills that size.
+- The relief model typed the picture path it was given at stone new. stone sent that raw png to surface(), the plaque built in 2 pieces and raising base_t never fixed it. The picture given to stone new now means the job image.
+- On a sign it typed icon=image=<path> and image=<path>. stone refused both and suggested rim. image= now means a recipe's one picture param, and a doubled image= is stripped.
+- The model-free NEXT run on set 4 still failed the panel: 4 buttons of 22 mm do not fit the default 60 mm plate, and stone's fix put the count back to 2. Recipes can now name a grow rule for an assert, and the panel widens to fit (128 mm here).
+
+NEXT driver on every held-out set after the fixes: 29/29. 94 tests pass. Set 5 is spent; set 6 measures this cleanly.

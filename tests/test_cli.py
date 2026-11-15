@@ -283,8 +283,9 @@ def test_image_command_and_image_param(jobenv, tmp_path, recipes_root):
     assert code == 0, text
     plan = json.loads((job / "plan.json").read_text())
     assert plan["params"]["img"] == str((job / "image" / "silhouette.svg").resolve())
-    text, code, nxt = stone("set", "fake_logo", "img=" + str(f))
-    assert code == 1 and "stone image" in text
+    text, code, nxt = stone("set", "fake_logo", "img=" + str(f))  # the picture given to stone new is the job image
+    assert code == 0, text
+    assert json.loads((job / "plan.json").read_text())["params"]["img"] == str((job / "image" / "silhouette.svg").resolve())
 
 
 def test_scad_literals():
@@ -440,5 +441,54 @@ def test_a_typed_out_job_picture_path_gets_the_recipes_kind(jobenv, tmp_path, re
     assert code == 0, text
     plan = json.loads((job / "plan.json").read_text())
     assert plan["params"]["image"] == str((job / "image" / "outline.svg").resolve())
+    text, code, nxt = stone("build")
+    assert "Part ready" in text, text
+
+
+def test_the_picture_given_to_stone_new_means_the_job_image(jobenv, tmp_path, recipes_root):
+    """Blind set 5, S card compacted: LFM3 set a relief's image to the png it was given at stone new. The raw
+    picture went to surface() unstretched, the plaque came out in 2 pieces, and raising base_t never fixed it."""
+    shutil.copytree(REPO / "recipes" / "relief", recipes_root / "relief")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib")
+    im = Image.new("RGB", (300, 200), "white")
+    ImageDraw.Draw(im).ellipse((30, 30, 270, 170), fill="black")
+    f = tmp_path / "leaf.png"
+    im.save(f)
+    stone("new", "a relief plaque of this leaf, no frame", "--image", str(f))
+    job = jobenv / "stone-job"
+    text, code, nxt = stone("set", "relief", "frame=0", "image=" + str(f))
+    assert code == 0, text
+    plan = json.loads((job / "plan.json").read_text())
+    assert plan["params"]["image"] == str((job / "image" / "height.png").resolve())
+
+
+def test_a_signs_picture_takes_image_and_doubled_names(jobenv, tmp_path, recipes_root):
+    """Blind set 5, S card: on a sign LFM3 wrote icon=image=<path> and then image=<path>. stone refused both and
+    suggested rim=<path>, so the run ran out of steps with no part."""
+    shutil.copytree(REPO / "recipes" / "sign", recipes_root / "sign")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib")
+    im = Image.new("RGB", (200, 200), "white")
+    ImageDraw.Draw(im).ellipse((30, 30, 170, 170), fill="black")
+    f = tmp_path / "sun.png"
+    im.save(f)
+    stone("new", "a sign that says SHOP with this icon", "--image", str(f))
+    job = jobenv / "stone-job"
+    want = str((job / "image" / "silhouette.svg").resolve())
+    for value in ("icon=image=" + want, "image=" + want, "image=" + str(f), "picture=image"):
+        text, code, nxt = stone("set", "sign", "text=SHOP", value)
+        assert code == 0, (value, text)
+        assert json.loads((job / "plan.json").read_text())["params"]["icon"] == want, value
+
+
+def test_a_plate_too_narrow_for_its_cutouts_grows(jobenv, recipes_root, openscad):
+    """Blind set 4 on the NEXT driver: 4 arcade buttons of 22 mm do not fit the default 60 mm plate. stone's fix
+    put the count back to 2, so the part was ready with half the buttons."""
+    shutil.copytree(REPO / "recipes" / "panel", recipes_root / "panel")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib")
+    stone("new", "a plate for 4 arcade buttons, 22 mm round holes")
+    stone("set", "panel", "cutouts=4", "cut_shape=round", "cut_w=22")
+    text, code, nxt = stone("build")
+    assert nxt == "stone set w=128", text
+    stone("set", "w=128")
     text, code, nxt = stone("build")
     assert "Part ready" in text, text

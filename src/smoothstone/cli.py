@@ -388,7 +388,10 @@ def cmd_set(args, job: Job) -> Out:
         hard = not retry
     names = [p.name for p in r.params]
     imgs = job.image_paths()
+    pics = [p.name for p in r.params if p.type == "image"]
     for k, raw in pairs:
+        if r.param(k) is None and k.lower() in ("image", "picture", "pic", "img", "photo") and len(pics) == 1:
+            k = pics[0]  # "image=" on a sign means its one picture parameter, icon
         p = r.param(k)
         if p is None:
             near = rc.closest(k, names)
@@ -555,6 +558,20 @@ def _error_param(r: rc.Recipe, params: dict, err: str):
     return None
 
 
+def _grow(r: rc.Recipe, params: dict, err: str):
+    """A failed assert the recipe knows how to fix by growing one size, like a plate too narrow for its cutouts."""
+    for text, rule in r.grow.items():
+        g = r.param(rule.get("param", ""))
+        if text in err and g is not None:
+            try:
+                v = math.ceil(float(rc.safe_eval(str(rule["value"]), r.merged(params))))
+            except (KeyError, ValueError, TypeError):
+                continue
+            if (g.max is None or v <= g.max) and v > float(params.get(g.name, g.default)):
+                return g, v
+    return None
+
+
 def cmd_build(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
@@ -618,6 +635,11 @@ def cmd_build(args, job: Job) -> Out:
             lower = int(lower) if quality.type == "int" else round(lower, 1)
             out.fix(f"lower {quality.name} to {lower} so it builds faster")
             out.next = f"stone set {quality.name}={lower}"
+        elif grown := _grow(r, params, run.error):
+            g, v = grown
+            unit = f" {g.unit}" if g.unit else ""
+            out.fix(f"{g.name} is too small for the rest of the part; set {g.name}={rc.fmt_value(g, v)}{unit}")
+            out.next = f"stone set {g.name}={rc.fmt_value(g, v)}"
         elif p is not None:
             d = rc.fmt_value(p, p.default)
             unit = f" {p.unit}" if p.unit and p.type in ("number", "int") else ""

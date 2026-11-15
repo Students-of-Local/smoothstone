@@ -110,3 +110,18 @@ def test_set4_shapes_in_new_words(recipe, request_text, want, monkeypatch):
         assert got.get(k) == v, (k, got)
     if not want:
         assert "label" not in got, got
+
+
+@pytest.mark.parametrize("recipe,request_text,want", [
+    ("phone_stand", "a phone stand, we don't want a cable slot on it", {"cable_slot": 0}),
+    ("phone_stand", "phone stand with a 20 mm cable slot", {"cable_slot": 20}),
+    ("relief", "a relief of this, leave off the frame", {"frame": 0}),
+    ("planter", "planter, skip the drain hole", {"drain_d": 0}),
+    ("sign", "a sign that says GARAGE, no holes", {"text": "GARAGE", "holes": "none"}),
+    ("planter", "planter 150 tall, 120 mm wide at the rim", {"height": 150, "top_d": 120}),
+])
+def test_set5_shapes_in_new_words(recipe, request_text, want, monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    got = match.suggest(rc.load(recipe), request_text)
+    for k, v in want.items():
+        assert got.get(k) == v, (k, got)
