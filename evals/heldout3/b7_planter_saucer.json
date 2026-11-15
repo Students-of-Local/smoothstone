@@ -1,0 +1,15 @@
+{
+ "id": "b7_planter_saucer",
+ "request": "I'd like a smooth plant pot roughly 5 inches tall, and print the matching saucer with it too",
+ "expect": {
+  "recipe": "planter",
+  "params": {
+   "height": [
+    120,
+    135
+   ],
+   "style": "smooth",
+   "part": "both"
+  }
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "id": "b4_fan_guard",
+ "request": "can you do a honeycomb style grill for my 140mm case fan",
+ "expect": {
+  "recipe": "fan_guard",
+  "params": {
+   "size": 140,
+   "style": "honeycomb"
+  }
+ }
+}

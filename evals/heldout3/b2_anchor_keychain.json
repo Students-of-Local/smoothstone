@@ -1,0 +1,13 @@
+{
+ "id": "b2_anchor_keychain",
+ "request": "Here's an anchor silhouette. I want a little keychain charm out of it, 40mm wide and kinda chunky, like 3mm thick",
+ "image": "anchor.png",
+ "expect": {
+  "recipe": "keychain",
+  "params": {
+   "size": 40,
+   "thickness": 3
+  },
+  "image_used": "image"
+ }
+}

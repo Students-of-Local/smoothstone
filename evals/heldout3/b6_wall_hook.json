@@ -1,0 +1,15 @@
+{
+ "id": "b6_wall_hook",
+ "request": "wall hook for a heavy winter coat. one inch wide, about 2 inches of reach inside the curve, and just one screw hole",
+ "expect": {
+  "recipe": "hook",
+  "params": {
+   "width": 25.4,
+   "reach": [
+    48,
+    54
+   ],
+   "holes": 1
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "id": "b8_cable_comb",
+ "request": "cable comb to keep six cables tidy behind my desk, the cables are 5mm thick",
+ "expect": {
+  "recipe": "cable_comb",
+  "params": {
+   "slots": 6,
+   "slot_w": [
+    5.2,
+    5.5
+   ]
+  }
+ }
+}

@@ -1,0 +1,16 @@
+{
+ "id": "b5_spur_gear",
+ "request": "print me a plain straight-cut gear, twenty-four teeth, module 1.5, goes on a 5mm shaft",
+ "expect": {
+  "recipe": "spur_gear",
+  "params": {
+   "teeth": 24,
+   "module_mm": 1.5,
+   "style": "spur",
+   "bore": [
+    5.0,
+    5.4
+   ]
+  }
+ }
+}

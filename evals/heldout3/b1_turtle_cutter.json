@@ -1,0 +1,15 @@
+{
+ "id": "b1_turtle_cutter",
+ "request": "my kid drew this sea turtle (attached). can you make it into a cookie cutter about 3 inches across?",
+ "image": "turtle.png",
+ "expect": {
+  "recipe": "cookie_cutter",
+  "params": {
+   "size": [
+    72,
+    80
+   ]
+  },
+  "image_used": "image"
+ }
+}

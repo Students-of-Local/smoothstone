@@ -22,3 +22,18 @@
   8db7054993d9f2f550af7a05917be31da30ff90f1a44e728c96fd5ddbe0421de  evals/heldout2/k5_anchor_cutter.json
   bab8f102ffebfb702301a660733667547b47fea9e42946d2a00665447ec46e34  evals/heldout2/k6_turtle_relief.json
   ffb43668cb0eac74d82520a30c7fa2cabc334e0370595f2530e22710283b953b  evals/heldout2/turtle.png
+- 2026-11-14 Held-out set 2 is withdrawn as a measurement: I wrote it, and my later matcher cases borrowed its
+  phrasing ("a box with a lid, 120 mm wide"), so it no longer tests anything blind. It stays in the repo, unused.
+  Held-out set 3 sealed instead: 8 requests written by a separate Opus subagent that read only the recipe
+  catalog (names, parameters, ranges, help), never the matcher, tests, cards or evals. Its expectations are kept
+  as written. Pictures are the turtle and anchor from set 2. Nothing has run on it. SHA-256:
+  3598fe10d920c2a2b639d76aa627eb52100d5475966240c8ac54f9c8e60229b6  evals/heldout3/anchor.png
+  2c7751a687a618f8ce5ea59ed94d61683fec14fb253023c9fa025aa6916a9cea  evals/heldout3/b1_turtle_cutter.json
+  078ba860657c85aaf5b929b9d1a3498ab12c5de495254d87ac1bdbbd3ba01955  evals/heldout3/b2_anchor_keychain.json
+  ce33f90a1f07e4719afe4896b8f941c250b6196bc2dc897c26581f9a1afc923a  evals/heldout3/b3_gridfinity_bin.json
+  83acc60ee38fb38e35f8d2a28dabaa87da6792fcc4fb132f355455da4b74c8c8  evals/heldout3/b4_fan_guard.json
+  1c79a24e55925567095aad43eafb2f6900c75f795ce90a29461e86a9c83edce3  evals/heldout3/b5_spur_gear.json
+  972bd7aa751d9f0c69e83a4374769b28f3cd59dff7638cb48cd1e6334bada204  evals/heldout3/b6_wall_hook.json
+  08f08cfc0e5da1d5d7f62f93aec4076d4c1fb5a258512b06afa302c4794419bd  evals/heldout3/b7_planter_saucer.json
+  c647053796f6d11059d0d5c7112eb4ee73c6d68c8e487872ff15a2905bf7864b  evals/heldout3/b8_cable_comb.json
+  ffb43668cb0eac74d82520a30c7fa2cabc334e0370595f2530e22710283b953b  evals/heldout3/turtle.png

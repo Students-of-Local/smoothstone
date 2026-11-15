@@ -1,0 +1,13 @@
+{
+ "id": "b3_gridfinity_bin",
+ "request": "need a gridfinity bin, 3 by 2 units and six units tall, with magnets in the bottom please",
+ "expect": {
+  "recipe": "gridfinity_bin",
+  "params": {
+   "grid_x": 3,
+   "grid_y": 2,
+   "units": 6,
+   "magnets": true
+  }
+ }
+}
