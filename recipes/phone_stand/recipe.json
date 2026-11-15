@@ -1,0 +1,137 @@
+{
+ "name": "phone_stand",
+ "title": "Phone stand",
+ "summary": "Open triangle stand for a phone or small tablet with a front lip and a cable slot. Prints on its side with no supports.",
+ "tags": [
+  "phone",
+  "stand",
+  "holder",
+  "tablet",
+  "ipad",
+  "dock",
+  "desk",
+  "cradle",
+  "charging",
+  "mobile"
+ ],
+ "params": [
+  {
+   "name": "width",
+   "type": "number",
+   "default": 70,
+   "min": 20,
+   "max": 200,
+   "unit": "mm",
+   "help": "stand width"
+  },
+  {
+   "name": "angle",
+   "type": "number",
+   "default": 65,
+   "min": 45,
+   "max": 80,
+   "unit": "deg",
+   "help": "back rest angle from the table"
+  },
+  {
+   "name": "rest",
+   "type": "number",
+   "default": 95,
+   "min": 40,
+   "max": 220,
+   "unit": "mm",
+   "help": "back rest length"
+  },
+  {
+   "name": "ledge",
+   "type": "number",
+   "default": 14,
+   "min": 6,
+   "max": 40,
+   "unit": "mm",
+   "help": "phone thickness plus case, plus 2"
+  },
+  {
+   "name": "lip",
+   "type": "number",
+   "default": 9,
+   "min": 3,
+   "max": 30,
+   "unit": "mm",
+   "help": "front lip height"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 6,
+   "min": 3,
+   "max": 15,
+   "unit": "mm",
+   "help": "bar thickness"
+  },
+  {
+   "name": "cable_slot",
+   "type": "number",
+   "default": 14,
+   "min": 0,
+   "max": 40,
+   "unit": "mm",
+   "help": "cable slot width, 0 = none"
+  },
+  {
+   "name": "edge",
+   "type": "number",
+   "default": 1,
+   "min": 0,
+   "max": 3,
+   "unit": "mm",
+   "help": "top edge rounding"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "z": "width"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "thickness",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "rest",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "tablet",
+   "params": {
+    "width": 140,
+    "rest": 150,
+    "ledge": 16,
+    "angle": 70,
+    "thickness": 8,
+    "cable_slot": 0
+   }
+  },
+  {
+   "name": "low_angle",
+   "params": {
+    "angle": 55,
+    "rest": 80,
+    "lip": 12
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

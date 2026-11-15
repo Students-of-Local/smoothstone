@@ -1,0 +1,140 @@
+{
+ "name": "hook",
+ "title": "Wall hook",
+ "summary": "J-shaped wall hook with countersunk screw holes. Prints on its side for strength.",
+ "tags": [
+  "hook",
+  "wall",
+  "hanger",
+  "coat",
+  "towel",
+  "bag",
+  "key",
+  "keys",
+  "headphone",
+  "screw",
+  "mount"
+ ],
+ "params": [
+  {
+   "name": "width",
+   "type": "number",
+   "default": 20,
+   "min": 8,
+   "max": 80,
+   "unit": "mm",
+   "help": "hook width"
+  },
+  {
+   "name": "back_h",
+   "type": "number",
+   "default": 70,
+   "min": 25,
+   "max": 200,
+   "unit": "mm",
+   "help": "back plate height"
+  },
+  {
+   "name": "reach",
+   "type": "number",
+   "default": 30,
+   "min": 8,
+   "max": 120,
+   "unit": "mm",
+   "help": "inside width of the curve"
+  },
+  {
+   "name": "tip",
+   "type": "number",
+   "default": 14,
+   "min": 0,
+   "max": 80,
+   "unit": "mm",
+   "help": "how far the tip rises"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 7,
+   "min": 3,
+   "max": 20,
+   "unit": "mm",
+   "help": "bar thickness"
+  },
+  {
+   "name": "holes",
+   "type": "int",
+   "default": 2,
+   "min": 0,
+   "max": 2,
+   "help": "screw holes"
+  },
+  {
+   "name": "screw_d",
+   "type": "number",
+   "default": 4.2,
+   "min": 2,
+   "max": 8,
+   "unit": "mm",
+   "help": "screw hole diameter"
+  },
+  {
+   "name": "edge",
+   "type": "number",
+   "default": 1.2,
+   "min": 0,
+   "max": 3,
+   "unit": "mm",
+   "help": "top edge rounding"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 64,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "z": "width"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "thickness",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "back_h",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "headphones",
+   "params": {
+    "width": 30,
+    "reach": 45,
+    "back_h": 90,
+    "thickness": 9,
+    "tip": 10
+   }
+  },
+  {
+   "name": "key",
+   "params": {
+    "width": 10,
+    "reach": 10,
+    "back_h": 40,
+    "tip": 6,
+    "thickness": 4,
+    "holes": 1,
+    "screw_d": 3.2
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}

@@ -1,0 +1,151 @@
+{
+ "name": "gridfinity_bin",
+ "title": "Gridfinity bin",
+ "summary": "Storage bin for the Gridfinity grid: standard base, stacking lip, dividers, front scoop and label shelf.",
+ "tags": [
+  "gridfinity",
+  "bin",
+  "box",
+  "storage",
+  "organizer",
+  "drawer",
+  "tray",
+  "container",
+  "parts",
+  "screws",
+  "workshop",
+  "desk"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "grid_x",
+   "type": "int",
+   "default": 2,
+   "min": 1,
+   "max": 6,
+   "help": "width in grid units of 42 mm"
+  },
+  {
+   "name": "grid_y",
+   "type": "int",
+   "default": 1,
+   "min": 1,
+   "max": 6,
+   "help": "depth in grid units of 42 mm"
+  },
+  {
+   "name": "units",
+   "type": "int",
+   "default": 3,
+   "min": 2,
+   "max": 20,
+   "help": "height in 7 mm units"
+  },
+  {
+   "name": "div_x",
+   "type": "int",
+   "default": 0,
+   "min": 0,
+   "max": 10,
+   "help": "dividers across X"
+  },
+  {
+   "name": "div_y",
+   "type": "int",
+   "default": 0,
+   "min": 0,
+   "max": 10,
+   "help": "dividers across Y"
+  },
+  {
+   "name": "scoop",
+   "type": "bool",
+   "default": true,
+   "help": "rounded inside front edge"
+  },
+  {
+   "name": "label",
+   "type": "bool",
+   "default": true,
+   "help": "label shelf on the back wall"
+  },
+  {
+   "name": "lip",
+   "type": "bool",
+   "default": true,
+   "help": "stacking lip"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 1.2,
+   "min": 0.8,
+   "max": 3,
+   "unit": "mm",
+   "help": "wall thickness"
+  },
+  {
+   "name": "magnets",
+   "type": "bool",
+   "default": false,
+   "help": "6 x 2 mm magnet pockets underneath"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "grid_x * 42 - 0.5",
+  "y": "grid_y * 42 - 0.5",
+  "z": "units * 7 + (4.4 if lip else 0)"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 1,
+ "max_overhang": 0.06,
+ "fix": {
+  "min_wall": {
+   "param": "wall",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "grid_x",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "1x1_small",
+   "params": {
+    "grid_x": 1,
+    "grid_y": 1,
+    "units": 3
+   }
+  },
+  {
+   "name": "3x2_dividers",
+   "params": {
+    "grid_x": 3,
+    "grid_y": 2,
+    "units": 4,
+    "div_x": 2
+   }
+  },
+  {
+   "name": "2x2_grid",
+   "params": {
+    "grid_x": 2,
+    "grid_y": 2,
+    "units": 6,
+    "div_x": 1,
+    "div_y": 1,
+    "scoop": false
+   }
+  }
+ ]
+}

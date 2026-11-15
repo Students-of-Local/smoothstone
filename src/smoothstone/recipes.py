@@ -67,6 +67,7 @@ class Recipe:
     dims_tol: float
     max_bodies: int
     max_overhang: float
+    min_wall: float
     fix: dict
     examples: list[dict]
     path: Path
@@ -165,6 +166,7 @@ def _load_one(d: Path) -> Recipe:
         dims_tol=float(data.get("dims_tol", 0.6)),
         max_bodies=int(data.get("max_bodies", 1)),
         max_overhang=float(data.get("max_overhang", 0.05)),
+        min_wall=float(data.get("min_wall", 0.8)),
         fix=dict(data.get("fix") or {}),
         examples=list(data.get("examples") or []),
         path=d,

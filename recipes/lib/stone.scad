@@ -62,3 +62,17 @@ module through(h) { translate([0, 0, -1]) linear_extrude(h + 2) children(); }
 module label2d(txt, size, font = "Liberation Sans:style=Bold", spacing = 1) {
     text(txt, size = size, font = font, halign = "center", valign = "center", spacing = spacing);
 }
+
+// 2D stroke along a path: round joins and round ends, width w. Good for hooks and stands.
+module stroke2d(pts, w) {
+    for (i = [0:len(pts) - 2]) hull() {
+        translate(pts[i]) circle(d = w);
+        translate(pts[i + 1]) circle(d = w);
+    }
+}
+
+// 2D teardrop pointing +Y: a round hole that prints lying on its side without support.
+module teardrop2d(d) {
+    circle(d = d);
+    rotate(45) square(d / 2);
+}

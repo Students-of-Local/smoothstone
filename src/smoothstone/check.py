@@ -173,13 +173,14 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
                       direction="up", need=need, measured=contact))
 
     wall = thinnest_wall(mesh)
+    need_wall = recipe.min_wall if recipe else MIN_WALL
     if wall is None:
         out.append(Result("min_wall", True, None, "skipped (no ray engine or no hits)"))
     else:
-        out.append(Result("min_wall", wall >= MIN_WALL, round(wall, 2),
-                          f"thinnest wall {wall:.2f} mm (need {MIN_WALL} mm)",
+        out.append(Result("min_wall", wall >= need_wall, round(wall, 2),
+                          f"thinnest wall {wall:.2f} mm (need {need_wall} mm)",
                           advice="a wall is too thin; make it thicker",
-                          direction="up", need=MIN_WALL, measured=wall))
+                          direction="up", need=need_wall, measured=wall))
 
     face_zmin = tri_z.min(axis=1)
     over = (nz < -OVERHANG_COS - 1e-3) & (face_zmin > zmin + BED_SKIP)

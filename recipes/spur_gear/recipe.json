@@ -1,0 +1,154 @@
+{
+ "name": "spur_gear",
+ "title": "Gear",
+ "summary": "Involute spur, helical or herringbone gear with hub, D-shaft bore and lightening holes.",
+ "tags": [
+  "gear",
+  "spur",
+  "helical",
+  "herringbone",
+  "cog",
+  "sprocket",
+  "wheel",
+  "teeth",
+  "motor",
+  "shaft",
+  "mechanism"
+ ],
+ "params": [
+  {
+   "name": "teeth",
+   "type": "int",
+   "default": 30,
+   "min": 8,
+   "max": 200,
+   "help": "number of teeth"
+  },
+  {
+   "name": "module_mm",
+   "type": "number",
+   "default": 2,
+   "min": 0.5,
+   "max": 6,
+   "unit": "mm",
+   "help": "tooth size; meshing gears need the same"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 8,
+   "min": 2,
+   "max": 50,
+   "unit": "mm",
+   "help": "gear thickness"
+  },
+  {
+   "name": "style",
+   "type": "choice",
+   "default": "herringbone",
+   "choices": [
+    "spur",
+    "helical",
+    "herringbone"
+   ],
+   "help": "tooth style"
+  },
+  {
+   "name": "helix",
+   "type": "number",
+   "default": 25,
+   "min": 0,
+   "max": 40,
+   "unit": "deg",
+   "help": "helix angle"
+  },
+  {
+   "name": "bore",
+   "type": "number",
+   "default": 5.2,
+   "min": 0,
+   "max": 60,
+   "unit": "mm",
+   "help": "shaft hole diameter, 0 = none"
+  },
+  {
+   "name": "d_flat",
+   "type": "bool",
+   "default": true,
+   "help": "flat in the bore for a D shaft"
+  },
+  {
+   "name": "hub_d",
+   "type": "number",
+   "default": 16,
+   "min": 0,
+   "max": 80,
+   "unit": "mm",
+   "help": "hub diameter, 0 = none"
+  },
+  {
+   "name": "hub_h",
+   "type": "number",
+   "default": 4,
+   "min": 0,
+   "max": 30,
+   "unit": "mm",
+   "help": "hub height above the gear"
+  },
+  {
+   "name": "holes",
+   "type": "int",
+   "default": 6,
+   "min": 0,
+   "max": 12,
+   "help": "lightening holes"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 64,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "z": "thickness + (hub_h if hub_d > 0 else 0)"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "module_mm",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "teeth",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "spur_small",
+   "params": {
+    "teeth": 16,
+    "style": "spur",
+    "holes": 0,
+    "hub_d": 12
+   }
+  },
+  {
+   "name": "big_helical",
+   "params": {
+    "teeth": 60,
+    "module_mm": 1.5,
+    "style": "helical",
+    "bore": 8,
+    "hub_d": 22
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6,
+ "min_wall": 0.5
+}

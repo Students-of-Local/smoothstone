@@ -1,0 +1,175 @@
+{
+ "name": "box",
+ "title": "Box with lid",
+ "summary": "Rounded box with a press-fit lid printed beside it, with an optional engraved label on the lid.",
+ "tags": [
+  "box",
+  "lid",
+  "container",
+  "case",
+  "storage",
+  "jewelry",
+  "gift",
+  "trinket",
+  "enclosure",
+  "cover",
+  "pill"
+ ],
+ "params": [
+  {
+   "name": "w",
+   "type": "number",
+   "default": 80,
+   "min": 20,
+   "max": 240,
+   "unit": "mm",
+   "help": "outside width"
+  },
+  {
+   "name": "d",
+   "type": "number",
+   "default": 60,
+   "min": 20,
+   "max": 240,
+   "unit": "mm",
+   "help": "outside depth"
+  },
+  {
+   "name": "h",
+   "type": "number",
+   "default": 40,
+   "min": 10,
+   "max": 200,
+   "unit": "mm",
+   "help": "box height without lid"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 2,
+   "min": 1.2,
+   "max": 6,
+   "unit": "mm",
+   "help": "wall thickness"
+  },
+  {
+   "name": "floor",
+   "type": "number",
+   "default": 2,
+   "min": 1.2,
+   "max": 6,
+   "unit": "mm",
+   "help": "floor thickness"
+  },
+  {
+   "name": "corner_r",
+   "type": "number",
+   "default": 8,
+   "min": 2,
+   "max": 40,
+   "unit": "mm",
+   "help": "outside corner radius"
+  },
+  {
+   "name": "lid_h",
+   "type": "number",
+   "default": 3,
+   "min": 1.6,
+   "max": 10,
+   "unit": "mm",
+   "help": "lid plate thickness"
+  },
+  {
+   "name": "lip_h",
+   "type": "number",
+   "default": 5,
+   "min": 2,
+   "max": 20,
+   "unit": "mm",
+   "help": "lid lip depth"
+  },
+  {
+   "name": "fit",
+   "type": "number",
+   "default": 0.25,
+   "min": 0.05,
+   "max": 0.8,
+   "unit": "mm",
+   "help": "gap between lid lip and wall"
+  },
+  {
+   "name": "label",
+   "type": "text",
+   "default": "",
+   "help": "text engraved on the lid, empty for none"
+  },
+  {
+   "name": "label_size",
+   "type": "number",
+   "default": 10,
+   "min": 4,
+   "max": 60,
+   "unit": "mm",
+   "help": "text height"
+  },
+  {
+   "name": "part",
+   "type": "choice",
+   "default": "both",
+   "choices": [
+    "both",
+    "box",
+    "lid"
+   ],
+   "help": "which part to print"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 64,
+   "min": 24,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "y": "d",
+  "z": "h if part != 'lid' else lid_h + lip_h"
+ },
+ "max_bodies": 2,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "wall",
+   "dir": "up"
+  },
+  "bed": {
+   "param": "w",
+   "dir": "down"
+  }
+ },
+ "examples": [
+  {
+   "name": "keepsake",
+   "params": {
+    "w": 70,
+    "d": 70,
+    "h": 30,
+    "corner_r": 14,
+    "label": "KEEP",
+    "label_size": 14
+   }
+  },
+  {
+   "name": "tall_box",
+   "params": {
+    "w": 60,
+    "d": 60,
+    "h": 90,
+    "part": "box"
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}
