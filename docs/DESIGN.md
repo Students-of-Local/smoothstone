@@ -20,10 +20,12 @@ smoothstone/
   skill/tiers/S.md          tiny models (about 3B and under): pick a recipe, fill parameters
   skill/tiers/M.md          mid models (4B to 30B): combine recipes, add labels and patterns
   skill/tiers/L.md          large models: write OpenSCAD against the library, add recipes
-  stone/                    python package, CLI `stone`
-  recipes/<name>/recipe.scad, recipe.json, example.json, preview.png
+  src/smoothstone/          python package, CLI `stone`; match.py reads sizes out of the request
+  recipes/<name>/recipe.scad, recipe.json (examples live in recipe.json)
+  recipes/lib/              stone.scad (rounded slabs, holes, text) and vessel.scad (vases, pots)
+  tools/sheet.py            builds every recipe and example through stone and tiles the previews
   vendor/BOSL2/             BSD-2, pinned commit
-  evals/                    specs, sealed held-out set, harness adapters, results
+  evals/                    tuning specs, sealed held-out set, run.py harness, sweep and summary
 ```
 
 ## The `stone` CLI is the memory
@@ -52,16 +54,19 @@ Rules for every message the tool prints: under 25 lines, plain words, no stack t
 
 A recipe is a tested, parametric, good-looking part that prints without supports by construction.
 
-- `recipe.scad`: `include <params.scad>` (written by `stone build`) then geometry. May use BOSL2.
-  Base on z = 0, centered in X and Y, millimeters, `$fn` set from a `quality` parameter.
+- `recipe.scad`: customizer-style parameters at the top, then geometry. `stone build` passes the
+  values with `-D name=value`. May use BOSL2 and `recipes/lib`. Base on z = 0, millimeters, `$fn`
+  set from a `quality` parameter.
 - `recipe.json`: `{"name", "title", "summary", "tags": [...], "tier": "S", "params": [{"name",
-  "type": "number|int|bool|text|choice|image", "default", "min", "max", "choices", "unit", "help"}],
-  "derived_checks": [...]}`. Every parameter has a default, so `stone set <recipe>` with nothing
+  "type": "number|int|bool|text|choice|image", "default", "min", "max", "choices", "unit", "help",
+  "required", "required_unless", "image_kind"}], "dims": {"x": "<expression of params>", ...},
+  "dims_tol", "max_bodies", "max_overhang", "min_wall", "fix": {check: param}, "examples": [...],
+  "aliases": {param: [words]}}`. Every parameter has a default, so `stone set <recipe>` with nothing
   builds a good part.
 - Design bar: fillets or chamfers on outside edges, no knife edges, walls at least 1.2 mm (3
   perimeters at 0.4 mm), first layer flat, overhangs at most 45 degrees or chamfered, text at least
   6 mm cap height and 0.8 mm deep, holes sized for real screws (M3 = 3.4 mm clearance).
-- Each recipe ships a test: defaults and every `example*.json` compile, pass `stone check`, and match
+- Each recipe ships a test: defaults and every example in recipe.json compile, pass `stone check`, and match
   their own dimension claims.
 
 First library (the round 1 parts plus parts people show off):
@@ -77,12 +82,13 @@ dividers, label tab, stacking lip), `box` (sliding or snap lid, screw bosses, ve
 ## Print checks (`stone check`)
 
 Generic, from the STL, with trimesh: compiles, watertight, one body (unless the recipe allows
-more), positive volume, fits the bed (default 260 x 260 x 260 mm, Creality K2), resting on z = 0
+more), positive volume, fits the bed (default 256 x 256 x 256 mm, set in stone.toml), resting on z = 0
 with a first-layer contact area of at least 15% of the footprint or 200 mm2, thinnest wall
 estimate at least 0.8 mm (ray casting from sampled surface points), unsupported overhang area
 under 5% of surface (faces steeper than 45 degrees from vertical facing down, not on the bed),
-no part above 260 mm. Recipe `derived_checks` add dimension claims (bbox within 0.3 mm, hole
-count, etc.). Output: one line per check, PASS or FIX with the parameter to change.
+Recipe `dims` add size claims: each expression of the parameters must match the measured
+bounding box within `dims_tol` (default 0.6 mm). The checks run on the OFF that OpenSCAD writes,
+and the binary STL is written from it (ASCII STL rounding breaks watertightness). Output: one line per check, PASS or FIX with the parameter to change.
 
 ## Tiers
 
