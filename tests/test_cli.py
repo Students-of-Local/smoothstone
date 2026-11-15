@@ -57,7 +57,8 @@ def test_flow_end_to_end(jobenv, openscad):
     assert code == 0, text
     assert "Size: 50.0 x 40.0 x 4.0 mm" in text
     assert "FIX" not in text
-    assert nxt == "stone done"
+    assert nxt == cli.DONE_NEXT and "Part ready" in text
+    assert (jobenv / "stone-job" / "_demo.stl").is_file()  # a passing build is the finished part
     b = jobenv / "stone-job" / "build"
     for f in ("params.json", "part.stl", "preview.png", "check.json", "openscad.log"):
         assert (b / f).is_file(), f
@@ -195,9 +196,10 @@ def test_build_thin_wall_suggests_fix(jobenv, openscad):
     assert code == 1 and "did not pass" in text and nxt == "stone set h=1"
     text, _, nxt = stone("status")
     assert nxt == "stone set h=1"
+    assert not list((jobenv / "stone-job").glob("*.stl"))  # a failed build leaves no finished part
     stone("set", "h=1")
     text, code, nxt = stone("build")
-    assert code == 0 and nxt == "stone done", text
+    assert code == 0 and nxt == cli.DONE_NEXT, text
 
 
 def test_build_compile_error_names_param(jobenv, openscad):
@@ -347,3 +349,22 @@ def test_build_without_required_picture_points_to_stone_image(jobenv, recipes_ro
     stone("set", "fake_cutter")
     text, code, nxt = stone("build")
     assert code == 1 and "needs a picture" in text and nxt == "stone image <path to picture>"
+
+
+def test_image_goes_to_the_recipe_the_request_names(jobenv, recipes_root):
+    """A picture plus "lithophane" in the request: NEXT shows the lithophane, not the first picture recipe."""
+    from PIL import Image
+    for name, title in [("fake_cutter", "Cookie cutter"), ("fake_litho", "Lithophane")]:
+        d = recipes_root / name
+        d.mkdir()
+        (d / "recipe.scad").write_text('image = "";\ncube(10);\n')
+        (d / "recipe.json").write_text(json.dumps({
+            "name": name, "title": title, "summary": "Uses a picture.", "tags": [],
+            "tier": "S", "params": [{"name": "image", "type": "image", "default": "", "image_kind": "height",
+                                     "help": "picture"}]}))
+    png = jobenv / "pic.png"
+    im = Image.new("L", (60, 40), 255)
+    im.paste(0, (10, 10, 50, 30))
+    im.save(png)
+    text, code, nxt = stone("new", "Turn this picture into a lithophane", "--image", str(png))
+    assert code == 0 and nxt == "stone show fake_litho"

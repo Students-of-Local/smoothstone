@@ -575,6 +575,8 @@ def cmd_build(args, job: Job) -> Out:
     bd.mkdir(parents=True, exist_ok=True)
     for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad"):
         (bd / f).unlink(missing_ok=True)
+    for f in job.root.glob("*.stl"):
+        f.unlink()  # the finished part always matches the last build
     write_json(bd / "params.json", {"recipe": r.name, "params": params})
     st = job.status()
     builds = int(st.get("builds", 0)) + 1
@@ -635,8 +637,12 @@ def cmd_build(args, job: Job) -> Out:
     out.add(f"STL: {stl}")
     out.add(f"Preview: {bd / 'preview.png'}" if pv.ok else f"Preview: not made ({pv.error[:60]})")
     if ok:
-        out.next = "stone done"
-        out.stage = "built"
+        # a passing build is the finished part: no last step for a small model to forget
+        final = job.root / f"{r.name}.stl"
+        shutil.copyfile(stl, final)
+        out.add(f"Part ready: {final}")
+        out.next = DONE_NEXT
+        out.stage = "done"
         out.result = f"build passed, {fmt_size(size) if size else ''}".rstrip(", ")
         job.update(builds=builds, failed_builds=0, passed=True)
         return out
@@ -722,8 +728,14 @@ def image_step(job: Job, path: Path, out: Out):
     out.add(f"Height map: {info['height']}")
     out.add(f"Good recipes: {', '.join(info['recipes'])}")
     out.add("For image parameters use name=image.")
-    words = " ".join(w.replace("_", " ") for w in info["recipes"])
-    out.next = f"stone recipes {words}"
+    # the request names the part ("lithophane", "cookie cutter"): go straight to that recipe
+    pic = [r for r in rc.visible(rc.load_all(), config.tier(job.root)) if any(p.type == "image" for p in r.params)]
+    ranked = rc.rank(pic, job.request() if job.exists() else "")
+    if ranked and ranked[0][0] > 0 and not job.plan():
+        out.next = f"stone show {ranked[0][1].name}"
+    else:
+        words = " ".join(w.replace("_", " ") for w in info["recipes"])
+        out.next = f"stone recipes {words}"
     out.stage = "image" if not job.plan() else None
     out.result = f"image {info['kind']}, aspect {info['aspect']:.2f}"
     return info

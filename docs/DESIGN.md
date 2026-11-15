@@ -40,10 +40,10 @@ the NEXT line. Nothing the model needs lives only in its context.
 | `stone recipes [words]` | menu, ranked by the words or the brief: name, one line, sizes | NEXT: stone show <best> |
 | `stone show <recipe>` | every parameter: name, type, default, range, unit, one-line meaning; one example `stone set` line | NEXT: stone set ... |
 | `stone set <recipe> k=v ...` | writes plan.json; validates names, types, ranges; unknown name lists the valid ones | NEXT: stone build |
-| `stone build` | plan -> params file -> OpenSCAD -> STL -> checks -> preview PNG | NEXT: stone done, or the one parameter to change |
+| `stone build` | plan -> params file -> OpenSCAD -> STL -> checks -> preview PNG | when every check passes, copies the part to the job folder (Part ready); else the one parameter to change |
 | `stone check [file.stl]` | print checks on any STL | NEXT |
 | `stone image PATH` | reference image -> silhouette SVG and height PNG in the job, aspect ratio, suggested recipes | NEXT |
-| `stone done` | final summary, paths to STL and preview | (none) |
+| `stone done` | final summary of the last passing build, paths to STL and preview | (none) |
 
 Rules for every message the tool prints: under 25 lines, plain words, no stack traces (log them to
 `stone-job/log.txt`), numbers with units. Error lines start with `FIX:` and name one change.
@@ -88,7 +88,7 @@ count, etc.). Output: one line per check, PASS or FIX with the parameter to chan
 
 - S (about 3B and under, text only): never writes OpenSCAD and never reads recipe files. Steps:
   `stone status`, `stone recipes`, `stone show`, `stone set`, `stone build`, change one number on
-  FIX, `stone done`. The card is under 40 lines and says to keep thinking to a few lines.
+  FIX; a passing build is the finished part. The card is under 40 lines and says to keep thinking to a few lines.
 - S-vision (small VLM): the same, plus it looks at the reference image to pick the recipe and sizes.
 - M: may set several recipes in one plan (`stone set panel ... + sign ...` is a union placed by
   offsets), and may pass `custom.scad` snippets that use only library modules.

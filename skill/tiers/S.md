@@ -17,7 +17,7 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
    Add any size the request gives that is missing, using the parameter names stone show lists.
 4. stone set <recipe> name=value name=value
 5. stone build. If a line starts with FIX, run the NEXT line it gives, then stone build again.
-6. stone done
+   When every check passes, the build says Part ready. Then stop.
 
 ## Example
 Request: A guard for a 92 mm fan with a honeycomb grille.
@@ -25,5 +25,4 @@ stone status -> NEXT: stone recipes
 stone recipes -> NEXT: stone show fan_guard
 stone show fan_guard -> From the request: size=92 style=honeycomb
 stone set fan_guard size=92 style=honeycomb
-stone build -> all PASS, NEXT: stone done
-stone done -> the part is ready
+stone build -> all PASS, Part ready, NEXT: none, the part is ready

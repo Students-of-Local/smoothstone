@@ -8,7 +8,7 @@ recipe and the settings that make the part look its best, then let stone build a
 - Set every size the request gives. Then choose the look: style, rounding, pattern, text.
 - After a FIX line, change only the parameter it names, then build again.
 - Keep the part to one piece that sits flat, unless the recipe makes two on purpose.
-- Stop after stone done says the part is ready.
+- Stop when stone build says Part ready, unless you want to change the look and build again.
 
 ## Making it look good
 - Pick the style that suits the use: honeycomb or spiral fan guards, twisted or wave vases,
@@ -22,5 +22,4 @@ recipe and the settings that make the part look its best, then let stone build a
 1. stone status (stone new "<request>" if there is no job; add --image PATH for a picture)
 2. stone recipes <words>, stone show <recipe>
 3. stone set <recipe> with the request's sizes and your look choices
-4. stone build, fix what it names, build again
-5. stone done
+4. stone build, fix what it names, build again; a passing build says Part ready

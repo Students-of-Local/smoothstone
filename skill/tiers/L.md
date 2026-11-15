@@ -9,7 +9,7 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - Every recipe prints without supports: flat base, no overhang past 45 degrees, walls of at
   least 1.2 mm, top edges rounded or chamfered, holes sized for real screws.
 - Check every new recipe with: uv run python tools/sheet.py <name>, and look at the previews.
-- Stop when the request's part is built with stone and stone done says it is ready.
+- Stop when the request's part is built with stone and the build says Part ready.
 
 ## Recipe format
 - recipe.scad: one assignment per parameter at the top, with a comment that gives the unit, then

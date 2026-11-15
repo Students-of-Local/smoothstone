@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from smoothstone import check as checks  # noqa: E402
 from smoothstone import recipes as rc  # noqa: E402
 
-HARNESS = "r2 (v3 settings; one stone tool; optional forced compaction)"
+HARNESS = "r2.1 (v3 settings; one stone tool; lenient call parse; optional forced compaction)"
 MAX_STEPS = 10
 MAX_NEW = 2048
 SAMPLING = {"temperature": 0.1, "top_k": 50, "repeat_penalty": 1.1}
@@ -84,7 +84,7 @@ def _post(base, path, body):
         return json.loads(r.read())
 
 
-TOOL_RE = re.compile(r"<tool_call>\s*<function=([^>\s]+)>(.*?)</function>\s*</tool_call>", re.S)
+TOOL_RE = re.compile(r"<tool_call>\s*<function=([^>]+)>(.*?)</function>\s*</tool_call>", re.S)
 PARAM_RE = re.compile(r"<parameter=([^>\s]+)>\n?(.*?)\n?</parameter>", re.S)
 
 
@@ -95,8 +95,16 @@ def parse_turn(text):
         reasoning, rest = text, ""
     calls = []
     for i, m in enumerate(TOOL_RE.finditer(rest)):
-        args = {k: v for k, v in PARAM_RE.findall(m.group(2))}
-        calls.append({"id": f"call{i}", "type": "function", "function": {"name": m.group(1), "arguments": json.dumps(args)}})
+        name, body = m.group(1).strip(), m.group(2)
+        args = {k: v for k, v in PARAM_RE.findall(body)}
+        # same rule for every condition: <function=stone status> carries the command in the name,
+        # and a bare body with no <parameter> is the command
+        if name.split()[0] == "stone" and " " in name and "command" not in args:
+            args = {"command": name}
+        elif not args and body.strip():
+            args = {"command": body.strip()}
+        calls.append({"id": f"call{i}", "type": "function",
+                      "function": {"name": name.split()[0], "arguments": json.dumps(args)}})
     return reasoning.strip(), TOOL_RE.sub("", rest).strip(), calls
 
 
@@ -216,7 +224,7 @@ def grade_job(job: Path, spec: dict) -> dict:
     final = job / f"{recipe}.stl" if recipe else None
     done = bool(final and final.exists())
     if not done:
-        why.append("stone done never wrote the part")
+        why.append("no finished part")
     exp = spec["expect"]
     if recipe != exp["recipe"]:
         why.append(f"recipe {recipe} (want {exp['recipe']})")
