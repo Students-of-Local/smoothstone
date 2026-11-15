@@ -1,0 +1,23 @@
+{
+  "name": "_demo",
+  "title": "Rounded plate with a hole",
+  "summary": "Flat plate with rounded corners and one through hole. Test recipe.",
+  "tags": ["plate", "test", "hole"],
+  "tier": "S",
+  "params": [
+    {"name": "w", "type": "number", "default": 60, "min": 10, "max": 200, "unit": "mm", "help": "width along X"},
+    {"name": "d", "type": "number", "default": 40, "min": 10, "max": 200, "unit": "mm", "help": "depth along Y"},
+    {"name": "h", "type": "number", "default": 4, "min": 0.2, "max": 20, "unit": "mm", "help": "thickness"},
+    {"name": "corner_r", "type": "number", "default": 4, "min": 0, "max": 50, "unit": "mm", "help": "corner radius"},
+    {"name": "hole_d", "type": "number", "default": 6, "min": 0, "max": 100, "unit": "mm", "help": "hole diameter, 0 for none"},
+    {"name": "hole_place", "type": "choice", "default": "center", "choices": ["center", "left"], "help": "where the hole goes"},
+    {"name": "chamfer", "type": "bool", "default": true, "help": "small chamfer on the top edge"},
+    {"name": "quality", "type": "int", "default": 48, "min": 16, "max": 128, "help": "circle smoothness"}
+  ],
+  "dims": {"x": "w", "y": "d", "z": "h"},
+  "dims_tol": 0.6,
+  "max_bodies": 1,
+  "max_overhang": 0.05,
+  "fix": {"min_wall": "h", "bed": "w", "first_layer": "w"},
+  "examples": [{"name": "small", "params": {"w": 40, "d": 30, "hole_d": 4}}]
+}
