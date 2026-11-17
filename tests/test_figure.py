@@ -121,3 +121,30 @@ def test_mini_alone_does_not_pick_figure(monkeypatch):
     from smoothstone import recipes as rc
     top = rc.rank(list(rc.load_all().values()), "a mini planter for a succulent")[0][1]
     assert top.name != "figure"
+
+
+def test_find_before_a_plan_leaves_a_fan_guard_alone(jobenv, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    from smoothstone import find as findtool
+
+    def no_fetch(*a, **k):
+        raise AssertionError("find downloaded photos for a fan guard")
+
+    monkeypatch.setattr(findtool, "fetch", no_fetch)
+    stone("new", "A guard for a 120 mm fan")
+    before = stone("status")[2]
+    text, code, nxt = stone("find", "fan guard")
+    assert code == 1 and "figure" in text and stone("status")[2] == before
+
+
+def test_own_photo_on_a_figure_plan_goes_to_build(jobenv, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A mini figure of my dog, 80 mm tall")
+    stone("set", "figure", "height=80")
+    assert stone("build")[2] == "stone image <path to photo>"
+    photo = REPO / "examples" / "dog.png"
+    if not photo.exists():
+        photo = REPO / "evals" / "heldout" / "dog.png"
+    text, code, nxt = stone("image", str(photo))
+    assert nxt == "stone build", text
+    assert stone("status")[2] == "stone build"

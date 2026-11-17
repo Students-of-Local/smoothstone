@@ -820,7 +820,11 @@ def image_step(job: Job, path: Path, out: Out):
     # the request names the part ("lithophane", "cookie cutter"): go straight to that recipe
     pic = [r for r in rc.visible(rc.load_all(), config.tier(job.root)) if any(p.type == "image" for p in r.params)]
     ranked = rc.rank(pic, job.request() if job.exists() else "")
-    if ranked and ranked[0][0] > 0 and not job.plan():
+    plan = job.plan() if job.exists() else None
+    if plan and plan.get("recipe") == "figure":
+        out.owns_next = True  # the photo is what the figure plan was waiting for
+        out.next = "stone build"
+    elif ranked and ranked[0][0] > 0 and not plan:
         out.next = f"stone show {ranked[0][1].name}"
     else:
         words = " ".join(w.replace("_", " ") for w in info["recipes"])
@@ -883,8 +887,13 @@ def cmd_find(args, job: Job) -> Out:
         out.next = 'stone find "<who or what>"'
         return out
     plan = job.plan()
-    if plan and plan.get("recipe") not in (None, "figure"):
-        out.fix(f"stone find gets photos for the figure recipe, and this job is {plan['recipe']}; "
+    recipe = plan.get("recipe") if plan else None
+    if not recipe:
+        seen = rc.visible(rc.load_all(), config.tier(job.root))
+        ranked = rc.rank(seen, job.request())
+        recipe = "figure" if ranked and ranked[0][0] > 0 and ranked[0][1].name == "figure" else "another recipe"
+    if recipe != "figure":
+        out.fix(f"stone find gets photos for the figure recipe, and this job is {recipe}; "
                 "stone recipes lists the recipes")
         out.next = _fallback_next(job, [])
         out.result = "find refused: the plan is not a figure"
