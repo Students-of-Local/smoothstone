@@ -366,7 +366,7 @@ def coerce(p: Param, raw: str, image_paths: dict[str, Path] | None = None):
         f = Path(raw).expanduser()
         if not f.is_file():
             raise ParamError(f"{p.name}: no file at {raw}, use {p.name}=image after stone image")
-        want = ".svg" if p.image_kind in ("silhouette", "outline") else ".png"
+        want = {"silhouette": ".svg", "outline": ".svg", "figure": ".stl"}.get(p.image_kind, ".png")
         if f.suffix.lower() != want:
             raise ParamError(
                 f"{p.name} needs a {want} file, run stone image {raw} then set {p.name}=image"

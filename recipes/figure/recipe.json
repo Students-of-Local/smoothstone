@@ -1,0 +1,148 @@
+{
+  "name": "figure",
+  "title": "Figure",
+  "summary": "A 3D figure of a person, pet or thing from photos (stone find or a photo), on a plinth with its name.",
+  "tags": [
+    "figure",
+    "figurine",
+    "minifig",
+    "mini",
+    "statue",
+    "statuette",
+    "bust",
+    "toy",
+    "chibi",
+    "collectible",
+    "likeness",
+    "person",
+    "pet",
+    "character",
+    "doll",
+    "model",
+    "replica",
+    "copy",
+    "sculpture"
+  ],
+  "params": [
+    {
+      "name": "figure",
+      "type": "image",
+      "default": "",
+      "image_kind": "figure",
+      "required": true,
+      "help": "the figure from stone build; give photos with stone find or stone image"
+    },
+    {
+      "name": "height",
+      "type": "number",
+      "default": 90,
+      "min": 40,
+      "max": 250,
+      "unit": "mm",
+      "help": "total height with the plinth"
+    },
+    {
+      "name": "style",
+      "type": "choice",
+      "default": "chibi",
+      "choices": [
+        "chibi",
+        "statue",
+        "bust",
+        "object"
+      ],
+      "help": "chibi: big head collectible; statue: real proportions; bust: head and shoulders; object: a copy of a thing"
+    },
+    {
+      "name": "base",
+      "type": "choice",
+      "default": "round",
+      "choices": [
+        "round",
+        "hex",
+        "none"
+      ],
+      "help": "plinth shape"
+    },
+    {
+      "name": "base_d",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 200,
+      "unit": "mm",
+      "help": "plinth diameter, 0 fits the figure"
+    },
+    {
+      "name": "base_h",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 30,
+      "unit": "mm",
+      "help": "plinth height, 0 picks 12 with a name and 8 without"
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "default": "",
+      "help": "name raised on the front of the plinth"
+    },
+    {
+      "name": "font",
+      "type": "choice",
+      "default": "sans",
+      "choices": [
+        "sans",
+        "serif",
+        "mono"
+      ],
+      "help": "font for the name"
+    },
+    {
+      "name": "spin",
+      "type": "number",
+      "default": 0,
+      "min": -180,
+      "max": 180,
+      "unit": "deg",
+      "help": "turn the figure on the plinth"
+    },
+    {
+      "name": "seed",
+      "type": "int",
+      "default": 7,
+      "min": 0,
+      "max": 99999,
+      "help": "another seed makes another take on the same photos"
+    },
+    {
+      "name": "quality",
+      "type": "int",
+      "default": 96,
+      "min": 32,
+      "max": 256,
+      "help": "circle smoothness"
+    }
+  ],
+  "dims": {
+    "z": "height"
+  },
+  "dims_tol": 1.0,
+  "max_bodies": 1,
+  "max_overhang": 0.6,
+  "supports": true,
+  "min_wall": 0.6,
+  "fix": {
+    "min_wall": {
+      "param": "height",
+      "dir": "up"
+    },
+    "bed": {
+      "param": "height",
+      "dir": "down"
+    }
+  },
+  "examples": [],
+  "tier": "S"
+}

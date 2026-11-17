@@ -1,0 +1,11 @@
+{
+ "id": "f1_jensen",
+ "request": "A mini figure of Jensen Huang, 90 mm tall, with \"JENSEN\" on the base.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "JENSEN"
+  }
+ }
+}

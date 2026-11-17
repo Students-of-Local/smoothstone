@@ -11,6 +11,12 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - Check every new recipe with: uv run python tools/sheet.py <name>, and look at the previews.
 - Stop when the request's part is built with stone and the build says Part ready.
 
+## Figures and image models
+- The figure recipe takes a unit-height mesh (image_kind "figure"). stone builds it from photos
+  with src/smoothstone/figure.py: describe (LFM3-VL-2B), style (FLUX.2 klein 4B), lift
+  (tools/lift), repair. Every step is cached in the job's images/figure folder.
+- You may pass your own mesh: stone set figure figure=path/to/unit_height.stl.
+
 ## Recipe format
 - recipe.scad: one assignment per parameter at the top, with a comment that gives the unit, then
   the geometry. Base on z = 0, centered in X and Y, millimeters. stone passes values with -D.

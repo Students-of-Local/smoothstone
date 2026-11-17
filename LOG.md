@@ -137,3 +137,22 @@ Run from frozen/066096c, 5 seeds a condition, LFM3-1.7B on llama-server. This is
 - No card: 37/40.
 
 Misses: round_bottom left on in 2 compacted runs, font sans for mono in 2 runs, and 2 no-card lithophane runs that never finished a part.
+
+## 2026-11-17 figure recipe
+
+A new recipe makes a figure of a person, animal or object from photos, on a drum plinth with the name raised on its front. The driving model only sets parameters. When there is no photo, build says FIX and NEXT is `stone find "<who>"`, which pulls license-filtered photos from Wikimedia Commons and Wikidata. Four local helpers then run one at a time, each skipped when its file is already there:
+
+- describe: LFM3-VL-2B 4 bit through mlx-vlm, 3.0 GB, 11 to 16 s, one sentence on how the subject looks.
+- style: FLUX.2 klein 4B 4 bit through mflux --low-ram, 7.8 GB, 1 to 2 min, a chibi front view on white.
+- lift: Hunyuan3D-2mini on MPS, octree 256 and chunks 4000, 9.04 GB peak, 234 s. The defaults (octree 380) peaked at 12.35 GB.
+- repair: trimesh keeps the main body, closes it and decimates to 250k faces.
+
+Driver: LFM3-1.7B Q4_K_M on Parish1's CPU through llama-server, 1.2 GB RSS, request evals/figure/f1_jensen.json, S card.
+
+- Run 1 (runs3): PASS, but the lead photo was serious and three quarter, so the figure lost the jacket and the smile, and find downloaded the same file twice.
+- Changes after run 1: the describe step (the style model kept the likeness far better with that sentence in its prompt), clothing in the person prompt with no expression, a friendly smile in the chibi look, and find dedupes by title (test_lead_is_not_downloaded_twice).
+- Run 2 (runs4): PASS in 8 commands: status, recipes, show figure, set figure height=90 name=JENSEN, build (FIX, then find), find "Jensen Huang", build (329 s, Part ready), status. The figure is 61 x 61 x 90 mm, one watertight body, 253,354 faces.
+
+Measuring from a photo: an outline traced from a photo with a ruler or card in it took the ruler too. image now crops to the bbox that measure found when the photo is the same file, in either order (test_outline_leaves_the_ruler_out, which failed before the fix).
+
+Suite: 117 passed.

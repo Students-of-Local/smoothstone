@@ -25,6 +25,21 @@ card's rules on every call, so they come back after a compaction.
 `stone new "<request>" --image photo.png` (or `stone image photo.png`) traces outlines for
 keychains, cookie cutters and signs, and makes a height map for lithophanes and reliefs.
 
+## Figures of people, pets and things
+
+The figure recipe makes a mini figure on a round plinth with a name on it. Ask for it plainly:
+`stone new 'A mini figure of Jensen Huang, 90 mm tall, with "JENSEN" on the base'`. With no
+photo, stone build says to run `stone find "<name>"`, which downloads free-licensed photos from
+Wikimedia Commons and writes credits.txt. With your own photo, run `stone image <photo>` instead.
+Then stone build runs three local models (describe, style, lift) and the print checks. Run
+tools/figure/setup.sh once first.
+
+## Measuring from a photo
+
+When a photo has a ruler, a bank card or a US quarter beside the object, `stone measure
+<photo>` (with `--ref card` or `--ref coin-us-quarter` for those) finds the object's real size,
+and stone show fills it in. `--known 120mm` works when you know the long side.
+
 ## Start
 
 stone status

@@ -20,6 +20,11 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 5. stone build. If a line starts with FIX, run the NEXT line it gives, then stone build again.
    When every check passes, the build says Part ready. Then stop.
 
+## Figures
+For a figure, statue or bust of a person, pet or thing, the recipe is figure. Set height and
+name only. If stone build prints FIX and NEXT: stone find "<name>", run that line, then run
+stone build again. The build takes a few minutes.
+
 ## Example
 Request: A guard for a 92 mm fan with a honeycomb grille.
 stone status -> NEXT: stone recipes
@@ -32,3 +37,9 @@ stone show gridfinity_bin -> From the request: grid_x=2 grid_y=1; Not placed yet
 div_x means dividers across X. 4 sections need 3 dividers.
 stone set gridfinity_bin grid_x=2 grid_y=1 div_x=3
 stone build -> all PASS, Part ready, NEXT: none, the part is ready
+
+Request: A mini figure of Ada Lovelace, 80 mm tall, with "ADA" on the base.
+stone set figure height=80 name=ADA
+stone build -> FIX the figure needs photos, NEXT: stone find "Ada Lovelace"
+stone find "Ada Lovelace" -> NEXT: stone build
+stone build -> Part ready
