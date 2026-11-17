@@ -881,22 +881,27 @@ def cmd_find(args, job: Job) -> Out:
     out = Out(owns_next=False)
     if not need_job(job, out):
         return out
+    plan = job.plan()
+    recipe = plan.get("recipe") if plan else None
+    other = None  # a part recipe the request names, ahead of figure
+    if not recipe:
+        ranked = rc.rank(rc.visible(rc.load_all(), config.tier(job.root)), job.request())
+        fig = next((s for s, r in ranked if r.name == "figure"), 0)
+        if ranked and ranked[0][0] > fig and ranked[0][1].name != "figure":
+            other = ranked[0][1].name
+    elif recipe != "figure":
+        other = recipe
+    if other:
+        out.fix(f"stone find gets photos for the figure recipe, and this job is {other}")
+        out.next = _fallback_next(job, []) if plan else f"stone show {other}"
+        if out.next.startswith("stone find"):
+            out.next = f"stone show {other}"
+        out.result = "find refused: the job is not a figure"
+        return out
     query = " ".join(args.query).strip().strip('"\'') or findtool.subject_from_request(job.request()) or ""
     if not query:
         out.fix('say who or what to find, like stone find "Ada Lovelace"')
         out.next = 'stone find "<who or what>"'
-        return out
-    plan = job.plan()
-    recipe = plan.get("recipe") if plan else None
-    if not recipe:
-        seen = rc.visible(rc.load_all(), config.tier(job.root))
-        ranked = rc.rank(seen, job.request())
-        recipe = "figure" if ranked and ranked[0][0] > 0 and ranked[0][1].name == "figure" else "another recipe"
-    if recipe != "figure":
-        out.fix(f"stone find gets photos for the figure recipe, and this job is {recipe}; "
-                "stone recipes lists the recipes")
-        out.next = _fallback_next(job, [])
-        out.result = "find refused: the plan is not a figure"
         return out
     try:
         got = findtool.fetch(query, job.image_dir / "found", n=args.n)

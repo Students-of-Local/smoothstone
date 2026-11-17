@@ -132,9 +132,8 @@ def test_find_before_a_plan_leaves_a_fan_guard_alone(jobenv, monkeypatch):
 
     monkeypatch.setattr(findtool, "fetch", no_fetch)
     stone("new", "A guard for a 120 mm fan")
-    before = stone("status")[2]
     text, code, nxt = stone("find", "fan guard")
-    assert code == 1 and "figure" in text and stone("status")[2] == before
+    assert code == 1 and "figure" in text and nxt == "stone show fan_guard"
 
 
 def test_own_photo_on_a_figure_plan_goes_to_build(jobenv, monkeypatch):
@@ -148,3 +147,20 @@ def test_own_photo_on_a_figure_plan_goes_to_build(jobenv, monkeypatch):
     text, code, nxt = stone("image", str(photo))
     assert nxt == "stone build", text
     assert stone("status")[2] == "stone build"
+
+
+@pytest.mark.parametrize("request_text", ["A guard for a 120 mm fan", "A mini Abraham Lincoln, 80 mm tall",
+                                          "A minifigure of Ada Lovelace", "a tiny Einstein"])
+def test_find_never_loops_back_to_find(jobenv, monkeypatch, request_text):
+    """A bare find, then a named find: the second NEXT is never another find that refuses."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    from smoothstone import find as findtool
+    got = []
+    monkeypatch.setattr(findtool, "fetch", lambda q, d, n=4: got.append(q) or [])
+    stone("new", request_text)
+    stone("find")
+    text, code, nxt = stone("find", "fan guard" if "fan" in request_text else "Abraham Lincoln")
+    if "fan" in request_text:
+        assert not got and code == 1 and not nxt.startswith("stone find")
+    else:
+        assert got, text  # a subject with no part named is a figure
