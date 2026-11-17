@@ -882,6 +882,13 @@ def cmd_find(args, job: Job) -> Out:
         out.fix('say who or what to find, like stone find "Ada Lovelace"')
         out.next = 'stone find "<who or what>"'
         return out
+    plan = job.plan()
+    if plan and plan.get("recipe") not in (None, "figure"):
+        out.fix(f"stone find gets photos for the figure recipe, and this job is {plan['recipe']}; "
+                "stone recipes lists the recipes")
+        out.next = _fallback_next(job, [])
+        out.result = "find refused: the plan is not a figure"
+        return out
     try:
         got = findtool.fetch(query, job.image_dir / "found", n=args.n)
     except findtool.FindProblem as e:
@@ -893,7 +900,6 @@ def cmd_find(args, job: Job) -> Out:
     for g in got:
         out.add(f"{Path(g['file']).name}: {g['license']}, by {g['author'] or 'unknown'}")
     out.add(f"Credits: {job.image_dir / 'found' / 'credits.txt'} (name them when you share the part)")
-    plan = job.plan()
     out.owns_next = True  # the photos are what the plan was waiting for
     if plan and plan.get("recipe") == "figure":
         out.next = "stone build"
