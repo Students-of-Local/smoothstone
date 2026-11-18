@@ -237,3 +237,19 @@ def test_a_smooth_band_all_round_stays():
     m = _tube()
     region, merged = _merge(m, np.zeros(len(m.faces), bool))
     assert merged == [] and (region == 2).any()
+
+
+def test_ledges_do_not_depend_on_the_vertex_order():
+    """Review sol-F1: ledges() must index its own mesh's vertices, so shuffling the input
+    vertices (faces remapped to match) gives the same result."""
+    m = collar_figure()
+    plane = {**_line("neck", 11.0, 4.2), "curve": None}
+    V, F, lab = _paint(m, plane)
+    perm = np.random.default_rng(3).permutation(len(V))
+    inv = np.empty_like(perm)
+    inv[perm] = np.arange(len(perm))
+    V2, F2 = np.asarray(V)[perm], inv[np.asarray(F)]
+    a, b = C.ledges(V, F, lab, [plane]), C.ledges(V2, F2, lab, [plane])
+    assert a[0]["faces"] > 0, a
+    assert [(x["area"], x["angle"], x["fil"], x["faces"]) for x in a] == \
+        [(x["area"], x["angle"], x["fil"], x["faces"]) for x in b], (a, b)

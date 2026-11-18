@@ -934,7 +934,7 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
         e = diff & near[adj[:, 0]] & near[adj[:, 1]]
         e &= np.isin(face_fil[adj[:, 0]], (U, L)) & np.isin(face_fil[adj[:, 1]], (U, L))
         if U != L and e.any():
-            mid = V[ev[e]].mean(1)
+            mid = mesh.vertices[ev[e]].mean(1)  # ev indexes the rebuilt mesh's vertices
             cand = np.where(near & (nz > LEDGE_NZ) & (face_fil == U))[0]
             if len(cand):
                 dist, _ = cKDTree(mid).query(c[cand], distance_upper_bound=LEDGE_MM)
