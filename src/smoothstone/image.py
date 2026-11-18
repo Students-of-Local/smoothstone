@@ -178,14 +178,22 @@ def _svg_contours(mask: np.ndarray, out: Path, width_mm: float, height_mm: float
     )
 
 
-def process(src: Path, out_dir: Path) -> dict:
-    """Copy src into out_dir and write silhouette.svg, outline.svg, height.png, info.json."""
+def process(src: Path, out_dir: Path, box: list[int] | None = None) -> dict:
+    """Copy src into out_dir and write silhouette.svg, outline.svg, height.png, info.json.
+
+    box is the object's box in the photo's pixels ([x0, y0, x1, y1], from stone measure). The
+    outline and height map then cover only the object, so a ruler or card beside it stays out.
+    """
     src = Path(src)
     out_dir = Path(out_dir)
     if not src.is_file():
         raise ImageProblem(f"no file at {src}")
     out_dir.mkdir(parents=True, exist_ok=True)
     im = _open(src)
+    if box:
+        x0, y0, x1, y1 = box
+        pad = round(0.04 * max(x1 - x0, y1 - y0))
+        im = im.crop((max(0, x0 - pad), max(0, y0 - pad), min(im.width, x1 + pad), min(im.height, y1 + pad)))
     dest = out_dir / ("source" + (src.suffix.lower() or ".png"))
     if src.resolve() != dest.resolve():
         shutil.copyfile(src, dest)
@@ -230,6 +238,7 @@ def process(src: Path, out_dir: Path) -> dict:
     kind = "silhouette" if (used_alpha or eta >= 0.75) and fill < 0.70 else "photo"
     info = {
         "source": str(dest),
+        "crop": list(box) if box else None,
         "width_px": im.width,
         "height_px": im.height,
         "image_aspect": round(im.width / im.height, 4),

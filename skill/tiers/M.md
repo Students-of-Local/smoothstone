@@ -18,6 +18,11 @@ recipe and the settings that make the part look its best, then let stone build a
 - From a picture: run stone image first. Outline shapes suit keychain, cookie_cutter and sign;
   photos suit lithophane and relief.
 
+- Figures: style chibi (big head, the default), statue (natural proportions) or bust. Keep the
+  name short, under about 10 letters, so it fits the plinth's front arc. 70 to 120 mm tall
+  prints well. Use stone find for a public figure, stone image for the user's own photo.
+- Photos with a ruler, card or coin beside the object: run stone measure first for real sizes.
+
 ## Steps
 1. stone status (stone new "<request>" if there is no job; add --image PATH for a picture)
 2. stone recipes <words>, stone show <recipe>

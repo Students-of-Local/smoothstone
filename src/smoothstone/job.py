@@ -56,6 +56,17 @@ class Job:
     def build_dir(self) -> Path:
         return self.root / "build"
 
+    @property
+    def measure_file(self) -> Path:
+        return self.root / "measure.json"
+
+    def measured(self) -> dict | None:
+        """The last stone measure result with a scale and an object, if any."""
+        m = read_json(self.measure_file)
+        if isinstance(m, dict) and m.get("mm_per_px") and (m.get("object") or {}).get("long_mm"):
+            return m
+        return None
+
     def exists(self) -> bool:
         return self.brief_file.is_file() or self.status_file.is_file()
 
@@ -147,4 +158,15 @@ class Job:
             out["outline"] = self.image_dir / "outline.svg"
         if png.is_file():
             out["height"] = png
+        latest = self.image_dir / "figure" / "latest.txt"
+        if latest.is_file():
+            fig = Path(latest.read_text().strip())
+            if fig.is_file():
+                out["figure"] = fig
         return out
+
+    def photos(self) -> list[Path]:
+        """Photos for a figure: found ones first, then the picture given with stone image."""
+        found = sorted((self.image_dir / "found").glob("photo_*"))
+        given = sorted(self.image_dir.glob("source.*"))
+        return given + found if given else found

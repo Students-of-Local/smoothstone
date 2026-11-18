@@ -1,0 +1,9 @@
+{
+  "image": "blender_ruler.jpg",
+  "made_by": "render_blender.py (Blender 5.2, Cycles)",
+  "object_mm": [60.0, 35.0],
+  "ruler_mm_per_px_beside_object": 0.16203,
+  "object_mm_at_ruler_scale": [64.66, 38.14],
+  "max_error": 0.12,
+  "why": "The camera is tilted 14 deg and the block is about 7 percent nearer the camera than the ruler, so even a perfect measurement at the ruler's scale reads the block 7.8 and 9.0 percent large. ruler_mm_per_px_beside_object and object_mm_at_ruler_scale come from projecting the true corners through the render camera; they check the method itself. max_error bounds the raw error against the real 60 x 35 mm."
+}

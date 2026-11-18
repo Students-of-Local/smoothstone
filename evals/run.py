@@ -65,7 +65,8 @@ def run_stone(command: str, env: dict, cwd: Path) -> str:
     if not argv:
         return "FIX: empty command.\nNEXT: stone status"
     try:
-        p = subprocess.run([STONE, *argv], capture_output=True, text=True, env=env, cwd=cwd, timeout=420)
+        p = subprocess.run([STONE, *argv], capture_output=True, text=True, env=env, cwd=cwd,
+                           timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "420")))
     except subprocess.TimeoutExpired:
         return "FIX: the command ran too long.\nNEXT: stone status"
     out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr and not p.stdout else "")

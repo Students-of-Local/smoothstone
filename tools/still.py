@@ -4,7 +4,7 @@ blender -b --python tools/still.py -- <part.stl> <out.png> [color] [res] [sample
 
 color is a PLA name from COLORS. STILL_BACKLIT=1 is for lithophanes: thin white PLA lit from behind,
 seen from the front. The mesh is the STL as written; it is only centered on the bed
-and framed by its own size. Cycles on the CPU (set STILL_GPU=1 for OptiX), denoised.
+and framed by its own size. Cycles on the CPU (STILL_GPU=1 for OptiX, STILL_GPU=metal on a Mac), denoised.
 """
 import math
 import os
@@ -32,10 +32,11 @@ scene = bpy.context.scene
 scene.render.engine = "CYCLES"
 if os.environ.get("STILL_GPU"):
     prefs = bpy.context.preferences.addons["cycles"].preferences
-    prefs.compute_device_type = "OPTIX"
+    kind = "METAL" if os.environ["STILL_GPU"].lower() == "metal" else "OPTIX"
+    prefs.compute_device_type = kind
     prefs.get_devices()
     for d in prefs.devices:
-        d.use = d.type == "OPTIX"
+        d.use = d.type == kind
     scene.cycles.device = "GPU"
 else:
     scene.cycles.device = "CPU"

@@ -8,6 +8,7 @@ import math
 import re
 import shutil
 import sys
+import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,6 +16,9 @@ from pathlib import Path
 from . import match, check as checks
 from . import config
 from . import image as imagetool
+from . import measure as measuretool
+from . import find as findtool
+from . import figure as figuretool
 from . import recipes as rc
 from . import scad
 from .job import Job, read_json, write_json
@@ -109,13 +113,32 @@ def params_summary(r: rc.Recipe, params: dict) -> str:
     return " ".join(ch) + f" ({rest} more at default)"
 
 
+def measured_size(job: Job | None, r: rc.Recipe) -> tuple[str, float, float] | None:
+    """(param, value, measured mm): the size a measured object gives this picture recipe."""
+    name = measuretool.SIZE_PARAMS.get(r.name)
+    p = r.param(name) if name else None
+    m = job.measured() if job and p is not None else None
+    if m is None:
+        return None
+    mm = round(float(m["object"]["long_mm"]), 1)
+    v = mm
+    if p.min is not None:
+        v = max(v, float(p.min))
+    if p.max is not None:
+        v = min(v, float(p.max))
+    return p.name, v, mm
+
+
 def build_params(job: Job | None, r: rc.Recipe, given: dict) -> dict:
-    """Defaults + plan, with the job image filled into unset image params."""
+    """Defaults + plan, with the job image filled into unset image params and a measured size."""
     merged = r.merged(given)
     imgs = job.image_paths() if job else {}
     for p in r.params:
         if p.type == "image" and p.name not in given and p.image_kind in imgs:
             merged[p.name] = str(imgs[p.image_kind].resolve())
+    ms = measured_size(job, r)
+    if ms and ms[0] not in given:
+        merged[ms[0]] = ms[1]
     return merged
 
 
@@ -154,6 +177,10 @@ def cmd_status(args, job: Job) -> Out:
             f"Image: {info.get('kind')}, aspect {float(info.get('aspect', 0)):.2f}, "
             f"{info.get('shapes')} shapes, param value: image"
         )
+    m = job.measured()
+    if m:
+        o = m["object"]
+        out.add(f"Measured: object {o['long_mm']:.1f} x {o['short_mm']:.1f} mm (from {m['method']})")
     plan = job.plan()
     if plan:
         r = rc.load(plan["recipe"])
@@ -294,9 +321,13 @@ def cmd_show(args, job: Job) -> Out:
     if sug:
         items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items()]
         out.add(f"From the request: {' '.join(items)}")
+    ms = measured_size(job, r) if job.exists() else None
+    if ms and ms[0] not in sug:
+        clamp = f", the measured {rc.fmt_num(ms[2])} mm is out of range" if ms[1] != ms[2] else ""
+        out.add(f"From the picture: {ms[0]}={rc.fmt_num(ms[1])} (object long side in mm{clamp})")
     if left:
         out.add(f"Not placed yet: {'; '.join(left[:4])}. If one is a size of this part, add it with its parameter name.")
-    elif request:
+    elif request and not sug:
         out.add("Nothing in the request names a parameter; the defaults make a good part.")
     out.add("Parameters (name = default):")
     room = MAX_LINES - len(out.lines) - 3
@@ -594,6 +625,12 @@ def cmd_build(args, job: Job) -> Out:
     given = {k: v for k, v in plan["params"].items() if r.param(k)}
     dropped = sorted(set(plan["params"]) - set(given))
     params = build_params(job, r, given)
+    fig = next((p for p in r.params if p.type == "image" and p.image_kind == "figure"), None)
+    if fig is not None and fig.name not in given:
+        made = figure_step(job, r, params, out)
+        if made is None:
+            return out
+        params[fig.name] = str(made)
     for p in r.params:
         if p.required and not params.get(p.name) and not (p.required_unless and params.get(p.required_unless)):
             other = f" or set {p.required_unless}" if p.required_unless else ""
@@ -742,9 +779,23 @@ def cmd_check(args, job: Job) -> Out:
 # image
 
 
-def image_step(job: Job, path: Path, out: Out):
+def measured_crop(job: Job, path: Path) -> list[int] | None:
+    """The measured object's box when stone measure ran on this same photo, else None."""
+    m = job.measured() if job.exists() else None
+    src = Path((m or {}).get("source", ""))
+    box = ((m or {}).get("object") or {}).get("bbox_px")
     try:
-        info = imagetool.process(path.expanduser(), job.image_dir)
+        same = src.is_file() and path.is_file() and src.read_bytes() == path.read_bytes()
+    except OSError:
+        same = False
+    return box if same and box else None
+
+
+def image_step(job: Job, path: Path, out: Out):
+    path = path.expanduser()
+    crop = measured_crop(job, path)
+    try:
+        info = imagetool.process(path, job.image_dir, box=crop)
     except imagetool.ImageProblem as e:
         job.log("image failed:\n" + traceback.format_exc())
         out.fix(f"{e}; give a PNG or JPG picture")
@@ -752,7 +803,7 @@ def image_step(job: Job, path: Path, out: Out):
         out.result = f"image failed: {e}"
         return None
     w, h = info["svg_size_mm"]
-    out.add(f"Image: {info['source']}")
+    out.add(f"Image: {info['source']}" + (" (cropped to the measured object)" if crop else ""))
     out.add(
         f"Aspect {info['aspect']:.2f} (subject width / height), picture {info['image_aspect']:.2f}"
     )
@@ -769,7 +820,11 @@ def image_step(job: Job, path: Path, out: Out):
     # the request names the part ("lithophane", "cookie cutter"): go straight to that recipe
     pic = [r for r in rc.visible(rc.load_all(), config.tier(job.root)) if any(p.type == "image" for p in r.params)]
     ranked = rc.rank(pic, job.request() if job.exists() else "")
-    if ranked and ranked[0][0] > 0 and not job.plan():
+    plan = job.plan() if job.exists() else None
+    if plan and plan.get("recipe") == "figure":
+        out.owns_next = True  # the photo is what the figure plan was waiting for
+        out.next = "stone build"
+    elif ranked and ranked[0][0] > 0 and not plan:
         out.next = f"stone show {ranked[0][1].name}"
     else:
         words = " ".join(w.replace("_", " ") for w in info["recipes"])
@@ -777,6 +832,97 @@ def image_step(job: Job, path: Path, out: Out):
     out.stage = "image" if not job.plan() else None
     out.result = f"image {info['kind']}, aspect {info['aspect']:.2f}"
     return info
+
+
+ANIMALS = {"dog", "puppy", "cat", "kitten", "pet", "bird", "horse", "rabbit", "bunny", "fox",
+           "bear", "lion", "tiger", "owl", "parrot", "hamster", "corgi", "pug", "frog", "turtle"}
+
+
+def figure_who(job: Job, style: str) -> str:
+    if style == "object":
+        return "object"
+    words = set(re.findall(r"[a-z]+", job.request().lower())) if job.exists() else set()
+    return "animal" if words & ANIMALS else "person"
+
+
+def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
+    """Photos -> styled render -> 3D figure, cached in images/figure. None after a FIX."""
+    photos = job.photos()
+    if not photos:
+        who = findtool.subject_from_request(job.request()) if job.exists() else None
+        out.add(f"Recipe: {r.name}")
+        out.fix("the figure needs photos" + (f" of {who}" if who else "") + " first")
+        out.next = f'stone find "{who}"' if who else "stone image <path to photo>"
+        out.stage = "needs_image"
+        out.result = "needs photos"
+        return None
+    style = str(params.get("style") or "chibi")
+    who = figure_who(job, style)
+    t0 = time.time()
+    try:
+        made = figuretool.make(photos, job.image_dir / "figure", style_name=style, who=who,
+                               seed=int(params.get("seed") or 7), say=lambda s: job.log(s))
+    except figuretool.FigureProblem as e:
+        job.log("figure failed:\n" + traceback.format_exc())
+        out.add(f"Recipe: {r.name}")
+        out.fix(str(e))
+        out.next = "stone build"
+        out.stage = "build_failed"
+        out.result = f"figure failed: {e}"[:120]
+        out.code = 1
+        return None
+    secs = time.time() - t0
+    out.add(f"Figure: {style} {who} from {len(photos)} photos"
+            + (f" ({secs:.0f} s)" if secs > 2 else " (made before)"))
+    return made
+
+
+def cmd_find(args, job: Job) -> Out:
+    out = Out(owns_next=False)
+    if not need_job(job, out):
+        return out
+    plan = job.plan()
+    recipe = plan.get("recipe") if plan else None
+    other = None  # a part recipe the request names, ahead of figure
+    if not recipe:
+        ranked = rc.rank(rc.visible(rc.load_all(), config.tier(job.root)), job.request())
+        fig = next((s for s, r in ranked if r.name == "figure"), 0)
+        if ranked and ranked[0][0] > fig and ranked[0][1].name != "figure":
+            other = ranked[0][1].name
+    elif recipe != "figure":
+        other = recipe
+    if other:
+        out.fix(f"stone find gets photos for the figure recipe, and this job is {other}")
+        out.next = _fallback_next(job, []) if plan else f"stone show {other}"
+        if out.next.startswith("stone find"):
+            out.next = f"stone show {other}"
+        out.result = "find refused: the job is not a figure"
+        return out
+    query = " ".join(args.query).strip().strip('"\'') or findtool.subject_from_request(job.request()) or ""
+    if not query:
+        out.fix('say who or what to find, like stone find "Ada Lovelace"')
+        out.next = 'stone find "<who or what>"'
+        return out
+    try:
+        got = findtool.fetch(query, job.image_dir / "found", n=args.n)
+    except findtool.FindProblem as e:
+        out.fix(f"{e}; give your own photo with stone image <path to photo>")
+        out.next = "stone image <path to photo>"
+        out.result = f"find failed: {e}"
+        return out
+    out.add(f"Found {len(got)} free-licensed photos of {query} on Wikimedia Commons:")
+    for g in got:
+        out.add(f"{Path(g['file']).name}: {g['license']}, by {g['author'] or 'unknown'}")
+    out.add(f"Credits: {job.image_dir / 'found' / 'credits.txt'} (name them when you share the part)")
+    out.owns_next = True  # the photos are what the plan was waiting for
+    if plan and plan.get("recipe") == "figure":
+        out.next = "stone build"
+        out.stage = "plan"
+    else:
+        out.next = "stone show figure"
+        out.stage = "image"
+    out.result = f"found {len(got)} photos of {query}"
+    return out
 
 
 def cmd_image(args, job: Job) -> Out:
@@ -791,6 +937,96 @@ def cmd_image(args, job: Job) -> Out:
         out.next = _fallback_next(job, [])
         return out
     image_step(job, Path(args.path), out)
+    return out
+
+
+# measure
+
+
+def cmd_measure(args, job: Job) -> Out:
+    out = Out(owns_next=False)
+    path = args.path
+    if not path:
+        info = read_json(job.image_dir / "info.json") if job.exists() else None
+        if info and Path(info.get("source", "")).is_file():
+            path = info["source"]
+        else:
+            out.fix("name the photo, like stone measure photo.jpg")
+            out.next = "stone measure <path to photo>"
+            return out
+    known = None
+    if args.known:
+        try:
+            known = measuretool.parse_known(args.known)
+        except measuretool.MeasureProblem as e:
+            out.fix(str(e))
+            out.next = f"stone measure {path} --known 120mm"
+            return out
+    try:
+        res = measuretool.measure(Path(path).expanduser(), ref=args.ref, known_mm=known)
+    except measuretool.MeasureProblem as e:
+        out.fix(str(e))
+        out.next = f"stone measure {path} --ref card"
+        return out
+    except imagetool.ImageProblem as e:
+        job.log("measure failed:\n" + traceback.format_exc())
+        out.fix(f"{e}; give a PNG or JPG photo")
+        out.next = "stone measure <path to photo>"
+        return out
+    out.add(f"Photo: {path}")
+    ru = res.get("ruler")
+    if ru:
+        out.add(f"Ruler: {res['unit']}, ticks {ru['tick']} apart, {ru['ticks']} ticks, at {ru['angle_deg']:g} deg.")
+    out.add(res["assumed"])
+    o = res.get("object")
+    if res["mm_per_px"] is None:
+        out.fix("add --known <long side>mm, or --ref card or --ref coin-us-quarter if one is in the photo")
+        out.next = f"stone measure {path} --known <long side>mm"
+        out.result = "measure: no scale"
+        return out
+    out.add(f"Scale: {res['mm_per_px']:.4f} mm per pixel ({1 / res['mm_per_px']:.2f} pixels per mm).")
+    if not o or not o.get("long_mm"):
+        out.fix("found no object apart from the reference; the object needs a plain surface around it")
+        out.next = "stone measure <path to photo>"
+        out.result = "measure: no object"
+        return out
+    out.add(f"Object: {o['long_mm']:.1f} x {o['short_mm']:.1f} mm (long x short side), "
+            f"box {o['bbox_mm'][0]:.1f} x {o['bbox_mm'][1]:.1f} mm.")
+    out.add(f"Confidence: {res['confidence']:.2f}" + (" (low, check the size)" if res["confidence"] < 0.5 else ""))
+    for n in res.get("notes", [])[:3]:
+        out.add(n)
+    out.result = f"measured {o['long_mm']:.1f} x {o['short_mm']:.1f} mm ({res['method']})"
+    if not job.exists():
+        out.add("No job, so the size is not saved.")
+        out.next = f'stone new "<what to make>" --image {path}'
+        return out
+    write_json(job.measure_file, res)
+    out.add(f"Saved to the job: picture recipes take {o['long_mm']:.1f} mm as their size.")
+    info = read_json(job.image_dir / "info.json")
+    traced = Path(info["source"]) if info and info.get("source") else None
+    crop = measured_crop(job, traced) if traced and not info.get("crop") else None
+    if crop:
+        try:
+            imagetool.process(traced, job.image_dir, box=crop)
+            out.add("Traced the outline again around the object only, without the ruler or card.")
+        except imagetool.ImageProblem:
+            job.log("retrace after measure failed:\n" + traceback.format_exc())
+    plan = job.plan()
+    r = rc.load(plan["recipe"]) if plan else None
+    ms = measured_size(job, r) if r else None
+    if r and ms and ms[0] not in plan["params"]:
+        out.add(f"Plan size now {ms[0]}={rc.fmt_num(ms[1])}.")
+        out.next = "stone build"
+        out.owns_next = True
+        job.update(passed=False)
+    elif not read_json(job.image_dir / "info.json"):
+        out.next = f"stone image {path}"
+    elif plan:
+        out.next = "stone build" if not job.status().get("passed") else DONE_NEXT
+    else:
+        pic = [x for x in rc.visible(rc.load_all(), config.tier(job.root)) if x.name in measuretool.SIZE_PARAMS]
+        ranked = rc.rank(pic, job.request())
+        out.next = f"stone show {ranked[0][1].name}" if ranked and ranked[0][0] > 0 else "stone recipes"
     return out
 
 
@@ -885,6 +1121,15 @@ def make_parser() -> Parser:
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
 
+    s = sub.add_parser("measure", parents=[common], help="real size from a ruler in the photo")
+    s.add_argument("path", nargs="?")
+    s.add_argument("--ref", help="card or coin-us-quarter, when there is no ruler")
+    s.add_argument("--known", help="the object's long side, like 120mm, when there is no ruler")
+
+    s = sub.add_parser("find", parents=[common], help="free-licensed photos of a person or thing")
+    s.add_argument("query", nargs="*")
+    s.add_argument("-n", type=int, default=3)
+
     sub.add_parser("done", parents=[common], help="finish the job")
     return p
 
@@ -898,6 +1143,8 @@ COMMANDS = {
     "build": cmd_build,
     "check": cmd_check,
     "image": cmd_image,
+    "measure": cmd_measure,
+    "find": cmd_find,
     "done": cmd_done,
 }
 
@@ -912,8 +1159,8 @@ def _guess_job(argv: list[str]) -> Path:
 
 
 # words small models use for a command, and commands that take no words
-SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes", "find": "recipes",
-            "search": "recipes", "info": "show", "describe": "show", "finish": "done", "check_status": "status"}
+SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes",
+            "search": "recipes", "info": "show", "scale": "measure", "describe": "show", "finish": "done", "check_status": "status"}
 NO_WORDS = ("status", "build", "done")
 
 
@@ -964,7 +1211,7 @@ def run(argv: list[str]) -> tuple[str, int]:
         out = COMMANDS[cmd](args, job)
     except UsageError as e:
         out = Out()
-        out.fix(f"{e}; commands: status new recipes show set build check image done")
+        out.fix(f"{e}; commands: status new recipes show set build check image measure done")
         out.next = _fallback_next(job, argv)
         out.owns_next = False
         cmd = "usage"

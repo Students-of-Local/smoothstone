@@ -62,9 +62,28 @@ stone new "A keychain of my dog" --image dog.png
 
 stone traces the outline for keychains, cookie cutters and signs, and makes a height map for lithophanes and reliefs. The model never has to look at the picture to use it.
 
+If the photo has a ruler, a bank card or a US quarter next to the thing, `stone measure photo.jpg` works out its real size in millimeters and the recipe takes that size, and the traced outline leaves the ruler out.
+
+## Figures
+
+```
+stone new 'A mini figure of Jensen Huang, 90 mm tall, with "JENSEN" on the base'
+```
+
+I wanted the small model to make something cooler than a bin, so smoothstone can now make a mini figure of a person, a pet or a thing. When there is no photo, stone build tells the model to run `stone find "Jensen Huang"`, which downloads free licensed photos from Wikimedia Commons and writes who took each one and its license to credits.txt. You can give it your own photo with `stone image` instead. Then three small models run one at a time on the Mac: LFM3-VL-2B writes one sentence about how the person looks, FLUX.2 klein 4B turns the photo and that sentence into a clean render of a figure, and Hunyuan3D-2mini lifts the render into a mesh. stone closes the mesh, stands it on a plinth with the name on the front and runs the same print checks as every other part.
+
+| Step | Model | Peak memory | Time on my Mac |
+| --- | --- | --- | --- |
+| drive stone | LFM3-1.7B, 4 bit, on the CPU | 1.2 GB | |
+| describe | LFM3-VL-2B, 4 bit | 3.0 GB | under a minute |
+| style | FLUX.2 klein 4B, 4 bit | 7.8 GB | about 2 minutes |
+| lift | Hunyuan3D-2mini | 9.0 GB | about 4 minutes |
+
+The sentence from the vision model matters more than I expected, as without it the render got the hair color and the glasses wrong on every try. Run `tools/figure/setup.sh` once on an Apple silicon Mac with 16 GB of memory. Hunyuan3D-2mini is under the Tencent Hunyuan Community License, which does not cover the EU, the UK or South Korea, so read it before you use the meshes there. Photos keep their own licenses, so credit them from credits.txt when you post a print.
+
 ## Recipes
 
-fan_guard, panel, cable_comb, vase, planter, gridfinity_bin, phone_stand, hook, spur_gear, box, keychain, cookie_cutter, sign, lithophane and relief. Every recipe prints without supports and every default and example is built and checked in CI.
+fan_guard, panel, cable_comb, vase, planter, gridfinity_bin, phone_stand, hook, spur_gear, box, keychain, cookie_cutter, sign, lithophane, relief and figure. Every recipe prints without supports and every default and example is built and checked in CI.
 
 ## Install
 

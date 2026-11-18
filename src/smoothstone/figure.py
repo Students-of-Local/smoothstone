@@ -1,0 +1,253 @@
+"""Photos -> styled render -> lifted mesh -> one clean printable body.
+
+Local models do the work, none of them the model that drives stone:
+- describe: LFM3-VL-2B (4 bit, about 3 GB) writes one sentence on how the subject looks. The
+  style model keeps a likeness far better with that sentence in its prompt.
+- style: FLUX.2 klein 4B edit through mflux (Apache 2.0, about 5 GB at 4 bit) turns one or two
+  photos into a clean front view of a collectible figure on white.
+- lift: tools/lift/lift.py turns that render into a mesh (single-image 3D).
+- repair: trimesh keeps the main body, closes it and scales it to unit height, feet on z = 0.
+
+Every step writes its file into the job's images/figure folder and is skipped when the file is
+already there and its inputs have not changed, so a build that dies half way picks up again.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shlex
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+from . import config
+
+STYLES = ("chibi", "statue", "bust", "object")
+
+LOOK = {
+    "chibi": (
+        "a collectible chibi vinyl figure of this exact {who}: big head, small body, a friendly "
+        "smile, the same clothes, arms close to the body, feet together, standing upright"
+    ),
+    "statue": (
+        "a detailed collectible statue of this exact {who} with natural proportions: the same "
+        "clothes, arms close to the body, feet together, standing upright, sculpted folds and "
+        "textures"
+    ),
+    "bust": (
+        "a sculpted bust of this exact {who}: head, neck and shoulders on a short round stand, "
+        "the same clothes at the shoulders"
+    ),
+    "object": (
+        "this exact {who} alone, the same shape, proportions and details, as a solid object "
+        "that stands on its own"
+    ),
+}
+LIKENESS = {
+    "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
+               "hairstyle, the same glasses frame shape if any, the same face shape, smile and "
+               "skin tone. "),
+    "animal": "Keep the likeness from the first photo exactly: the same fur colors, markings, ears and face. ",
+    "object": "",
+}
+FRAME = (
+    "{look}. {likeness}Full figure in frame, centered, facing the camera, front view, plain pure white "
+    "background, soft studio product lighting, crisp sculpted details, matte finish, no base, "
+    "no text, no shadow on the background."
+)
+
+
+class FigureProblem(Exception):
+    pass
+
+
+def prompt(style: str, who: str = "person", extra: str = "") -> str:
+    p = FRAME.format(look=LOOK[style].format(who=who), likeness=LIKENESS.get(who, ""))
+    return f"{p} {extra.strip()}".strip()
+
+
+def _digest(*parts) -> str:
+    h = hashlib.sha256()
+    for p in parts:
+        if isinstance(p, Path):
+            h.update(p.read_bytes())
+        else:
+            h.update(str(p).encode())
+    return h.hexdigest()[:16]
+
+
+def _mflux_bin() -> Path:
+    env = os.environ.get("STONE_MFLUX")
+    base = Path(env).expanduser() if env else Path.home() / ".cache" / "stone-style" / ".venv" / "bin"
+    exe = base / "mflux-generate-flux2-edit"
+    if not exe.exists():
+        raise FigureProblem("the style model is not set up, run tools/figure/setup.sh once")
+    return exe
+
+
+def _style_model() -> list[str]:
+    """The local 4 bit klein weights (mflux-community/flux2-klein-4b-mflux-q4), else the Hub copy."""
+    env = os.environ.get("STONE_STYLE_MODEL")
+    local = Path(env).expanduser() if env else Path.home() / ".cache/stone-style/models/flux2-klein-4b-q4"
+    if (local / "transformer").is_dir():
+        return ["--model", str(local), "--base-model", "flux2-klein-4b"]
+    return ["--model", "flux2-klein-4b", "--quantize", "4"]
+
+
+def _describe_model() -> Path | None:
+    env = os.environ.get("STONE_DESCRIBE_MODEL")
+    local = Path(env).expanduser() if env else Path.home() / ".cache/stone-style/models/lfm3-vl-2b-4bit"
+    return local if (local / "config.json").exists() else None
+
+
+def describe(photo: Path, out: Path, who: str) -> str:
+    """One sentence on how the subject looks, written to out. Empty when the model is not set up."""
+    if out.exists():
+        return out.read_text().strip()
+    model = _describe_model()
+    if model is None or os.environ.get("STONE_DESCRIBE") == "0":
+        out.write_text("")
+        return ""
+    py = _mflux_bin().parent / "python"
+    script = config.REPO_ROOT / "tools" / "figure" / "describe.py"
+    log = out.with_name("describe.log")
+    with log.open("a") as f:
+        try:
+            r = subprocess.run([str(py), "-I", str(script), str(photo), who, str(model)],
+                               capture_output=True, text=True, timeout=600)
+        except subprocess.TimeoutExpired as e:
+            raise FigureProblem("the describe model took over 600 s") from e
+        f.write(r.stderr)
+    text = " ".join(r.stdout.split())
+    if r.returncode != 0 or not text:
+        raise FigureProblem(f"the describe model failed, see {log}")
+    out.write_text(text + "\n")
+    return text
+
+
+def _lift_cmd() -> list[str]:
+    env = os.environ.get("STONE_LIFT")
+    if env:
+        return shlex.split(env)
+    lift = config.REPO_ROOT / "tools" / "lift"
+    if not (lift / "lift.py").exists():
+        raise FigureProblem("the lift model is not set up, run tools/figure/setup.sh once")
+    uv = shutil.which("uv") or "uv"
+    return [uv, "run", "--project", str(lift), "python", str(lift / "lift.py")]
+
+
+def _run(cmd: list[str], log: Path, timeout: int) -> None:
+    t = time.time()
+    with log.open("a") as f:
+        f.write(f"$ {' '.join(shlex.quote(c) for c in cmd)}\n")
+        f.flush()
+        try:
+            r = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
+        except subprocess.TimeoutExpired as e:
+            raise FigureProblem(f"{Path(cmd[0]).name} took over {timeout} s") from e
+        f.write(f"exit {r.returncode} after {time.time() - t:.0f} s\n")
+    if r.returncode != 0:
+        raise FigureProblem(f"{Path(cmd[-1] if 'lift' in cmd[-1] else cmd[0]).name} failed, see {log}")
+
+
+def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "") -> Path:
+    if out.exists():
+        return out
+    cmd = [str(_mflux_bin()), *_style_model(),
+           "--image-paths", *[str(p) for p in photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]],
+           "--prompt", prompt(style_name, who, extra),
+           "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed),
+           "--low-ram",
+           "--output", str(out)]
+    _run(cmd, out.with_name("style.log"), timeout=1800)
+    if not out.exists():
+        raise FigureProblem("the style model wrote no picture")
+    return out
+
+
+def lift(render: Path, out: Path, seed: int) -> Path:
+    if out.exists():
+        return out
+    _run(_lift_cmd() + [str(render), str(out), "--seed", str(seed),
+                        "--octree", os.environ.get("STONE_LIFT_OCTREE", "256"),
+                        "--chunks", os.environ.get("STONE_LIFT_CHUNKS", "4000")], out.with_name("lift.log"),
+         timeout=3600)
+    if not out.exists():
+        raise FigureProblem("the lift model wrote no mesh")
+    return out
+
+
+def repair(src: Path, out: Path, max_faces: int = 250_000) -> dict:
+    """Largest closed body, Z up, front to -Y, unit height, centered on x/y, feet on z = 0."""
+    import numpy as np
+    import trimesh
+
+    m = trimesh.load(src, force="mesh")
+    m.merge_vertices()
+    parts = m.split(only_watertight=False)
+    if len(parts) > 1:
+        m = max(parts, key=lambda p: abs(p.volume) if p.is_watertight else p.area * 1e-3)
+    if not m.is_watertight:
+        trimesh.repair.fill_holes(m)
+    if not m.is_watertight:
+        m = _remesh(m)
+    if len(m.faces) > max_faces:
+        m = m.simplify_quadric_decimation(face_count=max_faces)
+    trimesh.repair.fix_normals(m)
+    # lift models write Y up with the face toward +Z; OpenSCAD wants Z up with the face toward -Y
+    m.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]))
+    lo, hi = m.bounds
+    h = hi[2] - lo[2]
+    # center on the feet: the middle of the lowest 5% of the body
+    z = m.vertices[:, 2]
+    feet = m.vertices[z < lo[2] + 0.05 * h]
+    cx, cy = feet[:, 0].mean(), feet[:, 1].mean()
+    m.apply_translation([-cx, -cy, -lo[2]])
+    m.apply_scale(1.0 / h)
+    m.export(out)
+    lo, hi = m.bounds
+    info = {"faces": len(m.faces), "watertight": bool(m.is_watertight),
+            "width": float(hi[0] - lo[0]), "depth": float(hi[1] - lo[1]),
+            "feet_w": float(np.ptp(feet[:, 0]) / h), "feet_d": float(np.ptp(feet[:, 1]) / h)}
+    out.with_suffix(".json").write_text(json.dumps(info, indent=1))
+    return info
+
+
+def _remesh(m):
+    """Voxel remesh for a mesh that will not close: solid fill, then marching cubes."""
+    pitch = max(m.extents) / 220
+    v = m.voxelized(pitch).fill()
+    return v.marching_cubes.apply_transform(v.transform)
+
+
+def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str = "person",
+         seed: int = 7, extra: str = "", say=print) -> Path:
+    """Run every step that is not done yet and return the unit-height figure.stl."""
+    if style_name not in STYLES:
+        raise FigureProblem(f"style must be one of {', '.join(STYLES)}")
+    if not photos:
+        raise FigureProblem("no photos, run stone find or stone image first")
+    key = _digest(*photos, style_name, who, seed, extra, prompt(style_name, who, extra))
+    folder = folder / key
+    folder.mkdir(parents=True, exist_ok=True)
+    render = folder / "style.png"
+    if not render.exists():
+        look = folder / "look.txt"
+        if not look.exists():
+            say("Describing the photo (LFM3-VL-2B, under a minute)...")
+        desc = describe(photos[0], look, who)
+        say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
+        style(photos, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x))
+    mesh = folder / "lift.glb"
+    if not mesh.exists():
+        say("Lifting the render to 3D (Hunyuan3D-2mini, about 4 minutes)...")
+        lift(render, mesh, seed)
+    fig = folder / "figure.stl"
+    if not fig.exists():
+        repair(mesh, fig)
+    latest = folder.parent / "latest.txt"
+    latest.write_text(str(fig) + "\n")
+    return fig

@@ -47,6 +47,9 @@ def main():
         shots = ([] if needs_image else [build(r, "defaults", {}, out)]) + [build(r, e["name"], {**e["params"], **({"_image": e["image"]} if e.get("image") else {})}, out)
                                               for e in meta.get("examples", [])]
         failed += sum(1 for s in shots if not s[2])
+        if not shots:
+            print(f"{r:16s} skipped: needs a photo and has no example (tests cover it)")
+            continue
         tile = 450
         sheet = Image.new("RGB", (tile * len(shots), tile + 30), "#1a1b26")
         d = ImageDraw.Draw(sheet)
