@@ -208,6 +208,7 @@ GROOVE_COST = 0.2  # per mm of loop: below this the loop runs mostly along conca
 GROOVE_REACH = 0.7  # the groove loop is at least this share of the line's own ring, not a small loop
 GROOVE_SOFT = 8.0  # degrees of concavity that make an edge e times cheaper to follow
 GROOVE_SIGMA = 12.0  # degrees of angle round the line's center the groove height is smoothed over
+ON_FIT = 1e-6  # mm: a face center this close to the groove's smooth fit lies on it
 GROOVE_HUG = 0.08  # mm: the curve stays at least this far on the hidden side of the groove
 GROOVE_ROLL = 10  # degrees each way the envelope looks for the farthest groove point
 HAND_REACH = 8.0  # mm from a hand's axis: the faces below a cuff line that can be the hand
@@ -269,7 +270,7 @@ def crease_loop(mesh, center, z0: float, z1: float, rmax: float, seeds: int = 60
     cand = np.where(band & (np.abs(np.abs(th) - np.pi) < 0.08))[0]
     if not len(cand):
         return None, np.inf
-    cand = cand[np.argsort(V[cand, 2])][:: max(1, len(cand) // seeds)]
+    cand = cand[np.argsort(V[cand, 2], kind="stable")][:: max(1, len(cand) // seeds)]  # same seeds on any CPU
     D, P = dijkstra(G, indices=cand, return_predecessors=True)
     cost = D[np.arange(len(cand)), cand + n]
     i = int(np.argmin(cost))
@@ -394,7 +395,11 @@ def strip_seen(mesh, pts: np.ndarray, center, line: dict, side: int, only=None) 
     near = np.hypot(c[:, 0] - cx, c[:, 1] - cy) < float(np.hypot(pts[:, 0] - cx, pts[:, 1] - cy).max()) + 3.0
     g0 = _curve_field(groove_curve(pts, center, 1, lift=False), center, c)
     g = field(line, c)
-    strip = near & ((g0 > 0) & (g < 0) if side > 0 else (g0 < 0) & (g > 0))
+    # a face on the groove's own level (a flat rim or chin underside) sits at g0 ~ 1e-16, whose
+    # sign is rounding noise that differs between CPUs: it belongs to the part above when it
+    # faces down (the underside of the overhang) and to the part below when it faces up
+    upper = np.where(np.abs(g0) > ON_FIT, g0 > 0, mesh.face_normals[:, 2] < 0)
+    strip = near & (upper & (g < 0) if side > 0 else ~upper & (g > 0))
     if only is not None:
         hf = only(line)
         if hf is not None:

@@ -311,3 +311,20 @@ def test_a_cuff_cut_masked_to_the_hand_still_cuts_every_face_it_crosses():
     zone = (V2[F2][:, :, 0] > 0.0).all(1)  # every face whose corners are all inside, the rim's too
     across = zone & (d.min(1) < -0.03) & (d.max(1) > 0.03)
     assert not across.any(), f"{int(across.sum())} faces cross the cuff line uncut"
+
+
+
+def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
+    """CI on x86 failed test_cuff_over_wrist_slips_down while ARM passed: the sleeve rim's flat
+    underside lies exactly on the groove's level, so the sign of its distance to the groove fit
+    (about 1e-16 mm) was rounding noise, and the rim landed in the up strip on one CPU and the down
+    strip on another. Groove points 1e-9 mm above or below the rim give either sign on any CPU;
+    the side and the seen areas must not change."""
+    m = cuff_figure()
+    V = np.asarray(m.vertices)
+    ring = V[(np.abs(V[:, 2] - 10.0) < 1e-9) & (np.abs(np.hypot(V[:, 0], V[:, 1]) - 2.5) < 1e-6)]
+    got = set()
+    for eps in (0.0, 1e-9, -1e-9):
+        side, seen = parts.choose_side(m, ring + [0.0, 0.0, eps], (0.0, 0.0))
+        got.add((side, seen[1][0], seen[-1][0]))
+    assert len(got) == 1 and next(iter(got))[0] == -1, got
