@@ -184,3 +184,18 @@ Not in the drawings, so assumed or derived (each marked in devices.json):
 - 17 Pro and Pro Max: the 1.88 lens glass label reads from the back plate on one sheet and from the plateau on the other. The case uses only the plateau height.
 
 Stone flow in a temp job: new "A case for my iPhone 17 Pro with DONOVAN on the back", recipes (phone_case first), show (phone=iphone_17_pro text=DONOVAN, nothing left over), set, build: 10 PASS, Part ready.
+
+## 2026-11-18 asking for sizes, change requests, grommet (LFM3-1.7B, card S)
+
+stone set now refuses when the request names something the part must fit and gives no number and no known product. NEXT becomes "ask the person: <question>"; stone note "<answer>" records the answer in brief.md and sends the model back to stone show. A product chosen in the set line (phone=iphone_17_pro) counts as the answer, so stone does not ask twice.
+
+LFM3-1.7B Q4 on CPU, card S, seeds 1 to 3, full context and compacted at step 3:
+
+- Change requests (evals/feedback k1 to k3): 17/18.
+- a1 "a cover for the cable hole in my desk", answer "60 mm across": 0/6 before (it guessed a size), 6/6 now, grommet hole_d 60.
+- a2 "a case for my phone", answer "an iPhone 17 Pro": 3/6 before the set fix (stone asked again after the model set the phone), 6/6 after.
+- t7 "a TPU case for my iPhone 17 Pro Max": 6/6.
+
+New grommet recipe (desk cable hole cover, lip down). The panel grows to fit a round cutout taller than the plate instead of failing an assert.
+
+Figure: the style prompt keeps glasses as thin as in the photo. Thin frames in 4 of 6 seeds, against 2 of 6 before.
