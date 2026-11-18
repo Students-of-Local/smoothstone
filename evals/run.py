@@ -146,7 +146,7 @@ def main():
         "\nThe job is ready; use the stone tool."
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-    log = {"run_id": run_id, "spec": spec["id"], "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
+    log = {"run_id": run_id, "spec": spec["id"], "suite": spec_path.parent.name, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
            "seed": a.seed, "driver": a.driver, "card": a.card, "card_sha256": card_sha, "compact_at": a.compact_at,
            "model": a.model_name if a.driver == "lfm3" else None, "sampling": SAMPLING if a.driver == "lfm3" else None,
            "harness": HARNESS, "max_steps": MAX_STEPS, "max_new_tokens": MAX_NEW, "setup": setup,
@@ -224,8 +224,11 @@ def main():
     grade = grade_job(job, {**spec, "expect": exp}, messages)
     if first is not None and not first["pass"]:
         grade.update({"pass": False, "why": ["before the answer: " + w for w in first["why"]] + grade["why"]})
+    if exp.get("judge") and grade["pass"]:
+        grade = judge_run(rdir, job, spec["request"], exp["judge"], grade)
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
+    append_score(log)
     print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
 
 
@@ -277,6 +280,38 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
     if col is not None:
         out["colors"] = col
     return out
+
+
+def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> dict:
+    """The blind judge on the run's pictures (judge_views.py), saved as judge.json next to the run.
+    want {"faults_in": ["boundaries"]}: a fault the judge names in one of those pictures fails it."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import judge_views
+
+    res = judge_views.judge(job / "build", request)
+    (rdir / "judge.json").write_text(json.dumps(res, indent=1))
+    why = [w for w in grade["why"] if w != "all checks pass"]
+    for f in res["faults"]:
+        if any(f["panel"].lower().startswith(pic) for pic in want.get("faults_in", [])):
+            why.append(f"judge: {f['panel']}: {f['what']}")
+    return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
+
+
+SCORES = Path(os.environ.get("STONE_SCORES", str(ROOT / "evals" / "scores.jsonl")))
+
+
+def append_score(log: dict) -> None:
+    """One line per run in evals/scores.jsonl. The file is only ever appended to."""
+    try:
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
+                              text=True).stdout.strip() or None
+    except OSError:
+        head = None
+    line = {"date": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sha": head, "suite": log.get("suite"),
+            "spec": log["spec"], "card": log["card"], "driver": log["driver"], "pass": int(bool(log["pass"])),
+            "total": 1, "judge": log.get("judge"), "run": log["run_id"]}
+    with SCORES.open("a") as f:
+        f.write(json.dumps(line) + "\n")
 
 
 def _part_key(name: str) -> str:
