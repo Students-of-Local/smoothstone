@@ -723,6 +723,13 @@ def smooth_cut(V, F, face_fil, radius: float = EDGE_RADIUS, fixed=None):
     for i in range(len(fils) if len(fils) > 2 else 1):  # with two filaments both levels are one curve
         V, F, ind, par = clean.cut_iso(V, F, ind[:, i], 0.5, fields=ind, parents=True)
         parent = parent[par]
+    if len(fils) > 2:
+        # where three filaments meet, none may cross 0.5, yet the faces go by the largest: cut where
+        # each one stops being the largest too, so that boundary lies on edges, not inside triangles
+        for i in range(len(fils)):
+            g = ind[:, i] - np.delete(ind, i, axis=1).max(1)
+            V, F, ind, par = clean.cut_iso(V, F, g, 0.0, fields=ind, parents=True)
+            parent = parent[par]
     out = fils[ind[F].mean(1).argmax(1)]
     keep = fixed[parent]
     out[keep] = face_fil[parent[keep]]

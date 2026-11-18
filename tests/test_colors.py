@@ -632,3 +632,23 @@ def test_close_ups_are_antialiased_so_a_straight_edge_shows_no_pixel_stairs():
         return int(((im > 40) & (im < 170)).sum())
     assert mids(1) < 20  # aliased: the stairs are pure black or white pixels
     assert mids(3) > 150  # antialiased: about one blended pixel per column along the edge
+
+
+def test_three_colors_meeting_cut_on_mesh_edges():
+    """Review round 2 sol-sol-F3: three sectors of a sphere meet at the poles, where the smoothed
+    indicators sit near 1/3 and none crosses 0.5, so the largest-indicator boundary ran inside the
+    triangles and zigzagged (ratio 1.10). Cutting where each filament stops being the largest puts
+    that boundary on edges."""
+    import trimesh
+
+    s = trimesh.creation.icosphere(subdivisions=5, radius=10.0)
+    m = colors.load_stl_mesh(s.vertices, s.faces)
+    c = m.triangles_center
+    fil = 1 + (((np.degrees(np.arctan2(c[:, 1], c[:, 0])) % 360 + 7) // 120).astype(int) % 3)
+    V, F, out, parent = colors.smooth_cut(m.vertices, m.faces, fil)
+    assert set(np.unique(out)) == {1, 2, 3}
+    worst, lines = colors.color_edges(V, F, out)
+    assert len(lines) >= 3 and colors.edge_faults(lines) == [], [(ln["pair"], ln["ratio"], ln["wobble"]) for ln in lines]
+    assert worst < colors.JAGGED
+    t = trimesh.Trimesh(V, F, process=False)
+    assert t.is_watertight and abs(t.volume - m.volume) < 1e-6 * m.volume + 1e-6
