@@ -1,0 +1,27 @@
+{
+ "id": "k3_comb_more",
+ "request": "A cable comb, 100 mm long, that holds 8 cables that are 6 mm thick.",
+ "expect": {
+  "recipe": "cable_comb",
+  "params": {
+   "length": 100,
+   "slots": 8
+  }
+ },
+ "followups": [
+  {
+   "say": "Can it hold 10 cables instead? Keep the same length.",
+   "expect": {
+    "recipe": "cable_comb",
+    "params": {
+     "length": 100,
+     "slots": 10,
+     "slot_w": [
+      6,
+      7
+     ]
+    }
+   }
+  }
+ ]
+}

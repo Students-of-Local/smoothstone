@@ -1,0 +1,18 @@
+{
+ "id": "a2_case",
+ "request": "A case for my phone.",
+ "expect": {
+  "asks": true
+ },
+ "followups": [
+  {
+   "say": "It is an iPhone 17 Pro.",
+   "expect": {
+    "recipe": "phone_case",
+    "params": {
+     "phone": "iphone_17_pro"
+    }
+   }
+  }
+ ]
+}

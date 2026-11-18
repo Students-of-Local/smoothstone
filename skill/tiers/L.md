@@ -11,6 +11,11 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - Check every new recipe with: uv run python tools/sheet.py <name>, and look at the previews.
 - Stop when the request's part is built with stone and the build says Part ready.
 
+## Research
+- Follow research.md in full: maker drawings and datasheets first, a second source for every
+  fit-critical number, clearances, a fit-test slice, a look list for likeness, and a real
+  museum scan before generating any famous artwork. Save every fact with stone note.
+
 ## Figures and image models
 - The figure recipe takes a unit-height mesh (image_kind "figure"). stone builds it from photos
   with src/smoothstone/figure.py: describe (LFM3-VL-2B), style (FLUX.2 klein 4B), lift

@@ -1,0 +1,18 @@
+{
+ "id": "a1_grommet",
+ "request": "A cover for the cable hole in my desk.",
+ "expect": {
+  "asks": true
+ },
+ "followups": [
+  {
+   "say": "It is a round hole, 60 mm across.",
+   "expect": {
+    "recipe": "grommet",
+    "params": {
+     "hole_d": 60
+    }
+   }
+  }
+ ]
+}

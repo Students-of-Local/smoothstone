@@ -142,15 +142,27 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
                       r"([A-Z0-9][A-Za-z0-9&-]{0,15})\b", request)
         if m and m.group(1).lower() not in STOP | {"it", "on", "my", "this", "that"}:
             quoted = [m.group(1)]
+    if not quoted:  # a case with DONOVAN on the back: a word in capitals placed on a face
+        m = re.search(r"\bwith\s+([A-Z][A-Z0-9&-]{1,15})\s+(?:on|across)\s+(?:the\s+)?"
+                      r"(?:back|front|lid|top|bottom|side)\b", request)
+        if m:
+            quoted = [m.group(1)]
     if quoted and texts:
         out[texts[0].name] = quoted[0]
-    # choice values named in the request
-    low = " ".join(request.lower().split())
-    for phrase, vals in (getattr(r, "phrases", {}) or {}).items():
-        if phrase.lower() in low:
-            for k, v in vals.items():
-                if r.param(k) is not None and k not in out:
-                    out[k] = v
+    asks = []
+    if texts and texts[0].name not in out and re.search(r"\bmy name\b", request, re.I):
+        asks.append(f"my name (ask for it, then stone set {texts[0].name}=NAME)")
+    # phrases, longest first; a matched phrase is used up, so "17" in "iPhone 17 Pro" is not left as a size
+    phrases = getattr(r, "phrases", {}) or {}
+    for phrase in sorted(phrases, key=len, reverse=True):
+        pat = r"(?<![a-z0-9])" + r"\s+".join(re.escape(w) for w in phrase.lower().split()) + r"(?![a-z0-9])"
+        m = re.search(pat, request, re.I)
+        if not m:
+            continue
+        for k, v in phrases[phrase].items():
+            if r.param(k) is not None and k not in out:
+                out[k] = v
+        request = request[:m.start()] + " " * (m.end() - m.start()) + request[m.end():]
     req_words = set(_words(request))
     own = set(_words(r.name.replace("_", " ") + " " + r.title))  # "box" names the recipe, not part=box
     for p in r.params:
@@ -295,4 +307,40 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             continue
         tail = " ".join(re.findall(r"[a-zA-Z]+", request[e0:e0 + 30])[:2])
         left.append((request[s0:e0].strip() + " " + tail).strip())
-    return {p.name: out[p.name] for p in r.params if p.name in out}, left
+    return {p.name: out[p.name] for p in r.params if p.name in out}, left + asks
+
+
+# A part that has to fit a real thing: "a case for my phone", "a cover for the cable hole in my desk".
+FIT_RE = re.compile(r"\b(?:case|cover|lid|cap|mount|holder|bracket|adapter|sleeve|plug|grommet|insert|spacer|shim|"
+                    r"knob|clip|replacement)s?\s+(?:for|to fit|that fits)\s+(?P<thing>[^,.;!?]+)|"
+                    r"\b(?:to fit|that fits|fits)\s+(?P<thing2>[^,.;!?]+)", re.I)
+
+
+def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None) -> str | None:
+    """The question to ask when the part must fit something real and nothing says how big it is.
+
+    None when the request is not about a fit, or it has a number. A recipe with a product choice
+    (phone_case phone) needs one of its products named instead, as a number there is no size."""
+    if r.name == "figure":
+        return None
+    m = FIT_RE.search(request)
+    if not m:
+        return None
+    text = " ".join([request, *(notes or [])])
+    low = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()) + " "
+    product = next((p for p in r.params if p.product), None)
+    if product:
+        # only a product the recipe knows is a size: "iPhone 15" has a number but no case here fits it,
+        # and "cover" or "tpu" names no phone at all
+        def plain(c):
+            return " " + re.sub(r"[^a-z0-9]+", " ", str(c).lower()).strip() + " "
+        if any(plain(c) in low for c in product.choices):
+            return None
+        known = ", ".join(str(c).replace("_", " ") for c in product.choices)
+        return f"Which {product.name} is it, exactly? This part is drawn for: {known}."
+    if _numbers(text):
+        return None
+    thing = (m.group("thing") or m.group("thing2") or "it").strip()
+    thing = re.sub(r"\bmy\b", "your", re.sub(r"\bour\b", "your", thing, flags=re.I), flags=re.I)
+    return (f"What are the measurements of {thing}, in mm? A photo with a ruler in it works too, "
+            f"or the exact product name and model.")

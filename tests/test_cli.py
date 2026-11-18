@@ -492,3 +492,111 @@ def test_a_plate_too_narrow_for_its_cutouts_grows(jobenv, recipes_root, openscad
     stone("set", "w=128")
     text, code, nxt = stone("build")
     assert "Part ready" in text, text
+
+
+def test_note_keeps_facts_through_status(jobenv):
+    stone("new", "a case for an iPhone 17 Pro")
+    _, _, before = stone("status")
+    text, code, nxt = stone("note", "width = 71.9 mm, apple.com/iphone/compare")
+    assert code == 0 and "Noted (1 notes)" in text
+    assert nxt == before  # a note never moves NEXT
+    stone("note", "width = 71.9 mm, apple.com/iphone/compare")  # the same fact twice is kept once
+    stone("note", "look: thin half-rim glasses")
+    text, _, nxt = stone("status")
+    assert "Notes (2): width = 71.9 mm, apple.com/iphone/compare | look: thin half-rim glasses" in text
+    assert nxt == before
+    text, code, _ = stone("note")
+    assert code == 1 and "stone note" in text
+
+
+def test_set_asks_for_the_size_of_what_a_part_fits(jobenv, recipes_root):
+    # a small model built a default part for "the cable hole in my desk" in 3 of 3 runs before this
+    shutil.copytree(REPO / "recipes" / "panel", recipes_root / "panel")
+    stone("new", "A cover for the cable hole in my desk.")
+    text, code, nxt = stone("set", "panel")
+    assert code == 1 and nxt.startswith("ask the person: What are the measurements of the cable hole in your desk")
+    _, _, again = stone("status")
+    assert again == nxt  # a compacted model finds the question again
+    _, code, nxt = stone("note", "It is a round hole, 60 mm across.")
+    assert code == 0 and nxt == "stone show panel"
+    text, _, _ = stone("show", "panel")
+    assert "cut_shape=round" in text and "cut_w=60" in text
+    _, code, nxt = stone("set", "panel", "cut_shape=round", "cut_w=60")
+    assert code == 0 and nxt == "stone build"
+
+
+def test_fit_check_leaves_plain_requests_alone():
+    from smoothstone import match, recipes as rc
+    box = rc.load("box")
+    assert box is not None
+    for req in ("A box with a lid.", "A case for my iPhone 17 Pro.", "A mini figure of my dog Rex.",
+                "A cable comb, 100 mm long, for 8 cables 6 mm thick."):
+        assert match.missing_fit_size(box, req) is None, req
+    assert match.missing_fit_size(box, "A holder for my pens.")
+    assert match.missing_fit_size(rc.load("figure"), "A stand that fits my figure.") is None
+
+
+def test_a_round_cutout_taller_than_the_panel_grows_the_panel(jobenv, recipes_root, openscad):
+    # a 60 mm round cut in a 40 mm tall panel split it in 3 bodies, and build looped on show and set
+    shutil.copytree(REPO / "recipes" / "panel", recipes_root / "panel")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A faceplate with one round 60 mm hole.")
+    stone("set", "panel", "cut_shape=round", "cut_w=60")
+    nxt, seen = "stone build", []
+    for _ in range(6):
+        text, code, nxt = stone(*nxt.split()[1:])
+        seen.append(nxt)
+        if nxt.startswith("none"):
+            break
+    assert nxt.startswith("none"), seen
+    assert "Part ready" in text, text
+
+
+def test_a_desk_hole_cover_is_a_grommet():
+    from smoothstone import recipes as rc
+    from smoothstone import match
+    g = rc.load("grommet")
+    assert g is not None and g.tier == "S"
+    assert match.suggest(g, "It is a round hole, 60 mm across.") == {"hole_d": 60}
+
+
+def test_naming_the_product_in_set_answers_the_question(jobenv, recipes_root):
+    # the model asked "which phone?" itself, then set phone=iphone_17_pro, and stone asked again
+    shutil.copytree(REPO / "recipes" / "phone_case", recipes_root / "phone_case")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A case for my phone.")
+    _, code, nxt = stone("set", "phone_case")
+    assert code == 1 and nxt.startswith("ask the person")
+    _, code, nxt = stone("set", "phone_case", "phone=iphone_17_pro")
+    assert code == 0 and nxt == "stone build"
+
+
+def test_a_word_inside_the_request_is_not_a_product(jobenv, recipes_root):
+    # "cover" is a buttons choice and "tpu" a material: neither names the phone
+    shutil.copytree(REPO / "recipes" / "phone_case", recipes_root / "phone_case")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A cover for my phone.")
+    _, code, nxt = stone("set", "phone_case")
+    assert code == 1 and nxt.startswith("ask the person")
+    _, code, nxt = stone("set", "phone_case", "material=tpu", "wall=1.6")
+    assert code == 1 and nxt.startswith("ask the person")
+
+
+def test_a_length_in_the_set_line_answers_the_question(jobenv, recipes_root):
+    # the model asked in chat, got "60 mm", and set it: stone must not ask again
+    shutil.copytree(REPO / "recipes" / "grommet", recipes_root / "grommet")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A cover for the cable hole in my desk.")
+    _, code, nxt = stone("set", "grommet")
+    assert code == 1 and nxt.startswith("ask the person")
+    _, code, nxt = stone("set", "grommet", "hole_d=60")
+    assert code == 0 and nxt == "stone build"
+
+
+def test_a_phone_the_case_does_not_know_is_still_asked_about(jobenv, recipes_root):
+    # "15" is a number but no size: building a 17 Pro case for an iPhone 15 would be a guess
+    shutil.copytree(REPO / "recipes" / "phone_case", recipes_root / "phone_case")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A case for my iPhone 15.")
+    _, code, nxt = stone("set", "phone_case")
+    assert code == 1 and nxt.startswith("ask the person") and "iphone 17 pro max" in nxt.lower()

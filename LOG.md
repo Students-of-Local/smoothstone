@@ -156,3 +156,46 @@ Driver: LFM3-1.7B Q4_K_M on Parish1's CPU through llama-server, 1.2 GB RSS, requ
 Measuring from a photo: an outline traced from a photo with a ruler or card in it took the ruler too. image now crops to the bbox that measure found when the photo is the same file, in either order (test_outline_leaves_the_ruler_out, which failed before the fix).
 
 Suite: 117 passed.
+
+## 2026-11-17 phone_case recipe
+
+A fitted case for the iPhone 17, 17 Pro, 17 Pro Max and Air. Every fit-critical number is in recipes/phone_case/devices.json with its source page in Apple's dimensional drawings and how it was read; tools/phone_devices.py turns that file into devices.scad and the recipe's dims (`--check` fails when they are stale, and a test runs it). The plan-view corner is a Catmull-Rom curve through Apple's Detail A points, clamped to the straight sides and convex-hulled, because the raw spline overshot the sides by 0.035 mm.
+
+Measured cavity at the phone's mid-height (test_cavity_is_phone_plus_clearance), rigid, 0.25 per side:
+
+- iPhone 17: 71.950 x 150.110 for a 71.45 x 149.61 phone
+- 17 Pro: 72.350 x 150.510 for 71.85 x 150.01
+- 17 Pro Max: 78.480 x 163.930 for 77.98 x 163.43
+- Air: 75.200 x 156.680 for 74.70 x 156.18
+
+TPU (0.05 per side) matches the same way. All eight are within 0.001 mm of phone plus 2 x clearance.
+
+Geometry is polyhedron lofts through exact profile rings, not unions of hulls of 0.01 mm slabs. The slab version passed every check on part.off but wrote a part.stl with about 200 edges shorter than 0.0001 mm that loaded as 150 to 240 bodies and not watertight; the STL is the file people print. Two more coincidences were removed: the camera opening and the fit ring's floor cut now reach 0.05 mm into the wall instead of lying on the cavity's face. Every slot also starts past the lip's inner edge, because on the Air (lip reach 0.93) the USB-C and Camera Control slots left a 0.18 mm fin of lip tip.
+
+min_wall is 0.6 for this recipe, not the 0.8 default. The 3rd percentile lands on the intended tapers: the lip tip (0.55 tall at its inner edge, an upright face and a 0.2 chamfer so it is not a knife edge) and the V ceilings of the button slots, which keep every slot under 45 degrees. A 4 mm Air fit ring is the worst case and passes; full cases read 0.99. Other recipes use 0.5 to 0.7.
+
+The recipe is tier S, like every other recipe: at tier M, a new job (tier S by default) hid it and stone recipes sent the model to box.
+
+Not in the drawings, so assumed or derived (each marked in devices.json):
+
+- No single corner radius on any phone; the curve is drawn through the points.
+- 17 Pro and Pro Max: the plateau's lower edge has no number. The opening uses the dimensioned area on sheet 4 that contains it (58.01 from the top, R12 and R14 corners).
+- Air: no plateau corner radius (the margin rounds it); left button heights assumed at mid-thickness 2.82; the 2.71 port height does not say which face, so the slots cover both; the corner's tangent ends at 19.36 are derived.
+- 17 Pro and Pro Max: the 1.88 lens glass label reads from the back plate on one sheet and from the plateau on the other. The case uses only the plateau height.
+
+Stone flow in a temp job: new "A case for my iPhone 17 Pro with DONOVAN on the back", recipes (phone_case first), show (phone=iphone_17_pro text=DONOVAN, nothing left over), set, build: 10 PASS, Part ready.
+
+## 2026-11-18 asking for sizes, change requests, grommet (LFM3-1.7B, card S)
+
+stone set now refuses when the request names something the part must fit and gives no number and no known product. NEXT becomes "ask the person: <question>"; stone note "<answer>" records the answer in brief.md and sends the model back to stone show. A product chosen in the set line (phone=iphone_17_pro) counts as the answer, so stone does not ask twice.
+
+LFM3-1.7B Q4 on CPU, card S, seeds 1 to 3, full context and compacted at step 3:
+
+- Change requests (evals/feedback k1 to k3): 17/18.
+- a1 "a cover for the cable hole in my desk", answer "60 mm across": 0/6 before (it guessed a size), 6/6 now, grommet hole_d 60.
+- a2 "a case for my phone", answer "an iPhone 17 Pro": 3/6 before the set fix (stone asked again after the model set the phone), 6/6 after.
+- t7 "a TPU case for my iPhone 17 Pro Max": 6/6.
+
+New grommet recipe (desk cable hole cover, lip down). The panel grows to fit a round cutout taller than the plate instead of failing an assert.
+
+Figure: the style prompt keeps glasses as thin as in the photo. Thin frames in 4 of 6 seeds, against 2 of 6 before.

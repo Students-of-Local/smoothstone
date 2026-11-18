@@ -181,6 +181,9 @@ def cmd_status(args, job: Job) -> Out:
     if m:
         o = m["object"]
         out.add(f"Measured: object {o['long_mm']:.1f} x {o['short_mm']:.1f} mm (from {m['method']})")
+    notes = job.notes()
+    if notes:
+        out.add(f"Notes ({len(notes)}): " + " | ".join(notes[-8:]))
     plan = job.plan()
     if plan:
         r = rc.load(plan["recipe"])
@@ -404,6 +407,21 @@ def cmd_set(args, job: Job) -> Out:
             r = rc.load(plan["recipe"])
         else:
             return unknown_recipe(name, out, t)
+    given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
+    # the set line answers the question when it names the product (phone=iphone_17_pro) or gives a length
+    # (hole_d=60); so does a size measured from a photo
+    named = [f"{k} {v.replace('_', ' ')}" for k, v, p in given if p is not None and p.product]
+    sized = not any(p.product for p in r.params) and any(
+        p is not None and p.type in ("number", "int") and p.unit == "mm" for _, _, p in given)
+    ask = None if sized or job.measured() else match.missing_fit_size(r, job.request(), job.notes() + named)
+    if ask:
+        # never invent the size of the thing a part must fit: a small model would, so the tool stops it
+        out.fix("this part must fit something real and the request gives no size for it; never guess one")
+        out.add('When the person answers, run: stone note "<their answer>"')
+        out.next = f"ask the person: {ask}"
+        out.result = "set refused: no size for the fit"
+        job.update(ask_recipe=r.name)
+        return out
     same = plan is not None and plan["recipe"] == r.name
     params = dict(plan["params"]) if same and not args.reset else {}
     pairs, loose = split_items(items, r)
@@ -1033,6 +1051,31 @@ def cmd_measure(args, job: Job) -> Out:
 # done
 
 
+def cmd_note(args, job: Job) -> Out:
+    """Keep a researched fact and its source in the job, so it survives a compaction."""
+    out = Out(owns_next=False)
+    if not need_job(job, out):
+        return out
+    text = " ".join(args.text).strip()
+    if not text:
+        out.add('Write the fact and where it came from: stone note "width = 71.9 mm, apple.com/iphone/compare"')
+        out.code = 1
+        out.next = job.status().get("next") or "stone status"
+        return out
+    notes = job.add_note(text)
+    out.add(f"Noted ({len(notes)} notes): {text}")
+    st = job.status()
+    if str(st.get("next", "")).startswith("ask the person") and st.get("ask_recipe"):
+        # the answer to stone's question is part of the request now, so show places its size
+        with job.brief_file.open("a") as f:
+            f.write(f"\nAnswer: {text}\n")
+        out.owns_next = True
+        out.next = f"stone show {st['ask_recipe']}"
+        return out
+    out.next = st.get("next") or "stone recipes"
+    return out
+
+
 def cmd_done(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
@@ -1130,6 +1173,9 @@ def make_parser() -> Parser:
     s.add_argument("query", nargs="*")
     s.add_argument("-n", type=int, default=3)
 
+    s = sub.add_parser("note", parents=[common], help="keep a researched fact and its source in the job")
+    s.add_argument("text", nargs="*")
+
     sub.add_parser("done", parents=[common], help="finish the job")
     return p
 
@@ -1145,6 +1191,7 @@ COMMANDS = {
     "image": cmd_image,
     "measure": cmd_measure,
     "find": cmd_find,
+    "note": cmd_note,
     "done": cmd_done,
 }
 

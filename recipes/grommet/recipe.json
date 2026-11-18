@@ -1,0 +1,139 @@
+{
+ "name": "grommet",
+ "title": "Desk grommet cover",
+ "summary": "Cover for a round cable hole in a desk: a top lip, an insert that fits the hole, and a cable slot at the edge.",
+ "tags": [
+  "grommet",
+  "desk",
+  "cable",
+  "hole",
+  "cover",
+  "cap",
+  "plug",
+  "lid",
+  "table",
+  "cord",
+  "wire"
+ ],
+ "params": [
+  {
+   "name": "hole_d",
+   "type": "number",
+   "default": 60,
+   "min": 15,
+   "max": 120,
+   "help": "diameter of the hole in the desk (the hole, not the cover)",
+   "unit": "mm"
+  },
+  {
+   "name": "fit",
+   "type": "number",
+   "default": 0.3,
+   "min": 0,
+   "max": 1,
+   "help": "gap per side between the insert and the hole",
+   "unit": "mm"
+  },
+  {
+   "name": "depth",
+   "type": "number",
+   "default": 12,
+   "min": 3,
+   "max": 40,
+   "help": "how far the insert goes into the hole",
+   "unit": "mm"
+  },
+  {
+   "name": "lip",
+   "type": "number",
+   "default": 5,
+   "min": 2,
+   "max": 20,
+   "help": "how far the top lip reaches past the hole",
+   "unit": "mm"
+  },
+  {
+   "name": "top_t",
+   "type": "number",
+   "default": 2.4,
+   "min": 1.2,
+   "max": 5,
+   "help": "top thickness",
+   "unit": "mm"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 2,
+   "min": 1.2,
+   "max": 6,
+   "help": "insert wall thickness",
+   "unit": "mm"
+  },
+  {
+   "name": "slot_w",
+   "type": "number",
+   "default": 20,
+   "min": 0,
+   "max": 60,
+   "help": "cable slot width, 0 = no slot",
+   "unit": "mm"
+  },
+  {
+   "name": "slot_depth",
+   "type": "number",
+   "default": 18,
+   "min": 5,
+   "max": 70,
+   "help": "how far the cable slot reaches in from the edge",
+   "unit": "mm"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 128,
+   "min": 32,
+   "max": 256,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "hole_d + 2 * lip",
+  "z": "top_t + depth"
+ },
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "fix": {
+  "min_wall": {
+   "param": "wall",
+   "dir": "up"
+  }
+ },
+ "examples": [
+  {
+   "name": "desk_60",
+   "params": {
+    "hole_d": 60
+   }
+  },
+  {
+   "name": "small_35_no_slot",
+   "params": {
+    "hole_d": 35,
+    "slot_w": 0,
+    "lip": 4
+   }
+  },
+  {
+   "name": "big_80",
+   "params": {
+    "hole_d": 80,
+    "slot_w": 30,
+    "slot_depth": 26,
+    "depth": 18
+   }
+  }
+ ],
+ "tier": "S",
+ "dims_tol": 0.6
+}
