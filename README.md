@@ -43,6 +43,8 @@ That is shortened: each command prints a few more lines, and the build prints ev
 
 The build runs OpenSCAD with the Manifold backend and then checks the STL it ships, read the way a slicer reads it: watertight, no non-manifold edges or zero-area faces (the mesh is rebuilt through manifold3d at float32 first), one piece, flat on the bed, a real first layer, walls thick enough to print, no overhang past 45 degrees and the size the recipe promised. When a check fails, stone names the one setting to change and prints the command that changes it.
 
+Every passing build also writes `build/views.png`: the part from eight sides, from straight above and from straight below. Look at every panel, because a phone holder or a bracket that is right from the front and wrong on one side still fails.
+
 ## Tiers
 
 The skill gives each model a card that fits it.
@@ -84,7 +86,7 @@ The sentence from the vision model matters more than I expected, as without it t
 
 ## Colors
 
-A figure printed in one color looks unfinished, so after a passing build of a figure `stone colors` splits it into regions by the colors of its style picture, lists them and draws them numbered in `build/regions.png`. Then one line gives each region a filament, and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone reads the file back before it says so: watertight, clean for a slicer, the same faces as the STL. Put your printer's filament slots in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on, in the job folder or once in `~/.config/smoothstone/stone.toml`. When a figure's request names colors, the build's NEXT line is `stone colors` and its suggestion follows those colors; any other part prints in one color, and the build names the filament to load.
+A figure printed in one color looks unfinished, so after a passing build of a figure `stone colors` splits it into regions by the colors of its style picture, lists them and draws them numbered in `build/regions.png`. Then one line gives each region a filament, and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone cuts each color edge as a smooth curve through the triangles, then reads the file back before it says so: watertight, clean for a slicer, the same volume as the STL. The color_edges check compares each edge's length with the same edge smoothed over 2 mm and fails one that is over 8% longer, because that edge zigzags; then no file is written. `build/boundaries.png` shows every color edge close up from eight sides. Put your printer's filament slots in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on, in the job folder or once in `~/.config/smoothstone/stone.toml`. When a figure's request names colors, the build's NEXT line is `stone colors` and its suggestion follows those colors; any other part prints in one color, and the build names the filament to load.
 
 ```
 $ stone colors
@@ -99,9 +101,16 @@ Color regions of figure.stl, largest first:
 Filaments: 1 red, 2 white, 3 blue, 4 black (stone.toml [filaments])
 NEXT: stone colors 2=black 5=black rest=white
 $ stone colors 2=black 5=black rest=white
-filament 2 white: 80% of surface; filament 4 black: 20%
-Warning: the colors alternate on 99 layers: about 100 filament changes and 65 g purge.
+FIX: color boundary is jagged: filament 2/4 at z 68 mm is 1.19 times its smoothed length (max 1.08); no file written
+The paint of region 5 (black) does not follow a clean line; it takes the rest color.
+NEXT: stone colors 2=black rest=white
+$ stone colors 2=black rest=white
+filament 2 white: 82% of surface; filament 4 black: 18%
+Checked: the 3MF reads back watertight and clean for a slicer, 120504 faces, volume as the STL.
+PASS color_edges: every color boundary is a smooth curve (worst 1.035, max 1.08)
+Warning: the colors alternate on 47 layers: about 50 filament changes and 32 g purge.
 3MF: stone-job/figure.3mf (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)
+Views: stone-job/build/views.png (look at every panel before you call it done)
 In the slicer: filament 2 must be white, filament 4 must be black.
 NEXT: none, the part is ready
 ```

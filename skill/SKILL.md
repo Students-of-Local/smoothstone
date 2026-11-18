@@ -52,7 +52,17 @@ reads Bambu paint too. The loaded filaments, in slot order, go in stone.toml:
 `[filaments]` with `1 = "white"` and `2 = "black"` (the default), in the job folder or once per
 machine in ~/.config/smoothstone/stone.toml. When a figure's request names colors, the build's
 NEXT line is stone colors, and the mapping it suggests follows those colors. Other parts print in
-one color, and the build names the filament to load.
+one color, and the build names the filament to load. Before it writes the 3MF, stone cuts each color
+edge as a smooth curve through the triangles, and the color_edges check fails any edge that still
+zigzags: FIX "color boundary is jagged", no file, and a NEXT line that gives that region the rest color.
+
+## Check every angle
+
+The numbers are the gate: every check must pass. Then open build/views.png (and build/boundaries.png
+after stone colors) and look at it panel by panel, all ten sides, not just the front. A part that holds
+a phone, carries a load or fits a hole must be right from every side, because a fault on one side
+breaks it as surely as one on the front. Look for a feature missing on one side, a wall that thins,
+text cut off, and a color edge that zigzags. If a panel shows a fault, say what and where, and fix it.
 
 ## Measuring from a photo
 

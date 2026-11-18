@@ -8,6 +8,7 @@ recipe and the settings that make the part look its best, then let stone build a
 - Set every size the request gives. Then choose the look: style, rounding, pattern, text.
 - After a FIX line, change only the parameter it names, then build again.
 - Keep the part to one piece that sits flat, unless the recipe makes two on purpose.
+- Open views.png and look at every panel before you stop; if a panel shows a fault, say what and where, and fix it.
 - Stop when stone build says Part ready, unless you want to change the look and build again.
 - Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request.
 

@@ -331,3 +331,153 @@ def test_only_a_figure_with_a_style_picture_goes_on_to_stone_colors(tmp_path, mo
     (d / "style.png").write_bytes(b"png")
     assert cli._many_colors(job, fig, params)
     assert not cli._many_colors(job, rc.load("_demo"), params)
+
+
+# smooth color boundaries (SPEC2)
+
+
+def _sphere_halves():
+    s = trimesh.creation.icosphere(subdivisions=3, radius=6)  # about 0.9 mm edges, a coarse figure
+    m = colors.load_stl_mesh(s.vertices, s.faces)
+    fil = np.where(m.triangles_center[:, 2] > 0, 2, 1)
+    return m, fil
+
+
+def test_cut_iso_keeps_a_closed_mesh_watertight_clean_and_its_volume():
+    s = trimesh.creation.icosphere(subdivisions=3, radius=6)
+    V, F = np.asarray(s.vertices), np.asarray(s.faces)
+    f = V[:, 2] + 0.3 * V[:, 0]  # a tilted plane: it crosses edges anywhere, near vertices too
+    for level in (0.0, 1.234, -4.5):
+        V2, F2, par = clean.cut_iso(V, F, f, level, parents=True)
+        m = trimesh.Trimesh(V2, F2, process=False)
+        assert m.is_watertight and m.is_winding_consistent
+        assert all(x == 0 for x in clean.slicer_view(V2, F2).values())
+        assert abs(m.volume - s.volume) < 1e-6 * s.volume  # new vertices lie on the old edges
+        assert len(F2) > len(F) and len(par) == len(F2) and par.max() < len(F)
+        new = V2[len(V):]
+        lv = new[:, 2] + 0.3 * new[:, 0]
+        assert len(new) > 10 and np.abs(lv - level).max() < 1e-9  # every new vertex is on the level
+        # no face crosses the level any more: each lies on one side (or touches it)
+        g = np.r_[f, lv] - level
+        g[np.abs(g) < 0.03] = 0
+        side = np.sign(g)[F2]
+        assert not ((side.max(1) > 0) & (side.min(1) < 0)).any()
+
+
+def test_cut_iso_follows_a_slowly_changing_field_through_the_triangles():
+    s = trimesh.creation.icosphere(subdivisions=3, radius=6)
+    V, F = np.asarray(s.vertices), np.asarray(s.faces)
+    f = 0.01 * (V[:, 2] + 0.3 * V[:, 0])  # 0.01 per mm: a snap in units of f would take a 3 mm band
+    V2, F2, g = clean.cut_iso(V, F, f, 0.0, fields=f)
+    fil = np.where(g[F2].mean(1) > 0, 2, 1)
+    worst, lines = colors.color_edges(V2, F2, fil)
+    assert len(lines) == 1 and worst < 1.03  # a curve through the triangles, not along their edges
+    on_old = (lines[0]["verts"] < len(V)).mean()
+    assert on_old < 0.2
+
+
+def test_cut_iso_interpolates_fields_onto_new_vertices():
+    s = trimesh.creation.icosphere(subdivisions=2, radius=5)
+    V, F = np.asarray(s.vertices), np.asarray(s.faces)
+    V2, F2, X = clean.cut_iso(V, F, V[:, 2], 0.0, fields=V[:, :2].copy())
+    assert np.allclose(X, V2[:, :2])  # a field linear in position comes out exact
+
+
+def test_an_uncut_color_edge_is_jagged_and_the_cut_one_is_smooth():
+    m, fil = _sphere_halves()
+    worst, lines = colors.color_edges(m.vertices, m.faces, fil)
+    assert len(lines) == 1 and lines[0]["closed"]
+    assert worst > 1.10  # the edge runs along triangle edges: the check must be able to fail
+    V, F, fil2, parent = colors.smooth_cut(m.vertices, m.faces, fil)
+    cut = colors.load_stl_mesh(V, F)
+    assert cut.is_watertight and all(x == 0 for x in clean.slicer_view(V, F).values())
+    assert abs(cut.volume - m.volume) < colors.VOLUME_TOL * m.volume
+    worst2, lines2 = colors.color_edges(V, F, fil2)
+    assert worst2 < 1.03
+    assert len(parent) == len(F) and set(fil2) == {1, 2}
+
+
+def test_a_clean_small_loop_is_not_called_jagged():
+    t = np.linspace(0, 2 * np.pi, 400, endpoint=False)
+    for r in (1.5, 4.0, 20.0):  # a moving average shrinks small loops; the check corrects for it
+        pts = np.c_[r * np.cos(t), r * np.sin(t), 0 * t]
+        assert colors.jaggedness(np.vstack([pts, pts[:1]]), True) < 1.01
+
+
+def test_a_sawtooth_line_is_jagged():
+    x = np.arange(0, 30.01, 0.5)
+    pts = np.c_[x, 0.25 * (np.arange(len(x)) % 2), 0 * x]  # 0.5 mm teeth, 0.25 mm high
+    assert colors.jaggedness(pts, False) > colors.JAGGED
+    assert colors.jaggedness(np.c_[x, 0 * x, 0 * x], False) < 1.001
+
+
+def test_fixed_faces_keep_their_filament_and_their_edge():
+    box = trimesh.creation.box((20, 20, 20)).subdivide().subdivide().subdivide()
+    m = colors.load_stl_mesh(box.vertices, box.faces)
+    zc = m.triangles_center[:, 2]
+    base = zc < -5
+    fil = np.where(base, 1, 2)
+    fil[(zc > 5)] = 1
+    V, F, fil2, parent = colors.smooth_cut(m.vertices, m.faces, fil, fixed=base)
+    assert (fil2[base[parent]] == 1).all()  # the plinth stays its color
+    # the figure's color runs right down to the seam: no other color creeps onto it
+    zc2 = V[F].mean(1)[:, 2]
+    seam = (~base[parent]) & (zc2 < -4)
+    assert (fil2[seam] == 2).all()
+
+
+def test_check_3mf_finds_a_volume_change(tmp_path):
+    box = trimesh.creation.box((10, 10, 10))
+    m = colors.load_stl_mesh(box.vertices, box.faces)
+    fil = np.where(m.triangles_center[:, 2] > 0, 2, 1)
+    out = tmp_path / "box.3mf"
+    colors.write_3mf(out, m.vertices, m.faces, fil, "box.stl")
+    assert colors.check_3mf(out, len(m.faces), 2, volume=1000.0) == []
+    assert any("volume" in p for p in colors.check_3mf(out, len(m.faces), 2, volume=1010.0))
+
+
+def test_every_passing_build_writes_views_with_10_panels(jobenv, openscad):
+    from PIL import Image
+
+    stone("new", "a small plate with one hole")
+    stone("set", "_demo", "w=50")
+    text, code, nxt = stone("build")
+    assert code == 0, text
+    png = jobenv / "stone-job" / "build" / "views.png"
+    assert f"Views: {png} (look at every panel before you call it done)" in text
+    assert len(colors.VIEWS) == 10
+    im = Image.open(png)
+    assert im.size == (5 * colors.VIEW_PX, 2 * colors.VIEW_PX)  # 5 a row, 2 rows
+    # every panel shows the part: some pixels differ from the gray background
+    a = np.asarray(im.convert("RGB")).astype(int)
+    for i in range(10):
+        r, c = divmod(i, 5)
+        cell = a[r * colors.VIEW_PX:(r + 1) * colors.VIEW_PX, c * colors.VIEW_PX:(c + 1) * colors.VIEW_PX]
+        assert (np.abs(cell - 136).sum(2) > 30).mean() > 0.02, f"panel {i} is empty"
+
+
+def test_a_jagged_color_edge_writes_no_file(jobenv, openscad, monkeypatch):
+    stone("new", "a small red plate with one hole")
+    stone("set", "_demo", "w=50")
+    stone("build")
+    pts = np.c_[np.arange(0, 10.0, 0.5), np.zeros(20), np.zeros(20)]
+    line = {"pair": (1, 3), "pts": pts, "verts": np.arange(20), "closed": False, "length": 9.5, "ratio": 1.2}
+    monkeypatch.setattr(colors, "color_edges", lambda V, F, fil: (1.2, [line]))
+    text, code, nxt = stone("colors", "rest=red")
+    assert code != 0
+    assert "FIX: color boundary is jagged: filament 1/3 at z 0 mm is 1.20 times its smoothed length" in text
+    assert "no file written" in text
+    assert not (jobenv / "stone-job" / "_demo.3mf").exists()
+    assert (jobenv / "stone-job" / "build" / "boundaries.png").is_file()
+    assert not status_json(jobenv).get("colors")
+
+
+def test_a_painted_part_passes_color_edges_and_writes_views(jobenv, openscad):
+    stone("new", "a small red plate with one hole")
+    stone("set", "_demo", "w=50")
+    stone("build")
+    text, code, nxt = stone("colors", "rest=red")
+    assert code == 0, text
+    assert "PASS color_edges: every color boundary is a smooth curve" in text
+    assert "Views: " in text and (jobenv / "stone-job" / "build" / "views.png").is_file()
+    assert status_json(jobenv)["colors"]["color_edges"] == 1.0

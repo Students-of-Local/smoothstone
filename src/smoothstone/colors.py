@@ -27,6 +27,11 @@ LAYER = 0.2  # mm
 PURGE_G = 0.65  # grams of purge per filament change, about what Orca's default flush uses
 MANY_LAYERS = 10  # a warning from this many mixed layers
 MAX_FILAMENTS = 16
+EDGE_RADIUS = 1.5  # mm: color boundaries are smoothed over about this distance before the cut
+EDGE_WINDOW = 2.0  # mm of arc length: the moving average a boundary is compared with
+JAGGED = 1.08  # a boundary this much longer than its smoothed self zigzags
+EDGE_MIN = 4.0  # mm: shorter boundary pieces (ends at a three-color corner) are too short to judge
+VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 
 # plain color names and a typical filament of each
 NAMES = {
@@ -446,8 +451,10 @@ def read_3mf(path: Path) -> tuple[np.ndarray, np.ndarray, list[str], int]:
     return v.reshape(-1, 3), f.reshape(-1, 3), codes, int(m.group(1)) if m else 1
 
 
-def check_3mf(path: Path, faces: int, filaments: int) -> list[str]:
-    """Problems with a written 3MF, read back as a slicer would: [] when it is good."""
+def check_3mf(path: Path, faces: int, filaments: int, volume: float | None = None) -> list[str]:
+    """Problems with a written 3MF, read back as a slicer would: [] when it is good. `faces` is the
+    mesh that was written (the cut mesh); `volume`, when given, is the STL's, which the 3MF must keep
+    within VOLUME_TOL."""
     import trimesh
 
     try:
@@ -458,8 +465,11 @@ def check_3mf(path: Path, faces: int, filaments: int) -> list[str]:
     view = clean.slicer_view(v, f)
     if any(view.values()):
         bad.append("the 3MF mesh is not clean for a slicer: " + ", ".join(clean.problems(view)))
-    if not trimesh.Trimesh(v, f, process=False).is_watertight:
+    tm = trimesh.Trimesh(v, f, process=False)
+    if not tm.is_watertight:
         bad.append("the 3MF mesh is not watertight")
+    elif volume and abs(tm.volume - volume) > VOLUME_TOL * abs(volume):
+        bad.append(f"the 3MF volume {tm.volume:.1f} mm3 is not the STL's {volume:.1f} mm3")
     if len(f) != faces:
         bad.append(f"the 3MF has {len(f)} faces and the STL {faces}")
     if not 1 <= main <= filaments:
@@ -508,69 +518,296 @@ def layer_changes(mesh, filament: np.ndarray, layer: float = LAYER) -> tuple[int
     return mixed, changes
 
 
+# color boundaries
+
+
+def _diffuse(V, F, X, radius: float):
+    """Columns of X (one value per vertex) blurred over about `radius` mm along the surface: one
+    implicit heat step (M + tK) x = M x0 with the cotangent Laplacian K (negative weights clamped)
+    and vertex areas M. The surface metric, not the triangle count, sets how far a value spreads,
+    so a finely meshed foot does not bleed onto a coarse plinth beside it."""
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import splu
+
+    n = len(V)
+    p = V[F]
+    rows, cols, vals = [], [], []
+    for k in range(3):  # the corner k is opposite the edge (k+1, k+2)
+        i, j = F[:, (k + 1) % 3], F[:, (k + 2) % 3]
+        u, w = p[:, (k + 1) % 3] - p[:, k], p[:, (k + 2) % 3] - p[:, k]
+        cot = (u * w).sum(1) / np.maximum(np.linalg.norm(np.cross(u, w), axis=1), 1e-12)
+        c = np.maximum(cot, 0) / 2
+        rows += [i, j]
+        cols += [j, i]
+        vals += [c, c]
+    A = sp.coo_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=(n, n)).tocsr()
+    K = sp.diags(np.asarray(A.sum(1)).ravel()) - A
+    area = np.linalg.norm(np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0]), axis=1) / 2
+    M = np.bincount(F.ravel(), weights=np.repeat(area / 3, 3), minlength=n)
+    t = radius ** 2 / 2  # heat flow for time t spreads a point by sqrt(2t) in each direction
+    lu = splu((sp.diags(M) + t * K).tocsc())
+    return np.column_stack([lu.solve(np.ascontiguousarray(M * X[:, k])) for k in range(X.shape[1])])
+
+
+def smooth_cut(V, F, face_fil, radius: float = EDGE_RADIUS, fixed=None):
+    """Cut the mesh along smooth color boundaries. Each filament's indicator per vertex (the
+    area-weighted share of its faces) is diffused over about `radius` mm, the mesh is cut along its
+    0.5 level (clean.cut_iso), and every face takes the filament whose smoothed indicator is largest
+    at its centroid. A boundary then runs as a smooth curve through the triangles instead of along
+    their edges. Faces in `fixed` (a plinth: its edge with the figure is a seam in the shape, already
+    a clean line) keep their filament and take no part in the smoothing, so the figure's color runs
+    right down to that seam. Returns (V, F, face_fil, parent) of the cut mesh, parent being the input
+    face each face came from; one filament comes back unchanged."""
+    import scipy.sparse as sp
+
+    V = np.asarray(V, float)
+    F = np.asarray(F, np.int64)
+    face_fil = np.asarray(face_fil, int)
+    fils = np.unique(face_fil)
+    if len(fils) < 2:
+        return V, F, face_fil, np.arange(len(F))
+    p = V[F]
+    area = np.linalg.norm(np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0]), axis=1) / 2
+    rows = F.ravel()
+    cols = np.repeat(np.arange(len(F)), 3)
+    M = sp.coo_matrix((np.repeat(area, 3), (rows, cols)), shape=(len(V), len(F))).tocsr()
+    onehot = (face_fil[:, None] == fils[None, :]).astype(float)
+    ind = (M @ onehot) / np.maximum(np.asarray(M.sum(1)), 1e-30)
+    fixed = np.zeros(len(F), bool) if fixed is None else np.asarray(fixed, bool)
+    free = ~fixed
+    if free.any():
+        # the free faces alone set the values on their vertices, the seam included
+        Mf = M[:, free]
+        on = np.asarray(Mf.sum(1)).ravel() > 0
+        sub = (Mf @ onehot[free]) / np.maximum(np.asarray(Mf.sum(1)), 1e-30)
+        idx = np.where(on)[0]
+        remap = np.full(len(V), -1)
+        remap[idx] = np.arange(len(idx))
+        ind[idx] = _diffuse(V[idx], remap[F[free]], sub[idx], radius)
+    parent = np.arange(len(F))
+    for i in range(len(fils) if len(fils) > 2 else 1):  # with two filaments both levels are one curve
+        V, F, ind, par = clean.cut_iso(V, F, ind[:, i], 0.5, fields=ind, parents=True)
+        parent = parent[par]
+    out = fils[ind[F].mean(1).argmax(1)]
+    keep = fixed[parent]
+    out[keep] = face_fil[parent[keep]]
+    return V, F, out, parent
+
+
+def boundary_lines(V, F, face_fil) -> list[dict]:
+    """Every boundary between two filaments, chained into polylines: dicts with the filament pair,
+    the points, closed or not, and the length in mm."""
+    import trimesh
+
+    tm = trimesh.Trimesh(V, F, process=False)
+    adj = tm.face_adjacency
+    ev = tm.face_adjacency_edges
+    fa, fb = face_fil[adj[:, 0]], face_fil[adj[:, 1]]
+    diff = fa != fb
+    pairs = np.sort(np.stack([fa[diff], fb[diff]], 1), 1)
+    edges = ev[diff]
+    out = []
+    for pr in np.unique(pairs, axis=0):
+        es = edges[(pairs == pr).all(1)]
+        nb: dict[int, list[int]] = {}
+        for a, b in es:
+            nb.setdefault(int(a), []).append(int(b))
+            nb.setdefault(int(b), []).append(int(a))
+        used = set()
+
+        def walk(start, nxt):
+            path = [start]
+            prev, cur = start, nxt
+            while True:
+                used.add((min(prev, cur), max(prev, cur)))
+                path.append(cur)
+                if len(nb[cur]) != 2 or cur == start:
+                    return path
+                a, b = nb[cur]
+                n2 = b if a == prev else a
+                if (min(cur, n2), max(cur, n2)) in used:
+                    return path
+                prev, cur = cur, n2
+
+        ends = [v for v, ns in nb.items() if len(ns) != 2]
+        for v in ends + list(nb):
+            for w in nb[v]:
+                if (min(v, w), max(v, w)) not in used:
+                    path = walk(v, w)
+                    pts = V[path]
+                    closed = path[0] == path[-1] and len(path) > 3
+                    out.append({"pair": (int(pr[0]), int(pr[1])), "pts": pts, "verts": np.array(path), "closed": closed,
+                                "length": float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())})
+    return out
+
+
+def _moving_average(r: np.ndarray, k: int, closed: bool) -> np.ndarray:
+    if closed:
+        pad = np.concatenate([r[-(k // 2):], r, r[: k // 2]])
+    else:
+        h = k // 2  # mirror through each end point, so a straight line stays straight to its ends
+        pad = np.concatenate([2 * r[:1] - r[h:0:-1], r, 2 * r[-1:] - r[-2:-h - 2:-1]])
+    c = np.cumsum(np.vstack([np.zeros((1, 3)), pad]), 0)
+    return (c[k:] - c[:-k]) / k
+
+
+def _length(r: np.ndarray, closed: bool) -> float:
+    if closed:
+        r = np.vstack([r, r[:1]])
+    return float(np.linalg.norm(np.diff(r, axis=0), axis=1).sum())
+
+
+def jaggedness(pts: np.ndarray, closed: bool, window: float = EDGE_WINDOW) -> float:
+    """Length of a polyline over the length of the same line smoothed by a moving average over
+    `window` mm of arc length. 1.0 is perfectly smooth; a sawtooth along triangle edges is well over.
+
+    A moving average also shrinks any curve (a 8 mm loop by 11%), which would fail small round
+    loops that are perfectly smooth. So the ratio is divided by the shrink a second pass of the same
+    average gives: on a smooth curve the two passes shrink it alike, while a zigzag loses its
+    length in the first pass only."""
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    L = float(seg.sum())
+    if L <= 0:
+        return 1.0
+    s = np.r_[0, np.cumsum(seg)]
+    ds = min(0.05, L / 400)
+    q = np.arange(0, L, ds) if closed else np.linspace(0, L, max(int(L / ds), 2) + 1)
+    r = np.stack([np.interp(q, s, pts[:, k]) for k in range(3)], 1)
+    k = max(3, int(round(window / ds)) | 1)
+    k = min(k, max(3, (len(r) - 3) | 1))  # a line shorter than the window: average over most of it
+    m1 = _moving_average(r, k, closed)
+    m2 = _moving_average(m1, k, closed)
+    L1, L2 = _length(m1, closed), _length(m2, closed)
+    return (L / max(L1, 1e-9)) / max(L1 / max(L2, 1e-9), 1.0)
+
+
+def color_edges(V, F, face_fil) -> tuple[float, list[dict]]:
+    """(worst jaggedness over the color boundaries long enough to judge, the boundary lines with a
+    "ratio" each). 1.0 with no boundaries."""
+    lines = boundary_lines(V, F, np.asarray(face_fil))
+    worst = 1.0
+    for ln in lines:
+        ln["ratio"] = jaggedness(ln["pts"], ln["closed"]) if ln["length"] >= EDGE_MIN else None
+        if ln["ratio"] is not None:
+            worst = max(worst, ln["ratio"])
+    return worst, lines
+
+
 # pictures
 
-
-def _project(v, f, angle):
-    """Screen x, screen y (up), depth and a facing mask for a camera on -Y turned by `angle`."""
-    c, s = np.cos(angle), np.sin(angle)
-    R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
-    w = v @ R.T
-    t = w[f]
-    n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
-    n /= np.linalg.norm(n, axis=1)[:, None] + 1e-12
-    return t, n
+VIEW_PX = 360
+# every part from 8 sides at 20 degrees up, then straight down and straight up
+VIEWS = [(f"{a} deg", np.radians(a), np.radians(20)) for a in range(0, 360, 45)] + [
+    ("top", 0.0, np.radians(90)), ("bottom", 0.0, np.radians(-90))]
 
 
-def render(mesh, face_rgb: np.ndarray, out_png: Path, views=(("front", 0.0), ("back", np.pi)),
-           numbers: np.ndarray | None = None, show: set | None = None, px: int = 640) -> None:
-    """Shaded views of the mesh with per-face colors, and each region's number when given."""
-    from PIL import Image, ImageDraw, ImageFont
+def _rot(az: float, elev: float) -> np.ndarray:
+    """Turn the world so a camera on -Y, raised by `elev` and walked round by `az`, looks along +Y."""
+    c, s = np.cos(az), np.sin(az)
+    Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
+    ce, se = np.cos(elev), np.sin(elev)
+    Rx = np.array([[1, 0, 0], [0, ce, -se], [0, se, ce]])
+    return Rx @ Rz
+
+
+def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, show=None, clip=False, font=None):
+    """One flat-shaded orthographic view as a PIL image, `half` mm from the center to each edge."""
+    from PIL import Image, ImageDraw
     from scipy import ndimage
 
-    v = mesh.vertices - mesh.bounds.mean(0)
-    f = mesh.faces
-    ext = mesh.extents
-    span = max(ext[2], np.hypot(ext[0], ext[1])) * 1.06
-    scale = px / span
-    W = int(np.hypot(ext[0], ext[1]) * scale * 1.06) + 20
-    panels = []
-    font = ImageFont.load_default(size=max(14, px // 22))
-    for name, ang in views:
-        t, n = _project(v, f, ang)
-        vis = np.where(n[:, 1] < 0)[0]
-        order = vis[np.argsort(-t[vis, :, 1].mean(1))]  # far first
-        sx = (t[:, :, 0] * scale + W / 2)
-        sy = (px / 2 - t[:, :, 2] * scale)
-        ids = Image.new("I", (W, px), -1)
-        d = ImageDraw.Draw(ids)
-        for i in order:
-            d.polygon([(sx[i, 0], sy[i, 0]), (sx[i, 1], sy[i, 1]), (sx[i, 2], sy[i, 2])], fill=int(i))
-        idbuf = np.asarray(ids, dtype=np.int64)
-        shade = 0.35 + 0.65 * np.clip(-n[:, 1] * 0.7 + n[:, 2] * 0.3, 0, 1)
-        img = np.full((px, W, 3), 136, np.float64)
-        hit = idbuf >= 0
-        img[hit] = face_rgb[idbuf[hit]] * shade[idbuf[hit], None]
-        im = Image.fromarray(img.clip(0, 255).astype(np.uint8))
-        dd = ImageDraw.Draw(im)
-        if numbers is not None:
-            nb = np.where(hit, numbers[np.clip(idbuf, 0, None)], 0)
-            for r in sorted(show or set(np.unique(numbers))):
-                mask = nb == r
-                if mask.sum() < 40:
-                    continue
-                dist = ndimage.distance_transform_edt(mask)
-                y, x = np.unravel_index(int(dist.argmax()), dist.shape)
-                dd.text((x, y), str(r), fill=(0, 0, 0), font=font, anchor="mm", stroke_width=3,
-                        stroke_fill=(255, 255, 255))
-        dd.text((W / 2, 14), name, fill=(255, 255, 255), font=font, anchor="mm")
-        panels.append(im)
-    out = Image.new("RGB", (sum(p.width for p in panels), px), (136, 136, 136))
-    x = 0
-    for p in panels:
-        out.paste(p, (x, 0))
-        x += p.width
+    t = ((v - center) @ _rot(az, elev).T)[f]
+    n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
+    n /= np.linalg.norm(n, axis=1)[:, None] + 1e-12
+    cen = t.mean(1)
+    vis = n[:, 1] < 0
+    if clip:  # a close-up: only the faces around the spot
+        vis &= (np.abs(cen[:, 0]) < half * 1.5) & (np.abs(cen[:, 2]) < half * 1.5)
+    order = np.where(vis)[0]
+    order = order[np.argsort(-cen[order, 1])]  # far first
+    scale = px / (2 * half)
+    sx = t[:, :, 0] * scale + px / 2
+    sy = px / 2 - t[:, :, 2] * scale
+    ids = Image.new("I", (px, px), -1)
+    d = ImageDraw.Draw(ids)
+    for i in order:
+        d.polygon([(sx[i, 0], sy[i, 0]), (sx[i, 1], sy[i, 1]), (sx[i, 2], sy[i, 2])], fill=int(i))
+    idbuf = np.asarray(ids, dtype=np.int64)
+    shade = 0.35 + 0.65 * np.clip(-n[:, 1] * 0.7 + n[:, 2] * 0.3, 0, 1)
+    img = np.full((px, px, 3), 136, np.float64)
+    hit = idbuf >= 0
+    img[hit] = face_rgb[idbuf[hit]] * shade[idbuf[hit], None]
+    im = Image.fromarray(img.clip(0, 255).astype(np.uint8))
+    dd = ImageDraw.Draw(im)
+    if numbers is not None:
+        nb = np.where(hit, numbers[np.clip(idbuf, 0, None)], 0)
+        for r in sorted(show or set(np.unique(numbers))):
+            mask = nb == r
+            if mask.sum() < 40:
+                continue
+            dist = ndimage.distance_transform_edt(mask)
+            y, x = np.unravel_index(int(dist.argmax()), dist.shape)
+            dd.text((x, y), str(r), fill=(0, 0, 0), font=font, anchor="mm", stroke_width=3, stroke_fill=(255, 255, 255))
+    if title:
+        dd.text((px / 2, 12), title, fill=(255, 255, 255), font=font, anchor="mm", stroke_width=2, stroke_fill=(60, 60, 60))
+    return im
+
+
+def _sheet(panels, cols: int, out_png: Path) -> None:
+    from PIL import Image
+
+    rows = -(-len(panels) // cols)
+    w, h = panels[0].size
+    out = Image.new("RGB", (cols * w, rows * h), (136, 136, 136))
+    for i, p in enumerate(panels):
+        out.paste(p, ((i % cols) * w, (i // cols) * h))
     out.save(out_png)
+
+
+def render(mesh, face_rgb: np.ndarray, out_png: Path, views=(("front", 0.0, 0.0), ("back", np.pi, 0.0)),
+           numbers: np.ndarray | None = None, show: set | None = None, px: int = VIEW_PX * 2,
+           cols: int | None = None) -> int:
+    """Flat-shaded views of the whole mesh with per-face colors (and each region's number when
+    given), one square panel per (name, azimuth, elevation). Returns the number of panels."""
+    from PIL import ImageFont
+
+    v = np.asarray(mesh.vertices, float)
+    f = np.asarray(mesh.faces)
+    center = (v.min(0) + v.max(0)) / 2
+    half = float(np.linalg.norm(v - center, axis=1).max()) * 1.04
+    font = ImageFont.load_default(size=max(12, px // 26))
+    panels = [_panel(v, f, np.asarray(face_rgb, float), az, el, center, half, px, title=name,
+                     numbers=numbers, show=show, font=font) for name, az, el in views]
+    _sheet(panels, cols or len(panels), out_png)
+    return len(panels)
+
+
+def render_views(mesh, face_rgb, out_png: Path) -> int:
+    """build/views.png: 8 sides at 20 degrees up, top and bottom, 5 panels a row."""
+    return render(mesh, face_rgb, out_png, views=VIEWS, px=VIEW_PX, cols=5)
+
+
+def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: int = 6, px: int = 300) -> int:
+    """build/boundaries.png: each jagged color boundary, then the longest, close up from 8 sides, one
+    row per boundary, so the edge can be seen as it will print. Returns the number of rows."""
+    from PIL import ImageFont
+
+    font = ImageFont.load_default(size=13)
+    # the jagged ones first, so a failing check shows its edge, then the longest
+    pick = sorted([ln for ln in lines if ln["length"] >= EDGE_MIN],
+                  key=lambda ln: (-((ln.get("ratio") or 0) > JAGGED), -ln["length"]))[:most]
+    panels = []
+    for k, ln in enumerate(pick, 1):
+        lo, hi = ln["pts"].min(0), ln["pts"].max(0)
+        center = (lo + hi) / 2
+        half = float(np.clip(np.linalg.norm(hi - lo) / 2 + 2, 4, 20))
+        r = f"{ln['ratio']:.3f}" if ln.get("ratio") else "-"
+        for a in range(0, 360, 45):
+            name = f"{k}: {ln['pair'][0]}/{ln['pair'][1]} z{center[2]:.0f} {a}d r{r}"
+            panels.append(_panel(V, F, face_rgb, np.radians(a), np.radians(10), center, half, px,
+                                 title=name, clip=True, font=font))
+    if panels:
+        _sheet(panels, 8, out_png)
+    return len(pick)
 
 
 TINTS = [(230, 25, 75), (60, 180, 75), (255, 225, 25), (0, 130, 200), (245, 130, 48), (145, 30, 180),

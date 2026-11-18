@@ -12,7 +12,7 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   When the person answers, run: stone note "<their answer>", then run the NEXT line it prints.
 - If you lost track or your memory was cleared, run: stone status
 - For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
-- If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request.
+- If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. A FIX from stone colors is like any FIX: run the NEXT line it gives.
 - Stop when stone says the part is ready.
 
 ## Steps

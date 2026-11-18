@@ -626,6 +626,20 @@ def _grow(r: rc.Recipe, params: dict, err: str):
     return None
 
 
+def views_step(job: Job, stl: Path) -> Path | None:
+    """build/views.png: the part from every side, so a person or a large model can look at it all."""
+    import numpy as np
+
+    png = job.build_dir / "views.png"
+    try:
+        m = colortool.load_stl(stl)
+        colortool.render_views(m, np.tile([217.0, 160.0, 102.0], (len(m.faces), 1)), png)
+    except Exception:  # a picture is never worth failing a passing build
+        job.log("views failed:\n" + traceback.format_exc())
+        return None
+    return png
+
+
 def cmd_build(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
@@ -670,7 +684,7 @@ def cmd_build(args, job: Job) -> Out:
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
-    for f in ("regions.json", "regions.npy", "regions.png", "colors.png", "atlas.png"):
+    for f in ("regions.json", "regions.npy", "regions.png", "colors.png", "atlas.png", "views.png", "boundaries.png"):
         (bd / f).unlink(missing_ok=True)
     if job.status().get("colors"):
         job.update(colors=None)
@@ -750,6 +764,9 @@ def cmd_build(args, job: Job) -> Out:
         # a passing build is the finished part: no last step for a small model to forget
         final = job.root / f"{r.name}.stl"
         shutil.copyfile(stl, final)
+        views = views_step(job, stl)
+        if views:
+            out.add(f"Views: {views} (look at every panel before you call it done)")
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
         if colortool.asks_for_color(job.request()):
@@ -1421,8 +1438,50 @@ def cmd_colors(args, job: Job) -> Out:
         if len(assign) < len(info):
             out.add(f"No rest= given: the other regions take filament 1 {fil[0]}.")
     per = np.array([0] + [assign.get(d, rest) for d in range(1, len(info) + 1)])
-    face_fil = per[num]
-    area = mesh.area_faces
+    face_fil0 = per[num]
+    # cut along smooth boundaries, so a color edge runs as a curve through the triangles
+    fixed = num == base if base else None  # the plinth's edge is a seam in the shape: keep it there
+    V, F, face_fil, parent = colortool.smooth_cut(mesh.vertices, mesh.faces, face_fil0, fixed=fixed)
+    cut = colortool.load_stl_mesh(V, F)  # the float32 mesh the 3MF holds
+    names = _fil_value(fil)
+
+    def mapping_line(a: dict) -> str:
+        return " ".join([f"{k}={names[v - 1]}" for k, v in sorted(a.items())] + [f"rest={names[rest - 1]}"])
+
+    worst, lines = colortool.color_edges(V, F, face_fil)
+    fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
+    if worst > colortool.JAGGED:
+        # paint that cannot follow a clean line (often a feature the picture puts beside the shape)
+        reg_of = num[parent]
+        area_c = cut.area_faces
+        drop: list[int] = []
+        bad_lines = sorted([ln for ln in lines if ln["ratio"] and ln["ratio"] > colortool.JAGGED], key=lambda ln: -ln["ratio"])
+        for ln in bad_lines:
+            near = np.isin(F, ln["verts"]).any(1)
+            cand = {int(g): area_c[near & (reg_of == g)].sum() for g in np.unique(reg_of[near])
+                    if assign.get(int(g), rest) != rest}
+            if cand:
+                g = min(cand, key=lambda k: next(d["share"] for d in info if d["n"] == k))
+                if g not in drop:
+                    drop.append(g)
+        (job.root / f"{r.name}.3mf").unlink(missing_ok=True)  # no painted file with a jagged edge
+        if st.get("colors"):
+            job.update(colors=None)
+        colortool.render_boundaries(V, F, fil_rgb[face_fil - 1], lines, bd / "boundaries.png")
+        ln = bad_lines[0]
+        z = ln["pts"][:, 2].mean()
+        out.fix(f"color boundary is jagged: filament {ln['pair'][0]}/{ln['pair'][1]} at z {z:.0f} mm is "
+                f"{ln['ratio']:.2f} times its smoothed length (max {colortool.JAGGED}); no file written")
+        out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
+        if drop:
+            names_d = ", ".join(f"region {g} ({next(d['color'] or 'base' for d in info if d['n'] == g)})" for g in drop)
+            out.add(f"The paint of {names_d} does not follow a clean line; it takes the rest color.")
+            out.next = "stone colors " + mapping_line({k: v for k, v in assign.items() if k not in drop})
+        else:
+            out.next = "stone colors"
+        out.result = f"colors failed: jagged color boundary ({worst:.2f})"
+        return out
+    area = cut.area_faces
     total = area.sum()
     used = sorted(set(int(x) for x in face_fil))
     shares = "; ".join(
@@ -1431,8 +1490,8 @@ def cmd_colors(args, job: Job) -> Out:
     final = job.root / f"{r.name}.3mf"
     tmp = bd / "check.3mf"
     final.unlink(missing_ok=True)
-    main_fil = colortool.write_3mf(tmp, mesh.vertices, mesh.faces, face_fil, f"{r.name}.stl", bed=config.bed(job.root))
-    bad = colortool.check_3mf(tmp, len(mesh.faces), len(fil))
+    main_fil = colortool.write_3mf(tmp, V, F, face_fil, f"{r.name}.stl", bed=config.bed(job.root))
+    bad = colortool.check_3mf(tmp, len(F), len(fil), volume=mesh.volume)
     if bad:
         tmp.unlink(missing_ok=True)
         for b in bad[:3]:
@@ -1445,27 +1504,30 @@ def cmd_colors(args, job: Job) -> Out:
         out.add(f"{c} is not in stone.toml [filaments], so it is filament {fil.index(c) + 1} here: load it in that slot.")
     out.add(shares)
     out.add(f"Object filament {main_fil}; the other filaments are painted on, triangle by triangle.")
-    out.add(f"Checked: the 3MF reads back watertight and clean for a slicer, {len(mesh.faces)} faces like the STL.")
-    mixed, changes = colortool.layer_changes(mesh, face_fil)
+    out.add(f"Checked: the 3MF reads back watertight and clean for a slicer, {len(F)} faces, volume as the STL.")
+    out.add(f"PASS color_edges: every color boundary is a smooth curve (worst {worst:.3f}, max {colortool.JAGGED})")
+    mixed, changes = colortool.layer_changes(cut, face_fil)
     if mixed >= colortool.MANY_LAYERS:
         out.add(f"Warning: the colors alternate on {mixed} layers: about {changes} filament changes "
                 f"and {changes * colortool.PURGE_G:.0f} g purge.")
-    fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
-    colortool.render(mesh, fil_rgb[face_fil - 1], bd / "colors.png",
-                     views=(("front", 0.0), ("side", np.pi / 2), ("back", np.pi)))
+    rgb = fil_rgb[face_fil - 1]
+    colortool.render(cut, rgb, bd / "colors.png",
+                     views=(("front", 0.0, 0.0), ("side", np.pi / 2, 0.0), ("back", np.pi, 0.0)))
+    colortool.render_views(cut, rgb, bd / "views.png")
+    (bd / "boundaries.png").unlink(missing_ok=True)
+    if colortool.render_boundaries(V, F, rgb, lines, bd / "boundaries.png"):
+        out.add(f"Boundaries: {bd / 'boundaries.png'} (each color edge close up from 8 sides)")
     out.add(f"3MF: {final} (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)")
-    out.add(f"Colors picture: {bd / 'colors.png'}")
-    used = sorted(set(int(x) for x in np.unique(face_fil)))
+    out.add(f"Views: {bd / 'views.png'} (look at every panel before you call it done)")
     out.add("In the slicer: " + ", ".join(f"filament {i} must be {fil[i - 1]}" for i in used)
             + ". The 3MF names slots, not colors; set them in stone.toml [filaments] to match the printer.")
-    mapping = " ".join([f"{k}={_fil_value(fil)[v - 1]}" for k, v in sorted(assign.items())] + [f"rest={_fil_value(fil)[rest - 1]}"])
+    mapping = mapping_line(assign)
     job.update(colors={"mapping": mapping, "filaments": fil, "shares": shares, "file": str(final),
-                       "changes": changes, "mixed_layers": mixed})
+                       "changes": changes, "mixed_layers": mixed, "color_edges": round(worst, 3)})
     out.next = DONE_NEXT
     out.stage = "done"
     out.result = f"3MF written, {shares}"[:120]
     return out
-
 
 # main
 

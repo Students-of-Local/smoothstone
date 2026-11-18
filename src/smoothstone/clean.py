@@ -71,3 +71,85 @@ def problems(view: dict) -> list[str]:
     if view["collapsed"] or view["zero_area"]:
         bad.append(f"{view['collapsed'] + view['zero_area']} zero-area faces")
     return bad
+
+
+def cut_iso(V, F, s, level, snap=0.02, fields=None, parents=False):
+    """Cut a closed triangle mesh along the level set s == level, so a color boundary can run on a
+    clean line instead of zigzagging along triangle edges.
+
+    s is one value per vertex. Every edge whose ends sit strictly on opposite sides gets one new
+    vertex, shared by both faces on that edge, so the mesh stays watertight; the new vertex lies on
+    the edge, so the shape and volume do not change. Vertices within `snap` mm of the level count
+    as on it, so no sliver faces are made. That distance is the value over the steepest slope of s
+    along the vertex's edges: a snap in units of s would take in a wide band of vertices where s
+    changes slowly, and the line would step along triangle edges there. `fields` (one row per
+    vertex) are interpolated onto the new vertices. Returns (V, F), then fields when given, then
+    (with parents=True) the input face each output face came from."""
+    V = np.asarray(V, float)
+    F = np.asarray(F, np.int64)
+    d = np.asarray(s, float) - level
+    E = np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    slope = np.abs(d[E[:, 0]] - d[E[:, 1]]) / np.maximum(np.linalg.norm(V[E[:, 0]] - V[E[:, 1]], axis=1), 1e-12)
+    g = np.zeros(len(V))
+    np.maximum.at(g, E[:, 0], slope)
+    np.maximum.at(g, E[:, 1], slope)
+    side = np.where(np.abs(d) <= snap * g, 0, np.sign(d)).astype(int)
+    new_v: list[np.ndarray] = []
+    new_w: list[tuple[int, int, float]] = []
+    key: dict[tuple[int, int], int] = {}
+    n0 = len(V)
+
+    def P(i):
+        return V[i] if i < n0 else new_v[i - n0]
+
+    def mid(a, b):
+        k = (a, b) if a < b else (b, a)
+        if k not in key:
+            i, j = k
+            t = d[i] / (d[i] - d[j])
+            key[k] = n0 + len(new_v)
+            new_v.append(V[i] + t * (V[j] - V[i]))
+            new_w.append((i, j, t))
+        return key[k]
+
+    sf = side[F]
+    cross = ((sf == 1).any(1)) & ((sf == -1).any(1))
+    out = [F[~cross]]
+    par = [np.where(~cross)[0]]
+    for fi, f in zip(np.where(cross)[0], F[cross]):
+        a, b, c = (int(x) for x in f)
+        sa, sb, sc = side[a], side[b], side[c]
+        for _ in range(3):  # turn the face until the odd corner is first; winding is kept
+            if sa == 0 and sb * sc < 0:  # the line passes through a and crosses bc
+                m = mid(b, c)
+                out.append(np.array([[a, b, m], [a, m, c]]))
+                par.append(np.full(2, fi))
+                break
+            if sa != 0 and sb != 0 and sc != 0 and sb == sc and sa != sb:  # a alone on its side
+                m1, m2 = mid(a, b), mid(a, c)
+                tri = [[a, m1, m2]]
+                if np.linalg.norm(P(m1) - P(c)) < np.linalg.norm(P(b) - P(m2)):  # shorter diagonal
+                    tri += [[m1, b, c], [m1, c, m2]]
+                else:
+                    tri += [[m1, b, m2], [b, c, m2]]
+                out.append(np.array(tri))
+                par.append(np.full(3, fi))
+                break
+            a, b, c = b, c, a
+            sa, sb, sc = sb, sc, sa
+        else:
+            out.append(np.array([[a, b, c]]))
+            par.append(np.full(1, fi))
+    V2 = np.vstack([V, np.array(new_v).reshape(-1, 3)])
+    F2 = np.vstack(out)
+    res = [V2, F2]
+    if fields is not None:
+        fields = np.asarray(fields, float)
+        if new_w:
+            i, j, t = (np.array(x) for x in zip(*new_w))
+            tt = t.reshape((-1,) + (1,) * (fields.ndim - 1))
+            fields = np.concatenate([fields, fields[i] + tt * (fields[j] - fields[i])])
+        res.append(fields)
+    if parents:
+        res.append(np.concatenate(par))
+    return tuple(res)
