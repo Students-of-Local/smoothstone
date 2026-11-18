@@ -593,3 +593,28 @@ def test_wobble_fails_the_spec2_wrists_and_passes_the_plane_cut():
         assert colors.jaggedness(d[k].astype(float), True) < colors.JAGGED  # the old check missed it
     for k in ("plane_0", "plane_1"):
         assert colors.wobble(d[k].astype(float), True) < colors.WOBBLE / 3, k
+
+
+def test_close_ups_are_antialiased_so_a_straight_edge_shows_no_pixel_stairs():
+    # a flat square facing the camera, black above a straight edge tilted 7 degrees, white below;
+    # drawn without supersampling the edge is a run of one-pixel steps the judge reads as a stepped
+    # paint line (r1, 2026-11-18); antialiased, the edge pixels blend the two colors
+    from smoothstone.colors import _panel
+    n = 60
+    xs, zs = np.meshgrid(np.linspace(-5, 5, n), np.linspace(-5, 5, n))
+    V = np.c_[xs.ravel(), np.zeros(n * n), zs.ravel()]
+    F = []
+    for i in range(n - 1):
+        for j in range(n - 1):
+            a = i * n + j
+            F += [[a, a + 1, a + n], [a + 1, a + n + 1, a + n]]  # facing the camera (-y)
+    F = np.array(F)
+    c = V[F].mean(1)
+    black = c[:, 2] > np.tan(np.radians(7)) * c[:, 0]
+    rgb = np.where(black[:, None], [[20, 20, 20]], [[240, 240, 240]]).astype(float)
+    def mids(ss):
+        im = np.asarray(_panel(V, F, rgb, 0.0, 0.0, np.zeros(3), 4.0, 200, ss=ss).convert("L"), float)
+        assert im.min() < 30 and im.max() > 180  # both colors drawn (shaded white is about 193)
+        return int(((im > 40) & (im < 170)).sum())
+    assert mids(1) < 20  # aliased: the stairs are pure black or white pixels
+    assert mids(3) > 150  # antialiased: about one blended pixel per column along the edge

@@ -980,8 +980,14 @@ def _rot(az: float, elev: float) -> np.ndarray:
     return Rx @ Rz
 
 
-def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, show=None, clip=False, font=None):
-    """One flat-shaded orthographic view as a PIL image, `half` mm from the center to each edge."""
+SUPERSAMPLE = 3  # panels are drawn 3x and averaged down: antialiased edges
+
+
+def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, show=None, clip=False, font=None,
+           ss: int = SUPERSAMPLE):
+    """One flat-shaded orthographic view as a PIL image, `half` mm from the center to each edge.
+    Drawn at `ss` times the size and box-filtered down, so a smooth edge does not show as pixel
+    stairs that a reader (or the blind judge) takes for a stepped paint line."""
     from PIL import Image, ImageDraw
     from scipy import ndimage
 
@@ -994,19 +1000,24 @@ def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, s
         vis &= (np.abs(cen[:, 0]) < half * 1.5) & (np.abs(cen[:, 2]) < half * 1.5)
     order = np.where(vis)[0]
     order = order[np.argsort(-cen[order, 1])]  # far first
-    scale = px / (2 * half)
-    sx = t[:, :, 0] * scale + px / 2
-    sy = px / 2 - t[:, :, 2] * scale
-    ids = Image.new("I", (px, px), -1)
+    P = px * ss
+    scale = P / (2 * half)
+    sx = t[:, :, 0] * scale + P / 2
+    sy = P / 2 - t[:, :, 2] * scale
+    ids = Image.new("I", (P, P), -1)
     d = ImageDraw.Draw(ids)
     for i in order:
         d.polygon([(sx[i, 0], sy[i, 0]), (sx[i, 1], sy[i, 1]), (sx[i, 2], sy[i, 2])], fill=int(i))
     idbuf = np.asarray(ids, dtype=np.int64)
     shade = 0.35 + 0.65 * np.clip(-n[:, 1] * 0.7 + n[:, 2] * 0.3, 0, 1)
-    img = np.full((px, px, 3), 136, np.float64)
+    img = np.full((P, P, 3), 136, np.float64)
     hit = idbuf >= 0
     img[hit] = face_rgb[idbuf[hit]] * shade[idbuf[hit], None]
-    im = Image.fromarray(img.clip(0, 255).astype(np.uint8))
+    if ss > 1:
+        img = img.reshape(px, ss, px, ss, 3).mean((1, 3))
+        idbuf = idbuf[ss // 2::ss, ss // 2::ss]
+        hit = idbuf >= 0
+    im = Image.fromarray(img.round().clip(0, 255).astype(np.uint8))
     dd = ImageDraw.Draw(im)
     if numbers is not None:
         nb = np.where(hit, numbers[np.clip(idbuf, 0, None)], 0)

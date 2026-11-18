@@ -37,6 +37,11 @@ Score how well the paint does what the request asks, as a careful owner would be
 - 4 to 6: right colors but a flaw anyone would see: a jagged or sawtooth edge, a strip of the wrong
   color on a ledge or under a collar, a stray patch.
 - 1 to 3: a part has the wrong color, a part asked for is missing, or the paint is a mess.
+A part the request does not name takes the rest color, so the neck, the underside of the hair at the
+nape and the wrist below a cuff are correct in the rest color even where they show between painted
+parts; a light line there is that part catching the light. A fault is paint on the wrong side of
+where the shape changes: a strip of one color on the other part's surface, a step in the edge, a
+stray patch.
 Judge only what you see in the pictures. Name each fault with the picture and the panel it is in,
 starting with the picture's name (such as "boundaries row 2, column 3" or "views front"), and what
 is wrong in a few words.
