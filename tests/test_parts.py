@@ -192,3 +192,48 @@ def test_part_names_of_a_block_figure():
     parts.name_parts(m, region, info, zone, a, look="a man in a black jacket and jeans")
     got = sorted(d["part"] for d in info)
     assert got == sorted(["base", "jeans", "jacket", "hands", "hands", "face"]), got
+
+
+# SPEC3 E2: odd regions (the square notch on the back of the neck)
+
+
+def _tube():
+    t = trimesh.creation.cylinder(radius=10, height=30, sections=128)
+    t.apply_translation([0, 0, 15])
+    v, f = trimesh.remesh.subdivide_to_size(t.vertices, t.faces, max_edge=0.6)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+def _merge(m, patch):
+    region = np.where(patch, 1, 0)
+    band = (m.triangles_center[:, 2] > 20) & (m.triangles_center[:, 2] < 23)
+    band &= np.abs(m.face_normals[:, 2]) < 0.5
+    region[band] = 2
+    zone = np.full(len(region), parts.TORSO)
+    return parts.merge_odd(m, region, region.copy(), zone, keep={0}, x0=0.0)
+
+
+def test_a_one_sided_square_notch_merges_into_its_neighbor():
+    m = _tube()
+    c = m.triangles_center
+    patch = (c[:, 0] > 5) & (np.abs(c[:, 1]) < 3) & (c[:, 2] > 10) & (c[:, 2] < 16)
+    region, merged = _merge(m, patch)
+    assert [(r, into) for r, into, _ in merged] == [(1, 0)], merged
+    assert "one-sided" in merged[0][2]
+    assert not (region == 1).any() and (region == 2).any()  # the smooth band stays
+
+
+def test_a_symmetric_patch_with_square_corners_merges_too():
+    m = _tube()
+    c = m.triangles_center
+    patch = (c[:, 1] < -5) & (np.abs(c[:, 0]) < 3) & (c[:, 2] > 10) & (c[:, 2] < 16)
+    region, merged = _merge(m, patch)
+    assert [(r, into) for r, into, _ in merged] == [(1, 0)], merged
+    assert "corner" in merged[0][2]
+    assert (region == 2).any()
+
+
+def test_a_smooth_band_all_round_stays():
+    m = _tube()
+    region, merged = _merge(m, np.zeros(len(m.faces), bool))
+    assert merged == [] and (region == 2).any()

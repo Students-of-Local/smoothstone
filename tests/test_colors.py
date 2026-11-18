@@ -1,5 +1,6 @@
 """stone colors: regions on the mesh, Orca's paint codes, and a painted 3MF that reads back clean."""
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -577,3 +578,18 @@ def test_a_plain_color_alone_is_the_rest():
 def test_with_no_part_named_the_photo_colors_stay():
     line = cli._suggest_line(jensen_regions(), FIL, "A mini figure of Jensen Huang")
     assert "jacket=black" in line and "rest=" in line
+
+
+# SPEC3 E1: the wobble limit on Jensen's wrists
+
+
+def test_wobble_fails_the_spec2_wrists_and_passes_the_plane_cut():
+    """The Spec 2 wrists (paint that wandered up and down the cuff, wavy at 90 and 270 degrees) score
+    0.37 and 0.40 mm; the lead's plane cut scores 0.03. The whole-line ratio passed both (1.03)."""
+    d = np.load(Path(__file__).parent / "fixtures" / "edges" / "wrists.npz")
+    for k in ("spec2_0", "spec2_1"):
+        w = colors.wobble(d[k].astype(float), True)
+        assert w > colors.WOBBLE, (k, w)
+        assert colors.jaggedness(d[k].astype(float), True) < colors.JAGGED  # the old check missed it
+    for k in ("plane_0", "plane_1"):
+        assert colors.wobble(d[k].astype(float), True) < colors.WOBBLE / 3, k
