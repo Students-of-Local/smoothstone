@@ -124,13 +124,35 @@ def filament_rgb(name: str):
     return None
 
 
+NAME_BREAK = {"in", "with", "on", "of", "the", "a", "an", "and", "at", "for", "to", "from", "by", "but",
+              "except", "is", "are", "which", "that", "everywhere", "everything", "else", "rest", "all"}
+
+
 def subject_names(request: str, also=()) -> list[str]:
     """The names of people (or pets) in a request: runs of two or more capitalized words
-    ("Jack Black", "Betty White"), and any name given in `also` (the name stone find searched)."""
+    ("Jack Black", "Betty White"), and any name given in `also` (the name stone find searched).
+    A run is cut at small words ("Jensen Huang In A Black Jacket" is "Jensen Huang" and "Black
+    Jacket"), and loses leading color and part words, so title case "Black Jacket" or "White
+    Everywhere Else" is not a name and keeps its color."""
+    from .parts import part_of
+
     out = [n for n in also if n]
-    for m in re.finditer(r"\b[A-Z][a-z'.]+(?:[ -][A-Z][a-z'.]+)+\b", request):
-        if m.group(0) not in out:
-            out.append(m.group(0))
+    for m in re.finditer(r"\b[A-Z][a-z'.]*(?:[ -][A-Z][a-z'.]*)+\b", request):
+        run: list[str] = []
+        for w in re.split(r"([ -])", m.group(0)) + [" ", "And"]:
+            if w in (" ", "-"):
+                run.append(w)
+                continue
+            if w.lower() not in NAME_BREAK:
+                run.append(w)
+                continue
+            words = "".join(run).strip(" -").split()
+            while words and (word_color(words[0].lower()) or part_of(words[0].lower())):
+                words.pop(0)
+            name = " ".join(words)
+            if len(words) >= 2 and name in m.group(0) and name not in out:
+                out.append(name)
+            run = []
     return out
 
 

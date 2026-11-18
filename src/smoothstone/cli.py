@@ -679,6 +679,17 @@ def cmd_build(args, job: Job) -> Out:
             out.code = 1
             return out
     bd = job.build_dir
+    st0 = job.status()
+    if (read_json(bd / "params.json") == {"recipe": r.name, "params": params} and st0.get("passed")
+            and (job.root / f"{r.name}.stl").exists()
+            and (st0.get("colors") or str(st0.get("next") or "").startswith("stone colors"))):
+        # the part already passed with this exact plan and is being painted: a rebuild would make
+        # the same part and throw the paint (or a stone colors retry) away
+        out.add(f"Recipe: {r.name}",
+                "Nothing changed since the last build, which passed. The part and its colors stay as they are.")
+        out.next = str(st0.get("next") or DONE_NEXT)
+        out.result = "build skipped: nothing changed"
+        return out
     bd.mkdir(parents=True, exist_ok=True)
     for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad"):
         (bd / f).unlink(missing_ok=True)
@@ -1323,7 +1334,10 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
     if rest_c is None:
         plain = [c for c in named if c not in pc.values()]
         rest_c = plain[0] if plain else None
-    _, rest_p, _ = _suggest_colors(info, fil, "")
+    # with no rest color in the request, rest is the photo color of the parts it does not name:
+    # a named part's own color (a long black coat) must not become everything else's
+    unnamed = [d for d in info if (parts.part_of(d.get("part") or "") or d.get("part")) not in pc]
+    _, rest_p, _ = _suggest_colors(unnamed or info, fil, "")
     rest = num(rest_c) if rest_c else rest_p
     pick: dict[int, int] = {}
     for d in info:
@@ -1418,10 +1432,12 @@ def _mapping_items(info: list[dict], pick: dict[int, int], rest: int, names: lis
     regions take one filament ("hands=white"), else by region number."""
     items: list[str] = []
     done: set[str] = set()
-    for d in info[:colortool.LIST_MAX]:
+    for d in info:  # every region, not only the listed ones: a part asked for is never dropped
         f = pick.get(d["n"], rest)
         part = d.get("part")
-        if part and part not in ("other", "base") and part not in done:
+        if part in done:
+            continue  # its key=filament is already in the line
+        if part and part not in ("other", "base"):
             same = {pick.get(e["n"], rest) for e in info if e.get("part") == part}
             if len(same) == 1:
                 done.add(part)

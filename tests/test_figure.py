@@ -233,6 +233,24 @@ def test_stone_colors_end_to_end_on_a_figure_with_a_style_picture(jobenv, monkey
     wrong = {"rest": rest, rest: [odd]}
     assert f"{odd} is {got[odd]} (want {rest})" in evrun.grade_colors(job, "figure", wrong)["why"]
 
+    # PR 6 review r2 sol-sol-F4: a part painted 60% right and 40% wrong must fail, though its
+    # majority is right. Repaint 40% of the odd part's area (by region) in the rest color.
+    import numpy as np
+
+    V, F, codes, main = colors.read_3mf(job / "figure.3mf")
+    fil = status_json_colors(jobenv)["filaments"]
+    face = np.array([colors.decode_paint(c) if c else main for c in codes])
+    num = np.load(job / "build" / "paint.npy")
+    regs = json.loads((job / "build" / "regions.json").read_text())["regions"]
+    sel = np.isin(num, [d["n"] for d in regs if (d.get("part") or "other") == odd])
+    area = colors.load_stl_mesh(V, F).area_faces
+    idx = np.where(sel & (face == fil.index(got[odd]) + 1))[0]
+    flip = idx[np.cumsum(area[idx]) <= 0.4 * area[sel].sum()]
+    face[flip] = fil.index(rest) + 1
+    colors.write_3mf(job / "figure.3mf", V, F, face, "figure")
+    why = evrun.grade_colors(job, "figure", want)["why"]
+    assert any(w.startswith(f"{odd} is ") and f"not {got[odd]}" in w for w in why), why
+
 
 def test_a_failing_color_edge_never_points_back_at_the_same_mapping(jobenv, monkeypatch, openscad, tmp_path):
     """Review first-F1: a ledge fault must give a NEXT that changes the mapping (the region on the
@@ -282,3 +300,33 @@ def test_a_failing_color_edge_never_points_back_at_the_same_mapping(jobenv, monk
 
 def status_json_colors(work: Path) -> dict:
     return json.loads((work / "stone-job" / "status.json").read_text())["colors"]
+
+
+def test_a_build_after_stone_colors_with_nothing_changed_keeps_the_paint(jobenv, monkeypatch, openscad, tmp_path):
+    """Review r2 second-N2: a small model that reads a FIX from stone colors as "fix, then stone
+    build again" must not undo the paint: the rebuild wiped the 3MF and re-suggested the first
+    mapping, so a retry looped forever. With the plan unchanged the build is skipped."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    d = tmp_path / "abc123"
+    d.mkdir()
+    fig = d / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    _style_picture(d / "style.png")
+    stone("new", 'A figure 70 mm tall with "ADA" on the base, all white but the body, which is black')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert code == 0 and nxt.startswith("stone colors"), text
+    text, code, nxt = stone("colors")
+    text, code, nxt = stone(*nxt.split()[1:])
+    assert nxt == cli.DONE_NEXT, text
+    painted = jobenv / "stone-job" / "figure.3mf"
+    before = painted.read_bytes()
+    text, code, nxt = stone("build")
+    assert code == 0, text
+    assert painted.exists() and painted.read_bytes() == before, text
+    assert nxt == cli.DONE_NEXT and "Nothing changed" in text, text
+    assert status_json_colors(jobenv), "the colors were dropped from status"
+    # a real change still rebuilds, and drops the old paint
+    stone("set", "figure", f"figure={fig}", "height=72", "name=ADA")
+    text, code, nxt = stone("build")
+    assert "Nothing changed" not in text and not painted.exists(), text

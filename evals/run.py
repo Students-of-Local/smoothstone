@@ -325,6 +325,9 @@ def _part_key(name: str) -> str:
     return name
 
 
+PART_OFF_MAX = 0.08  # share of a part's area that may take another color where its edge follows a groove
+
+
 def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
     """The painted file against {"<color>": [parts], "rest": "<color>"}: the 3MF must be there and
     read back clean, its color edges smooth, and each part must print in the color asked for (every
@@ -381,6 +384,13 @@ def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
         need = named.get(_part_key(part), rest)
         if need and c != need:
             why.append(f"{part} is {c} (want {need})")
+        elif need and need in fil:
+            # the majority is right; the rest of the part must be right too, but for the band where
+            # the paint follows the shape's groove instead of the part's own outline
+            t = tally[part]
+            off = 1 - float(t[fil.index(need) + 1] / t[1:].sum()) if t[1:].sum() else 0.0
+            if off > PART_OFF_MAX:
+                why.append(f"{part} is {off:.0%} not {need} (at most {PART_OFF_MAX:.0%})")
     for p in named:
         if not any(_part_key(q) == p for q in got):
             why.append(f"no part {p} in the listing")
