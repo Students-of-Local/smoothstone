@@ -10,7 +10,7 @@ recipe and the settings that make the part look its best, then let stone build a
 - Keep the part to one piece that sits flat, unless the recipe makes two on purpose.
 - Open views.png and look at every panel before you stop; if a panel shows a fault, say what and where, and fix it.
 - Stop when stone build says Part ready, unless you want to change the look and build again.
-- Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request.
+- Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. Parts go by name: jacket=black rest=white.
 
 ## Research
 - A part that fits a real product needs the maker's numbers: follow research.md section 2, save

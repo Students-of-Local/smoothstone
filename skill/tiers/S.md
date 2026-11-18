@@ -51,9 +51,9 @@ stone build -> Part ready
 Request: A mini figure of Ada Lovelace, white with a red dress, with "ADA" on the base.
 stone set figure name=ADA
 stone build -> Part ready, NEXT: stone colors
-stone colors -> a list of regions, like: 2  red     30% of surface  z 12-50 mm  bottom
-  NEXT: stone colors 2=red rest=white
-stone colors 2=red rest=white -> NEXT: none, the part is ready
+stone colors -> a list of parts, like: 2  red     30% of surface  dress
+  NEXT: stone colors dress=red rest=white
+stone colors dress=red rest=white -> NEXT: none, the part is ready
 
 Request: A cover for the cable hole in my desk.
 stone set panel -> FIX ... NEXT: ask the person: What are the measurements of the cable hole in your desk, in mm? ...

@@ -86,29 +86,28 @@ The sentence from the vision model matters more than I expected, as without it t
 
 ## Colors
 
-A figure printed in one color looks unfinished, so after a passing build of a figure `stone colors` splits it into regions by the colors of its style picture, lists them and draws them numbered in `build/regions.png`. Then one line gives each region a filament, and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone cuts each color edge as a smooth curve through the triangles, then reads the file back before it says so: watertight, clean for a slicer, the same volume as the STL. The color_edges check compares each edge's length with the same edge smoothed over 2 mm and fails one that is over 8% longer, because that edge zigzags; then no file is written. `build/boundaries.png` shows every color edge close up from eight sides. Put your printer's filament slots in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on, in the job folder or once in `~/.config/smoothstone/stone.toml`. When a figure's request names colors, the build's NEXT line is `stone colors` and its suggestion follows those colors; any other part prints in one color, and the build names the filament to load.
+A figure printed in one color looks unfinished, so after a passing build of a figure `stone colors` splits it into regions by the colors of its style picture, lists them with a part name each (base, shoes, pants, jacket or top, hands, face, hair, glasses, other, in the words of the request) and draws them numbered in `build/regions.png`. Then one line gives each part a filament, by name or number (`jacket=black rest=white`), and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone cuts each color edge as a smooth curve through the triangles, then reads the file back before it says so: watertight, clean for a slicer, the same volume as the STL. The color_edges check compares each edge's length with the same edge smoothed over 2 mm and fails one that is over 8% longer, because that edge zigzags; then no file is written. A color edge within 3 mm of the hem, the neck or a wrist moves onto that line of the shape, and where the sculpt has a groove there (a collar, a cuff) the edge follows the groove instead of a flat cut, on the side a viewer sees least (measured by ray casting from 48 directions). The ledges check then fails any edge with up-facing faces of the wrong color seen beside it, like a white strip along the top of a collar. Edges in a groove are exempt from the wobble limit, since a sculpted collar is not straight. `build/boundaries.png` shows every color edge close up from eight sides, and the collar from level and from 30 degrees up. Put your printer's filament slots in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on, in the job folder or once in `~/.config/smoothstone/stone.toml`. When a figure's request names colors, the build's NEXT line is `stone colors` and its suggestion follows those colors; any other part prints in one color, and the build names the filament to load.
 
 ```
 $ stone colors
 Color regions of figure.stl, largest first:
-1  white   48% of surface  z 0-12 mm  base
-2  black   18% of surface  z 12-52 mm  bottom
-3  skin    17% of surface  z 48-80 mm  middle
-4  white   14% of surface  z 61-90 mm  top
-5  black   2% of surface  z 61-70 mm  top
-6  skin    1% of surface  z 24-30 mm  bottom
-7  skin    1% of surface  z 24-30 mm  bottom
+1  white   48% of surface  base
+2  skin    17% of surface  face
+3  white   14% of surface  hair
+4  black   13% of surface  jacket
+5  black   5% of surface  pants
+6  black   2% of surface  glasses
+7  skin    1% of surface  hands
+8  skin    1% of surface  hands
 Filaments: 1 red, 2 white, 3 blue, 4 black (stone.toml [filaments])
-NEXT: stone colors 2=black 5=black rest=white
-$ stone colors 2=black 5=black rest=white
-FIX: color boundary is jagged: filament 2/4 at z 68 mm is 1.19 times its smoothed length (max 1.08); no file written
-The paint of region 5 (black) does not follow a clean line; it takes the rest color.
-NEXT: stone colors 2=black rest=white
-$ stone colors 2=black rest=white
-filament 2 white: 82% of surface; filament 4 black: 18%
-Checked: the 3MF reads back watertight and clean for a slicer, 120504 faces, volume as the STL.
-PASS color_edges: every color boundary is a smooth curve (worst 1.035, max 1.08)
-Warning: the colors alternate on 47 layers: about 50 filament changes and 32 g purge.
+Give each part or region a color, by name or filament number (like jacket=black); rest= colors the others.
+NEXT: stone colors jacket=black pants=black glasses=black rest=white
+$ stone colors jacket=black rest=white
+filament 2 white: 87% of surface; filament 4 black: 13%
+Checked: the 3MF reads back watertight and clean for a slicer, 122138 faces, volume as the STL.
+PASS color_edges: every color boundary is a smooth curve (worst 1.027, max 1.08; wobble 0.01 mm, max 0.15; 3 edges run in a sculpted groove, which the wobble limit does not apply to)
+PASS ledges: no up-facing face of the wrong color is seen next to a part's edge; edges in the groove: neck up, wrist left down, wrist right down
+Warning: the colors alternate on 50 layers: about 52 filament changes and 34 g purge.
 3MF: stone-job/figure.3mf (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)
 Views: stone-job/build/views.png (look at every panel before you call it done)
 In the slicer: filament 2 must be white, filament 4 must be black.

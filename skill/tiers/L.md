@@ -11,7 +11,7 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - Check every new recipe with: uv run python tools/sheet.py <name>, and look at the previews.
 - Open views.png and look at every panel before you stop; if a panel shows a fault, say what and where, and fix it.
 - Stop when the request's part is built with stone and the build says Part ready.
-- Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. You may change the mapping after looking at regions.png, and check colors.png after it.
+- Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. Parts go by name: jacket=black rest=white. You may change the mapping after looking at regions.png, and check colors.png after it.
 
 ## Research
 - Follow research.md in full: maker drawings and datasheets first, a second source for every
