@@ -8,6 +8,8 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   "Not placed yet", add those sizes to the stone set line first.
 - Think in at most 3 short lines, then call the tool.
 - Use the sizes in the request. Leave every other setting at its default.
+- Never make up a size the part has to fit. If the part must fit a real product and you have no
+  size for it, ask for the size or a photo with a ruler (stone measure).
 - If you lost track or your memory was cleared, run: stone status
 - Stop when stone says the part is ready.
 

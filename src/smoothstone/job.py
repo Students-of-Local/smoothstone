@@ -57,6 +57,19 @@ class Job:
         return self.root / "build"
 
     @property
+    def notes_file(self) -> Path:
+        return self.root / "notes.json"
+
+    def notes(self) -> list[str]:
+        n = read_json(self.notes_file, [])
+        return n if isinstance(n, list) else []
+
+    def add_note(self, text: str) -> list[str]:
+        n = [x for x in self.notes() if x != text] + [text]
+        write_json(self.notes_file, n)
+        return n
+
+    @property
     def measure_file(self) -> Path:
         return self.root / "measure.json"
 
