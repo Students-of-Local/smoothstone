@@ -591,3 +591,12 @@ def test_a_length_in_the_set_line_answers_the_question(jobenv, recipes_root):
     assert code == 1 and nxt.startswith("ask the person")
     _, code, nxt = stone("set", "grommet", "hole_d=60")
     assert code == 0 and nxt == "stone build"
+
+
+def test_a_phone_the_case_does_not_know_is_still_asked_about(jobenv, recipes_root):
+    # "15" is a number but no size: building a 17 Pro case for an iPhone 15 would be a guess
+    shutil.copytree(REPO / "recipes" / "phone_case", recipes_root / "phone_case")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A case for my iPhone 15.")
+    _, code, nxt = stone("set", "phone_case")
+    assert code == 1 and nxt.startswith("ask the person") and "iphone 17 pro max" in nxt.lower()

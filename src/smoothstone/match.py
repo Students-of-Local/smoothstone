@@ -319,20 +319,27 @@ FIT_RE = re.compile(r"\b(?:case|cover|lid|cap|mount|holder|bracket|adapter|sleev
 def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None) -> str | None:
     """The question to ask when the part must fit something real and nothing says how big it is.
 
-    None when the request is not about a fit, or it has a number, or it names a product the
-    recipe knows (a choice option such as a phone model): those are sizes too."""
+    None when the request is not about a fit, or it has a number. A recipe with a product choice
+    (phone_case phone) needs one of its products named instead, as a number there is no size."""
     if r.name == "figure":
         return None
     m = FIT_RE.search(request)
     if not m:
         return None
     text = " ".join([request, *(notes or [])])
+    low = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()) + " "
+    product = next((p for p in r.params if p.product), None)
+    if product:
+        # only a product the recipe knows is a size: "iPhone 15" has a number but no case here fits it,
+        # and "cover" or "tpu" names no phone at all
+        def plain(c):
+            return " " + re.sub(r"[^a-z0-9]+", " ", str(c).lower()).strip() + " "
+        if any(plain(c) in low for c in product.choices):
+            return None
+        known = ", ".join(str(c).replace("_", " ") for c in product.choices)
+        return f"Which {product.name} is it, exactly? This part is drawn for: {known}."
     if _numbers(text):
         return None
-    low = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()) + " "
-    for p in r.params:  # only a product choice is a size: "cover" or "round" names no real thing
-        if p.product and any(" " + re.sub(r"[^a-z0-9]+", " ", str(c).lower()).strip() + " " in low for c in p.choices):
-            return None
     thing = (m.group("thing") or m.group("thing2") or "it").strip()
     thing = re.sub(r"\bmy\b", "your", re.sub(r"\bour\b", "your", thing, flags=re.I), flags=re.I)
     return (f"What are the measurements of {thing}, in mm? A photo with a ruler in it works too, "
