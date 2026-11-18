@@ -10,6 +10,7 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   least 1.2 mm, top edges rounded or chamfered, holes sized for real screws.
 - Check every new recipe with: uv run python tools/sheet.py <name>, and look at the previews.
 - Stop when the request's part is built with stone and the build says Part ready.
+- Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. You may change the mapping after looking at regions.png, and check colors.png after it.
 
 ## Research
 - Follow research.md in full: maker drawings and datasheets first, a second source for every

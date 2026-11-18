@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import match, check as checks
+from . import colors as colortool
 from . import config
 from . import image as imagetool
 from . import measure as measuretool
@@ -208,6 +209,10 @@ def cmd_status(args, job: Job) -> Out:
     out.add(f"Stage: {s.get('stage')}")
     if s.get("stage") == "done" and plan:
         out.add(f"Part: {job.root / (plan['recipe'] + '.stl')}")
+    col = s.get("colors")
+    if col and plan:
+        out.add(f"Colors: {col.get('shares', '')} (stone colors {col.get('mapping', '')})")
+        out.add(f"3MF: {col.get('file', '')}")
     out.next = s.get("next") or "stone recipes"
     return out
 
@@ -663,8 +668,12 @@ def cmd_build(args, job: Job) -> Out:
     bd.mkdir(parents=True, exist_ok=True)
     for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad"):
         (bd / f).unlink(missing_ok=True)
-    for f in job.root.glob("*.stl"):
+    for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
+    for f in ("regions.json", "regions.npy", "regions.png", "colors.png", "atlas.png"):
+        (bd / f).unlink(missing_ok=True)
+    if job.status().get("colors"):
+        job.update(colors=None)
     write_json(bd / "params.json", {"recipe": r.name, "params": params})
     st = job.status()
     builds = int(st.get("builds", 0)) + 1
@@ -690,6 +699,15 @@ def cmd_build(args, job: Job) -> Out:
             lower = int(lower) if quality.type == "int" else round(lower, 1)
             out.fix(f"lower {quality.name} to {lower} so it builds faster")
             out.next = f"stone set {quality.name}={lower}"
+        elif run.error.startswith(scad.SLICER_ERROR):
+            seed = r.param("seed")
+            if seed is not None:
+                nxt_seed = int(params.get("seed", seed.default) or 0) + 1
+                out.fix(f"{run.error}; another seed makes another mesh: set seed={nxt_seed}")
+                out.next = f"stone set seed={nxt_seed}"
+            else:
+                out.fix(f"{run.error}; return to defaults with stone set {r.name} --reset")
+                out.next = f"stone set {r.name} --reset"
         elif grown := _grow(r, params, run.error):
             g, v = grown
             unit = f" {g.unit}" if g.unit else ""
@@ -734,6 +752,14 @@ def cmd_build(args, job: Job) -> Out:
         shutil.copyfile(stl, final)
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
+        if colortool.asks_for_color(job.request()):
+            if _many_colors(job, r, params):
+                out.add("The request names colors: stone colors splits the figure into color regions.")
+                out.next = "stone colors"
+            else:
+                named = colortool.request_colors(job.request())
+                out.add(f"This part prints in one color: {named[0]}. Load that filament."
+                        if named else "This part prints in one color.")
         out.stage = "done"
         out.result = f"build passed, {fmt_size(size) if size else ''}".rstrip(", ")
         job.update(builds=builds, failed_builds=0, passed=True)
@@ -1126,6 +1152,321 @@ def cmd_done(args, job: Job) -> Out:
     return out
 
 
+# colors
+
+
+REST_KEYS = ("rest", "others", "other", "all", "else", "*")
+
+
+def _style_pictures(job: Job, params: dict) -> tuple[Path | None, Path | None]:
+    """The figure step's style picture (and back view) for this build: the cache folder named
+    like the built figure's, in this job first, so a copied job still finds its own."""
+    fig = params.get("figure") or ""
+    if not fig:
+        return None, None
+    d = Path(fig).parent
+    for c in (job.image_dir / "figure" / d.name, d):
+        if (c / "style.png").is_file():
+            back = c / "back.png"
+            return c / "style.png", back if back.is_file() else None
+    return None, None
+
+
+def _many_colors(job: Job, r: rc.Recipe, params: dict) -> bool:
+    """True when the part can have more than one color region: a figure with a style picture."""
+    is_fig = any(p.type == "image" and p.image_kind == "figure" for p in r.params)
+    return is_fig and _style_pictures(job, params)[0] is not None
+
+
+def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh):
+    """(face region numbers, region list), cached in build/ for this exact STL."""
+    import hashlib
+
+    import numpy as np
+
+    bd = job.build_dir
+    stamp = hashlib.sha1((bd / "part.stl").read_bytes()).hexdigest()
+    cached = read_json(bd / "regions.json") or {}
+    if cached.get("stl") == stamp and (bd / "regions.npy").is_file():
+        num = np.load(bd / "regions.npy")
+        if len(num) == len(mesh.faces):
+            return num, cached["regions"]
+    front, back = _style_pictures(job, params) if any(
+        p.type == "image" and p.image_kind == "figure" for p in r.params) else (None, None)
+    num, info = colortool.find_regions(mesh, r.name, params, front, back, bd / "atlas.png")
+    np.save(bd / "regions.npy", num)
+    write_json(bd / "regions.json", {"stl": stamp, "picture": str(front) if front else None, "regions": info})
+    colortool.render(mesh, colortool.region_tints(num, info), bd / "regions.png", numbers=num,
+                     show=set(range(1, colortool.LIST_MAX + 1)))
+    return num, info
+
+
+def _fil_value(fil: list[str]) -> list[str]:
+    """How each filament is written in a stone colors line: its name, or its number when the name has spaces."""
+    return [f if re.fullmatch(r"[A-Za-z#0-9_-]+", f) else str(i) for i, f in enumerate(fil, 1)]
+
+
+NAMED_DE = 45.0  # a region takes a named color only when its photo color is this close (delta E)
+
+
+def _rest_color(request: str, named: list[str]) -> str | None:
+    """The color the request gives to everything not named, or None when it gives none:
+    "all white", "white everywhere else", "the rest white", "white with a red dress"."""
+    words = re.findall(r"[a-z]+(?:-[a-z]+)?", request.lower())
+    for i, w in enumerate(words):
+        c = colortool.word_color(w)
+        if c not in named:
+            continue
+        before, after = words[max(0, i - 3):i], words[i + 1:i + 3]
+        if (i and words[i - 1] == "all") or {"rest", "else", "otherwise"} & set(before):
+            return c
+        if after and (after[0] in ("everywhere", "everything", "otherwise", "with") or after[:2] == ["for", "the"]):
+            return c
+    return None
+
+
+def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int, list[str]]:
+    """(region -> filament, rest filament, extra filaments). Each region starts from its photo
+    color, mapped to the nearest loaded filament. A region takes a color the request names when
+    that named color is nearest its photo color, under NAMED_DE. Rest (and the base) is the color
+    the request gives to everything else ("all white", "white everywhere else", "white with a red
+    dress"); then the other regions take rest too, except, after "but" or "except", the ones far
+    from rest, which keep their photo color. With no such phrase, rest is the photo color that
+    covers the most surface among the regions no named color took."""
+    import numpy as np
+
+    pick: dict[int, int] = {}
+    extra: list[str] = []
+    allf = list(fil)
+
+    def num(c: str) -> int:
+        n = _match_filament(c, allf)
+        if n is None:
+            allf.append(c)
+            extra.append(c)
+            n = len(allf)
+        return n
+
+    named = colortool.request_colors(request)
+    if not any(d["rgb"] is not None for d in info):
+        return pick, (num(named[0]) if named else 1), extra
+    rest_c = _rest_color(request, named)
+    others = [c for c in named if c != rest_c]
+    ref = colortool._lab([colortool.NAMES[c] for c in others]) if others else None
+    taken: set[int] = set()
+    for d in info:
+        if d["rgb"] is None or d["base"]:
+            continue
+        pick[d["n"]] = colortool.nearest_filament(d["rgb"], fil)
+        if ref is not None:
+            dist = np.sqrt(((ref - colortool._lab(d["rgb"])) ** 2).sum(1))
+            k = int(dist.argmin())
+            if dist[k] < NAMED_DE:
+                pick[d["n"]] = num(others[k])
+                taken.add(d["n"])
+    if rest_c is not None:
+        rest = num(rest_c)
+        keep = bool({"but", "except"} & set(re.findall(r"[a-z]+", request.lower())))
+        rlab = colortool._lab([colortool.NAMES[rest_c]])
+        for d in info:
+            if d["n"] not in pick or d["n"] in taken:
+                continue
+            far = float(np.sqrt(((rlab - colortool._lab(d["rgb"])) ** 2).sum())) >= NAMED_DE
+            if not (keep and far):
+                pick[d["n"]] = rest
+        return pick, rest, extra
+    share: dict[int, float] = {}
+    for d in info:
+        if d["n"] in pick and d["n"] not in taken:
+            share[pick[d["n"]]] = share.get(pick[d["n"]], 0.0) + d["share"]
+    if not share:
+        for d in info:
+            if d["n"] in pick:
+                share[pick[d["n"]]] = share.get(pick[d["n"]], 0.0) + d["share"]
+    rest = max(share, key=share.get) if share else 1
+    return pick, rest, extra
+
+
+def _match_filament(v: str, fil: list[str]) -> int | None:
+    """Filament number for a color word or a filament's name, or None when none is loaded."""
+    v = v.strip().lower()
+    for i, f in enumerate(fil, 1):
+        if f.lower() == v:
+            return i
+    c = colortool.word_color(v)
+    if c:
+        for i, f in enumerate(fil, 1):
+            if any(colortool.word_color(w) == c for w in re.findall(r"[a-z]+", f.lower())):
+                return i
+    return None
+
+
+def _suggest_line(info: list[dict], fil: list[str], request: str) -> str:
+    pick, rest, extra = _suggest(info, fil, request)
+    names = _fil_value(fil + extra)
+    items = [f"{d['n']}={names[pick[d['n']] - 1]}" for d in info[:colortool.LIST_MAX]
+             if d["n"] in pick and pick[d["n"]] != rest]
+    return "stone colors " + " ".join(items + [f"rest={names[rest - 1]}"])
+
+
+def _region_line(d: dict, name: str) -> str:
+    return (f"{d['n']}  {name:<8}{d['share'] * 100:.0f}% of surface  "
+            f"z {d['z0']:.0f}-{d['z1']:.0f} mm  {d['pos']}")
+
+
+def cmd_colors(args, job: Job) -> Out:
+    import numpy as np
+
+    out = Out()
+    if not need_job(job, out):
+        return out
+    plan = job.plan()
+    r = rc.load(plan["recipe"]) if plan else None
+    st = job.status()
+    bd = job.build_dir
+    stl = bd / "part.stl"
+    built = read_json(bd / "params.json") or {}
+    if r is not None and stl.is_file() and built:
+        # the same check as stone done: the 3MF must be the part the plan describes
+        current = build_params(job, r, {k: v for k, v in plan["params"].items() if r.param(k)})
+        if built.get("recipe") != r.name or built.get("params") != current:
+            out.fix("the plan changed after the last build")
+            out.next = "stone build"
+            out.owns_next = False
+            out.result = "colors refused: the plan changed after the last build"
+            return out
+    if r is None or not st.get("passed") or not stl.is_file() or built.get("recipe") != r.name:
+        out.fix("stone colors needs a passing build first")
+        out.next = "stone build" if plan else "stone recipes"
+        out.owns_next = False
+        out.result = "colors refused: no passing build"
+        return out
+    params = built.get("params") or {}
+    mesh = colortool.load_stl(stl)
+    num, info = _color_regions(job, r, params, mesh)
+    fil = config.filaments(job.root)
+    request = job.request()
+    pick, rest_s, extra_s = _suggest(info, fil, request)
+    shown = _fil_value(fil + extra_s)
+
+    def name_of(d):
+        if d["color"]:
+            return d["color"]
+        n = pick.get(d["n"], rest_s)
+        return colortool.word_color((fil + extra_s)[n - 1]) or shown[n - 1]
+
+    if not args.items:
+        out.add(f"Color regions of {r.name}.stl, largest first:")
+        for d in info[:colortool.LIST_MAX]:
+            out.add(_region_line(d, name_of(d)))
+        if len(info) > colortool.LIST_MAX:
+            out.add(f"({len(info) - colortool.LIST_MAX} smaller regions take the rest= color)")
+        out.add(f"Regions picture: {bd / 'regions.png'}")
+        out.add("Filaments: " + ", ".join(f"{i} {f}" for i, f in enumerate(fil, 1)) + " (stone.toml [filaments])")
+        out.add("Give each region a color, by name or filament number; rest= colors the others.")
+        out.next = _suggest_line(info, fil, request)
+        out.stage = "colors"
+        out.result = f"{len(info)} color regions"
+        return out
+
+    # the mapping
+    fil = list(fil)
+    added: list[str] = []
+    assign: dict[int, int] = {}
+    rest = None
+    fixes: list[str] = []
+    base = next((d["n"] for d in info if d["base"]), None)
+    for it in args.items:
+        sep = "=" if "=" in it else ":" if ":" in it else None
+        if sep is None:
+            fixes.append(f"write region=color, like 1=black rest=white (not {it})")
+            continue
+        k, v = (x.strip().lower() for x in it.split(sep, 1))
+        if v.isdigit():
+            n = int(v)
+            if not 1 <= n <= len(fil):
+                fixes.append(f"there is no filament {n}; loaded: " + ", ".join(f"{i} {f}" for i, f in enumerate(fil, 1)))
+                continue
+        else:
+            n = _match_filament(v, fil)
+            if n is None:
+                c = colortool.word_color(v)
+                if c is None:
+                    fixes.append(f'"{v}" is not a color; use a filament number or one of: {", ".join(colortool.NAMES)}')
+                    continue
+                fil.append(c)
+                added.append(c)
+                n = len(fil)
+        if k in REST_KEYS:
+            rest = n
+        elif k == "base":
+            if base is None:
+                fixes.append("this part has no base region; use region numbers and rest=")
+            else:
+                assign[base] = n
+        elif k.isdigit() and 1 <= int(k) <= len(info):
+            assign[int(k)] = n
+        else:
+            fixes.append(f'no region "{k}"; regions are 1 to {len(info)}' + (", base" if base else "") + " and rest")
+    if len(fil) > colortool.MAX_FILAMENTS:
+        fixes.append(f"at most {colortool.MAX_FILAMENTS} filaments")
+    if fixes:
+        for f in fixes[:4]:
+            out.fix(f)
+        out.next = _suggest_line(info, config.filaments(job.root), request)
+        out.result = "colors refused: " + fixes[0]
+        return out
+    if rest is None:
+        rest = 1
+        if len(assign) < len(info):
+            out.add(f"No rest= given: the other regions take filament 1 {fil[0]}.")
+    per = np.array([0] + [assign.get(d, rest) for d in range(1, len(info) + 1)])
+    face_fil = per[num]
+    area = mesh.area_faces
+    total = area.sum()
+    used = sorted(set(int(x) for x in face_fil))
+    shares = "; ".join(
+        f"filament {n} {fil[n - 1]}: {area[face_fil == n].sum() / total * 100:.0f}%" + (" of surface" if i == 0 else "")
+        for i, n in enumerate(used))
+    final = job.root / f"{r.name}.3mf"
+    tmp = bd / "check.3mf"
+    final.unlink(missing_ok=True)
+    main_fil = colortool.write_3mf(tmp, mesh.vertices, mesh.faces, face_fil, f"{r.name}.stl", bed=config.bed(job.root))
+    bad = colortool.check_3mf(tmp, len(mesh.faces), len(fil))
+    if bad:
+        tmp.unlink(missing_ok=True)
+        for b in bad[:3]:
+            out.fix(b)
+        out.next = "stone build"
+        out.result = "colors failed: " + bad[0]
+        return out
+    tmp.replace(final)
+    for c in added:
+        out.add(f"{c} is not in stone.toml [filaments], so it is filament {fil.index(c) + 1} here: load it in that slot.")
+    out.add(shares)
+    out.add(f"Object filament {main_fil}; the other filaments are painted on, triangle by triangle.")
+    out.add(f"Checked: the 3MF reads back watertight and clean for a slicer, {len(mesh.faces)} faces like the STL.")
+    mixed, changes = colortool.layer_changes(mesh, face_fil)
+    if mixed >= colortool.MANY_LAYERS:
+        out.add(f"Warning: the colors alternate on {mixed} layers: about {changes} filament changes "
+                f"and {changes * colortool.PURGE_G:.0f} g purge.")
+    fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
+    colortool.render(mesh, fil_rgb[face_fil - 1], bd / "colors.png",
+                     views=(("front", 0.0), ("side", np.pi / 2), ("back", np.pi)))
+    out.add(f"3MF: {final} (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)")
+    out.add(f"Colors picture: {bd / 'colors.png'}")
+    used = sorted(set(int(x) for x in np.unique(face_fil)))
+    out.add("In the slicer: " + ", ".join(f"filament {i} must be {fil[i - 1]}" for i in used)
+            + ". The 3MF names slots, not colors; set them in stone.toml [filaments] to match the printer.")
+    mapping = " ".join([f"{k}={_fil_value(fil)[v - 1]}" for k, v in sorted(assign.items())] + [f"rest={_fil_value(fil)[rest - 1]}"])
+    job.update(colors={"mapping": mapping, "filaments": fil, "shares": shares, "file": str(final),
+                       "changes": changes, "mixed_layers": mixed})
+    out.next = DONE_NEXT
+    out.stage = "done"
+    out.result = f"3MF written, {shares}"[:120]
+    return out
+
+
 # main
 
 
@@ -1176,6 +1517,9 @@ def make_parser() -> Parser:
     s.add_argument("text", nargs="*")
 
     sub.add_parser("done", parents=[common], help="finish the job")
+
+    s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
+    s.add_argument("items", nargs="*")
     return p
 
 
@@ -1192,6 +1536,7 @@ COMMANDS = {
     "find": cmd_find,
     "note": cmd_note,
     "done": cmd_done,
+    "colors": cmd_colors,
 }
 
 
@@ -1206,7 +1551,8 @@ def _guess_job(argv: list[str]) -> Path:
 
 # words small models use for a command, and commands that take no words
 SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes",
-            "search": "recipes", "info": "show", "scale": "measure", "describe": "show", "finish": "done", "check_status": "status"}
+            "search": "recipes", "info": "show", "scale": "measure", "describe": "show", "finish": "done", "check_status": "status",
+            "color": "colors", "colour": "colors", "colours": "colors", "paint": "colors"}
 NO_WORDS = ("status", "build", "done")
 
 
@@ -1257,7 +1603,7 @@ def run(argv: list[str]) -> tuple[str, int]:
         out = COMMANDS[cmd](args, job)
     except UsageError as e:
         out = Out()
-        out.fix(f"{e}; commands: status new recipes show set build check image measure done")
+        out.fix(f"{e}; commands: status new recipes show set build check image measure colors done")
         out.next = _fallback_next(job, argv)
         out.owns_next = False
         cmd = "usage"

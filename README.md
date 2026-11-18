@@ -82,6 +82,30 @@ I wanted the small model to make something cooler than a bin, so smoothstone can
 
 The sentence from the vision model matters more than I expected, as without it the render got the hair color and the glasses wrong on every try. Run `tools/figure/setup.sh` once on an Apple silicon Mac with 16 GB of memory. Hunyuan3D-2mini is under the Tencent Hunyuan Community License, which does not cover the EU, the UK or South Korea, so read it before you use the meshes there. Photos keep their own licenses, so credit them from credits.txt when you post a print.
 
+## Colors
+
+A figure printed in one color looks unfinished, so after a passing build of a figure `stone colors` splits it into regions by the colors of its style picture, lists them and draws them numbered in `build/regions.png`. Then one line gives each region a filament, and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone reads the file back before it says so: watertight, clean for a slicer, the same faces as the STL. Put your printer's filament slots in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on, in the job folder or once in `~/.config/smoothstone/stone.toml`. When a figure's request names colors, the build's NEXT line is `stone colors` and its suggestion follows those colors; any other part prints in one color, and the build names the filament to load.
+
+```
+$ stone colors
+Color regions of figure.stl, largest first:
+1  white   48% of surface  z 0-12 mm  base
+2  black   18% of surface  z 12-52 mm  bottom
+3  skin    17% of surface  z 48-80 mm  middle
+4  white   14% of surface  z 61-90 mm  top
+5  black   2% of surface  z 61-70 mm  top
+6  skin    1% of surface  z 24-30 mm  bottom
+7  skin    1% of surface  z 24-30 mm  bottom
+Filaments: 1 red, 2 white, 3 blue, 4 black (stone.toml [filaments])
+NEXT: stone colors 2=black 5=black rest=white
+$ stone colors 2=black 5=black rest=white
+filament 2 white: 80% of surface; filament 4 black: 20%
+Warning: the colors alternate on 99 layers: about 100 filament changes and 65 g purge.
+3MF: stone-job/figure.3mf (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)
+In the slicer: filament 2 must be white, filament 4 must be black.
+NEXT: none, the part is ready
+```
+
 ## Recipes
 
 fan_guard, panel, cable_comb, vase, planter, gridfinity_bin, phone_stand, hook, spur_gear, box, keychain, cookie_cutter, sign, lithophane, relief and figure. Every recipe prints without supports and every default and example is built and checked in CI.

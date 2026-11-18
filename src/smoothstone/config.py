@@ -69,8 +69,13 @@ def openscad_env() -> dict[str, str]:
     return env
 
 
+def user_config_dir() -> Path:
+    """Machine-wide settings, such as the printer's filament slots: $XDG_CONFIG_HOME/smoothstone."""
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "smoothstone"
+
+
 def _toml(job: Path | None) -> dict:
-    for base in (Path.cwd(), job):
+    for base in (Path.cwd(), job, user_config_dir()):
         if base is None:
             continue
         f = base / "stone.toml"
@@ -97,7 +102,7 @@ def bed(job: Path | None = None) -> tuple[float, float, float]:
         return DEFAULT_BED
 
 
-def tier_rules(t: str, limit: int = 6) -> list[str]:
+def tier_rules(t: str, limit: int = 12) -> list[str]:
     f = skill_dir() / "tiers" / f"{t}.md"
     if not f.is_file():
         return []
@@ -115,3 +120,23 @@ def tier_rules(t: str, limit: int = 6) -> list[str]:
         if len(rules) >= limit:
             break
     return rules
+
+
+DEFAULT_FILAMENTS = ("white", "black")
+
+
+def filaments(job: Path | None = None) -> list[str]:
+    """Loaded filaments in slot order, from stone.toml [filaments] (1 = "white", 2 = "black")."""
+    raw = _toml(job).get("filaments")
+    if not isinstance(raw, dict) or not raw:
+        return list(DEFAULT_FILAMENTS)
+    slots = {}
+    for k, v in raw.items():
+        try:
+            slots[int(k)] = str(v).strip()
+        except (TypeError, ValueError):
+            continue
+    if not slots:
+        return list(DEFAULT_FILAMENTS)
+    top = max(slots)
+    return [slots.get(i, "unknown") for i in range(1, top + 1)]

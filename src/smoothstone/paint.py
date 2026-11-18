@@ -356,3 +356,17 @@ def textured(mesh, front: Path, back: Path | None, out_png: Path):
                                               metallicFactor=0.0)
     m.visual = trimesh.visual.TextureVisuals(uv=m.visual.uv, material=mat)
     return m
+
+
+def face_colors(mesh, front: Path, back: Path | None, atlas_png: Path) -> np.ndarray:
+    """RGB (0..255 float) for each face of `mesh`, in its face order: textured() projects the
+    pictures, and the atlas it writes is read at each face's center UV."""
+    from PIL import Image
+
+    m = textured(mesh, front, back, atlas_png)
+    atlas = np.asarray(Image.open(atlas_png).convert("RGB")).astype(np.float32)
+    uv = np.asarray(m.visual.uv)[m.faces].mean(1)
+    h, w = atlas.shape[:2]
+    px = np.clip((uv[:, 0] * w).astype(int), 0, w - 1)
+    py = np.clip(((1 - uv[:, 1]) * h).astype(int), 0, h - 1)
+    return atlas[py, px]
