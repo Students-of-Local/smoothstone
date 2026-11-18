@@ -269,6 +269,27 @@ def test_suggestion_follows_the_colors_the_request_names():
     assert line == "stone colors 2=red rest=white"
 
 
+def test_suggestion_takes_rest_from_the_phrase_not_the_word_order():
+    """Review round 2, first-F1: the accent color named first must not become rest."""
+    line = cli._suggest_line(ada_regions(), ["white", "black"],
+                             "A mini figure of Ada Lovelace in a red dress, white everywhere else")
+    assert line == "stone colors 2=red rest=white"
+    line = cli._suggest_line(ada_regions(), ["white", "black", "red"],
+                             "Ada Lovelace in a red dress, the rest white")
+    assert line == "stone colors 2=red rest=white"
+
+
+def test_one_named_color_keeps_the_other_photo_colors():
+    """Review round 2, second-S1: one named color must not paint the whole figure one color."""
+    line = cli._suggest_line(ada_regions(), ["white", "black", "red"], "A mini figure of Ada Lovelace in a red dress")
+    assert line == "stone colors 2=red 4=black rest=white"
+    # the owner's own words: everything white except the part named, which keeps its photo color
+    line = cli._suggest_line(ada_regions(), ["white", "black", "red"], "Ada Lovelace, all white but the dress")
+    assert "rest=white" in line and "2=red" in line
+    line = cli._suggest_line(ada_regions(), ["white", "black"], "Ada Lovelace, all white")
+    assert line == "stone colors rest=white"
+
+
 def test_suggestion_keeps_the_photo_colors_when_the_request_names_none():
     line = cli._suggest_line(ada_regions(), ["white", "black"], "A mini figure of Ada Lovelace")
     assert line == "stone colors 3=white rest=black"  # the red dress is nearer black than white

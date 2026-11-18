@@ -1209,44 +1209,80 @@ def _fil_value(fil: list[str]) -> list[str]:
 NAMED_DE = 45.0  # a region takes a named color only when its photo color is this close (delta E)
 
 
+def _rest_color(request: str, named: list[str]) -> str | None:
+    """The color the request gives to everything not named, or None when it gives none:
+    "all white", "white everywhere else", "the rest white", "white with a red dress"."""
+    words = re.findall(r"[a-z]+(?:-[a-z]+)?", request.lower())
+    for i, w in enumerate(words):
+        c = colortool.word_color(w)
+        if c not in named:
+            continue
+        before, after = words[max(0, i - 3):i], words[i + 1:i + 3]
+        if (i and words[i - 1] == "all") or {"rest", "else", "otherwise"} & set(before):
+            return c
+        if after and (after[0] in ("everywhere", "everything", "otherwise", "with") or after[:2] == ["for", "the"]):
+            return c
+    return None
+
+
 def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int, list[str]]:
-    """(region -> filament, rest filament, extra filaments). When the request names colors, the
-    first is rest (and the base's), and a region takes another named color when that is the named
-    color nearest its photo color, under NAMED_DE. Otherwise the photo's colors, each mapped to the
-    nearest loaded filament."""
+    """(region -> filament, rest filament, extra filaments). Each region starts from its photo
+    color, mapped to the nearest loaded filament. A region takes a color the request names when
+    that named color is nearest its photo color, under NAMED_DE. Rest (and the base) is the color
+    the request gives to everything else ("all white", "white everywhere else", "white with a red
+    dress"); then the other regions take rest too, except, after "but" or "except", the ones far
+    from rest, which keep their photo color. With no such phrase, rest is the photo color that
+    covers the most surface among the regions no named color took."""
     import numpy as np
 
     pick: dict[int, int] = {}
     extra: list[str] = []
+    allf = list(fil)
+
+    def num(c: str) -> int:
+        n = _match_filament(c, allf)
+        if n is None:
+            allf.append(c)
+            extra.append(c)
+            n = len(allf)
+        return n
+
     named = colortool.request_colors(request)
-    if named:
-        allf = list(fil)
-        nums = []
-        for c in named:
-            n = _match_filament(c, allf)
-            if n is None:
-                allf.append(c)
-                extra.append(c)
-                n = len(allf)
-            nums.append(n)
-        rest = nums[0]
-        ref = colortool._lab([colortool.NAMES[c] for c in named])
-        for d in info:
-            if d["rgb"] is None or d["base"]:
-                continue
+    if not any(d["rgb"] is not None for d in info):
+        return pick, (num(named[0]) if named else 1), extra
+    rest_c = _rest_color(request, named)
+    others = [c for c in named if c != rest_c]
+    ref = colortool._lab([colortool.NAMES[c] for c in others]) if others else None
+    taken: set[int] = set()
+    for d in info:
+        if d["rgb"] is None or d["base"]:
+            continue
+        pick[d["n"]] = colortool.nearest_filament(d["rgb"], fil)
+        if ref is not None:
             dist = np.sqrt(((ref - colortool._lab(d["rgb"])) ** 2).sum(1))
             k = int(dist.argmin())
-            if dist[k] < NAMED_DE and nums[k] != rest:
-                pick[d["n"]] = nums[k]
+            if dist[k] < NAMED_DE:
+                pick[d["n"]] = num(others[k])
+                taken.add(d["n"])
+    if rest_c is not None:
+        rest = num(rest_c)
+        keep = bool({"but", "except"} & set(re.findall(r"[a-z]+", request.lower())))
+        rlab = colortool._lab([colortool.NAMES[rest_c]])
+        for d in info:
+            if d["n"] not in pick or d["n"] in taken:
+                continue
+            far = float(np.sqrt(((rlab - colortool._lab(d["rgb"])) ** 2).sum())) >= NAMED_DE
+            if not (keep and far):
+                pick[d["n"]] = rest
         return pick, rest, extra
-    if not any(d["rgb"] is not None for d in info):
-        return pick, 1, extra
     share: dict[int, float] = {}
     for d in info:
-        if d["rgb"] is not None:
-            n = colortool.nearest_filament(d["rgb"], fil)
-            pick[d["n"]] = n
-            share[n] = share.get(n, 0.0) + d["share"]
+        if d["n"] in pick and d["n"] not in taken:
+            share[pick[d["n"]]] = share.get(pick[d["n"]], 0.0) + d["share"]
+    if not share:
+        for d in info:
+            if d["n"] in pick:
+                share[pick[d["n"]]] = share.get(pick[d["n"]], 0.0) + d["share"]
     rest = max(share, key=share.get) if share else 1
     return pick, rest, extra
 
