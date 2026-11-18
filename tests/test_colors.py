@@ -75,6 +75,21 @@ def test_a_small_patch_joins_its_neighbor_and_the_base_stays():
     assert len(set(reg[base])) == 1 and reg[base][0] not in reg[~base]
 
 
+def test_a_small_patch_that_stands_out_stays_its_own_region():
+    """White hands on a black jacket are about 1% of a figure each: under MIN_SHARE, but not noise."""
+    m = trimesh.creation.icosphere(subdivisions=5, radius=10)
+    c = m.triangles_center
+    near = np.linalg.norm(c - [10, 0, 0], axis=1)
+    patch = near < np.sort(near)[int(0.01 * len(c))]  # about 1% of the faces
+    labels = np.where(patch, 1, 0)
+    black_white = colors._lab([[20, 20, 20], [240, 240, 240]])
+    black_gray = colors._lab([[20, 20, 20], [45, 45, 45]])
+    kept = colors.regions(m, labels, lab=black_white)
+    assert kept.max() + 1 == 2 and len(set(kept[patch])) == 1 and kept[patch][0] not in kept[~patch]
+    merged = colors.regions(m, labels, lab=black_gray)  # shading on the same cloth
+    assert merged.max() + 1 == 1
+
+
 def test_layer_changes_counts_mixed_layers():
     box = trimesh.creation.box((10, 10, 10)).subdivide().subdivide().subdivide()
     m = colors.load_stl_mesh(box.vertices, box.faces)

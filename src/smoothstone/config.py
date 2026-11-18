@@ -97,7 +97,7 @@ def bed(job: Path | None = None) -> tuple[float, float, float]:
         return DEFAULT_BED
 
 
-def tier_rules(t: str, limit: int = 6) -> list[str]:
+def tier_rules(t: str, limit: int = 12) -> list[str]:
     f = skill_dir() / "tiers" / f"{t}.md"
     if not f.is_file():
         return []

@@ -19,7 +19,9 @@ import numpy as np
 
 from . import clean
 
-MIN_SHARE = 0.015  # a region under this share of the surface joins its neighbor
+MIN_SHARE = 0.015  # a region under this share of the surface joins its neighbor...
+SPECK = 0.003  # ...unless it is at least this big and stands out from that neighbor (hands beside a jacket)
+CONTRAST = 50.0  # delta E (Lab) that counts as standing out; shading on one cloth stays well under it
 LIST_MAX = 8
 LAYER = 0.2  # mm
 PURGE_G = 0.65  # grams of purge per filament change, about what Orca's default flush uses
@@ -184,9 +186,11 @@ def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None) -> np.nd
     return labels
 
 
-def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE) -> np.ndarray:
+def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, lab=None) -> np.ndarray:
     """Connected regions of equal label over face adjacency, numbered from 0. Regions under
-    `min_share` of the surface join the neighbor they share the longest edge with. Faces in the
+    `min_share` of the surface join the neighbor they share the longest edge with, except that with
+    `lab` (a Lab color per label) a region of at least SPECK that differs from that neighbor by more
+    than CONTRAST stays its own: white hands on a black jacket are small but not noise. Faces in the
     `base` mask are one region of their own that never merges."""
     import scipy.sparse as sp
     from scipy.sparse.csgraph import connected_components
@@ -201,6 +205,8 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE) -
     a, b = adj[same, 0], adj[same, 1]
     G = sp.coo_matrix((np.ones(len(a)), (a, b)), shape=(n, n))
     nc, comp = connected_components(G, directed=False)
+    comp_label = np.zeros(nc, int)
+    comp_label[comp] = labels
     if base.any():  # the plinth and the name letters are one region even where they do not touch
         bid = comp[base][0]
         comp[base] = bid
@@ -234,6 +240,10 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE) -
         j = max(pick, key=pick.get)
         if is_base[j]:
             continue  # only the plinth touches it: leave it, the base never grows
+        if (lab is not None and area[i] >= SPECK * area.sum() and comp_label[i] < len(lab)
+                and comp_label[j] < len(lab)
+                and np.linalg.norm(lab[comp_label[i]] - lab[comp_label[j]]) > CONTRAST):
+            continue  # small but plainly a different color from what it touches: keep it
         # i joins j
         alive[i] = False
         parent[i] = j
@@ -320,7 +330,7 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     labels = np.zeros(n, int)
     labels[fig] = lab_f
     labels = smooth_labels(mesh, labels, keep=base)
-    reg = regions(mesh, labels, base=base if base.any() else None)
+    reg = regions(mesh, labels, base=base if base.any() else None, lab=_lab(pal))
     R = int(reg.max()) + 1
     rgb: list = [None] * R
     base_region = int(reg[base][0]) if base.any() else None
