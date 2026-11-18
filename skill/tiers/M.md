@@ -10,6 +10,12 @@ recipe and the settings that make the part look its best, then let stone build a
 - Keep the part to one piece that sits flat, unless the recipe makes two on purpose.
 - Stop when stone build says Part ready, unless you want to change the look and build again.
 
+## Research
+- A part that fits a real product needs the maker's numbers: follow research.md section 2, save
+  each with stone note, and add the clearance it lists. No source and no measurement: ask.
+- A figure of a real person: list five to eight things that make them recognizable with
+  stone note "look: ...", and check the style render against that list.
+
 ## Making it look good
 - Pick the style that suits the use: honeycomb or spiral fan guards, twisted or wave vases,
   faceted planters, a raised rim on signs, lead in chamfers and a grip on cable combs.

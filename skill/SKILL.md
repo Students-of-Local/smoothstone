@@ -20,6 +20,14 @@ from where it was.
 Set the tier with STONE_TIER=S|M|L or `tier = "S"` in stone.toml. stone status prints the
 card's rules on every call, so they come back after a compaction.
 
+## Research first
+
+When the request names a real thing (a phone to fit, a person to look like, a famous statue),
+follow research.md before stone set: exact sizes from the maker's own drawings, a list of what
+makes a person recognizable, a real museum scan before a generated one. Keep each fact and its
+source with `stone note "<fact>, <source>"`; stone status shows the notes again after a
+compaction. Never make up a size a part has to fit.
+
 ## Pictures
 
 `stone new "<request>" --image photo.png` (or `stone image photo.png`) traces outlines for

@@ -492,3 +492,18 @@ def test_a_plate_too_narrow_for_its_cutouts_grows(jobenv, recipes_root, openscad
     stone("set", "w=128")
     text, code, nxt = stone("build")
     assert "Part ready" in text, text
+
+
+def test_note_keeps_facts_through_status(jobenv):
+    stone("new", "a case for an iPhone 17 Pro")
+    _, _, before = stone("status")
+    text, code, nxt = stone("note", "width = 71.9 mm, apple.com/iphone/compare")
+    assert code == 0 and "Noted (1 notes)" in text
+    assert nxt == before  # a note never moves NEXT
+    stone("note", "width = 71.9 mm, apple.com/iphone/compare")  # the same fact twice is kept once
+    stone("note", "look: thin half-rim glasses")
+    text, _, nxt = stone("status")
+    assert "Notes (2): width = 71.9 mm, apple.com/iphone/compare | look: thin half-rim glasses" in text
+    assert nxt == before
+    text, code, _ = stone("note")
+    assert code == 1 and "stone note" in text

@@ -181,6 +181,9 @@ def cmd_status(args, job: Job) -> Out:
     if m:
         o = m["object"]
         out.add(f"Measured: object {o['long_mm']:.1f} x {o['short_mm']:.1f} mm (from {m['method']})")
+    notes = job.notes()
+    if notes:
+        out.add(f"Notes ({len(notes)}): " + " | ".join(notes[-8:]))
     plan = job.plan()
     if plan:
         r = rc.load(plan["recipe"])
@@ -1033,6 +1036,23 @@ def cmd_measure(args, job: Job) -> Out:
 # done
 
 
+def cmd_note(args, job: Job) -> Out:
+    """Keep a researched fact and its source in the job, so it survives a compaction."""
+    out = Out(owns_next=False)
+    if not need_job(job, out):
+        return out
+    text = " ".join(args.text).strip()
+    if not text:
+        out.add('Write the fact and where it came from: stone note "width = 71.9 mm, apple.com/iphone/compare"')
+        out.code = 1
+        out.next = job.status().get("next") or "stone status"
+        return out
+    notes = job.add_note(text)
+    out.add(f"Noted ({len(notes)} notes): {text}")
+    out.next = job.status().get("next") or "stone recipes"
+    return out
+
+
 def cmd_done(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
@@ -1130,6 +1150,9 @@ def make_parser() -> Parser:
     s.add_argument("query", nargs="*")
     s.add_argument("-n", type=int, default=3)
 
+    s = sub.add_parser("note", parents=[common], help="keep a researched fact and its source in the job")
+    s.add_argument("text", nargs="*")
+
     sub.add_parser("done", parents=[common], help="finish the job")
     return p
 
@@ -1145,6 +1168,7 @@ COMMANDS = {
     "image": cmd_image,
     "measure": cmd_measure,
     "find": cmd_find,
+    "note": cmd_note,
     "done": cmd_done,
 }
 
