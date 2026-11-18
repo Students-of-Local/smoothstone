@@ -481,3 +481,36 @@ def test_a_painted_part_passes_color_edges_and_writes_views(jobenv, openscad):
     assert "PASS color_edges: every color boundary is a smooth curve" in text
     assert "Views: " in text and (jobenv / "stone-job" / "build" / "views.png").is_file()
     assert status_json(jobenv)["colors"]["color_edges"] == 1.0
+
+
+# review mediums from PR #5: names that are color words, hyphenated shades
+
+
+def test_hyphenated_shades_map_to_their_base_color():
+    assert colors.word_color("dark-red") == "red"
+    assert colors.word_color("sky-blue") == "blue"
+    assert colors.word_color("light-grey") == "gray"
+    assert colors.request_colors("a dark-red mug") == ["red"]
+    assert colors.asks_for_color("a sky-blue vase")
+
+
+def test_a_name_that_is_a_color_word_is_not_a_color():
+    for req in ("A mini figure of Jack Black, 90 mm tall", "a bust of Betty White",
+                "Charlie Brown on a plinth", "a figure of Hank Green"):
+        names = colors.subject_names(req)
+        assert colors.request_colors(req, names) == [], req
+        assert not colors.asks_for_color(req, names), req
+        assert colors.part_colors(req, names) == {}, req
+
+
+def test_the_name_stone_find_searched_counts_even_in_lower_case():
+    req = "a mini figure of jack black with a red shirt"
+    names = colors.subject_names(req, ["Jack Black"])
+    assert colors.request_colors(req, names) == ["red"]
+    assert {k: v for k, v in colors.part_colors(req, names).items() if not k.startswith("word:")} == {"top": "red"}
+
+
+def test_a_named_person_still_gets_the_colors_the_request_gives():
+    req = "Betty White in a red dress, all blue but the dress"
+    names = colors.subject_names(req)
+    assert colors.request_colors(req, names) == ["red", "blue"]

@@ -75,16 +75,29 @@ def user_config_dir() -> Path:
 
 
 def _toml(job: Path | None) -> dict:
-    for base in (Path.cwd(), job, user_config_dir()):
+    """Settings from every stone.toml found: the working directory's, the job's, then the
+    machine's. The nearest file wins per key, and a table such as [filaments] merges by key, so a
+    job's stone.toml with only tier = "S" keeps the machine's filament slots. A file that does
+    not parse is skipped."""
+    out: dict = {}
+    seen: set[Path] = set()
+    for base in (user_config_dir(), job, Path.cwd()):  # farthest first; nearer files override
         if base is None:
             continue
-        f = base / "stone.toml"
-        if f.is_file():
-            try:
-                return tomllib.loads(f.read_text())
-            except (tomllib.TOMLDecodeError, OSError):
-                return {}
-    return {}
+        f = (base / "stone.toml").resolve()
+        if f in seen or not f.is_file():
+            continue
+        seen.add(f)
+        try:
+            data = tomllib.loads(f.read_text())
+        except (tomllib.TOMLDecodeError, OSError):
+            continue
+        for k, v in data.items():
+            if isinstance(v, dict) and isinstance(out.get(k), dict):
+                out[k] = {**out[k], **v}
+            else:
+                out[k] = v
+    return out
 
 
 def tier(job: Path | None = None) -> str:
