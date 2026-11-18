@@ -130,6 +130,12 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
     out.append(Result("watertight", wt, wt, "closed surface" if wt else "surface has holes",
                       advice="the surface has holes; go back to the default parameters"))
 
+    from .clean import problems, slicer_view
+
+    bad = problems(slicer_view(mesh.vertices, mesh.faces))
+    out.append(Result("slicer", not bad, bad or "ok", "; ".join(bad) or "no non-manifold edges or zero-area faces",
+                      advice="a slicer will report this mesh as broken; rebuild the part with stone build"))
+
     bodies = len(mesh.split(only_watertight=False))
     out.append(Result("bodies", bodies <= max_bodies, bodies,
                       f"{bodies} bodies (max {max_bodies})",

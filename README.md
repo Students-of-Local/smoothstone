@@ -29,6 +29,7 @@ NEXT: stone build
 $ stone build
 Size: 120.0 x 120.0 x 3.0 mm
 PASS watertight: closed surface
+PASS slicer: no non-manifold edges or zero-area faces
 PASS bodies: 1 bodies (max 1)
 PASS first_layer: 6344.7 mm2 on the bed (need 200.0 mm2)
 PASS min_wall: thinnest wall 1.98 mm (need 0.8 mm)
@@ -40,7 +41,7 @@ NEXT: none, the part is ready
 
 That is shortened: each command prints a few more lines, and the build prints every check.
 
-The build runs OpenSCAD with the Manifold backend and then checks the mesh: watertight, one piece, flat on the bed, a real first layer, walls thick enough to print, no overhang past 45 degrees and the size the recipe promised. When a check fails, stone names the one setting to change and prints the command that changes it.
+The build runs OpenSCAD with the Manifold backend and then checks the STL it ships, read the way a slicer reads it: watertight, no non-manifold edges or zero-area faces (the mesh is rebuilt through manifold3d at float32 first), one piece, flat on the bed, a real first layer, walls thick enough to print, no overhang past 45 degrees and the size the recipe promised. When a check fails, stone names the one setting to change and prints the command that changes it.
 
 ## Tiers
 

@@ -67,9 +67,10 @@ def _shorten(line: str, n: int = 160) -> str:
 
 
 def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadRun:
-    """Build the recipe to <out_stl>.off (exact mesh, used by the checks) and <out_stl> (binary STL
-    written from that mesh). ASCII STL from OpenSCAD rounds coordinates, which merges vertices that
-    are distinct in the real mesh and makes good parts read as open."""
+    """Build the recipe to <out_stl>.off (OpenSCAD's exact mesh) and <out_stl>: that mesh rebuilt as a
+    float32 2-manifold (clean.for_slicer), the file that is checked and shipped. Written straight
+    from the OFF, float32 rounding can merge distinct vertices and leave non-manifold edges that a
+    slicer reports even though the float64 mesh was closed."""
     out_off = out_stl.with_suffix(".off")
     cmd = _base_cmd(binary) + ["-o", str(out_off)] + d_flags(recipe, params) + [str(recipe.scad)]
     try:
@@ -91,10 +92,12 @@ def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadR
     if proc.returncode == 0 and out_off.is_file() and out_off.stat().st_size > 0:
         try:
             from .check import load_off
+            from .clean import for_slicer
 
-            load_off(out_off).export(str(out_stl))
+            for_slicer(load_off(out_off)).export(str(out_stl))
         except Exception as e:  # a broken OFF means a broken build; report it, do not crash
             log += f"\nOFF to STL failed: {type(e).__name__}: {e}"
+            out_stl.unlink(missing_ok=True)
     ok = proc.returncode == 0 and out_stl.is_file() and out_stl.stat().st_size > 0 and not (
         err.startswith("ERROR") or "Assertion" in err
     )

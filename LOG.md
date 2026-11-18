@@ -199,3 +199,15 @@ LFM3-1.7B Q4 on CPU, card S, seeds 1 to 3, full context and compacted at step 3:
 New grommet recipe (desk cable hole cover, lip down). The panel grows to fit a round cutout taller than the plate instead of failing an assert.
 
 Figure: the style prompt keeps glasses as thin as in the photo. Thin frames in 4 of 6 seeds, against 2 of 6 before.
+
+## 2026-11-18: the figure Creality Print called broken
+
+Creality Print flagged the small model's Jensen figure: 14 non-manifold edges. Every stone check had
+passed, because the checks read OpenSCAD's float64 OFF while the STL that shipped was float32. Twelve
+faces whose corners were 1e-9 mm apart collapsed once written, and one sliver had zero area.
+
+Fix: `stone build` rebuilds the mesh through manifold3d at float32 (`clean.for_slicer`, with a light
+quadric pass if a sliver is left), and checks run on the shipped STL, including a new `slicer` check
+(`clean.slicer_view`: float32 merge, collapsed and zero-area faces, edges not shared by exactly two
+faces). The figure went from 13 bad faces to none, volume within 0.01%. Every image-free recipe still
+passes. Tests: tests/test_clean.py.

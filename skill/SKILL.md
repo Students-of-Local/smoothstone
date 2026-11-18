@@ -6,8 +6,8 @@ description: Make 3D printable parts that look designed, from a text request or 
 # smoothstone
 
 stone turns a request into a print-ready STL. The model picks a recipe and sets its numbers;
-stone builds the part with OpenSCAD, checks that it prints (watertight, one piece, flat base,
-walls, overhangs, size), and keeps every step in a job folder. Every stone message ends with one
+stone builds the part with OpenSCAD, checks that it prints (watertight, clean for a slicer, one piece,
+flat base, walls, overhangs, size), and keeps every step in a job folder. Every stone message ends with one
 line, NEXT: <command>, and `stone status` repeats it, so a model that loses its context goes on
 from where it was.
 
