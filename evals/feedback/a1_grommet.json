@@ -8,10 +8,9 @@
   {
    "say": "It is a round hole, 60 mm across.",
    "expect": {
-    "recipe": "panel",
+    "recipe": "grommet",
     "params": {
-     "cut_shape": "round",
-     "cut_w": 60
+     "hole_d": 60
     }
    }
   }
