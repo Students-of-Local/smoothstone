@@ -156,67 +156,80 @@ def main():
     nxt = "stone status"
     print(f"{spec['id']}  {cond}  seed {a.seed}", flush=True)
 
-    for step in range(1, MAX_STEPS + 1):
-        st = {"step": step, "t": round(time.time() - t0, 2)}
-        if a.compact_at and step == a.compact_at + 1 and a.driver == "lfm3":
-            messages = [{"role": "system", "content": system}, {"role": "user", "content": user + "\n\n" + COMPACTED}]
-            pending = ""
-            st["compacted"] = True
-            print(f"{step:>2} (context compacted)", flush=True)
-        if a.driver == "next":
-            if not nxt or "<" in nxt or nxt.startswith("none"):
-                st["final"] = f"stopped: NEXT is {nxt!r}"
-                log["steps"].append(st)
-                break
-            calls = [{"id": f"n{step}", "type": "function", "function": {"name": "stone", "arguments": json.dumps({"command": nxt})}}]
-            am = {"role": "assistant", "content": "", "tool_calls": calls}
-        else:
-            prompt = _post(a.server, "/apply-template", {"messages": messages, "tools": TOOLS})["prompt"] + pending
-            r = _post(a.server, "/completion", {"prompt": prompt, "n_predict": MAX_NEW, "seed": a.seed, "stop": ["<|im_end|>"],
-                                                "cache_prompt": True, **SAMPLING})
-            text, cut = r["content"], r.get("stop_type") == "limit"
-            st.update({"generated": text, "tokens_predicted": r.get("tokens_predicted"), "stop_type": r.get("stop_type"),
-                       "continued_from_cut": bool(pending)})
-            if cut:
-                pending += text
-                st["tool_calls"] = []
-                log["steps"].append(st)
-                print(f"{step:>2} (cut at {MAX_NEW} tokens, continues)", flush=True)
-                continue
-            reasoning, content, calls = parse_turn(pending + text)
-            pending = ""
-            am = {"role": "assistant", "content": content}
-            if reasoning:
-                am["reasoning_content"] = reasoning
-            if calls:
-                am["tool_calls"] = calls
-        messages.append(am)
-        st["tool_calls"] = []
-        for c in calls:
-            try:
-                args = json.loads(c["function"].get("arguments") or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            if c["function"]["name"] != "stone":
-                result = "FIX: the only tool is stone. Call it with a command like: stone status"
+    # a follow-up is the person asking for a change after the model stopped: the same chat goes on
+    says = [None] + [f["say"] for f in spec.get("followups", [])]
+    first = None  # an "asks" spec with follow-ups: the first phase must end in a question, not a part
+    for phase, say in enumerate(says):
+        if phase == 1 and spec["expect"].get("asks"):
+            first = grade_job(job, spec, messages)
+        if say:
+            messages.append({"role": "user", "content": say})
+            nxt = "stone status"
+            print(f"   person: {say}", flush=True)
+        for step in range(1, MAX_STEPS + 1):
+            st = {"step": step, "phase": phase, "t": round(time.time() - t0, 2)}
+            if a.compact_at and step == a.compact_at + 1 and a.driver == "lfm3":
+                messages = [{"role": "system", "content": system}, {"role": "user", "content": user + "\n\n" + COMPACTED}]
+                pending = ""
+                st["compacted"] = True
+                print(f"{step:>2} (context compacted)", flush=True)
+            if a.driver == "next":
+                if not nxt or "<" in nxt or nxt.startswith(("none", "ask the person")):
+                    st["final"] = f"stopped: NEXT is {nxt!r}"
+                    log["steps"].append(st)
+                    break
+                calls = [{"id": f"n{step}", "type": "function", "function": {"name": "stone", "arguments": json.dumps({"command": nxt})}}]
+                am = {"role": "assistant", "content": "", "tool_calls": calls}
             else:
-                result = run_stone(str(args.get("command", "")), env, rdir)
-            nxt = last_next(result) or nxt
-            st["tool_calls"].append({"name": c["function"]["name"], "args": args, "result": result})
-            messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": result})
-            print(f"{step:>2} {args.get('command', '?')[:70]}  ->  {(last_next(result) or result.splitlines()[-1] if result else '')[:60]}", flush=True)
-        log["steps"].append(st)
-        if not calls:
-            print(f"{step:>2} (stopped, no tool call)", flush=True)
-            break
+                prompt = _post(a.server, "/apply-template", {"messages": messages, "tools": TOOLS})["prompt"] + pending
+                r = _post(a.server, "/completion", {"prompt": prompt, "n_predict": MAX_NEW, "seed": a.seed, "stop": ["<|im_end|>"],
+                                                    "cache_prompt": True, **SAMPLING})
+                text, cut = r["content"], r.get("stop_type") == "limit"
+                st.update({"generated": text, "tokens_predicted": r.get("tokens_predicted"), "stop_type": r.get("stop_type"),
+                           "continued_from_cut": bool(pending)})
+                if cut:
+                    pending += text
+                    st["tool_calls"] = []
+                    log["steps"].append(st)
+                    print(f"{step:>2} (cut at {MAX_NEW} tokens, continues)", flush=True)
+                    continue
+                reasoning, content, calls = parse_turn(pending + text)
+                pending = ""
+                am = {"role": "assistant", "content": content}
+                if reasoning:
+                    am["reasoning_content"] = reasoning
+                if calls:
+                    am["tool_calls"] = calls
+            messages.append(am)
+            st["tool_calls"] = []
+            for c in calls:
+                try:
+                    args = json.loads(c["function"].get("arguments") or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                if c["function"]["name"] != "stone":
+                    result = "FIX: the only tool is stone. Call it with a command like: stone status"
+                else:
+                    result = run_stone(str(args.get("command", "")), env, rdir)
+                nxt = last_next(result) or nxt
+                st["tool_calls"].append({"name": c["function"]["name"], "args": args, "result": result})
+                messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": result})
+                print(f"{step:>2} {args.get('command', '?')[:70]}  ->  {(last_next(result) or result.splitlines()[-1] if result else '')[:60]}", flush=True)
+            log["steps"].append(st)
+            if not calls:
+                print(f"{step:>2} (stopped, no tool call)", flush=True)
+                break
 
-    grade = grade_job(job, spec)
+    exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
+    grade = grade_job(job, {**spec, "expect": exp}, messages)
+    if first is not None and not first["pass"]:
+        grade.update({"pass": False, "why": ["before the answer: " + w for w in first["why"]] + grade["why"]})
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
 
 
-def grade_job(job: Path, spec: dict) -> dict:
+def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
     """Outside the model's reach: did stone done write a part that passes the checks and the spec?"""
     why = []
     built = json.loads((job / "build" / "params.json").read_text()) if (job / "build" / "params.json").exists() else {}
@@ -227,6 +240,12 @@ def grade_job(job: Path, spec: dict) -> dict:
     if not done:
         why.append("no finished part")
     exp = spec["expect"]
+    if exp.get("asks"):
+        # a part that must fit something with no size given: the right move is a question, not a part
+        last = next((m.get("content") or "" for m in reversed(messages or []) if m["role"] == "assistant"), "")
+        why = [] if not done and "?" in last else (["built a part with a made-up size"] if done else ["ended without asking"])
+        return {"pass": not why, "why": why or ["asked for the size"], "recipe": recipe, "params": params,
+                "checks": [], "stl": None, "stl_sha256": None}
     if recipe != exp["recipe"]:
         why.append(f"recipe {recipe} (want {exp['recipe']})")
     for k, want in exp.get("params", {}).items():

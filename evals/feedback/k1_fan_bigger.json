@@ -1,0 +1,23 @@
+{
+ "id": "k1_fan_bigger",
+ "request": "A guard for a 92 mm fan with a honeycomb grille.",
+ "expect": {
+  "recipe": "fan_guard",
+  "params": {
+   "size": 92,
+   "style": "honeycomb"
+  }
+ },
+ "followups": [
+  {
+   "say": "It needs to fit a 120 mm fan instead.",
+   "expect": {
+    "recipe": "fan_guard",
+    "params": {
+     "size": 120,
+     "style": "honeycomb"
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "id": "k2_comb_tight",
+ "request": "A cable comb, 100 mm long, that holds 8 cables that are 6 mm thick.",
+ "expect": {
+  "recipe": "cable_comb",
+  "params": {
+   "length": 100,
+   "slots": 8,
+   "slot_w": [
+    6,
+    7
+   ]
+  }
+ },
+ "followups": [
+  {
+   "say": "I printed it and the cables don't fit, the slots are too tight.",
+   "expect": {
+    "recipe": "cable_comb",
+    "params": {
+     "length": 100,
+     "slots": 8,
+     "slot_w": [
+      6.4,
+      8
+     ]
+    }
+   }
+  }
+ ]
+}

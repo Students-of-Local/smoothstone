@@ -407,6 +407,15 @@ def cmd_set(args, job: Job) -> Out:
             r = rc.load(plan["recipe"])
         else:
             return unknown_recipe(name, out, t)
+    ask = match.missing_fit_size(r, job.request(), job.notes())
+    if ask:
+        # never invent the size of the thing a part must fit: a small model would, so the tool stops it
+        out.fix("this part must fit something real and the request gives no size for it; never guess one")
+        out.add('When the person answers, run: stone note "<their answer>"')
+        out.next = f"ask the person: {ask}"
+        out.result = "set refused: no size for the fit"
+        job.update(ask_recipe=r.name)
+        return out
     same = plan is not None and plan["recipe"] == r.name
     params = dict(plan["params"]) if same and not args.reset else {}
     pairs, loose = split_items(items, r)
@@ -1049,7 +1058,15 @@ def cmd_note(args, job: Job) -> Out:
         return out
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
-    out.next = job.status().get("next") or "stone recipes"
+    st = job.status()
+    if str(st.get("next", "")).startswith("ask the person") and st.get("ask_recipe"):
+        # the answer to stone's question is part of the request now, so show places its size
+        with job.brief_file.open("a") as f:
+            f.write(f"\nAnswer: {text}\n")
+        out.owns_next = True
+        out.next = f"stone show {st['ask_recipe']}"
+        return out
+    out.next = st.get("next") or "stone recipes"
     return out
 
 

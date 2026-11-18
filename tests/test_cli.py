@@ -507,3 +507,30 @@ def test_note_keeps_facts_through_status(jobenv):
     assert nxt == before
     text, code, _ = stone("note")
     assert code == 1 and "stone note" in text
+
+
+def test_set_asks_for_the_size_of_what_a_part_fits(jobenv, recipes_root):
+    # a small model built a default part for "the cable hole in my desk" in 3 of 3 runs before this
+    shutil.copytree(REPO / "recipes" / "panel", recipes_root / "panel")
+    stone("new", "A cover for the cable hole in my desk.")
+    text, code, nxt = stone("set", "panel")
+    assert code == 1 and nxt.startswith("ask the person: What are the measurements of the cable hole in your desk")
+    _, _, again = stone("status")
+    assert again == nxt  # a compacted model finds the question again
+    _, code, nxt = stone("note", "It is a round hole, 60 mm across.")
+    assert code == 0 and nxt == "stone show panel"
+    text, _, _ = stone("show", "panel")
+    assert "cut_shape=round" in text and "cut_w=60" in text
+    _, code, nxt = stone("set", "panel", "cut_shape=round", "cut_w=60")
+    assert code == 0 and nxt == "stone build"
+
+
+def test_fit_check_leaves_plain_requests_alone():
+    from smoothstone import match, recipes as rc
+    box = rc.load("box")
+    assert box is not None
+    for req in ("A box with a lid.", "A case for my iPhone 17 Pro.", "A mini figure of my dog Rex.",
+                "A cable comb, 100 mm long, for 8 cables 6 mm thick."):
+        assert match.missing_fit_size(box, req) is None, req
+    assert match.missing_fit_size(box, "A holder for my pens.")
+    assert match.missing_fit_size(rc.load("figure"), "A stand that fits my figure.") is None
