@@ -34,7 +34,8 @@ def slicer_view(vertices, faces) -> dict:
 
 def for_slicer(mesh, tolerance: float = 0.01):
     """Return the mesh rebuilt as a float32 2-manifold, with edges under `tolerance` mm collapsed
-    (well below a 0.4 mm nozzle line). Raises ValueError when the mesh cannot be made manifold."""
+    (well below a 0.4 mm nozzle line). Raises ValueError when the mesh cannot be made manifold, or
+    when three quadric passes still leave non-manifold edges or zero-area faces."""
     import fast_simplification
     import manifold3d as m3
     import trimesh
@@ -57,6 +58,9 @@ def for_slicer(mesh, tolerance: float = 0.01):
             break
         v2, f2 = fast_simplification.simplify(v.astype(np.float32), f.astype(np.int32), target_reduction=reduction)
         v, f = rebuild(v2, f2)
+    left = problems(slicer_view(v, f))
+    if left:  # never hand a slicer a part it will complain about
+        raise ValueError("still " + " and ".join(left) + " after three repair passes")
     return trimesh.Trimesh(v, f, process=False)
 
 

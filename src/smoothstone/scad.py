@@ -11,6 +11,7 @@ from . import config
 from .recipes import Recipe, scad_literal
 
 BUILD_TIMEOUT = 300
+SLICER_ERROR = "the mesh is not clean for a slicer"
 PREVIEW_TIMEOUT = 120
 
 
@@ -95,6 +96,10 @@ def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadR
             from .clean import for_slicer
 
             for_slicer(load_off(out_off)).export(str(out_stl))
+        except ValueError as e:  # the mesh cannot be made clean for a slicer
+            log += f"\nOFF to STL failed: {e}"
+            out_stl.unlink(missing_ok=True)
+            err = f"{SLICER_ERROR}: {e}"
         except Exception as e:  # a broken OFF means a broken build; report it, do not crash
             log += f"\nOFF to STL failed: {type(e).__name__}: {e}"
             out_stl.unlink(missing_ok=True)
