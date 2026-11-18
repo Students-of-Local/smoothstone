@@ -542,6 +542,8 @@ FIL = ["red", "white", "blue", "black"]
     "Jensen Huang in a black jacket, white everywhere else",
     "Jensen Huang, white with a black jacket",
     "Jensen Huang with the jacket in black, the rest white",
+    "A mini figure of Jensen Huang in a black jacket",
+    "A mini figure of Jensen Huang with a black jacket",
 ])
 def test_part_phrases_give_exactly_that_mapping(req):
     names = colors.subject_names(req)

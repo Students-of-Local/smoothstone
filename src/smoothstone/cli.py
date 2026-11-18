@@ -1323,7 +1323,7 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
     if rest_c is None:
         plain = [c for c in named if c not in pc.values()]
         rest_c = plain[0] if plain else None
-    photo, rest_p, _ = _suggest_colors(info, fil, "")
+    _, rest_p, _ = _suggest_colors(info, fil, "")
     rest = num(rest_c) if rest_c else rest_p
     pick: dict[int, int] = {}
     for d in info:
@@ -1333,7 +1333,7 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
         if p in pc:
             pick[d["n"]] = _picture_filament(d["rgb"], allf, rest) if pc[p] == "picture" else num(pc[p])
         else:
-            pick[d["n"]] = rest if rest_c else photo.get(d["n"], rest)
+            pick[d["n"]] = rest  # every part not named takes rest (the photo's when none is named)
     return pick, rest, extra
 
 
