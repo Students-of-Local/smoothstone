@@ -717,8 +717,9 @@ def _remesh(m):
     return v.marching_cubes.apply_transform(v.transform)
 
 
-# graft.json and lift-octree.txt too: without them a cached figure is lifted and grafted again
-CACHED = ("look.txt", "style.png", "lift.glb", "lift-octree.txt", "figure.stl", "graft.json", "figure.json")
+# graft.json and lift-octree.txt too: without them a cached figure is lifted and grafted again;
+# figure.stl last, since it marks a whole copy
+CACHED = ("look.txt", "style.png", "lift.glb", "lift-octree.txt", "graft.json", "figure.json", "figure.stl")
 REPAIR_VERSION = 1  # bump whenever repair() changes what it writes: old cached figures stop matching
 
 
@@ -729,25 +730,46 @@ def cache_dir() -> Path | None:
     return Path(env).expanduser() if env else Path.home() / ".cache" / "stone-figure"
 
 
+def _can_style() -> bool:
+    try:
+        _mflux_bin()
+        return True
+    except FigureProblem:
+        return False
+
+
+def _model_id(env: str | None) -> str:
+    """A custom style model by its path and the sizes of its weight files; "" for the default."""
+    if not env:
+        return ""
+    p = Path(env).expanduser()
+    files = sorted(p.rglob("*.safetensors")) if p.is_dir() else []
+    return str(p.resolve()) + ":" + ",".join(str(f.stat().st_size) for f in files)
+
+
 def cache_key(key: str) -> str:
-    """The folder key plus every setting outside it that changes the finished mesh."""
+    """The folder key plus every setting outside it that changes the finished mesh. Describe counts
+    as it will really run here; a host with no style model can only reuse a figure, so it asks
+    for one made as its settings request. The job's own folder keeps the plain key, so a job made
+    before keeps its figure; a lift on another grid is lifted again there (lift-octree.txt)."""
     e = os.environ.get
-    model = e("STONE_STYLE_MODEL")
-    return _digest(key, e("STONE_STYLE_REFS", "1"), Path(model).name if model else "",
-                   lift_octree(), e("STONE_LIFT_CHUNKS", "4000"),
-                   e("STONE_DESCRIBE", "1") != "0", e("STONE_HEAD_GRAFT", "1") != "0", REPAIR_VERSION)
+    describe = e("STONE_DESCRIBE", "1") != "0" and (_describe_model() is not None or not _can_style())
+    return _digest(key, e("STONE_STYLE_REFS", "1"), _model_id(e("STONE_STYLE_MODEL")), e("STONE_LIFT") or "",
+                   lift_octree(), e("STONE_LIFT_CHUNKS", "4000"), describe,
+                   e("STONE_HEAD_GRAFT", "1") != "0", REPAIR_VERSION)
 
 
 def _from_cache(key: str, folder: Path) -> bool:
     c = cache_dir()
-    if c is None:
-        return False
-    k = cache_key(key)
-    if not (c / k / "figure.stl").exists():
+    k = cache_key(key) if c is not None else ""
+    if c is None or not (c / k / "figure.stl").exists():
         return False
     for name in CACHED:
-        if (c / k / name).exists() and not (folder / name).exists():
-            shutil.copyfile(c / k / name, folder / name)
+        src = c / k / name
+        if src.exists() and not (folder / name).exists():
+            tmp = folder / f".{name}.tmp{os.getpid()}"
+            shutil.copyfile(src, tmp)
+            os.replace(tmp, folder / name)  # a killed copy never leaves a short figure.stl
     return True
 
 
