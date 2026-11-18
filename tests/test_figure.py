@@ -213,6 +213,26 @@ def test_stone_colors_end_to_end_on_a_figure_with_a_style_picture(jobenv, monkey
     assert nxt == cli.DONE_NEXT
     assert (jobenv / "stone-job" / "build" / "views.png").is_file()
 
+    # SPEC3 C: the eval grader reads the parts' colors back from the 3MF
+    import sys
+
+    sys.path.insert(0, str(REPO / "evals"))
+    import run as evrun
+
+    job = jobenv / "stone-job"
+    got = evrun.grade_colors(job, "figure", {"rest": "none"})["parts"]
+    assert "base" in got and len(set(got.values())) >= 2, got
+    rest = got["base"]
+    want: dict = {"rest": rest}
+    for part, c in got.items():
+        if c != rest:
+            want.setdefault(c, []).append(part)
+    g = evrun.grade_colors(job, "figure", want)
+    assert g["why"] == [] and abs(sum(g["shares"].values()) - 1) < 0.01, g
+    odd = next(p for p, c in got.items() if c != rest)
+    wrong = {"rest": rest, rest: [odd]}
+    assert f"{odd} is {got[odd]} (want {rest})" in evrun.grade_colors(job, "figure", wrong)["why"]
+
 
 def status_json_colors(work: Path) -> dict:
     return json.loads((work / "stone-job" / "status.json").read_text())["colors"]
