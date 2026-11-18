@@ -558,3 +558,14 @@ def test_a_desk_hole_cover_is_a_grommet():
     g = rc.load("grommet")
     assert g is not None and g.tier == "S"
     assert match.suggest(g, "It is a round hole, 60 mm across.") == {"hole_d": 60}
+
+
+def test_naming_the_product_in_set_answers_the_question(jobenv, recipes_root):
+    # the model asked "which phone?" itself, then set phone=iphone_17_pro, and stone asked again
+    shutil.copytree(REPO / "recipes" / "phone_case", recipes_root / "phone_case")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A case for my phone.")
+    _, code, nxt = stone("set", "phone_case")
+    assert code == 1 and nxt.startswith("ask the person")
+    _, code, nxt = stone("set", "phone_case", "phone=iphone_17_pro")
+    assert code == 0 and nxt == "stone build"
