@@ -706,3 +706,47 @@ def test_a_part_asked_for_is_in_the_line_even_past_the_listed_regions():
     assert len(regs) > colors.LIST_MAX
     line = cli._suggest_line(regs, FIL, "Jensen Huang with red shoes, white everywhere else")
     assert line == "stone colors shoes=red rest=white", line
+
+
+# PR 9 review round 1
+
+
+def test_a_name_that_starts_with_a_color_word_stays_a_name():
+    """Review first-F1: "Gray Davis" and "Black Francis" are people, so gray and black are not
+    asked for."""
+    assert colors.subject_names("A bust of Gray Davis, 80 mm tall") == ["Gray Davis"]
+    assert colors.subject_names("A mini figure of Black Francis") == ["Black Francis"]
+    req = "A bust of Gray Davis, 80 mm tall"
+    assert colors.request_colors(req, colors.subject_names(req)) == []
+
+
+@pytest.mark.parametrize("req", [
+    "Jensen Huang In A Long Black Jacket, White Everywhere Else",
+    "A mini figure of Jensen Huang in a Long Black Jacket, white everywhere else",
+])
+def test_a_word_in_front_of_a_title_case_color_part_keeps_its_color(req):
+    """Review second-F3: one adjective in front of "Black Jacket" made "Long Black Jacket" a
+    name, so the jacket lost its black."""
+    names = colors.subject_names(req, ["Jensen Huang"])
+    assert not any("Black" in n for n in names), names
+    line = cli._suggest_line(jensen_regions(), FIL, colors.without_names(req, names))
+    assert line == "stone colors jacket=black rest=white", line
+
+
+def test_an_adjective_before_a_title_case_color_on_a_plain_part():
+    req = "A Small Red Gridfinity Bin, 2 by 1"
+    assert colors.request_colors(req, colors.subject_names(req)) == ["red"]
+
+
+def test_numbered_regions_past_the_listing_take_the_rest_color():
+    """Review second-F5: regions with no part past LIST_MAX were never shown, so the line must not
+    give them their own photo colors; the listing says they take the rest color."""
+    def reg(n, rgb, share):
+        return {"n": n, "rgb": rgb, "share": share, "base": False, "part": None,
+                "color": colors.color_name(rgb), "z0": 0, "z1": 10, "pos": "middle", "region": n - 1}
+    regs = [reg(n, [235, 235, 235] if n % 2 else [200, 30, 30], 0.3 if n == 1 else 0.05)
+            for n in range(1, 11)]
+    assert len(regs) > colors.LIST_MAX
+    line = cli._suggest_line(regs, FIL, "A vase with stripes")
+    keys = [i.split("=")[0] for i in line.split()[2:]]
+    assert keys and all(k == "rest" or int(k) <= colors.LIST_MAX for k in keys), line

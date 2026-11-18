@@ -130,29 +130,35 @@ NAME_BREAK = {"in", "with", "on", "of", "the", "a", "an", "and", "at", "for", "t
 
 def subject_names(request: str, also=()) -> list[str]:
     """The names of people (or pets) in a request: runs of two or more capitalized words
-    ("Jack Black", "Betty White"), and any name given in `also` (the name stone find searched).
-    A run is cut at small words ("Jensen Huang In A Black Jacket" is "Jensen Huang" and "Black
-    Jacket"), and loses leading color and part words, so title case "Black Jacket" or "White
-    Everywhere Else" is not a name and keeps its color."""
+    ("Jack Black", "Betty White", "Gray Davis"), and any name given in `also` (the name stone find
+    searched). A run is cut at small words ("Jensen Huang In A Black Jacket" is "Jensen Huang" and
+    "Black Jacket"). A piece after a small word, or one that ends in a part word, is a described
+    thing, not a name: it is cut at its first color word, so title case "Black Jacket", "Long Black
+    Jacket" and "Red Gridfinity Bin" keep their color. A color word last ("Betty White") or at the
+    start of a run ("Gray Davis") stays part of the name."""
     from .parts import part_of
 
     out = [n for n in also if n]
     for m in re.finditer(r"\b[A-Z][a-z'.]*(?:[ -][A-Z][a-z'.]*)+\b", request):
-        run: list[str] = []
-        for w in re.split(r"([ -])", m.group(0)) + [" ", "And"]:
-            if w in (" ", "-"):
-                run.append(w)
+        pieces: list[list[str]] = [[]]
+        for w in re.split(r"[ -]", m.group(0)):
+            if w.lower() in NAME_BREAK:
+                pieces.append([])
+            else:
+                pieces[-1].append(w)
+        for i, words in enumerate(pieces):
+            if not words:
                 continue
-            if w.lower() not in NAME_BREAK:
-                run.append(w)
-                continue
-            words = "".join(run).strip(" -").split()
-            while words and (word_color(words[0].lower()) or part_of(words[0].lower())):
-                words.pop(0)
+            if i > 0 or part_of(words[-1].lower()):
+                cut = next((k for k, w in enumerate(words[:-1]) if word_color(w.lower())), len(words))
+                words = words[:cut]
             name = " ".join(words)
-            if len(words) >= 2 and name in m.group(0) and name not in out:
-                out.append(name)
-            run = []
+            if len(words) >= 2 and name not in out:
+                # keep the spelling the request used ("Jean-Luc Picard")
+                hit = re.search(r"[ -]".join(map(re.escape, words)), m.group(0))
+                name = hit.group(0) if hit else name
+                if name not in out:
+                    out.append(name)
     return out
 
 

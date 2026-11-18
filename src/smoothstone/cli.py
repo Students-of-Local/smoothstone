@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -128,6 +129,22 @@ def measured_size(job: Job | None, r: rc.Recipe) -> tuple[str, float, float] | N
     if p.max is not None:
         v = min(v, float(p.max))
     return p.name, v, mm
+
+
+def _file_sig(path) -> str | None:
+    p = Path(path)
+    return hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else None
+
+
+def build_stamp(job: Job, r: rc.Recipe, given: dict) -> dict:
+    """Everything a build reads: the plan, the recipe source, and the contents of every file it
+    uses (pictures, the figure mesh, the photos the figure is made from). Equal stamps make the
+    same part."""
+    params = build_params(job, r, given)
+    files = {k: _file_sig(v) for k, v in sorted(params.items())
+             if v and r.param(k) is not None and r.param(k).type == "image"}
+    return {"recipe": r.name, "params": params, "files": files, "source": _file_sig(r.scad),
+            "photos": [_file_sig(p) for p in job.photos()]}
 
 
 def build_params(job: Job | None, r: rc.Recipe, given: dict) -> dict:
@@ -662,6 +679,18 @@ def cmd_build(args, job: Job) -> Out:
     given = {k: v for k, v in plan["params"].items() if r.param(k)}
     dropped = sorted(set(plan["params"]) - set(given))
     params = build_params(job, r, given)
+    st0 = job.status()
+    if (st0.get("passed") and (job.root / f"{r.name}.stl").exists()
+            and (st0.get("colors") or str(st0.get("next") or "").startswith("stone colors"))
+            and read_json(job.build_dir / "stamp.json") == build_stamp(job, r, given)):
+        # the part already passed with this exact plan, recipe and files, and is being painted: a
+        # rebuild would make the same part and throw the paint (or a stone colors retry) away.
+        # Checked before the figure step, which takes minutes when it has to run.
+        out.add(f"Recipe: {r.name}",
+                "Nothing changed since the last build, which passed. The part and its colors stay as they are.")
+        out.next = str(st0.get("next") or DONE_NEXT)
+        out.result = "build skipped: nothing changed"
+        return out
     fig = next((p for p in r.params if p.type == "image" and p.image_kind == "figure"), None)
     if fig is not None and fig.name not in given:
         made = figure_step(job, r, params, out)
@@ -679,19 +708,8 @@ def cmd_build(args, job: Job) -> Out:
             out.code = 1
             return out
     bd = job.build_dir
-    st0 = job.status()
-    if (read_json(bd / "params.json") == {"recipe": r.name, "params": params} and st0.get("passed")
-            and (job.root / f"{r.name}.stl").exists()
-            and (st0.get("colors") or str(st0.get("next") or "").startswith("stone colors"))):
-        # the part already passed with this exact plan and is being painted: a rebuild would make
-        # the same part and throw the paint (or a stone colors retry) away
-        out.add(f"Recipe: {r.name}",
-                "Nothing changed since the last build, which passed. The part and its colors stay as they are.")
-        out.next = str(st0.get("next") or DONE_NEXT)
-        out.result = "build skipped: nothing changed"
-        return out
     bd.mkdir(parents=True, exist_ok=True)
-    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad"):
+    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad", "stamp.json"):
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
@@ -700,6 +718,7 @@ def cmd_build(args, job: Job) -> Out:
     if job.status().get("colors"):
         job.update(colors=None)
     write_json(bd / "params.json", {"recipe": r.name, "params": params})
+    write_json(bd / "stamp.json", build_stamp(job, r, given))
     st = job.status()
     builds = int(st.get("builds", 0)) + 1
     fails = int(st.get("failed_builds", 0))
@@ -1432,6 +1451,7 @@ def _mapping_items(info: list[dict], pick: dict[int, int], rest: int, names: lis
     regions take one filament ("hands=white"), else by region number."""
     items: list[str] = []
     done: set[str] = set()
+    listed = {d["n"] for d in info[:colortool.LIST_MAX]}
     for d in info:  # every region, not only the listed ones: a part asked for is never dropped
         f = pick.get(d["n"], rest)
         part = d.get("part")
@@ -1444,7 +1464,7 @@ def _mapping_items(info: list[dict], pick: dict[int, int], rest: int, names: lis
                 if f != rest:
                     items.append(f"{part}={names[f - 1]}")
                 continue
-        if f != rest:
+        if f != rest and d["n"] in listed:  # a numbered region only when the listing showed it
             items.append(f"{d['n']}={names[f - 1]}")
     return items
 
