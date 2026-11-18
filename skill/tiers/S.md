@@ -12,7 +12,7 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   When the person answers, run: stone note "<their answer>", then run the NEXT line it prints.
 - If you lost track or your memory was cleared, run: stone status
 - For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
-- If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. A FIX from stone colors is like any FIX: run the NEXT line it gives.
+- If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. A FIX from stone colors: run only the NEXT line it gives, never stone build.
 - Stop when stone says the part is ready.
 
 ## Steps
@@ -21,7 +21,7 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 3. stone show prints "From the request: ..." and maybe "Not placed yet: ...". For each size
    not placed yet, find the parameter in the list whose meaning fits and add name=value.
 4. stone set <recipe> name=value name=value
-5. stone build. If a line starts with FIX, run the NEXT line it gives, then stone build again.
+5. stone build. If the build prints FIX, run the NEXT line it gives, then stone build again.
    When every check passes, the build says Part ready. Then stop.
 
 ## Figures

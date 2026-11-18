@@ -652,3 +652,101 @@ def test_three_colors_meeting_cut_on_mesh_edges():
     assert worst < colors.JAGGED
     t = trimesh.Trimesh(V, F, process=False)
     assert t.is_watertight and abs(t.volume - m.volume) < 1e-6 * m.volume + 1e-6
+
+
+# PR 6 review mediums, open since: each fails on the code before its fix
+
+
+@pytest.mark.parametrize("req", [
+    "A mini figure of Jensen Huang in a Black Jacket, white everywhere else",
+    "Jensen Huang In A Black Jacket, White Everywhere Else",
+])
+def test_title_case_colors_are_not_taken_for_a_name(req):
+    """Review r2 first-F2: "Black Jacket" is two capitalized words, but it is a color and a part,
+    not a person, so its color must survive."""
+    names = colors.subject_names(req, ["Jensen Huang"])
+    assert "Black Jacket" not in names and not any(n.split()[0].lower() == "black" for n in names), names
+    line = cli._suggest_line(jensen_regions(), FIL, colors.without_names(req, names))
+    assert line == "stone colors jacket=black rest=white", line
+
+
+def test_a_title_case_color_on_a_plain_part_still_counts():
+    names = colors.subject_names("A Black Gridfinity Bin, 2 by 1")
+    assert colors.asks_for_color("A Black Gridfinity Bin, 2 by 1", names)
+    # a real name that is also a color word stays a name
+    assert colors.subject_names("A mini figure of Betty White") == ["Betty White"]
+
+
+def test_a_leading_color_with_the_base_mentioned_is_a_one_color_print():
+    """Review r2 sol-sol-F5: "A white mini figure ... on the base" is the whole figure in white."""
+    req = 'A white mini figure of Jensen Huang, 90 mm tall, with "JENSEN" on the base'
+    names = colors.subject_names(req)
+    line = cli._suggest_line(jensen_regions(), FIL, colors.without_names(req, names))
+    assert line == "stone colors rest=white", line
+
+
+def test_a_named_part_with_no_rest_color_does_not_paint_the_rest_its_color():
+    """Review r1 first-F3: "in a black jacket" with no rest phrase. Every other part takes one rest
+    color, and that rest comes from the parts not named; the jacket's own black must not decide
+    it, even when the jacket covers more of the figure than anything else."""
+    regs = jensen_regions()
+    regs[3]["share"] = 0.45  # a long coat: the biggest region by far
+    line = cli._suggest_line(regs, FIL, "A mini figure of Jensen Huang in a black jacket")
+    assert line == "stone colors jacket=black rest=white", line
+
+
+def test_a_part_asked_for_is_in_the_line_even_past_the_listed_regions():
+    """Review r1 sol-F3: ten regions, the shoes ranked ninth and tenth. "red shoes, rest white"
+    must paint them red, though the listing shows only the first eight."""
+    regs = jensen_regions()
+    def reg(n, rgb, share, part):
+        return {"n": n, "rgb": rgb, "share": share, "base": False, "part": part,
+                "color": colors.color_name(rgb), "z0": 0, "z1": 10, "pos": "middle", "region": n - 1}
+    regs += [reg(9, [90, 60, 40], 0.004, "shoes"), reg(10, [90, 60, 40], 0.004, "shoes")]
+    assert len(regs) > colors.LIST_MAX
+    line = cli._suggest_line(regs, FIL, "Jensen Huang with red shoes, white everywhere else")
+    assert line == "stone colors shoes=red rest=white", line
+
+
+# PR 9 review round 1
+
+
+def test_a_name_that_starts_with_a_color_word_stays_a_name():
+    """Review first-F1: "Gray Davis" and "Black Francis" are people, so gray and black are not
+    asked for."""
+    assert colors.subject_names("A bust of Gray Davis, 80 mm tall") == ["Gray Davis"]
+    assert colors.subject_names("A mini figure of Black Francis") == ["Black Francis"]
+    req = "A bust of Gray Davis, 80 mm tall"
+    assert colors.request_colors(req, colors.subject_names(req)) == []
+
+
+@pytest.mark.parametrize("req", [
+    "Jensen Huang In A Long Black Jacket, White Everywhere Else",
+    "A mini figure of Jensen Huang in a Long Black Jacket, white everywhere else",
+])
+def test_a_word_in_front_of_a_title_case_color_part_keeps_its_color(req):
+    """Review second-F3: one adjective in front of "Black Jacket" made "Long Black Jacket" a
+    name, so the jacket lost its black."""
+    names = colors.subject_names(req, ["Jensen Huang"])
+    assert not any("Black" in n for n in names), names
+    line = cli._suggest_line(jensen_regions(), FIL, colors.without_names(req, names))
+    assert line == "stone colors jacket=black rest=white", line
+
+
+def test_an_adjective_before_a_title_case_color_on_a_plain_part():
+    req = "A Small Red Gridfinity Bin, 2 by 1"
+    assert colors.request_colors(req, colors.subject_names(req)) == ["red"]
+
+
+def test_numbered_regions_past_the_listing_take_the_rest_color():
+    """Review second-F5: regions with no part past LIST_MAX were never shown, so the line must not
+    give them their own photo colors; the listing says they take the rest color."""
+    def reg(n, rgb, share):
+        return {"n": n, "rgb": rgb, "share": share, "base": False, "part": None,
+                "color": colors.color_name(rgb), "z0": 0, "z1": 10, "pos": "middle", "region": n - 1}
+    regs = [reg(n, [235, 235, 235] if n % 2 else [200, 30, 30], 0.3 if n == 1 else 0.05)
+            for n in range(1, 11)]
+    assert len(regs) > colors.LIST_MAX
+    line = cli._suggest_line(regs, FIL, "A vase with stripes")
+    keys = [i.split("=")[0] for i in line.split()[2:]]
+    assert keys and all(k == "rest" or int(k) <= colors.LIST_MAX for k in keys), line
