@@ -5,6 +5,14 @@
   "rate": 0.5,
   "total": 2
  },
+ "regressions/next": {
+  "judge": 7.0,
+  "passing": [
+   "r2_creality_open_edges"
+  ],
+  "rate": 0.5,
+  "total": 2
+ },
  "tuning/S": {
   "judge": null,
   "passing": [
