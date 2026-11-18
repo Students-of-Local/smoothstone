@@ -12,6 +12,10 @@ Local models do the work, none of them the model that drives stone:
 
 Every step writes its file into the job's images/figure folder and is skipped when the file is
 already there and its inputs have not changed, so a build that dies half way picks up again.
+A finished figure is also kept in a shared cache (STONE_FIGURE_CACHE, default
+~/.cache/stone-figure; "0" turns it off) under the same key, so a new job with the same photos and
+settings reuses it instead of running the models again. A machine without the style model (Linux
+has no mflux) can build a figure that was made once elsewhere, by copying that key folder in.
 """
 
 from __future__ import annotations
@@ -711,6 +715,42 @@ def _remesh(m):
     return v.marching_cubes.apply_transform(v.transform)
 
 
+# graft.json and lift-octree.txt too: without them a cached figure is lifted and grafted again
+CACHED = ("look.txt", "style.png", "lift.glb", "lift-octree.txt", "figure.stl", "graft.json", "figure.json")
+
+
+def cache_dir() -> Path | None:
+    env = os.environ.get("STONE_FIGURE_CACHE")
+    if env == "0":
+        return None
+    return Path(env).expanduser() if env else Path.home() / ".cache" / "stone-figure"
+
+
+def _from_cache(key: str, folder: Path) -> bool:
+    c = cache_dir()
+    if c is None or not (c / key / "figure.stl").exists():
+        return False
+    for name in CACHED:
+        if (c / key / name).exists() and not (folder / name).exists():
+            shutil.copyfile(c / key / name, folder / name)
+    return True
+
+
+def _to_cache(key: str, folder: Path) -> None:
+    c = cache_dir()
+    if c is None or (c / key / "figure.stl").exists():
+        return
+    try:
+        tmp = c / f".{key}.tmp{os.getpid()}"
+        tmp.mkdir(parents=True, exist_ok=True)
+        for name in CACHED:
+            if (folder / name).exists():
+                shutil.copyfile(folder / name, tmp / name)
+        tmp.rename(c / key)
+    except OSError:
+        shutil.rmtree(c / f".{key}.tmp{os.getpid()}", ignore_errors=True)
+
+
 def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str = "person",
          seed: int = 7, extra: str = "", say=print, shown=None) -> Path:
     """Run every step that is not done yet and return the unit-height figure.stl.
@@ -725,6 +765,8 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
                          heavy=bool((want or {}).get("heavy"))))
     folder = folder / key
     folder.mkdir(parents=True, exist_ok=True)
+    if not (folder / "figure.stl").exists() and _from_cache(key, folder):
+        say("Using the figure made before from these photos (shared cache).")
     render = folder / "style.png"
     if not render.exists():
         desc = ""
@@ -787,6 +829,7 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
             shutil.copyfile(body, fig)
         if head_on:
             done.write_text(json.dumps(res, indent=1) + "\n")
+    _to_cache(key, folder)
     latest = folder.parent / "latest.txt"
     latest.write_text(str(fig) + "\n")
     return fig
