@@ -626,6 +626,20 @@ def _grow(r: rc.Recipe, params: dict, err: str):
     return None
 
 
+def views_step(job: Job, stl: Path) -> Path | None:
+    """build/views.png: the part from every side, so a person or a large model can look at it all."""
+    import numpy as np
+
+    png = job.build_dir / "views.png"
+    try:
+        m = colortool.load_stl(stl)
+        colortool.render_views(m, np.tile([217.0, 160.0, 102.0], (len(m.faces), 1)), png)
+    except Exception:  # a picture is never worth failing a passing build
+        job.log("views failed:\n" + traceback.format_exc())
+        return None
+    return png
+
+
 def cmd_build(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
@@ -670,7 +684,7 @@ def cmd_build(args, job: Job) -> Out:
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
-    for f in ("regions.json", "regions.npy", "regions.png", "colors.png", "atlas.png"):
+    for f in ("regions.json", "regions.npy", "regions.npz", "paint.npy", "regions.png", "colors.png", "atlas.png", "views.png", "boundaries.png"):
         (bd / f).unlink(missing_ok=True)
     if job.status().get("colors"):
         job.update(colors=None)
@@ -750,14 +764,22 @@ def cmd_build(args, job: Job) -> Out:
         # a passing build is the finished part: no last step for a small model to forget
         final = job.root / f"{r.name}.stl"
         shutil.copyfile(stl, final)
+        views = views_step(job, stl)
+        if views:
+            out.add(f"Views: {views} (look at every panel before you call it done)")
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
-        if colortool.asks_for_color(job.request()):
+        if colortool.asks_for_color(_color_text(job)):
             if _many_colors(job, r, params):
                 out.add("The request names colors: stone colors splits the figure into color regions.")
                 out.next = "stone colors"
+                try:  # the parts are known now: NEXT is the mapping the request asks for
+                    res = _color_regions(job, r, params, colortool.load_stl(final))
+                    out.next = _suggest_line(res["regions"], config.filaments(job.root), _color_text(job))
+                except Exception:  # the list is still one stone colors away
+                    job.log("colors in build failed:\n" + traceback.format_exc())
             else:
-                named = colortool.request_colors(job.request())
+                named = colortool.request_colors(_color_text(job))
                 out.add(f"This part prints in one color: {named[0]}. Load that filament."
                         if named else "This part prints in one color.")
         out.stage = "done"
@@ -1178,8 +1200,30 @@ def _many_colors(job: Job, r: rc.Recipe, params: dict) -> bool:
     return is_fig and _style_pictures(job, params)[0] is not None
 
 
-def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh):
-    """(face region numbers, region list), cached in build/ for this exact STL."""
+def _look(job: Job, params: dict) -> str:
+    """The figure step's one-sentence look (look.txt), or ""."""
+    front, _ = _style_pictures(job, params)
+    if front is None:
+        return ""
+    p = front.parent / "look.txt"
+    return p.read_text().strip() if p.is_file() else ""
+
+
+def _names(job: Job) -> list[str]:
+    """The subject's names: the one stone find searched, and capitalized names in the request."""
+    found = read_json(job.image_dir / "found" / "found.json") or {}
+    return colortool.subject_names(job.request(), [found.get("query") or ""])
+
+
+def _color_text(job: Job) -> str:
+    """The request with the subject's name taken out, so "Jack Black" names no color."""
+    return colortool.without_names(job.request(), _names(job))
+
+
+def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh) -> dict:
+    """colors.find_regions for the built part, cached in build/ for this exact STL: the mesh the
+    regions are on (a figure's is cut along its hem, neck and wrists), the region number per face,
+    the region list and the faces whose edge is a line of the shape."""
     import hashlib
 
     import numpy as np
@@ -1187,18 +1231,25 @@ def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh):
     bd = job.build_dir
     stamp = hashlib.sha1((bd / "part.stl").read_bytes()).hexdigest()
     cached = read_json(bd / "regions.json") or {}
-    if cached.get("stl") == stamp and (bd / "regions.npy").is_file():
-        num = np.load(bd / "regions.npy")
-        if len(num) == len(mesh.faces):
-            return num, cached["regions"]
+    if cached.get("stl") == stamp and (bd / "regions.npz").is_file():
+        d = np.load(bd / "regions.npz")
+        m = colortool.load_stl_mesh(d["V"], d["F"]) if len(d["F"]) != len(mesh.faces) else mesh
+        if len(d["num"]) == len(m.faces):
+            fixed = d["fixed"] if d["fixed"].any() else None
+            return {"mesh": m, "num": d["num"], "regions": cached["regions"], "fixed": fixed,
+                    "anatomy": cached.get("anatomy")}
     front, back = _style_pictures(job, params) if any(
         p.type == "image" and p.image_kind == "figure" for p in r.params) else (None, None)
-    num, info = colortool.find_regions(mesh, r.name, params, front, back, bd / "atlas.png")
-    np.save(bd / "regions.npy", num)
-    write_json(bd / "regions.json", {"stl": stamp, "picture": str(front) if front else None, "regions": info})
-    colortool.render(mesh, colortool.region_tints(num, info), bd / "regions.png", numbers=num,
+    res = colortool.find_regions(mesh, r.name, params, front, back, bd / "atlas.png", look=_look(job, params))
+    m = res["mesh"]
+    fixed = res["fixed"] if res["fixed"] is not None else np.zeros(len(m.faces), bool)
+    np.savez(bd / "regions.npz", V=np.asarray(m.vertices, np.float32), F=np.asarray(m.faces, np.int32),
+             num=res["num"], fixed=fixed)
+    write_json(bd / "regions.json", {"stl": stamp, "picture": str(front) if front else None, "regions": res["regions"],
+                                     "anatomy": res["anatomy"]})
+    colortool.render(m, colortool.region_tints(res["num"], res["regions"]), bd / "regions.png", numbers=res["num"],
                      show=set(range(1, colortool.LIST_MAX + 1)))
-    return num, info
+    return res
 
 
 def _fil_value(fil: list[str]) -> list[str]:
@@ -1225,7 +1276,68 @@ def _rest_color(request: str, named: list[str]) -> str | None:
     return None
 
 
+def _picture_filament(rgb, fil: list[str], rest: int) -> int:
+    """A part that keeps its picture color: the nearest loaded filament, or when that is the rest
+    color, the next nearest, so the part still stands out."""
+    import numpy as np
+
+    have = [(i, colortool.filament_rgb(f)) for i, f in enumerate(fil, 1)]
+    have = [(i, c) for i, c in have if c is not None]
+    if rgb is None or not have:
+        return rest
+    d = [float(np.sqrt(((colortool._lab(c) - colortool._lab(rgb)) ** 2).sum())) for _, c in have]
+    order = [have[k][0] for k in np.argsort(d)]
+    return next((i for i in order if i != rest), order[0])
+
+
 def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int, list[str]]:
+    """(region -> filament, rest filament, extra filaments). On a figure whose request names parts
+    ("a black jacket", "all white but the jacket"), exactly that: each named part its color, a
+    part after "but" its picture color, every other part the rest color. Otherwise _suggest_colors."""
+    from . import parts
+
+    pc = {k: v for k, v in colortool.part_colors(request).items() if not k.startswith("word:")}
+    named = colortool.request_colors(request)
+    if not pc and len(named) == 1 and any(d.get("part") for d in info):
+        # one color and no part given a color ("Jensen Huang in white", even with "on the base"
+        # or "his face" said along the way): the whole figure is that color
+        n = _match_filament(named[0], fil)
+        if n is None:
+            return {}, len(fil) + 1, [named[0]]
+        return {}, n, []
+    if not pc or not any(d.get("part") for d in info):
+        return _suggest_colors(info, fil, request)
+
+    extra: list[str] = []
+    allf = list(fil)
+
+    def num(c: str) -> int:
+        n = _match_filament(c, allf)
+        if n is None:
+            allf.append(c)
+            extra.append(c)
+            n = len(allf)
+        return n
+
+    rest_c = _rest_color(request, named)
+    if rest_c is None:
+        plain = [c for c in named if c not in pc.values()]
+        rest_c = plain[0] if plain else None
+    _, rest_p, _ = _suggest_colors(info, fil, "")
+    rest = num(rest_c) if rest_c else rest_p
+    pick: dict[int, int] = {}
+    for d in info:
+        p = parts.part_of(d.get("part") or "") or d.get("part")
+        if d["base"] and p not in pc:
+            continue
+        if p in pc:
+            pick[d["n"]] = _picture_filament(d["rgb"], allf, rest) if pc[p] == "picture" else num(pc[p])
+        else:
+            pick[d["n"]] = rest  # every part not named takes rest (the photo's when none is named)
+    return pick, rest, extra
+
+
+def _suggest_colors(info: list[dict], fil: list[str], request: str) -> tuple[dict, int, list[str]]:
     """(region -> filament, rest filament, extra filaments). Each region starts from its photo
     color, mapped to the nearest loaded filament. A region takes a color the request names when
     that named color is nearest its photo color, under NAMED_DE. Rest (and the base) is the color
@@ -1301,15 +1413,45 @@ def _match_filament(v: str, fil: list[str]) -> int | None:
     return None
 
 
+def _mapping_items(info: list[dict], pick: dict[int, int], rest: int, names: list[str]) -> list[str]:
+    """key=filament for every region not in the rest color: by part name when all of that part's
+    regions take one filament ("hands=white"), else by region number."""
+    items: list[str] = []
+    done: set[str] = set()
+    for d in info[:colortool.LIST_MAX]:
+        f = pick.get(d["n"], rest)
+        part = d.get("part")
+        if part and part not in ("other", "base") and part not in done:
+            same = {pick.get(e["n"], rest) for e in info if e.get("part") == part}
+            if len(same) == 1:
+                done.add(part)
+                if f != rest:
+                    items.append(f"{part}={names[f - 1]}")
+                continue
+        if f != rest:
+            items.append(f"{d['n']}={names[f - 1]}")
+    return items
+
+
 def _suggest_line(info: list[dict], fil: list[str], request: str) -> str:
     pick, rest, extra = _suggest(info, fil, request)
     names = _fil_value(fil + extra)
-    items = [f"{d['n']}={names[pick[d['n']] - 1]}" for d in info[:colortool.LIST_MAX]
-             if d["n"] in pick and pick[d["n"]] != rest]
-    return "stone colors " + " ".join(items + [f"rest={names[rest - 1]}"])
+    return "stone colors " + " ".join(_mapping_items(info, pick, rest, names) + [f"rest={names[rest - 1]}"])
+
+
+def _part_regions(info: list[dict], key: str) -> list[int]:
+    """The region numbers a part name stands for ("jacket", or "top" for the jacket)."""
+    from . import parts
+
+    key = key.strip().lower()
+    want = parts.part_of(key)
+    return [d["n"] for d in info if d.get("part") and d["part"] not in ("other",)
+            and (d["part"] == key or (want is not None and parts.part_of(d["part"]) == want))]
 
 
 def _region_line(d: dict, name: str) -> str:
+    if d.get("part"):  # a figure's region says which part it is
+        return f"{d['n']}  {name:<8}{d['share'] * 100:.0f}% of surface  {d['part']}"
     return (f"{d['n']}  {name:<8}{d['share'] * 100:.0f}% of surface  "
             f"z {d['z0']:.0f}-{d['z1']:.0f} mm  {d['pos']}")
 
@@ -1342,10 +1484,10 @@ def cmd_colors(args, job: Job) -> Out:
         out.result = "colors refused: no passing build"
         return out
     params = built.get("params") or {}
-    mesh = colortool.load_stl(stl)
-    num, info = _color_regions(job, r, params, mesh)
+    res = _color_regions(job, r, params, colortool.load_stl(stl))
+    mesh, num, info = res["mesh"], res["num"], res["regions"]
     fil = config.filaments(job.root)
-    request = job.request()
+    request = _color_text(job)
     pick, rest_s, extra_s = _suggest(info, fil, request)
     shown = _fil_value(fil + extra_s)
 
@@ -1363,7 +1505,11 @@ def cmd_colors(args, job: Job) -> Out:
             out.add(f"({len(info) - colortool.LIST_MAX} smaller regions take the rest= color)")
         out.add(f"Regions picture: {bd / 'regions.png'}")
         out.add("Filaments: " + ", ".join(f"{i} {f}" for i, f in enumerate(fil, 1)) + " (stone.toml [filaments])")
-        out.add("Give each region a color, by name or filament number; rest= colors the others.")
+        if any(d.get("part") for d in info):
+            out.add("Give each part or region a color, by name or filament number (like jacket=black); "
+                    "rest= colors the others.")
+        else:
+            out.add("Give each region a color, by name or filament number; rest= colors the others.")
         out.next = _suggest_line(info, fil, request)
         out.stage = "colors"
         out.result = f"{len(info)} color regions"
@@ -1406,8 +1552,13 @@ def cmd_colors(args, job: Job) -> Out:
                 assign[base] = n
         elif k.isdigit() and 1 <= int(k) <= len(info):
             assign[int(k)] = n
+        elif _part_regions(info, k):
+            for g in _part_regions(info, k):
+                assign[g] = n
         else:
-            fixes.append(f'no region "{k}"; regions are 1 to {len(info)}' + (", base" if base else "") + " and rest")
+            known = sorted({d["part"] for d in info if d.get("part") and d["part"] not in ("other", "base")})
+            fixes.append(f'no region "{k}"; regions are 1 to {len(info)}' + (", base" if base else "")
+                         + (", " + ", ".join(known) if known else "") + " and rest")
     if len(fil) > colortool.MAX_FILAMENTS:
         fixes.append(f"at most {colortool.MAX_FILAMENTS} filaments")
     if fixes:
@@ -1421,8 +1572,95 @@ def cmd_colors(args, job: Job) -> Out:
         if len(assign) < len(info):
             out.add(f"No rest= given: the other regions take filament 1 {fil[0]}.")
     per = np.array([0] + [assign.get(d, rest) for d in range(1, len(info) + 1)])
-    face_fil = per[num]
-    area = mesh.area_faces
+    face_fil0 = per[num]
+    # cut along smooth boundaries, so a color edge runs as a curve through the triangles
+    # the plinth's edge and a figure's hem, neck and wrists are lines of the shape: keep them there
+    fixed = res["fixed"] if res["fixed"] is not None else (num == base if base else None)
+    V, F, face_fil, parent = colortool.smooth_cut(mesh.vertices, mesh.faces, face_fil0, fixed=fixed)
+    cut = colortool.load_stl_mesh(V, F)  # the float32 mesh the 3MF holds
+    names = _fil_value(fil)
+
+    def mapping_line(a: dict) -> str:
+        return " ".join(_mapping_items(info, a, rest, names) + [f"rest={names[rest - 1]}"])
+
+    worst, lines = colortool.color_edges(V, F, face_fil)
+    anat_lines = (res.get("anatomy") or {}).get("lines") or []
+    colortool.mark_grooves(lines, anat_lines)
+    faults = colortool.edge_faults(lines)
+    wob = colortool.worst_wobble(lines)
+    fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
+    one_color = len(np.unique(face_fil)) == 1  # no color edge, so nothing can climb a ledge
+    ledge = (colortool.ledge_faults(colortool.ledges(V, F, face_fil, anat_lines))
+             if anat_lines and not faults and not one_color else [])
+    reg_of = num[parent]
+
+    def smallest_painted(near: np.ndarray) -> int | None:
+        """The smallest region off the rest color among the faces `near` a failing edge."""
+        cand = [int(g) for g in np.unique(reg_of[near]) if assign.get(int(g), rest) != rest]
+        return min(cand, key=lambda k: next(d["share"] for d in info if d["n"] == k)) if cand else None
+
+    def retry(drop: list[int]) -> None:
+        """A NEXT that changes the outcome: the regions on the failing edges take the rest color;
+        with none to give, the part prints in one color. Never the mapping that just failed."""
+        failed = mapping_line(assign)
+        nxt = mapping_line({k: v for k, v in assign.items() if k not in drop}) if drop else failed
+        if drop:
+            names_d = ", ".join(f"region {g} ({next(d.get('part') or d['color'] or 'base' for d in info if d['n'] == g)})"
+                                for g in drop)
+            out.add(f"The paint of {names_d} does not follow a clean line; it takes the rest color.")
+        if nxt == failed:
+            nxt = f"rest={names[rest - 1]}"
+            out.add(f"No region can take the rest color to clear it, so the part prints in one color, "
+                    f"{names[rest - 1]}.")
+        out.next = "stone colors " + nxt
+
+    if ledge:
+        x = ledge[0]
+        (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
+        if st.get("colors"):
+            job.update(colors=None)
+        colortool.render_boundaries(V, F, fil_rgb[face_fil - 1], lines, bd / "boundaries.png",
+                                    anatomy=anat_lines)
+        out.fix(f"the {x['name']} color edge climbs onto a ledge: {x['area']:.2f} mm2 of up-facing filament "
+                f"{x['fil']} faces seen next to it at {x['angle']:.0f} degrees (max {colortool.LEDGE_AREA}); "
+                "no file written")
+        out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
+        from . import parts
+
+        ln = next(a for a in anat_lines if a["name"] == x["name"] and a.get("side") == x["side"])
+        cc = cut.triangles_center
+        near = (np.abs(parts.field(ln, cc)) < parts.SNAP + colortool.LEDGE_MM) & \
+            (np.hypot(cc[:, 0] - ln["center"][0], cc[:, 1] - ln["center"][1]) < ln["rmax"] + colortool.LEDGE_MM)
+        g = smallest_painted(near)
+        retry([g] if g is not None else [])
+        out.result = f"colors failed: {x['name']} edge on a ledge ({x['area']:.2f} mm2 seen)"
+        return out
+    if faults:
+        # paint that cannot follow a clean line (often a feature the picture puts beside the shape)
+        drop: list[int] = []
+        bad_lines = faults
+        for ln in bad_lines:
+            g = smallest_painted(np.isin(F, ln["verts"]).any(1))
+            if g is not None and g not in drop:
+                drop.append(g)
+        (job.root / f"{r.name}.3mf").unlink(missing_ok=True)  # no painted file with a jagged edge
+        if st.get("colors"):
+            job.update(colors=None)
+        colortool.render_boundaries(V, F, fil_rgb[face_fil - 1], lines, bd / "boundaries.png", anatomy=anat_lines)
+        ln = bad_lines[0]
+        z = ln["pts"][:, 2].mean()
+        if (ln.get("ratio") or 0) > colortool.JAGGED:
+            out.fix(f"color boundary is jagged: filament {ln['pair'][0]}/{ln['pair'][1]} at z {z:.0f} mm is "
+                    f"{ln['ratio']:.2f} times its smoothed length (max {colortool.JAGGED}); no file written")
+        else:
+            out.fix(f"color boundary is wavy: filament {ln['pair'][0]}/{ln['pair'][1]} at z {z:.0f} mm strays "
+                    f"{ln['wobble']:.2f} mm from a straight course within {colortool.EDGE_SPAN:.0f} mm "
+                    f"(max {colortool.WOBBLE}); no file written")
+        out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
+        retry(drop)
+        out.result = f"colors failed: color boundary not smooth (ratio {worst:.2f}, wobble {wob:.2f} mm)"
+        return out
+    area = cut.area_faces
     total = area.sum()
     used = sorted(set(int(x) for x in face_fil))
     shares = "; ".join(
@@ -1431,8 +1669,8 @@ def cmd_colors(args, job: Job) -> Out:
     final = job.root / f"{r.name}.3mf"
     tmp = bd / "check.3mf"
     final.unlink(missing_ok=True)
-    main_fil = colortool.write_3mf(tmp, mesh.vertices, mesh.faces, face_fil, f"{r.name}.stl", bed=config.bed(job.root))
-    bad = colortool.check_3mf(tmp, len(mesh.faces), len(fil))
+    main_fil = colortool.write_3mf(tmp, V, F, face_fil, f"{r.name}.stl", bed=config.bed(job.root))
+    bad = colortool.check_3mf(tmp, len(F), len(fil), volume=mesh.volume)
     if bad:
         tmp.unlink(missing_ok=True)
         for b in bad[:3]:
@@ -1441,31 +1679,44 @@ def cmd_colors(args, job: Job) -> Out:
         out.result = "colors failed: " + bad[0]
         return out
     tmp.replace(final)
+    np.save(bd / "paint.npy", num[parent])  # the region of each 3MF triangle, in file order
     for c in added:
         out.add(f"{c} is not in stone.toml [filaments], so it is filament {fil.index(c) + 1} here: load it in that slot.")
     out.add(shares)
     out.add(f"Object filament {main_fil}; the other filaments are painted on, triangle by triangle.")
-    out.add(f"Checked: the 3MF reads back watertight and clean for a slicer, {len(mesh.faces)} faces like the STL.")
-    mixed, changes = colortool.layer_changes(mesh, face_fil)
+    out.add(f"Checked: the 3MF reads back watertight and clean for a slicer, {len(F)} faces, volume as the STL.")
+    in_groove = sum(1 for ln in lines if ln.get("groove"))
+    out.add(f"PASS color_edges: every color boundary is a smooth curve (worst {worst:.3f}, max {colortool.JAGGED}; "
+            f"wobble {wob:.2f} mm, max {colortool.WOBBLE}"
+            + (f"; {in_groove} edges run in a sculpted groove, which the wobble limit does not apply to)" if in_groove else ")"))
+    if anat_lines:
+        grooves = [f"{x['name']}{'' if x.get('side') is None else (' left' if x['side'] < 0 else ' right')} "
+                   f"{'up' if x['groove']['side'] > 0 else 'down'}" for x in anat_lines if (x.get("groove") or {}).get("used")]
+        out.add("PASS ledges: no up-facing face of the wrong color is seen next to a part's edge"
+                + (f"; edges in the groove: {', '.join(grooves)}" if grooves else ""))
+    mixed, changes = colortool.layer_changes(cut, face_fil)
     if mixed >= colortool.MANY_LAYERS:
         out.add(f"Warning: the colors alternate on {mixed} layers: about {changes} filament changes "
                 f"and {changes * colortool.PURGE_G:.0f} g purge.")
-    fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
-    colortool.render(mesh, fil_rgb[face_fil - 1], bd / "colors.png",
-                     views=(("front", 0.0), ("side", np.pi / 2), ("back", np.pi)))
+    rgb = fil_rgb[face_fil - 1]
+    colortool.render(cut, rgb, bd / "colors.png",
+                     views=(("front", 0.0, 0.0), ("side", np.pi / 2, 0.0), ("back", np.pi, 0.0)))
+    colortool.render_views(cut, rgb, bd / "views.png")
+    (bd / "boundaries.png").unlink(missing_ok=True)
+    if colortool.render_boundaries(V, F, rgb, lines, bd / "boundaries.png", anatomy=anat_lines):
+        out.add(f"Boundaries: {bd / 'boundaries.png'} (each color edge close up from 8 sides)")
     out.add(f"3MF: {final} (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)")
-    out.add(f"Colors picture: {bd / 'colors.png'}")
-    used = sorted(set(int(x) for x in np.unique(face_fil)))
+    out.add(f"Views: {bd / 'views.png'} (look at every panel before you call it done)")
     out.add("In the slicer: " + ", ".join(f"filament {i} must be {fil[i - 1]}" for i in used)
             + ". The 3MF names slots, not colors; set them in stone.toml [filaments] to match the printer.")
-    mapping = " ".join([f"{k}={_fil_value(fil)[v - 1]}" for k, v in sorted(assign.items())] + [f"rest={_fil_value(fil)[rest - 1]}"])
+    mapping = mapping_line(assign)
     job.update(colors={"mapping": mapping, "filaments": fil, "shares": shares, "file": str(final),
-                       "changes": changes, "mixed_layers": mixed})
+                       "changes": changes, "mixed_layers": mixed, "color_edges": round(worst, 3),
+                       "wobble": round(wob, 3)})
     out.next = DONE_NEXT
     out.stage = "done"
     out.result = f"3MF written, {shares}"[:120]
     return out
-
 
 # main
 

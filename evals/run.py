@@ -146,7 +146,7 @@ def main():
         "\nThe job is ready; use the stone tool."
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-    log = {"run_id": run_id, "spec": spec["id"], "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
+    log = {"run_id": run_id, "spec": spec["id"], "suite": spec_path.parent.name, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
            "seed": a.seed, "driver": a.driver, "card": a.card, "card_sha256": card_sha, "compact_at": a.compact_at,
            "model": a.model_name if a.driver == "lfm3" else None, "sampling": SAMPLING if a.driver == "lfm3" else None,
            "harness": HARNESS, "max_steps": MAX_STEPS, "max_new_tokens": MAX_NEW, "setup": setup,
@@ -224,8 +224,11 @@ def main():
     grade = grade_job(job, {**spec, "expect": exp}, messages)
     if first is not None and not first["pass"]:
         grade.update({"pass": False, "why": ["before the answer: " + w for w in first["why"]] + grade["why"]})
+    if exp.get("judge") and grade["pass"]:
+        grade = judge_run(rdir, job, spec["request"], exp["judge"], grade)
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
+    append_score(log)
     print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
 
 
@@ -267,9 +270,121 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         bad = [x["name"] for x in res if not x["ok"]]
         if bad:
             why.append("print checks fail: " + ", ".join(bad))
+    col = None
+    if exp.get("colors"):
+        col = grade_colors(job, recipe, exp["colors"])
+        why += col.pop("why")
     stl_sha = sha(final.read_bytes()) if done else None
-    return {"pass": not why, "why": why or ["all checks pass"], "recipe": recipe, "params": params,
-            "checks": res, "stl": str(final) if done else None, "stl_sha256": stl_sha}
+    out = {"pass": not why, "why": why or ["all checks pass"], "recipe": recipe, "params": params,
+           "checks": res, "stl": str(final) if done else None, "stl_sha256": stl_sha}
+    if col is not None:
+        out["colors"] = col
+    return out
+
+
+def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> dict:
+    """The blind judge on the run's pictures (judge_views.py), saved as judge.json next to the run.
+    want {"faults_in": ["boundaries"]}: a fault the judge names in one of those pictures fails it."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import judge_views
+
+    res = judge_views.judge(job / "build", request)
+    (rdir / "judge.json").write_text(json.dumps(res, indent=1))
+    why = [w for w in grade["why"] if w != "all checks pass"]
+    for f in res["faults"]:
+        if any(f["panel"].lower().startswith(pic) for pic in want.get("faults_in", [])):
+            why.append(f"judge: {f['panel']}: {f['what']}")
+    return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
+
+
+SCORES = Path(os.environ.get("STONE_SCORES", str(ROOT / "evals" / "scores.jsonl")))
+
+
+def append_score(log: dict) -> None:
+    """One line per run in evals/scores.jsonl. The file is only ever appended to."""
+    try:
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
+                              text=True).stdout.strip() or None
+    except OSError:
+        head = None
+    line = {"date": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sha": head, "suite": log.get("suite"),
+            "spec": log["spec"], "card": log["card"], "driver": log["driver"], "pass": int(bool(log["pass"])),
+            "total": 1, "judge": log.get("judge"), "run": log["run_id"]}
+    with SCORES.open("a") as f:
+        f.write(json.dumps(line) + "\n")
+
+
+def _part_key(name: str) -> str:
+    """A part word to its group's default name: jacket and shirt are both "top"."""
+    from smoothstone import parts
+
+    name = name.lower()
+    for key, words in parts.PART_WORDS.items():
+        if name in words:
+            return key
+    return name
+
+
+def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
+    """The painted file against {"<color>": [parts], "rest": "<color>"}: the 3MF must be there and
+    read back clean, its color edges smooth, and each part must print in the color asked for (every
+    part not named takes the rest color). Returns {"why", "shares", "parts"}."""
+    import numpy as np
+
+    from smoothstone import colors as C
+
+    why: list[str] = []
+    f3 = job / f"{recipe}.3mf" if recipe else None
+    if not f3 or not f3.exists():
+        return {"why": [f"no {recipe}.3mf"], "shares": {}, "parts": {}}
+    st = json.loads((job / "status.json").read_text()).get("colors") if (job / "status.json").exists() else None
+    if not st:
+        return {"why": ["stone status has no colors"], "shares": {}, "parts": {}}
+    fil = [str(x).lower() for x in st["filaments"]]
+    V, F, codes, main = C.read_3mf(f3)
+    face_fil = np.array([C.decode_paint(c) if c else main for c in codes])
+    stl = job / f"{recipe}.stl"
+    vol = None
+    if stl.exists():
+        import trimesh
+
+        vol = float(trimesh.load(stl, process=False).volume)
+    why += C.check_3mf(f3, len(F), len(fil), volume=vol)
+    worst, _ = C.color_edges(V, F, face_fil)
+    if worst > C.JAGGED:
+        why.append(f"color edges jagged ({worst:.2f}, max {C.JAGGED})")
+    if (st.get("wobble") or 0) > C.WOBBLE:
+        why.append(f"color edges wavy ({st['wobble']:.2f} mm, max {C.WOBBLE})")
+    m = C.load_stl_mesh(V, F)
+    area = m.area_faces
+    shares = {fil[n - 1]: round(float(area[face_fil == n].sum() / area.sum()), 3) for n in np.unique(face_fil)}
+    got: dict[str, str] = {}
+    pn, rj = job / "build" / "paint.npy", job / "build" / "regions.json"
+    if not pn.exists() or not rj.exists():
+        why.append("no paint.npy or regions.json to tell the parts")
+        return {"why": why, "shares": shares, "parts": got}
+    num = np.load(pn)
+    if len(num) != len(F):
+        why.append(f"paint.npy has {len(num)} triangles, the 3MF {len(F)}")
+        return {"why": why, "shares": shares, "parts": got}
+    tally: dict[str, np.ndarray] = {}
+    for d in json.loads(rj.read_text())["regions"]:
+        sel = num == d["n"]
+        part = d.get("part") or "other"
+        t = tally.setdefault(part, np.zeros(len(fil) + 1))
+        t += np.bincount(face_fil[sel], weights=area[sel], minlength=len(fil) + 1)
+    for part, t in tally.items():
+        got[part] = fil[int(t[1:].argmax())]
+    named = {_part_key(p): str(c).lower() for c, ps in want.items() if c != "rest" for p in ps}
+    rest = str(want.get("rest", "")).lower()
+    for part, c in sorted(got.items()):
+        need = named.get(_part_key(part), rest)
+        if need and c != need:
+            why.append(f"{part} is {c} (want {need})")
+    for p in named:
+        if not any(_part_key(q) == p for q in got):
+            why.append(f"no part {p} in the listing")
+    return {"why": why, "shares": shares, "parts": got}
 
 
 if __name__ == "__main__":

@@ -45,14 +45,30 @@ tools/figure/setup.sh once first.
 ## Colors
 
 After a passing build of a figure, `stone colors` splits it into color regions from the colors
-of its style picture, lists them largest first and draws them numbered in regions.png.
-`stone colors 2=black rest=white` then writes a 3MF next to the STL with each triangle painted
+of its style picture, lists them largest first with a part name each (base, shoes, pants, jacket or
+top, hands, face, hair, glasses, other; the words of the request and look.txt, so a dress is
+"dress"), and draws them numbered in regions.png. A part name or a region number picks a region:
+`stone colors jacket=black rest=white` (or `2=black`) then writes a 3MF next to the STL with each triangle painted
 with its filament. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer
 reads Bambu paint too. The loaded filaments, in slot order, go in stone.toml:
 `[filaments]` with `1 = "white"` and `2 = "black"` (the default), in the job folder or once per
 machine in ~/.config/smoothstone/stone.toml. When a figure's request names colors, the build's
 NEXT line is stone colors, and the mapping it suggests follows those colors. Other parts print in
-one color, and the build names the filament to load.
+one color, and the build names the filament to load. Before it writes the 3MF, stone cuts each color
+edge as a smooth curve through the triangles, and the color_edges check fails any edge that still
+zigzags: FIX "color boundary is jagged", no file, and a NEXT line that gives that region the rest color.
+The hem, neck and wrists are lines of the shape: a color edge within 3 mm of one moves onto it, and
+where the shape has a sculpted groove there (a collar, a cuff) the edge follows the groove, slipped to
+the side a viewer sees least. The ledges check fails a color edge with up-facing faces of the wrong
+color seen beside it, such as a white strip on top of a collar: FIX, no file.
+
+## Check every angle
+
+The numbers are the gate: every check must pass. Then open build/views.png (and build/boundaries.png
+after stone colors) and look at it panel by panel, all ten sides, not just the front. A part that holds
+a phone, carries a load or fits a hole must be right from every side, because a fault on one side
+breaks it as surely as one on the front. Look for a feature missing on one side, a wall that thins,
+text cut off, and a color edge that zigzags. If a panel shows a fault, say what and where, and fix it.
 
 ## Measuring from a photo
 

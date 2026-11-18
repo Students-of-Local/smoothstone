@@ -1,0 +1,15 @@
+{
+ "id": "f2_jensen_colors",
+ "request": "A mini figure of Jensen Huang, 90 mm tall, with \"JENSEN\" on the base, all white but the jacket, which is black.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "JENSEN"
+  },
+  "colors": {
+   "black": ["jacket"],
+   "rest": "white"
+  }
+ }
+}

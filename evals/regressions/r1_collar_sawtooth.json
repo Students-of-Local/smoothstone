@@ -1,0 +1,19 @@
+{
+ "id": "r1_collar_sawtooth",
+ "request": "A mini figure of Jensen Huang, 90 mm tall, with \"JENSEN\" on the base, all white but the jacket, which is black.",
+ "why": "The owner opened the painted Jensen figure in Creality Print and the collar edge printed as a sawtooth about 1 mm deep. His words: the skill must require examination of all angles; think of the danger of inaccuracy in something important like an engineering part.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "JENSEN"
+  },
+  "colors": {
+   "black": ["jacket"],
+   "rest": "white"
+  },
+  "judge": {
+   "faults_in": ["boundaries"]
+  }
+ }
+}

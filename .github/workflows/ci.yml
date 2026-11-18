@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: System packages
         run: |
@@ -49,3 +51,7 @@ jobs:
           done
           uv run python evals/summary.py "$RUNNER_TEMP/next" | tee "$RUNNER_TEMP/next.txt"
           ! grep -q "^t.* 0/1" "$RUNNER_TEMP/next.txt"
+          uv run python evals/ratchet.py "$RUNNER_TEMP/next"
+
+      - name: The ratchet holds against main (no lowered floor or deleted spec without a LOG.md line)
+        run: uv run python evals/ratchet.py --check-git origin/main

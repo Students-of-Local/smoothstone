@@ -1,0 +1,12 @@
+{
+ "id": "r2_creality_open_edges",
+ "request": "A mini figure of Jensen Huang, 90 mm tall, with \"JENSEN\" on the base.",
+ "why": "Creality Print flagged the small model's Jensen figure: 14 non-manifold edges, though every stone check had passed it.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "JENSEN"
+  }
+ }
+}

@@ -1,0 +1,44 @@
+{
+ "figure/S": {
+  "judge": null,
+  "passing": [],
+  "rate": 0.5,
+  "total": 2
+ },
+ "regressions/next": {
+  "judge": 7.0,
+  "passing": [
+   "r2_creality_open_edges"
+  ],
+  "rate": 0.5,
+  "total": 2
+ },
+ "tuning/S": {
+  "judge": null,
+  "passing": [
+   "t1_fan_guard",
+   "t2_cable_comb",
+   "t3_faceplate",
+   "t4_name_tag",
+   "t5_lithophane",
+   "t6_planter",
+   "t7_phone_case"
+  ],
+  "rate": 1.0,
+  "total": 7
+ },
+ "tuning/next": {
+  "judge": null,
+  "passing": [
+   "t1_fan_guard",
+   "t2_cable_comb",
+   "t3_faceplate",
+   "t4_name_tag",
+   "t5_lithophane",
+   "t6_planter",
+   "t7_phone_case"
+  ],
+  "rate": 1.0,
+  "total": 7
+ }
+}

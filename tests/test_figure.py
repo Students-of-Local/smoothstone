@@ -1,5 +1,6 @@
 """The figure recipe without the style and lift models: a stand-in mesh goes through repair,
 the plinth recipe and every print check, and the CLI points at stone find when photos are missing."""
+import json
 import shutil
 from pathlib import Path
 
@@ -164,3 +165,120 @@ def test_find_never_loops_back_to_find(jobenv, monkeypatch, request_text):
         assert not got and code == 1 and not nxt.startswith("stone find")
     else:
         assert got, text  # a subject with no part named is a figure
+
+
+def _style_picture(path: Path) -> None:
+    """A stand-in style picture: a skin-colored head over a black body on white."""
+    from PIL import Image, ImageDraw
+
+    im = Image.new("RGB", (256, 512), (255, 255, 255))
+    d = ImageDraw.Draw(im)
+    d.rectangle([60, 170, 196, 470], fill=(20, 20, 20))
+    d.rectangle([70, 470, 186, 505], fill=(20, 20, 20))
+    d.ellipse([70, 20, 186, 180], fill=(225, 180, 150))
+    im.save(path)
+
+
+def test_stone_colors_end_to_end_on_a_figure_with_a_style_picture(jobenv, monkeypatch, openscad, tmp_path):
+    """Review medium (cli.py:1299): cmd_colors on a real figure job, listing and then painting."""
+    from smoothstone import colors
+
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    d = tmp_path / "abc123"
+    d.mkdir()
+    fig = d / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    _style_picture(d / "style.png")
+    stone("new", 'A figure 70 mm tall with "ADA" on the base, all white but the body, which is black')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert code == 0 and "Part ready" in text, text
+    assert nxt.startswith("stone colors"), text
+
+    text, code, nxt = stone("colors")
+    assert code == 0, text
+    assert "Color regions of figure.stl" in text and "base" in text
+    assert "% of surface" in text
+    assert nxt.startswith("stone colors ") and "rest=" in nxt, text
+    regions = json.loads((jobenv / "stone-job" / "build" / "regions.json").read_text())
+    assert regions["anatomy"]["top"] > 0
+
+    text, code, nxt = stone(*nxt.split()[1:])
+    assert code == 0, text
+    assert "PASS color_edges" in text, text
+    out = jobenv / "stone-job" / "figure.3mf"
+    assert out.is_file(), text
+    n = len(colors.read_3mf(out)[1])
+    assert colors.check_3mf(out, n, len(status_json_colors(jobenv)["filaments"])) == []
+    assert nxt == cli.DONE_NEXT
+    assert (jobenv / "stone-job" / "build" / "views.png").is_file()
+
+    # SPEC3 C: the eval grader reads the parts' colors back from the 3MF
+    import sys
+
+    sys.path.insert(0, str(REPO / "evals"))
+    import run as evrun
+
+    job = jobenv / "stone-job"
+    got = evrun.grade_colors(job, "figure", {"rest": "none"})["parts"]
+    assert "base" in got and len(set(got.values())) >= 2, got
+    rest = got["base"]
+    want: dict = {"rest": rest}
+    for part, c in got.items():
+        if c != rest:
+            want.setdefault(c, []).append(part)
+    g = evrun.grade_colors(job, "figure", want)
+    assert g["why"] == [] and abs(sum(g["shares"].values()) - 1) < 0.01, g
+    odd = next(p for p, c in got.items() if c != rest)
+    wrong = {"rest": rest, rest: [odd]}
+    assert f"{odd} is {got[odd]} (want {rest})" in evrun.grade_colors(job, "figure", wrong)["why"]
+
+
+def test_a_failing_color_edge_never_points_back_at_the_same_mapping(jobenv, monkeypatch, openscad, tmp_path):
+    """Review first-F1: a ledge fault must give a NEXT that changes the mapping (the region on the
+    failing edge takes the rest color, or the part prints in one color), so following NEXT ends in
+    a written 3MF instead of a loop."""
+    import numpy as np
+
+    from smoothstone import colors
+
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    d = tmp_path / "abc123"
+    d.mkdir()
+    fig = d / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    _style_picture(d / "style.png")
+    stone("new", 'A figure 70 mm tall with "ADA" on the base, all white but the body, which is black')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert code == 0 and nxt.startswith("stone colors"), text
+
+    real = colors.ledges
+
+    def always_a_ledge(V, F, face_fil, lines):  # every two-color paint climbs a ledge
+        out = real(V, F, face_fil, lines)
+        if len(np.unique(face_fil)) > 1 and out:
+            out[0] = {**out[0], "area": 1.0, "angle": 15.0, "fil": int(face_fil.max()), "faces": 9}
+        return out
+
+    monkeypatch.setattr(colors, "ledges", always_a_ledge)
+    if nxt == "stone colors":
+        text, code, nxt = stone("colors")
+    tried = []
+    for _ in range(6):
+        mapping = nxt
+        text, code, nxt = stone(*mapping.split()[1:])
+        tried.append(mapping)
+        if nxt == cli.DONE_NEXT:
+            break
+        assert "climbs onto a ledge" in text, text
+        assert nxt != mapping and nxt != "stone colors", text  # never the mapping that just failed
+    assert nxt == cli.DONE_NEXT, tried
+    assert len(tried) > 1, tried
+    out = jobenv / "stone-job" / "figure.3mf"
+    assert out.is_file()
+    assert len(status_json_colors(jobenv)["shares"].split(";")) == 1  # the one-color print
+
+
+def status_json_colors(work: Path) -> dict:
+    return json.loads((work / "stone-job" / "status.json").read_text())["colors"]
