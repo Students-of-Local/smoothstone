@@ -1590,7 +1590,31 @@ def cmd_colors(args, job: Job) -> Out:
     faults = colortool.edge_faults(lines)
     wob = colortool.worst_wobble(lines)
     fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
-    ledge = colortool.ledge_faults(colortool.ledges(V, F, face_fil, anat_lines)) if anat_lines and not faults else []
+    one_color = len(np.unique(face_fil)) == 1  # no color edge, so nothing can climb a ledge
+    ledge = (colortool.ledge_faults(colortool.ledges(V, F, face_fil, anat_lines))
+             if anat_lines and not faults and not one_color else [])
+    reg_of = num[parent]
+
+    def smallest_painted(near: np.ndarray) -> int | None:
+        """The smallest region off the rest color among the faces `near` a failing edge."""
+        cand = [int(g) for g in np.unique(reg_of[near]) if assign.get(int(g), rest) != rest]
+        return min(cand, key=lambda k: next(d["share"] for d in info if d["n"] == k)) if cand else None
+
+    def retry(drop: list[int]) -> None:
+        """A NEXT that changes the outcome: the regions on the failing edges take the rest color;
+        with none to give, the part prints in one color. Never the mapping that just failed."""
+        failed = mapping_line(assign)
+        nxt = mapping_line({k: v for k, v in assign.items() if k not in drop}) if drop else failed
+        if drop:
+            names_d = ", ".join(f"region {g} ({next(d.get('part') or d['color'] or 'base' for d in info if d['n'] == g)})"
+                                for g in drop)
+            out.add(f"The paint of {names_d} does not follow a clean line; it takes the rest color.")
+        if nxt == failed:
+            nxt = f"rest={names[rest - 1]}"
+            out.add(f"No region can take the rest color to clear it, so the part prints in one color, "
+                    f"{names[rest - 1]}.")
+        out.next = "stone colors " + nxt
+
     if ledge:
         x = ledge[0]
         (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
@@ -1602,23 +1626,24 @@ def cmd_colors(args, job: Job) -> Out:
                 f"{x['fil']} faces seen next to it at {x['angle']:.0f} degrees (max {colortool.LEDGE_AREA}); "
                 "no file written")
         out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
-        out.next = "stone colors"
+        from . import parts
+
+        ln = next(a for a in anat_lines if a["name"] == x["name"] and a.get("side") == x["side"])
+        cc = cut.triangles_center
+        near = (np.abs(parts.field(ln, cc)) < parts.SNAP + colortool.LEDGE_MM) & \
+            (np.hypot(cc[:, 0] - ln["center"][0], cc[:, 1] - ln["center"][1]) < ln["rmax"] + colortool.LEDGE_MM)
+        g = smallest_painted(near)
+        retry([g] if g is not None else [])
         out.result = f"colors failed: {x['name']} edge on a ledge ({x['area']:.2f} mm2 seen)"
         return out
     if faults:
         # paint that cannot follow a clean line (often a feature the picture puts beside the shape)
-        reg_of = num[parent]
-        area_c = cut.area_faces
         drop: list[int] = []
         bad_lines = faults
         for ln in bad_lines:
-            near = np.isin(F, ln["verts"]).any(1)
-            cand = {int(g): area_c[near & (reg_of == g)].sum() for g in np.unique(reg_of[near])
-                    if assign.get(int(g), rest) != rest}
-            if cand:
-                g = min(cand, key=lambda k: next(d["share"] for d in info if d["n"] == k))
-                if g not in drop:
-                    drop.append(g)
+            g = smallest_painted(np.isin(F, ln["verts"]).any(1))
+            if g is not None and g not in drop:
+                drop.append(g)
         (job.root / f"{r.name}.3mf").unlink(missing_ok=True)  # no painted file with a jagged edge
         if st.get("colors"):
             job.update(colors=None)
@@ -1633,12 +1658,7 @@ def cmd_colors(args, job: Job) -> Out:
                     f"{ln['wobble']:.2f} mm from a straight course within {colortool.EDGE_SPAN:.0f} mm "
                     f"(max {colortool.WOBBLE}); no file written")
         out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
-        if drop:
-            names_d = ", ".join(f"region {g} ({next(d['color'] or 'base' for d in info if d['n'] == g)})" for g in drop)
-            out.add(f"The paint of {names_d} does not follow a clean line; it takes the rest color.")
-            out.next = "stone colors " + mapping_line({k: v for k, v in assign.items() if k not in drop})
-        else:
-            out.next = "stone colors"
+        retry(drop)
         out.result = f"colors failed: color boundary not smooth (ratio {worst:.2f}, wobble {wob:.2f} mm)"
         return out
     area = cut.area_faces

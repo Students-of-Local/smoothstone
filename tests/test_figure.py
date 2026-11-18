@@ -234,5 +234,51 @@ def test_stone_colors_end_to_end_on_a_figure_with_a_style_picture(jobenv, monkey
     assert f"{odd} is {got[odd]} (want {rest})" in evrun.grade_colors(job, "figure", wrong)["why"]
 
 
+def test_a_failing_color_edge_never_points_back_at_the_same_mapping(jobenv, monkeypatch, openscad, tmp_path):
+    """Review first-F1: a ledge fault must give a NEXT that changes the mapping (the region on the
+    failing edge takes the rest color, or the part prints in one color), so following NEXT ends in
+    a written 3MF instead of a loop."""
+    import numpy as np
+
+    from smoothstone import colors
+
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    d = tmp_path / "abc123"
+    d.mkdir()
+    fig = d / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    _style_picture(d / "style.png")
+    stone("new", 'A figure 70 mm tall with "ADA" on the base, all white but the body, which is black')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert code == 0 and nxt.startswith("stone colors"), text
+
+    real = colors.ledges
+
+    def always_a_ledge(V, F, face_fil, lines):  # every two-color paint climbs a ledge
+        out = real(V, F, face_fil, lines)
+        if len(np.unique(face_fil)) > 1 and out:
+            out[0] = {**out[0], "area": 1.0, "angle": 15.0, "fil": int(face_fil.max()), "faces": 9}
+        return out
+
+    monkeypatch.setattr(colors, "ledges", always_a_ledge)
+    if nxt == "stone colors":
+        text, code, nxt = stone("colors")
+    tried = []
+    for _ in range(6):
+        mapping = nxt
+        text, code, nxt = stone(*mapping.split()[1:])
+        tried.append(mapping)
+        if nxt == cli.DONE_NEXT:
+            break
+        assert "climbs onto a ledge" in text, text
+        assert nxt != mapping and nxt != "stone colors", text  # never the mapping that just failed
+    assert nxt == cli.DONE_NEXT, tried
+    assert len(tried) > 1, tried
+    out = jobenv / "stone-job" / "figure.3mf"
+    assert out.is_file()
+    assert len(status_json_colors(jobenv)["shares"].split(";")) == 1  # the one-color print
+
+
 def status_json_colors(work: Path) -> dict:
     return json.loads((work / "stone-job" / "status.json").read_text())["colors"]
