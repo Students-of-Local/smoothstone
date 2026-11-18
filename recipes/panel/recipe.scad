@@ -28,7 +28,7 @@ ly = label_y > -99 ? label_y : (cut_y - cut_h / 2 - d / 2) / 2;
 depth = 0.6;
 
 assert(cutouts == 0 || (cutouts - 1) * pitch + cut_w < w - 2, "the cutouts do not fit across the plate");
-assert(cut_h < d - 2, "cut_h must be smaller than d");
+assert((cut_shape == "round" ? cut_w : cut_h) < d - 2, "the cutouts do not fit along the plate height");
 
 module cut2d() {
     if (cut_shape == "round") circle(d = cut_w);

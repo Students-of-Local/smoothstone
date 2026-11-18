@@ -534,3 +534,27 @@ def test_fit_check_leaves_plain_requests_alone():
         assert match.missing_fit_size(box, req) is None, req
     assert match.missing_fit_size(box, "A holder for my pens.")
     assert match.missing_fit_size(rc.load("figure"), "A stand that fits my figure.") is None
+
+
+def test_a_round_cutout_taller_than_the_panel_grows_the_panel(jobenv, recipes_root, openscad):
+    # a 60 mm round cut in a 40 mm tall panel split it in 3 bodies, and build looped on show and set
+    shutil.copytree(REPO / "recipes" / "panel", recipes_root / "panel")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A faceplate with one round 60 mm hole.")
+    stone("set", "panel", "cut_shape=round", "cut_w=60")
+    nxt, seen = "stone build", []
+    for _ in range(6):
+        text, code, nxt = stone(*nxt.split()[1:])
+        seen.append(nxt)
+        if nxt.startswith("none"):
+            break
+    assert nxt.startswith("none"), seen
+    assert "Part ready" in text, text
+
+
+def test_a_desk_hole_cover_is_a_grommet():
+    from smoothstone import recipes as rc
+    from smoothstone import match
+    g = rc.load("grommet")
+    assert g is not None and g.tier == "S"
+    assert match.suggest(g, "It is a round hole, 60 mm across.") == {"hole_d": 60}
