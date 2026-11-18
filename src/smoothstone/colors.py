@@ -30,6 +30,11 @@ MAX_FILAMENTS = 16
 EDGE_RADIUS = 1.5  # mm: color boundaries are smoothed over about this distance before the cut
 EDGE_WINDOW = 2.0  # mm of arc length: the moving average a boundary is compared with
 JAGGED = 1.08  # a boundary this much longer than its smoothed self zigzags
+EDGE_SPAN = 5.0  # mm: the stretch the wobble check looks at
+WOBBLE = 0.15  # mm: over any EDGE_SPAN stretch a crisp edge stays this close to one plane
+LEDGE_MM = 2.0  # mm from a part's color edge where an up-facing face of the upper color is a ledge
+LEDGE_NZ = 0.5  # a face whose normal points up at least this much faces up (within 60 degrees)
+LEDGE_AREA = 0.2  # mm2 of such faces seen (parts.visible_faces) in any 30 degree sector fails the check
 EDGE_MIN = 4.0  # mm: shorter boundary pieces (ends at a three-color corner) are too short to judge
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 
@@ -94,9 +99,17 @@ def color_name(rgb) -> str:
 
 
 def word_color(word: str) -> str | None:
+    """The plain color a word names: "grey" -> "gray", "dark-red" -> "red", "sky-blue" -> "blue"."""
     w = word.strip().lower()
     w = ALIASES.get(w, w)
-    return w if w in NAMES else None
+    if w in NAMES:
+        return w
+    if "-" in w:  # a shade: the last word that is a color names it
+        for p in reversed(w.split("-")):
+            p = ALIASES.get(p, p)
+            if p in NAMES:
+                return p
+    return None
 
 
 def filament_rgb(name: str):
@@ -111,19 +124,99 @@ def filament_rgb(name: str):
     return None
 
 
-def request_colors(request: str) -> list[str]:
-    """Plain color names a request mentions, in order."""
+def subject_names(request: str, also=()) -> list[str]:
+    """The names of people (or pets) in a request: runs of two or more capitalized words
+    ("Jack Black", "Betty White"), and any name given in `also` (the name stone find searched)."""
+    out = [n for n in also if n]
+    for m in re.finditer(r"\b[A-Z][a-z'.]+(?:[ -][A-Z][a-z'.]+)+\b", request):
+        if m.group(0) not in out:
+            out.append(m.group(0))
+    return out
+
+
+def without_names(request: str, names=()) -> str:
+    """The request with the subject's name taken out, so "Jack Black" is not a color."""
+    for n in sorted(names, key=len, reverse=True):
+        request = re.sub(re.escape(n), " ", request, flags=re.I)
+    return request
+
+
+def request_colors(request: str, names=()) -> list[str]:
+    """Plain color names a request mentions, in order, leaving out the subject's name."""
     out = []
-    for w in re.findall(r"[a-z]+(?:-[a-z]+)?", request.lower()):
+    for w in re.findall(r"[a-z]+(?:-[a-z]+)?", without_names(request, names).lower()):
         c = word_color(w)
         if c and c not in out:
             out.append(c)
     return out
 
 
-def asks_for_color(request: str) -> bool:
-    words = set(re.findall(r"[a-z]+(?:-[a-z]+)?", request.lower()))
-    return bool(words & WORDS)
+def asks_for_color(request: str, names=()) -> bool:
+    words = re.findall(r"[a-z]+(?:-[a-z]+)?", without_names(request, names).lower())
+    return any(w in WORDS or word_color(w) for w in words)
+
+
+STOP = {"but", "except", "with", "and", "or", "while", "which", "that", "is", "are", "in", "on",
+        "everywhere", "everything", "else", "rest", "all", "other", "others"}
+
+
+def part_colors(request: str, names=()) -> dict[str, str]:
+    """The colors a request gives to parts of a figure: {"top": "black"} for "a black jacket",
+    "the jacket in black" or "the jacket, which is black"; "picture" for a part after "all
+    <color> but" with no color of its own (it keeps its color from the picture). Keys are parts
+    (parts.part_of), the word the request used under "word:<part>"."""
+    from .parts import part_of
+
+    words = re.findall(r"[a-z]+(?:-[a-z]+)?|[,.;]", without_names(request, names).lower())
+    out: dict[str, str] = {}
+    used: dict[str, str] = {}
+
+    def give(i, c):
+        p = part_of(words[i])
+        if p and p not in out:
+            out[p] = c
+            used[p] = words[i]
+
+    for i, w in enumerate(words):
+        p = part_of(w)
+        if p is None:
+            continue
+        # <color> <up to two words> <part>: "a black leather jacket"
+        for j in range(i - 1, max(-1, i - 4), -1):
+            if words[j] in STOP or words[j] in ",.;":
+                break
+            c = word_color(words[j])
+            if c:
+                give(i, c)
+                break
+        if p in out:
+            continue
+        # <part> in <color>, <part> is <color>, <part>, which is <color>
+        k = i + 1
+        if k < len(words) and words[k] == ",":
+            k += 1
+        if k < len(words) and words[k] in ("which", "that"):
+            k += 1
+        if k < len(words) and words[k] in ("in", "is", "are"):
+            for j in range(k + 1, min(len(words), k + 4)):
+                if words[j] in ",.;":
+                    break
+                c = word_color(words[j])
+                if c:
+                    give(i, c)
+                    break
+    # all <color> but / except (for) the <part> (and the <part>): those keep the picture's color
+    for i, w in enumerate(words):
+        if w in ("but", "except") and i >= 1 and any(word_color(x) for x in words[max(0, i - 3):i]):
+            for j in range(i + 1, min(len(words), i + 8)):
+                if words[j] in ".;":
+                    break
+                p = part_of(words[j])
+                if p and p not in out:
+                    out[p] = "picture"
+                    used[p] = words[j]
+    out.update({f"word:{p}": w for p, w in used.items()})
+    return out
 
 
 def nearest_filament(rgb, filaments: list[str]) -> int:
@@ -194,12 +287,13 @@ def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None, never: i
     return labels
 
 
-def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, lab=None) -> np.ndarray:
+def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, lab=None, zone=None) -> np.ndarray:
     """Connected regions of equal label over face adjacency, numbered from 0. Regions under
     `min_share` of the surface join the neighbor they share the longest edge with, except that with
     `lab` (a Lab color per label) a region of at least SPECK that differs from that neighbor by more
     than CONTRAST stays its own: white hands on a black jacket are small but not noise. Faces in the
-    `base` mask are one region of their own that never merges."""
+    `base` mask are one region of their own that never merges. With `zone` (a part of the body
+    per face), a region never spans two zones and joins only a neighbor in its own zone."""
     import scipy.sparse as sp
     from scipy.sparse.csgraph import connected_components
 
@@ -208,13 +302,16 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, l
     base = np.zeros(n, bool) if base is None else np.asarray(base, bool)
     if base.any():
         labels[base] = labels.max() + 1  # its own label, so it is its own component
+    zone = np.zeros(n, int) if zone is None else np.asarray(zone, int)
     adj = mesh.face_adjacency
-    same = labels[adj[:, 0]] == labels[adj[:, 1]]
+    same = (labels[adj[:, 0]] == labels[adj[:, 1]]) & (zone[adj[:, 0]] == zone[adj[:, 1]])
     a, b = adj[same, 0], adj[same, 1]
     G = sp.coo_matrix((np.ones(len(a)), (a, b)), shape=(n, n))
     nc, comp = connected_components(G, directed=False)
     comp_label = np.zeros(nc, int)
     comp_label[comp] = labels
+    comp_zone = np.zeros(nc, int)
+    comp_zone[comp] = zone
     if base.any():  # the plinth and the name letters are one region even where they do not touch
         bid = comp[base][0]
         comp[base] = bid
@@ -240,7 +337,7 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, l
         ar, i = heapq.heappop(heap)
         if not alive[i] or ar != area[i] or area[i] >= thresh:
             continue
-        cands = {j: L for j, L in nb[i].items() if alive[j]}
+        cands = {j: L for j, L in nb[i].items() if alive[j] and (comp_zone[j] == comp_zone[i] or is_base[j])}
         if not cands:
             continue  # an island on its own (a loose piece): it stays
         plain = {j: L for j, L in cands.items() if not is_base[j]}
@@ -317,19 +414,32 @@ def figure_labels(mesh, fig_labels: np.ndarray, base: np.ndarray, npal: int) -> 
     return smooth_labels(mesh, labels, keep=base, never=npal)
 
 
-def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path | None, atlas: Path):
-    """(face region numbers 1..R in face order, region list) for a part."""
+def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path | None, atlas: Path,
+                 look: str = "") -> dict:
+    """The color regions of a part: {"mesh" (the mesh they are on: a figure's is cut along the
+    lines of its shape), "num" (region number 1..R per face), "regions" (the list, largest first,
+    with a part name each on a figure), "fixed" (faces whose color edge is already a line of the
+    shape, kept through the edge smoothing) and "anatomy" (a figure's hem, neck and wrists)}."""
+    from . import parts
+
     n = len(mesh.faces)
     if front is None or not Path(front).is_file():
         region = np.zeros(n, int)
         info = describe(mesh, region, [None], None)
         info[0]["pos"] = "whole part"
-        return region + 1, info
+        return {"mesh": mesh, "num": region + 1, "regions": info, "fixed": None, "anatomy": None}
     import trimesh
 
     from . import paint
 
     top = base_top(recipe, params)
+    anat = None
+    if recipe == "figure" and top > 0:
+        anat = parts.anatomy(mesh, top)
+        if parts.all_lines(anat):
+            V, F = parts.cut(mesh.vertices, mesh.faces, anat)
+            mesh = load_stl_mesh(V, F)
+            n = len(mesh.faces)
     zc = mesh.triangles_center[:, 2]
     ztop = mesh.vertices[mesh.faces][:, :, 2].max(1)
     # the plinth's top face lies at exactly `top`: a face is base when its center is below the top
@@ -344,22 +454,46 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     rgb_f = paint.face_colors(sub, Path(front), Path(back) if back else None, atlas)
     pal, lab_f = paint.palette(rgb_f, most=6)
     labels = figure_labels(mesh, lab_f, base, len(pal))
-    reg = regions(mesh, labels, base=base if base.any() else None, lab=_lab(pal))
-    R = int(reg.max()) + 1
-    rgb: list = [None] * R
-    base_region = int(reg[base][0]) if base.any() else None
-    area = mesh.area_faces
-    for r in range(R):
-        if r == base_region:
-            continue
-        sel = reg == r
-        votes = np.bincount(labels[sel], weights=area[sel], minlength=len(pal))
-        rgb[r] = pal[int(votes.argmax())]
-    info = describe(mesh, reg, rgb, base_region)
-    num = np.zeros(R, int)
+    zone = None
+    fixed = base.copy()
+    if anat is not None:
+        zone, hand = parts.zones(mesh, anat, base)
+        labels, band = parts.snap(mesh, labels, zone, hand, anat)
+        fixed |= band
+    reg = regions(mesh, labels, base=base if base.any() else None, lab=_lab(pal), zone=zone)
+
+    def listing(reg):
+        R = int(reg.max()) + 1
+        rgb: list = [None] * R
+        base_region = int(reg[base][0]) if base.any() else None
+        area = mesh.area_faces
+        for r in range(R):
+            if r == base_region:
+                continue
+            sel = reg == r
+            votes = np.bincount(labels[sel], weights=area[sel], minlength=len(pal) + 1)[:len(pal)]
+            rgb[r] = pal[int(votes.argmax())]
+        info = describe(mesh, reg, rgb, base_region)
+        if anat is not None:
+            parts.name_parts(mesh, reg, info, zone, anat, look)
+        return info
+
+    info = listing(reg)
+    merged = []
+    if anat is not None:
+        keep = {d["region"] for d in info if d["part"] != "other"}
+        reg, merged = parts.merge_odd(mesh, reg, labels, zone, keep, anat["center"])
+        if merged:
+            _, reg = np.unique(reg, return_inverse=True)
+            reg = reg.reshape(-1)
+            info = listing(reg)
+    num = np.zeros(int(reg.max()) + 1, int)
     for d in info:
         num[d["region"]] = d["n"]
-    return num[reg], info
+    if anat is not None:
+        anat = {**anat, "merged": [why for _, _, why in merged]}
+    return {"mesh": mesh, "num": num[reg], "regions": info, "fixed": fixed if anat is not None else (base if base.any() else None),
+            "anatomy": anat}
 
 
 # 3MF
@@ -657,6 +791,39 @@ def _length(r: np.ndarray, closed: bool) -> float:
     return float(np.linalg.norm(np.diff(r, axis=0), axis=1).sum())
 
 
+def _resample(pts: np.ndarray, closed: bool):
+    """(points every ds mm along a polyline, its length, ds)."""
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    L = float(seg.sum())
+    s = np.r_[0, np.cumsum(seg)]
+    ds = min(0.05, max(L, 1e-9) / 400)
+    q = np.arange(0, L, ds) if closed else np.linspace(0, L, max(int(L / ds), 2) + 1)
+    return np.stack([np.interp(q, s, pts[:, k]) for k in range(3)], 1), L, ds
+
+
+def wobble(pts: np.ndarray, closed: bool, span: float = EDGE_SPAN) -> float:
+    """The farthest any point of a line strays from the best-fit plane of the `span` mm stretch
+    around it, in mm. A cuff or a hem cut along a plane scores 0; an edge that wanders up and
+    down across the surface, which reads as wavy from the side, scores its wander. The length
+    ratio (jaggedness) cannot see this: a smoothed edge can wander and still be short, and a
+    plane cut through folds is long but straight from every side."""
+    if len(pts) < 3:
+        return 0.0
+    r, L, ds = _resample(pts, closed)
+    n = max(4, int(round(span / ds)))
+    if len(r) <= n:
+        idx = [np.arange(len(r))]
+    else:
+        stride = max(1, int(round(0.25 / ds)))
+        idx = [np.arange(i, i + n) % len(r) for i in range(0, len(r) if closed else len(r) - n + 1, stride)]
+    worst = 0.0
+    for ii in idx:
+        p = r[ii] - r[ii].mean(0)
+        normal = np.linalg.svd(p, full_matrices=False)[2][2]
+        worst = max(worst, float(np.abs(p @ normal).max()))
+    return worst
+
+
 def jaggedness(pts: np.ndarray, closed: bool, window: float = EDGE_WINDOW) -> float:
     """Length of a polyline over the length of the same line smoothed by a moving average over
     `window` mm of arc length. 1.0 is perfectly smooth; a sawtooth along triangle edges is well over.
@@ -683,14 +850,117 @@ def jaggedness(pts: np.ndarray, closed: bool, window: float = EDGE_WINDOW) -> fl
 
 def color_edges(V, F, face_fil) -> tuple[float, list[dict]]:
     """(worst jaggedness over the color boundaries long enough to judge, the boundary lines with a
-    "ratio" each). 1.0 with no boundaries."""
+    "ratio" and a "wobble" each). 1.0 with no boundaries."""
     lines = boundary_lines(V, F, np.asarray(face_fil))
     worst = 1.0
     for ln in lines:
-        ln["ratio"] = jaggedness(ln["pts"], ln["closed"]) if ln["length"] >= EDGE_MIN else None
+        judge = ln["length"] >= EDGE_MIN
+        ln["ratio"] = jaggedness(ln["pts"], ln["closed"]) if judge else None
+        ln["wobble"] = wobble(ln["pts"], ln["closed"]) if judge else None
         if ln["ratio"] is not None:
             worst = max(worst, ln["ratio"])
     return worst, lines
+
+
+ON_GROOVE = 0.1  # mm: a color edge this close to a groove line (most of its length) runs in the groove
+
+
+def mark_grooves(lines: list[dict], anatomy: list[dict]) -> None:
+    """Set ln["groove"] to the anatomy line's name on each color edge that runs in a sculpted groove
+    (parts.find_groove): 80% of its points within ON_GROOVE mm of the groove line. Such an edge
+    follows the shape, so it is not flat like a plane and the wobble limit does not apply to it."""
+    from . import parts
+
+    grooves = [g for g in anatomy or [] if (g.get("groove") or {}).get("used")]
+    for ln in lines:
+        p = ln["pts"]
+        for g in grooves:
+            cx, cy = g["center"]
+            near = np.hypot(p[:, 0] - cx, p[:, 1] - cy) < g["rmax"] + 1.0
+            on = near & (np.abs(parts.field(g, p)) < ON_GROOVE)
+            if on.mean() >= 0.8:
+                ln["groove"] = g["name"]
+                break
+
+
+def edge_faults(lines: list[dict]) -> list[dict]:
+    """The lines that fail: zigzag (ratio over JAGGED) or wavy (wobble over WOBBLE, unless the edge
+    runs in a groove: mark_grooves), worst first."""
+    bad = [ln for ln in lines if (ln.get("ratio") or 0) > JAGGED
+           or ((ln.get("wobble") or 0) > WOBBLE and not ln.get("groove"))]
+    return sorted(bad, key=lambda ln: -max((ln.get("ratio") or 1) - 1,
+                                           0 if ln.get("groove") else (ln.get("wobble") or 0) / WOBBLE * (JAGGED - 1)))
+
+
+def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
+    """Up-facing faces of the wrong color next to a part boundary, per anatomy line (parts.py):
+    where the color above the line has climbed onto a ledge of the part below it, like the top of
+    a standing collar painted the head's color by a plane cut through the collar. For each color
+    edge near the line, the color of its upper face is the upper color; the faces of that color
+    within LEDGE_MM of the edge that face up (normal z over LEDGE_NZ) and that a person sees are
+    the fault (a strip tucked under a cuff's rim is hidden and counts as seen only where it is).
+    Returns one entry per line: {"name", "side", "area" (seen mm2, worst 30 degree sector), "angle" (that sector's
+    middle, degrees around the line's center, 0 = +x), "fil" (the upper color), "faces"}."""
+    from scipy.spatial import cKDTree
+
+    from . import parts
+
+    V = np.asarray(V, float)
+    F = np.asarray(F)
+    face_fil = np.asarray(face_fil)
+    mesh = load_stl_mesh(V, F)
+    c = mesh.triangles_center
+    nz = mesh.face_normals[:, 2]
+    area = mesh.area_faces
+    adj = mesh.face_adjacency
+    ev = mesh.face_adjacency_edges
+    diff = face_fil[adj[:, 0]] != face_fil[adj[:, 1]]
+    out = []
+    for ln in lines:
+        if not ln.get("rmax"):
+            continue
+        cx, cy = ln["center"]
+        d = parts.field(ln, c)
+        r = np.hypot(c[:, 0] - cx, c[:, 1] - cy)
+        near = (np.abs(d) < parts.SNAP + LEDGE_MM) & (r < ln["rmax"] + LEDGE_MM)
+        res = {"name": ln["name"], "side": ln.get("side"), "area": 0.0, "angle": None, "fil": None, "faces": 0}
+        above = near & (d > 0.5) & (d < parts.SNAP)
+        below = near & (d < -0.5) & (d > -parts.SNAP)
+        if not above.any() or not below.any():
+            out.append(res)
+            continue
+        U = int(np.bincount(face_fil[above], weights=area[above]).argmax())
+        L = int(np.bincount(face_fil[below], weights=area[below]).argmax())
+        e = diff & near[adj[:, 0]] & near[adj[:, 1]]
+        e &= np.isin(face_fil[adj[:, 0]], (U, L)) & np.isin(face_fil[adj[:, 1]], (U, L))
+        if U != L and e.any():
+            mid = V[ev[e]].mean(1)
+            cand = np.where(near & (nz > LEDGE_NZ) & (face_fil == U))[0]
+            if len(cand):
+                dist, _ = cKDTree(mid).query(c[cand], distance_upper_bound=LEDGE_MM)
+                bad = cand[np.isfinite(dist)]
+                if len(bad):
+                    th = np.degrees(np.arctan2(c[bad, 1] - cy, c[bad, 0] - cx)) % 360
+                    sec = (th // 30).astype(int)
+                    sel = np.zeros(len(F), bool)
+                    sel[bad] = True
+                    seen = np.zeros(len(F))
+                    seen[sel] = parts.visible_faces(mesh, sel)
+                    per = np.bincount(sec, weights=seen[bad], minlength=12)
+                    k = int(per.argmax())
+                    res.update(area=float(per[k]), angle=float(k * 30 + 15), fil=U, faces=int(len(bad)))
+        out.append(res)
+    return out
+
+
+def ledge_faults(found: list[dict]) -> list[dict]:
+    """The lines whose worst sector has more than LEDGE_AREA mm2 of up-facing upper color."""
+    return sorted([x for x in found if x["area"] > LEDGE_AREA], key=lambda x: -x["area"])
+
+
+def worst_wobble(lines: list[dict]) -> float:
+    """The largest wobble of the edges the limit applies to (not those in a groove)."""
+    return max([ln["wobble"] for ln in lines if ln.get("wobble") is not None and not ln.get("groove")], default=0.0)
 
 
 # pictures
@@ -786,9 +1056,11 @@ def render_views(mesh, face_rgb, out_png: Path) -> int:
     return render(mesh, face_rgb, out_png, views=VIEWS, px=VIEW_PX, cols=5)
 
 
-def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: int = 6, px: int = 300) -> int:
+def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: int = 6, px: int = 300,
+                      anatomy: list[dict] | None = None) -> int:
     """build/boundaries.png: each jagged color boundary, then the longest, close up from 8 sides, one
-    row per boundary, so the edge can be seen as it will print. Returns the number of rows."""
+    row per boundary, so the edge can be seen as it will print; then, on a figure, the collar (the
+    neck line) from 8 sides level and from 30 degrees up. Returns the number of rows."""
     from PIL import ImageFont
 
     font = ImageFont.load_default(size=13)
@@ -805,9 +1077,22 @@ def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: in
             name = f"{k}: {ln['pair'][0]}/{ln['pair'][1]} z{center[2]:.0f} {a}d r{r}"
             panels.append(_panel(V, F, face_rgb, np.radians(a), np.radians(10), center, half, px,
                                  title=name, clip=True, font=font))
+    rows = len(pick)
+    neck = next((ln for ln in anatomy or [] if ln["name"] == "neck" and ln.get("rmax")), None)
+    if neck is not None:
+        zc = float(np.mean(neck["curve"])) if neck.get("curve") is not None else float(neck["z"])
+        center = np.array([neck["center"][0], neck["center"][1], zc])
+        half = float(np.clip(neck["rmax"] + 2, 6, 20))
+        how = "groove" if (neck.get("groove") or {}).get("used") else "level"
+        for el in (0, 30):
+            at = center - [0, 0, 3.0 if el else 0.0]  # from above, the head fills the top of the panel
+            for a in range(0, 360, 45):
+                panels.append(_panel(V, F, face_rgb, np.radians(a), np.radians(el), at, half, px,
+                                     title=f"collar ({how}) {a}d up {el}d", clip=False, font=font))
+            rows += 1
     if panels:
         _sheet(panels, 8, out_png)
-    return len(pick)
+    return rows
 
 
 TINTS = [(230, 25, 75), (60, 180, 75), (255, 225, 25), (0, 130, 200), (245, 130, 48), (145, 30, 180),
