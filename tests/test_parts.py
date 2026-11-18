@@ -289,3 +289,42 @@ def test_a_jacket_in_three_palette_regions_is_all_jacket():
     assert len(jacket) == 3 and sleeves <= set(jacket), [(d["region"], d["part"]) for d in info]
     black = sorted(r for n in cli._part_regions(info, "jacket") for r in [next(d["region"] for d in info if d["n"] == n)])
     assert black == jacket
+
+
+def test_a_cuff_cut_masked_to_the_hand_still_cuts_every_face_it_crosses():
+    """Eval r1: the cuff line cuts only round the hand, so parts.cut sets the field to +1 on every
+    other vertex. cut_iso took its snap distance from the slope along each vertex's edges, and the
+    jump to +1 at the rim of the hand made that slope steep: vertices up to 0.15 mm off the line
+    counted as on it, faces across the line stayed whole, and the jacket's color ran onto the hand
+    in a 0.2 mm tab. The snap must come from the true field, so every face inside the zone that
+    the line crosses is cut."""
+    m = trimesh.creation.cylinder(radius=3.0, height=10.0, sections=96)
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=0.3)
+    V, F = np.asarray(v, float), np.asarray(f, np.int64)
+
+    def true(X):  # a tilted, wavy cuff line
+        return X[:, 2] - 0.4 * np.sin(np.arctan2(X[:, 1], X[:, 0]))
+
+    inside = V[:, 0] > 0.0  # the hand's faces and their ring: one half of the tube
+    V2, F2 = parts.cut_masked(V, F, true(V), inside)
+    d = true(V2)[F2]
+    zone = (V2[F2][:, :, 0] > 0.0).all(1)  # every face whose corners are all inside, the rim's too
+    across = zone & (d.min(1) < -0.03) & (d.max(1) > 0.03)
+    assert not across.any(), f"{int(across.sum())} faces cross the cuff line uncut"
+
+
+
+def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
+    """CI on x86 failed test_cuff_over_wrist_slips_down while ARM passed: the sleeve rim's flat
+    underside lies exactly on the groove's level, so the sign of its distance to the groove fit
+    (about 1e-16 mm) was rounding noise, and the rim landed in the up strip on one CPU and the down
+    strip on another. Groove points 1e-9 mm above or below the rim give either sign on any CPU;
+    the side and the seen areas must not change."""
+    m = cuff_figure()
+    V = np.asarray(m.vertices)
+    ring = V[(np.abs(V[:, 2] - 10.0) < 1e-9) & (np.abs(np.hypot(V[:, 0], V[:, 1]) - 2.5) < 1e-6)]
+    got = set()
+    for eps in (0.0, 1e-9, -1e-9):
+        side, seen = parts.choose_side(m, ring + [0.0, 0.0, eps], (0.0, 0.0))
+        got.add((side, seen[1][0], seen[-1][0]))
+    assert len(got) == 1 and next(iter(got))[0] == -1, got

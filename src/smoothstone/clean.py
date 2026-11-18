@@ -73,7 +73,7 @@ def problems(view: dict) -> list[str]:
     return bad
 
 
-def cut_iso(V, F, s, level, snap=0.02, fields=None, parents=False):
+def cut_iso(V, F, s, level, snap=0.02, fields=None, parents=False, slope=None):
     """Cut a closed triangle mesh along the level set s == level, so a color boundary can run on a
     clean line instead of zigzagging along triangle edges.
 
@@ -84,15 +84,19 @@ def cut_iso(V, F, s, level, snap=0.02, fields=None, parents=False):
     along the vertex's edges: a snap in units of s would take in a wide band of vertices where s
     changes slowly, and the line would step along triangle edges there. `fields` (one row per
     vertex) are interpolated onto the new vertices. Returns (V, F), then fields when given, then
-    (with parents=True) the input face each output face came from."""
+    (with parents=True) the input face each output face came from. `slope` (one value per vertex,
+    default s) is the field whose slope sets that distance: give the true field when s is held at
+    a constant outside a zone, or the jump at the zone's rim makes the slope steep there and
+    vertices well off the line count as on it."""
     V = np.asarray(V, float)
     F = np.asarray(F, np.int64)
     d = np.asarray(s, float) - level
+    t = d if slope is None else np.asarray(slope, float)
     E = np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
-    slope = np.abs(d[E[:, 0]] - d[E[:, 1]]) / np.maximum(np.linalg.norm(V[E[:, 0]] - V[E[:, 1]], axis=1), 1e-12)
+    rate = np.abs(t[E[:, 0]] - t[E[:, 1]]) / np.maximum(np.linalg.norm(V[E[:, 0]] - V[E[:, 1]], axis=1), 1e-12)
     g = np.zeros(len(V))
-    np.maximum.at(g, E[:, 0], slope)
-    np.maximum.at(g, E[:, 1], slope)
+    np.maximum.at(g, E[:, 0], rate)
+    np.maximum.at(g, E[:, 1], rate)
     side = np.where(np.abs(d) <= snap * g, 0, np.sign(d)).astype(int)
     new_v: list[np.ndarray] = []
     new_w: list[tuple[int, int, float]] = []
