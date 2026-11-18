@@ -514,3 +514,66 @@ def test_a_named_person_still_gets_the_colors_the_request_gives():
     req = "Betty White in a red dress, all blue but the dress"
     names = colors.subject_names(req)
     assert colors.request_colors(req, names) == ["red", "blue"]
+
+
+# SPEC3 B: the request decides exactly, by part
+
+
+def jensen_regions():
+    """Regions like the Jensen figure: base, face, hair, jacket, pants, glasses, two hands."""
+    def reg(n, rgb, share, part, base=False):
+        return {"n": n, "rgb": rgb, "share": share, "base": base, "part": part,
+                "color": None if rgb is None else colors.color_name(rgb),
+                "z0": 0, "z1": 10, "pos": "base" if base else "middle", "region": n - 1}
+    return [reg(1, None, 0.48, "base", base=True), reg(2, [225, 180, 150], 0.17, "face"),
+            reg(3, [235, 235, 235], 0.14, "hair"), reg(4, [25, 25, 25], 0.13, "jacket"),
+            reg(5, [30, 30, 30], 0.05, "pants"), reg(6, [20, 20, 20], 0.01, "glasses"),
+            reg(7, [225, 180, 150], 0.01, "hands"), reg(8, [225, 180, 150], 0.01, "hands")]
+
+
+FIL = ["red", "white", "blue", "black"]
+
+
+@pytest.mark.parametrize("req", [
+    "A mini figure of Jensen Huang, 90 mm tall, all white but the jacket",
+    "A mini figure of Jensen Huang, 90 mm tall, with \"JENSEN\" on the base, all white but the jacket, which is black.",
+    "Jensen Huang, all white except the jacket",
+    "Jensen Huang in a black jacket, white everywhere else",
+    "Jensen Huang, white with a black jacket",
+    "Jensen Huang with the jacket in black, the rest white",
+])
+def test_part_phrases_give_exactly_that_mapping(req):
+    names = colors.subject_names(req)
+    line = cli._suggest_line(jensen_regions(), FIL, colors.without_names(req, names))
+    assert line == "stone colors jacket=black rest=white", (req, line)
+
+
+def test_part_phrase_forms():
+    pc = lambda r: {k: v for k, v in colors.part_colors(r).items() if not k.startswith("word:")}
+    assert pc("a black jacket") == {"top": "black"}
+    assert pc("the jacket in black") == {"top": "black"}
+    assert pc("all white but the jacket") == {"top": "picture"}
+    assert pc("all white but the jacket, which is black") == {"top": "black"}
+    assert pc("red shoes and blue pants") == {"shoes": "red", "pants": "blue"}
+    assert colors.part_colors("a black jacket")["word:top"] == "jacket"
+
+
+def test_a_part_after_but_keeps_its_picture_color_or_the_next_most_different():
+    # the jacket is black in the picture and black is loaded: jacket=black
+    line = cli._suggest_line(jensen_regions(), FIL, "all white but the jacket")
+    assert line == "stone colors jacket=black rest=white"
+    # a jacket that is white in the picture, all white but the jacket: not white again
+    regs = jensen_regions()
+    regs[3]["rgb"] = [240, 240, 240]
+    regs[3]["color"] = "white"
+    line = cli._suggest_line(regs, FIL, "all white but the jacket")
+    assert "rest=white" in line and "jacket=white" not in line and "jacket=" in line, line
+
+
+def test_a_plain_color_alone_is_the_rest():
+    assert cli._suggest_line(jensen_regions(), FIL, "Jensen Huang in white") == "stone colors rest=white"
+
+
+def test_with_no_part_named_the_photo_colors_stay():
+    line = cli._suggest_line(jensen_regions(), FIL, "A mini figure of Jensen Huang")
+    assert "jacket=black" in line and "rest=" in line

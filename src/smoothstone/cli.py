@@ -1294,10 +1294,20 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
     """(region -> filament, rest filament, extra filaments). On a figure whose request names parts
     ("a black jacket", "all white but the jacket"), exactly that: each named part its color, a
     part after "but" its picture color, every other part the rest color. Otherwise _suggest_colors."""
+    from . import parts
+
     pc = {k: v for k, v in colortool.part_colors(request).items() if not k.startswith("word:")}
+    named = colortool.request_colors(request)
+    words = re.findall(r"[a-z]+(?:-[a-z]+)?", request.lower())
+    if (not pc and len(named) == 1 and any(d.get("part") for d in info)
+            and not any(parts.part_of(w) for w in words)):
+        # one color and no part named ("Jensen Huang in white"): the whole figure is that color
+        n = _match_filament(named[0], fil)
+        if n is None:
+            return {}, len(fil) + 1, [named[0]]
+        return {}, n, []
     if not pc or not any(d.get("part") for d in info):
         return _suggest_colors(info, fil, request)
-    from . import parts
 
     extra: list[str] = []
     allf = list(fil)
@@ -1310,7 +1320,6 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
             n = len(allf)
         return n
 
-    named = colortool.request_colors(request)
     rest_c = _rest_color(request, named)
     if rest_c is None:
         plain = [c for c in named if c not in pc.values()]
