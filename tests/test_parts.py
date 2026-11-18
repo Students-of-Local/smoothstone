@@ -118,3 +118,77 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
     C.mark_grooves([ring], [ln])
     assert ring.get("groove") == "wrist"
     assert not C.edge_faults([ring])
+
+
+# SPEC3 A: the anatomy of a figure from its shape
+
+
+def block_figure():
+    """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
+    a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
+    the neck between the torso and the head (48 to 52)."""
+    def box(ext, at):
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        return b
+
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    torso = box([22, 12, 20], [0, 0, 38])
+    arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
+    hands = []
+    for x in (-14.5, 14.5):  # 1 mm clear of the torso, so below the arm each hand is loose
+        h = trimesh.creation.icosphere(subdivisions=4, radius=2.5)
+        h.apply_translation([x, 0, 32.5])
+        hands.append(h)
+    neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    # fine faces, as a sculpted figure has, so lines and pieces are resolved
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+def test_anatomy_of_a_block_figure():
+    m = block_figure()
+    a = parts.anatomy(m, 8.0)
+    assert 28.0 <= a["hem"] <= 29.0, a["hem"]
+    assert 48.0 <= a["neck"] <= 52.0, a["neck"]
+    assert sorted(w["side"] for w in a["wrists"]) == [-1, 1]
+    for w in a["wrists"]:
+        assert 33.5 <= w["z"] <= 35.0, w
+    assert abs(a["center"]) < 0.5
+    names = {(ln["name"], ln.get("side")) for ln in a["lines"]}
+    assert names == {("hem", None), ("neck", None), ("wrist", -1), ("wrist", 1)}
+
+
+def test_part_names_of_a_block_figure():
+    m = block_figure()
+    a = parts.anatomy(m, 8.0)
+    V, F = parts.cut(m.vertices, m.faces, a)
+    m = C.load_stl_mesh(V, F)
+    zc = m.triangles_center[:, 2]
+    base = (zc < 8.0) | (m.vertices[m.faces][:, :, 2].max(1) <= 8.01)
+    zone, hand = parts.zones(m, a, base)
+    assert (hand >= 0).sum() > 0 and set(np.unique(hand[hand >= 0])) == {0, 1}
+    # one region per zone, each hand its own
+    region = zone.copy()
+    region[hand == 1] = len(parts.ZONES)
+    _, region = np.unique(region, return_inverse=True)
+    region = region.reshape(-1)
+    R = int(region.max()) + 1
+    base_region = int(region[base][0])
+    palette = {parts.LEGS: [30, 30, 90], parts.TORSO: [20, 20, 20], parts.HANDS: [225, 180, 150],
+               parts.HEAD: [225, 180, 150]}
+    rgb = [None] * R
+    for r in range(R):
+        if r != base_region:
+            z = int(np.bincount(zone[region == r]).argmax())
+            rgb[r] = palette[z]
+    info = C.describe(m, region, rgb, base_region)
+    parts.name_parts(m, region, info, zone, a, look="a man in a black jacket and jeans")
+    got = sorted(d["part"] for d in info)
+    assert got == sorted(["base", "jeans", "jacket", "hands", "hands", "face"]), got
