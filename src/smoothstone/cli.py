@@ -713,8 +713,7 @@ def cmd_build(args, job: Job) -> Out:
         return out
 
     bed = config.bed(job.root)
-    off = stl.with_suffix(".off")
-    results = checks.check_stl(off if off.is_file() else stl, recipe=r, params=params, bed=bed)
+    results = checks.check_stl(stl, recipe=r, params=params, bed=bed)  # the file that ships
     ok = checks.passed(results)
     size = checks.measured_size(results)
     texts, nxt = plan_fix(r, params, results) if not ok else ({}, None)

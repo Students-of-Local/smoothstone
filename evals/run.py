@@ -262,9 +262,8 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         why.append("the picture was not used")
     res = []
     if done and recipe:
-        off = job / "build" / "part.off"
         r = rc.load(recipe)
-        res = [x.to_dict() for x in checks.check_stl(off if off.exists() else final, recipe=r, params=params)]
+        res = [x.to_dict() for x in checks.check_stl(final, recipe=r, params=params)]  # the file that ships
         bad = [x["name"] for x in res if not x["ok"]]
         if bad:
             why.append("print checks fail: " + ", ".join(bad))
