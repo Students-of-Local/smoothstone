@@ -24,6 +24,7 @@
   {
    "name": "phone",
    "type": "choice",
+   "product": true,
    "default": "iphone_17_pro",
    "choices": [
     "iphone_17",

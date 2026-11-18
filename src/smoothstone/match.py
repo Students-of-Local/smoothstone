@@ -329,10 +329,9 @@ def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None)
     text = " ".join([request, *(notes or [])])
     if _numbers(text):
         return None
-    low = text.lower()
-    for p in r.params:
-        if p.type == "choice" and any(len(str(c)) > 3 and str(c).lower().replace("_", " ") in low.replace("-", " ")
-                                      for c in p.choices):
+    low = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()) + " "
+    for p in r.params:  # only a product choice is a size: "cover" or "round" names no real thing
+        if p.product and any(" " + re.sub(r"[^a-z0-9]+", " ", str(c).lower()).strip() + " " in low for c in p.choices):
             return None
     thing = (m.group("thing") or m.group("thing2") or "it").strip()
     thing = re.sub(r"\bmy\b", "your", re.sub(r"\bour\b", "your", thing, flags=re.I), flags=re.I)

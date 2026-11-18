@@ -407,9 +407,13 @@ def cmd_set(args, job: Job) -> Out:
             r = rc.load(plan["recipe"])
         else:
             return unknown_recipe(name, out, t)
-    named = [f"{k} {v.replace('_', ' ')}" for k, v in (it.split("=", 1) for it in items if "=" in it)
-             if r.param(k) is not None and r.param(k).type == "choice"]  # phone=iphone_17_pro names the product
-    ask = match.missing_fit_size(r, job.request(), job.notes() + named)
+    given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
+    # the set line answers the question when it names the product (phone=iphone_17_pro) or gives a length
+    # (hole_d=60); so does a size measured from a photo
+    named = [f"{k} {v.replace('_', ' ')}" for k, v, p in given if p is not None and p.product]
+    sized = not any(p.product for p in r.params) and any(
+        p is not None and p.type in ("number", "int") and p.unit == "mm" for _, _, p in given)
+    ask = None if sized or job.measured() else match.missing_fit_size(r, job.request(), job.notes() + named)
     if ask:
         # never invent the size of the thing a part must fit: a small model would, so the tool stops it
         out.fix("this part must fit something real and the request gives no size for it; never guess one")

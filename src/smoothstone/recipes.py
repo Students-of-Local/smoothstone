@@ -40,6 +40,7 @@ class Param:
     required: bool = False
     required_unless: str = ""
     fit_add: float = 0.0  # clearance added to a size read from the request ("5 mm cables" -> 5.3 mm slots)
+    product: bool = False  # a choice that names the real thing the part fits (phone=iphone_17_pro), so it is a size
 
     def range_text(self) -> str:
         if self.type in ("number", "int"):
@@ -164,6 +165,7 @@ def _load_one(d: Path) -> Recipe:
                 required=bool(raw.get("required", False)),
                 required_unless=raw.get("required_unless", "") or "",
                 fit_add=float(raw.get("fit_add", 0) or 0),
+                product=bool(raw.get("product", False)),
             )
         )
     return Recipe(

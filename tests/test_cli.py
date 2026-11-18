@@ -569,3 +569,25 @@ def test_naming_the_product_in_set_answers_the_question(jobenv, recipes_root):
     assert code == 1 and nxt.startswith("ask the person")
     _, code, nxt = stone("set", "phone_case", "phone=iphone_17_pro")
     assert code == 0 and nxt == "stone build"
+
+
+def test_a_word_inside_the_request_is_not_a_product(jobenv, recipes_root):
+    # "cover" is a buttons choice and "tpu" a material: neither names the phone
+    shutil.copytree(REPO / "recipes" / "phone_case", recipes_root / "phone_case")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A cover for my phone.")
+    _, code, nxt = stone("set", "phone_case")
+    assert code == 1 and nxt.startswith("ask the person")
+    _, code, nxt = stone("set", "phone_case", "material=tpu", "wall=1.6")
+    assert code == 1 and nxt.startswith("ask the person")
+
+
+def test_a_length_in_the_set_line_answers_the_question(jobenv, recipes_root):
+    # the model asked in chat, got "60 mm", and set it: stone must not ask again
+    shutil.copytree(REPO / "recipes" / "grommet", recipes_root / "grommet")
+    shutil.copytree(REPO / "recipes" / "lib", recipes_root / "lib", dirs_exist_ok=True)
+    stone("new", "A cover for the cable hole in my desk.")
+    _, code, nxt = stone("set", "grommet")
+    assert code == 1 and nxt.startswith("ask the person")
+    _, code, nxt = stone("set", "grommet", "hole_d=60")
+    assert code == 0 and nxt == "stone build"
