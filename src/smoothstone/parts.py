@@ -591,9 +591,17 @@ def cut(V, F, anat: dict):
         if hf is None:
             continue
         vr = _with_ring(F, hf, len(V))[0]
-        V, F = cut_iso(V, F, np.where(vr, field(ln, V), 1.0), 0.0, snap=0.02)
+        V, F = cut_masked(V, F, field(ln, V), vr)
         V = V.astype(np.float32).astype(float)
     return V, F
+
+
+def cut_masked(V, F, d: np.ndarray, inside: np.ndarray):
+    """Cut along d == 0 only among the `inside` vertices: every other vertex counts as +1. The snap
+    distance comes from d itself, not from the jump to +1 at the rim of the zone."""
+    from .clean import cut_iso
+
+    return cut_iso(V, F, np.where(inside, d, 1.0), 0.0, snap=0.02, slope=d)
 
 
 def _wrist_lines(anat: dict) -> list[dict]:
