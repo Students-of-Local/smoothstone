@@ -48,7 +48,8 @@ LOOK = {
 }
 LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
-               "hairstyle, the same glasses frame shape if any, the same face shape, smile and "
+               "hairstyle, the same glasses exactly if any: the same frame shape, the same thin frame "
+               "thickness and color, never thicker or bolder than in the photo, the same face shape, smile and "
                "skin tone. "),
     "animal": "Keep the likeness from the first photo exactly: the same fur colors, markings, ears and face. ",
     "object": "",
