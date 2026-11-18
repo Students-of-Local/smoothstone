@@ -575,6 +575,18 @@ def test_a_plain_color_alone_is_the_rest():
     assert cli._suggest_line(jensen_regions(), FIL, "Jensen Huang in white") == "stone colors rest=white"
 
 
+@pytest.mark.parametrize("req,want", [
+    ('A mini figure of Jensen Huang in white, 90 mm tall, with "JENSEN" on the base', "white"),
+    ('A mini figure of Jensen Huang in red, 90 mm tall, with "JENSEN" on the base', "red"),
+])
+def test_one_color_with_the_base_mentioned_is_a_one_color_print(req, want):
+    """Review round 2 first-F1: "base" (or name, head, face) mentioned without a color is not a
+    part given a color, so one named color still means the whole figure in it."""
+    names = colors.subject_names(req)
+    line = cli._suggest_line(jensen_regions(), FIL, colors.without_names(req, names))
+    assert line == f"stone colors rest={want}", (req, line)
+
+
 def test_with_no_part_named_the_photo_colors_stay():
     line = cli._suggest_line(jensen_regions(), FIL, "A mini figure of Jensen Huang")
     assert "jacket=black" in line and "rest=" in line

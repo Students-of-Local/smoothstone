@@ -1298,10 +1298,9 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
 
     pc = {k: v for k, v in colortool.part_colors(request).items() if not k.startswith("word:")}
     named = colortool.request_colors(request)
-    words = re.findall(r"[a-z]+(?:-[a-z]+)?", request.lower())
-    if (not pc and len(named) == 1 and any(d.get("part") for d in info)
-            and not any(parts.part_of(w) for w in words)):
-        # one color and no part named ("Jensen Huang in white"): the whole figure is that color
+    if not pc and len(named) == 1 and any(d.get("part") for d in info):
+        # one color and no part given a color ("Jensen Huang in white", even with "on the base"
+        # or "his face" said along the way): the whole figure is that color
         n = _match_filament(named[0], fil)
         if n is None:
             return {}, len(fil) + 1, [named[0]]
