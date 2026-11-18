@@ -253,3 +253,39 @@ def test_ledges_do_not_depend_on_the_vertex_order():
     assert a[0]["faces"] > 0, a
     assert [(x["area"], x["angle"], x["fil"], x["faces"]) for x in a] == \
         [(x["area"], x["angle"], x["fil"], x["faces"]) for x in b], (a, b)
+
+
+def test_a_jacket_in_three_palette_regions_is_all_jacket():
+    """Review sol-F2: a jacket split into the chest and two sleeves of another palette color
+    is one garment; jacket=black reaches all three regions."""
+    from smoothstone import cli
+
+    m = block_figure()
+    a = parts.anatomy(m, 8.0)
+    V, F = parts.cut(m.vertices, m.faces, a)
+    m = C.load_stl_mesh(V, F)
+    c = m.triangles_center
+    base = (c[:, 2] < 8.0) | (m.vertices[m.faces][:, :, 2].max(1) <= 8.01)
+    zone, hand = parts.zones(m, a, base)
+    region = zone.copy()
+    region[hand == 1] = len(parts.ZONES)
+    torso = zone == parts.TORSO
+    region[torso & (c[:, 0] < -11)] = len(parts.ZONES) + 1  # left sleeve
+    region[torso & (c[:, 0] > 11)] = len(parts.ZONES) + 2  # right sleeve
+    _, region = np.unique(region, return_inverse=True)
+    region = region.reshape(-1)
+    R = int(region.max()) + 1
+    base_region = int(region[base][0])
+    sleeves = {int(region[torso & (c[:, 0] < -11)][0]), int(region[torso & (c[:, 0] > 11)][0])}
+    palette = {parts.LEGS: [30, 30, 90], parts.TORSO: [20, 20, 20], parts.HANDS: [225, 180, 150],
+               parts.HEAD: [225, 180, 150]}
+    rgb = [None] * R
+    for r in range(R):
+        if r != base_region:
+            rgb[r] = [70, 70, 75] if r in sleeves else palette[int(np.bincount(zone[region == r]).argmax())]
+    info = C.describe(m, region, rgb, base_region)
+    parts.name_parts(m, region, info, zone, a, look="a man in a black jacket and jeans")
+    jacket = sorted(d["region"] for d in info if d["part"] == "jacket")
+    assert len(jacket) == 3 and sleeves <= set(jacket), [(d["region"], d["part"]) for d in info]
+    black = sorted(r for n in cli._part_regions(info, "jacket") for r in [next(d["region"] for d in info if d["n"] == n)])
+    assert black == jacket

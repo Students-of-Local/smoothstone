@@ -481,7 +481,7 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     info = listing(reg)
     merged = []
     if anat is not None:
-        keep = {d["region"] for d in info if d["part"] != "other"}
+        keep = {d["region"] for d in info if d["part"] != "other" and not d.get("extra")}
         reg, merged = parts.merge_odd(mesh, reg, labels, zone, keep, anat["center"])
         if merged:
             _, reg = np.unique(reg, return_inverse=True)
@@ -490,6 +490,7 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     num = np.zeros(int(reg.max()) + 1, int)
     for d in info:
         num[d["region"]] = d["n"]
+        d.pop("extra", None)
     if anat is not None:
         anat = {**anat, "merged": [why for _, _, why in merged]}
     return {"mesh": mesh, "num": num[reg], "regions": info, "fixed": fixed if anat is not None else (base if base.any() else None),

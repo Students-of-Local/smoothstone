@@ -901,8 +901,14 @@ def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, ana
     for d in info:
         if zr[d["region"]] == HANDS:
             d["part"] = "hands"
-    head = sorted([d for d in info if zr[d["region"]] == HEAD and not d["base"]], key=lambda d: -d["share"])
     skin = _lab([NAMES["skin"]])[0]
+    # the garment between hem and neck, body and arms: every region of it, not just the largest, so
+    # sleeves of another shade are the jacket too. Skin there is bare arms, not the garment. These
+    # extra regions stay open to merge_odd, which cleans up stray patches ("extra").
+    for d in torso[1:]:
+        if d["part"] == "other" and d["rgb"] is not None and np.linalg.norm(_lab(d["rgb"])[0] - skin) >= 40:
+            d["part"], d["extra"] = "top", True
+    head = sorted([d for d in info if zr[d["region"]] == HEAD and not d["base"]], key=lambda d: -d["share"])
     face = None
     for d in head:
         if d["rgb"] is not None and np.linalg.norm(_lab(d["rgb"])[0] - skin) < 40 and (region == d["region"]).any():
