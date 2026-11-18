@@ -1,0 +1,11 @@
+{
+ "id": "t7_phone_case",
+ "request": "A case for my iPhone 17 Pro Max in TPU.",
+ "expect": {
+  "recipe": "phone_case",
+  "params": {
+   "phone": "iphone_17_pro_max",
+   "material": "tpu"
+  }
+ }
+}
