@@ -325,7 +325,7 @@ def _part_key(name: str) -> str:
     return name
 
 
-PART_OFF_MAX = 0.08  # share of a part's area that may take another color where its edge follows a groove
+PART_OFF_MAX = 0.02  # share of a part's area that may take another color (0.0 measured on real f2 builds)
 
 
 def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
