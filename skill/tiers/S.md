@@ -11,6 +11,7 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 - Never make up a size the part has to fit. If the part must fit a real product and you have no
   size for it, ask for the size or a photo with a ruler (stone measure).
 - If you lost track or your memory was cleared, run: stone status
+- For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
 - Stop when stone says the part is ready.
 
 ## Steps

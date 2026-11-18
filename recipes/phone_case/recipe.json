@@ -1,0 +1,249 @@
+{
+ "name": "phone_case",
+ "title": "Phone case",
+ "summary": "Fitted case for the iPhone 17, 17 Pro, 17 Pro Max or iPhone Air, sized from Apple's dimensional drawings. Rigid or TPU fit, open or covered buttons, optional name on the back, and a thin fit-test ring.",
+ "tags": [
+  "phone",
+  "case",
+  "iphone",
+  "cover",
+  "bumper",
+  "shell",
+  "tpu",
+  "apple",
+  "17",
+  "pro",
+  "max",
+  "air",
+  "protective",
+  "mobile",
+  "cell"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "phone",
+   "type": "choice",
+   "default": "iphone_17_pro",
+   "choices": [
+    "iphone_17",
+    "iphone_17_pro",
+    "iphone_17_pro_max",
+    "iphone_air"
+   ],
+   "help": "which phone; the exact model matters, a 17 Pro case does not fit a 17 Pro Max"
+  },
+  {
+   "name": "material",
+   "type": "choice",
+   "default": "rigid",
+   "choices": [
+    "rigid",
+    "tpu"
+   ],
+   "help": "rigid (PLA, PETG, ABS) leaves 0.25 mm room per side; tpu (flexible) leaves 0.05 mm"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 1.6,
+   "min": 1.0,
+   "max": 3.0,
+   "unit": "mm",
+   "help": "side wall thickness outside the phone"
+  },
+  {
+   "name": "back",
+   "type": "number",
+   "default": 1.4,
+   "min": 1.0,
+   "max": 2.1,
+   "unit": "mm",
+   "help": "back plate thickness (Apple allows at most 2.1)"
+  },
+  {
+   "name": "lip",
+   "type": "number",
+   "default": 0.8,
+   "min": 0.3,
+   "max": 2.0,
+   "unit": "mm",
+   "help": "how far the rim stands above the screen"
+  },
+  {
+   "name": "buttons",
+   "type": "choice",
+   "default": "cutout",
+   "choices": [
+    "cutout",
+    "cover"
+   ],
+   "help": "cutout = open slots over the buttons; cover = covers you press through (Camera Control stays open)"
+  },
+  {
+   "name": "camera_margin",
+   "type": "number",
+   "default": 1.0,
+   "min": 0.3,
+   "max": 4.0,
+   "unit": "mm",
+   "help": "extra room around the camera plateau"
+  },
+  {
+   "name": "text",
+   "type": "text",
+   "default": "",
+   "help": "name or word engraved on the back; empty for none"
+  },
+  {
+   "name": "text_size",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 20,
+   "unit": "mm",
+   "help": "letter height, 0 = fit the width"
+  },
+  {
+   "name": "font",
+   "type": "choice",
+   "default": "sans",
+   "choices": [
+    "sans",
+    "serif",
+    "mono"
+   ],
+   "help": "font for the text"
+  },
+  {
+   "name": "slice",
+   "type": "number",
+   "default": 0,
+   "min": 0,
+   "max": 15,
+   "unit": "mm",
+   "help": "0 = whole case; above 0 = print only the top this many mm as a quick fit-test ring (10 is a good test)"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 48,
+   "min": 16,
+   "max": 128,
+   "help": "circle smoothness"
+  }
+ ],
+ "dims": {
+  "x": "(71.45 if phone == 'iphone_17' else 71.85 if phone == 'iphone_17_pro' else 77.98 if phone == 'iphone_17_pro_max' else 74.7) + 2 * ((0.05 if material == 'tpu' else 0.25) + wall) + (0.3 if buttons == 'cover' else 0)",
+  "y": "(149.61 if phone == 'iphone_17' else 150.01 if phone == 'iphone_17_pro' else 163.43 if phone == 'iphone_17_pro_max' else 156.18) + 2 * ((0.05 if material == 'tpu' else 0.25) + wall)",
+  "z": "min(slice, back + (7.95 if phone == 'iphone_17' else 8.75 if phone == 'iphone_17_pro' else 8.75 if phone == 'iphone_17_pro_max' else 5.64) + lip) if slice > 0 else back + (7.95 if phone == 'iphone_17' else 8.75 if phone == 'iphone_17_pro' else 8.75 if phone == 'iphone_17_pro_max' else 5.64) + lip"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "min_wall": 0.6,
+ "fix": {
+  "min_wall": {
+   "param": "wall",
+   "dir": "up"
+  }
+ },
+ "examples": [
+  {
+   "name": "pro_name",
+   "params": {
+    "phone": "iphone_17_pro",
+    "text": "DONOVAN"
+   }
+  },
+  {
+   "name": "pro_max_tpu_cover",
+   "params": {
+    "phone": "iphone_17_pro_max",
+    "material": "tpu",
+    "buttons": "cover"
+   }
+  },
+  {
+   "name": "iphone_17",
+   "params": {
+    "phone": "iphone_17"
+   }
+  },
+  {
+   "name": "air_cover",
+   "params": {
+    "phone": "iphone_air",
+    "buttons": "cover"
+   }
+  },
+  {
+   "name": "pro_fit_ring",
+   "params": {
+    "phone": "iphone_17_pro",
+    "slice": 10
+   }
+  }
+ ],
+ "aliases": {
+  "text": [
+   "name",
+   "engraving",
+   "words"
+  ],
+  "slice": [
+   "test ring",
+   "fit test"
+  ]
+ },
+ "phrases": {
+  "iphone 17 pro max": {
+   "phone": "iphone_17_pro_max"
+  },
+  "17 pro max": {
+   "phone": "iphone_17_pro_max"
+  },
+  "pro max": {
+   "phone": "iphone_17_pro_max"
+  },
+  "iphone 17 pro": {
+   "phone": "iphone_17_pro"
+  },
+  "17 pro": {
+   "phone": "iphone_17_pro"
+  },
+  "iphone 17": {
+   "phone": "iphone_17"
+  },
+  "iphone air": {
+   "phone": "iphone_air"
+  },
+  "air": {
+   "phone": "iphone_air"
+  },
+  "flexible": {
+   "material": "tpu"
+  },
+  "soft case": {
+   "material": "tpu"
+  },
+  "tpu": {
+   "material": "tpu"
+  },
+  "button covers": {
+   "buttons": "cover"
+  },
+  "covered buttons": {
+   "buttons": "cover"
+  },
+  "cover the buttons": {
+   "buttons": "cover"
+  },
+  "fit test": {
+   "slice": 10
+  },
+  "test ring": {
+   "slice": 10
+  }
+ }
+}

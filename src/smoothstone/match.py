@@ -142,15 +142,27 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
                       r"([A-Z0-9][A-Za-z0-9&-]{0,15})\b", request)
         if m and m.group(1).lower() not in STOP | {"it", "on", "my", "this", "that"}:
             quoted = [m.group(1)]
+    if not quoted:  # a case with DONOVAN on the back: a word in capitals placed on a face
+        m = re.search(r"\bwith\s+([A-Z][A-Z0-9&-]{1,15})\s+(?:on|across)\s+(?:the\s+)?"
+                      r"(?:back|front|lid|top|bottom|side)\b", request)
+        if m:
+            quoted = [m.group(1)]
     if quoted and texts:
         out[texts[0].name] = quoted[0]
-    # choice values named in the request
-    low = " ".join(request.lower().split())
-    for phrase, vals in (getattr(r, "phrases", {}) or {}).items():
-        if phrase.lower() in low:
-            for k, v in vals.items():
-                if r.param(k) is not None and k not in out:
-                    out[k] = v
+    asks = []
+    if texts and texts[0].name not in out and re.search(r"\bmy name\b", request, re.I):
+        asks.append(f"my name (ask for it, then stone set {texts[0].name}=NAME)")
+    # phrases, longest first; a matched phrase is used up, so "17" in "iPhone 17 Pro" is not left as a size
+    phrases = getattr(r, "phrases", {}) or {}
+    for phrase in sorted(phrases, key=len, reverse=True):
+        pat = r"(?<![a-z0-9])" + r"\s+".join(re.escape(w) for w in phrase.lower().split()) + r"(?![a-z0-9])"
+        m = re.search(pat, request, re.I)
+        if not m:
+            continue
+        for k, v in phrases[phrase].items():
+            if r.param(k) is not None and k not in out:
+                out[k] = v
+        request = request[:m.start()] + " " * (m.end() - m.start()) + request[m.end():]
     req_words = set(_words(request))
     own = set(_words(r.name.replace("_", " ") + " " + r.title))  # "box" names the recipe, not part=box
     for p in r.params:
@@ -295,4 +307,4 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             continue
         tail = " ".join(re.findall(r"[a-zA-Z]+", request[e0:e0 + 30])[:2])
         left.append((request[s0:e0].strip() + " " + tail).strip())
-    return {p.name: out[p.name] for p in r.params if p.name in out}, left
+    return {p.name: out[p.name] for p in r.params if p.name in out}, left + asks

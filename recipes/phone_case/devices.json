@@ -1,0 +1,1925 @@
+{
+ "about": "Fit numbers for the phone_case recipe, read from Apple's Accessory Design Guidelines dimensional drawings (Apple's PDFs in smoothstone-jobs/apple-drawings). Every value has v (mm unless noted) and src (pdf and page). src 'not in drawing' marks a value the drawing does not give; how says what was used instead. Page 1 is the legal page, p2 is sheet 1 (main dimensions), p3 sheet 2 (Camera Control), p4 sheet 3 (camera and sensor keepouts), p5 sheet 4 (antenna and metal keepouts). The drawings say DO NOT SCALE, so nothing here is measured off the picture. Front view: x across from the left edge, y down from the top. Left side = Action and volume buttons; right side = side button and Camera Control. Run tools/phone_devices.py after editing this file.",
+ "case_rules": {
+  "back_max": {
+   "v": 2.1,
+   "src": "iphone-17-pro.pdf p2",
+   "how": "note 8 on every sheet 1: case thickness on the back at most 2.1 mm"
+  },
+  "ports_open": {
+   "v": null,
+   "src": "iphone-17-pro.pdf p2",
+   "how": "note 2: do not obstruct ports, speakers or microphones"
+  }
+ },
+ "phones": {
+  "iphone_17_pro": {
+   "name": "iPhone 17 Pro",
+   "drawing": "iphone-17-pro.pdf",
+   "body": {
+    "width": {
+     "v": 71.85,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "overall width, front view, sheet 1"
+    },
+    "height": {
+     "v": 150.01,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "overall height, front view, sheet 1"
+    },
+    "depth": {
+     "v": 8.75,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "overall thickness without the camera plateau, side view, sheet 1"
+    }
+   },
+   "display": {
+    "glass_width": {
+     "v": 69.45,
+     "src": "iphone-17-pro.pdf p2"
+    },
+    "glass_height": {
+     "v": 147.61,
+     "src": "iphone-17-pro.pdf p2"
+    },
+    "housing_to_active_area": {
+     "v": 2.64,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail A"
+    },
+    "housing_to_flat": {
+     "v": 2.61,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail B: where the front face turns flat, mm in from the side"
+    }
+   },
+   "corner": {
+    "points": {
+     "v": [
+      [
+       0,
+       19.43
+      ],
+      [
+       0.04,
+       13.9
+      ],
+      [
+       0.92,
+       8.46
+      ],
+      [
+       3.8,
+       3.8
+      ],
+      [
+       8.46,
+       0.92
+      ],
+      [
+       13.9,
+       0.04
+      ],
+      [
+       19.43,
+       0
+      ]
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail A: [mm in from the side edge, mm down from the top edge] along the plan-view corner. Points are listed from the side tangent to the top tangent."
+    },
+    "radius": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "Apple gives no single corner radius; the corner is a continuous-curvature curve given by the points. The recipe draws a Catmull-Rom curve through them. tools/phone_devices.py reports the radius of the circle through the 45 degree point for reference."
+    }
+   },
+   "edge": {
+    "front": {
+     "v": [
+      [
+       0.01,
+       1.5
+      ],
+      [
+       0.15,
+       2.99
+      ],
+      [
+       0.9,
+       4.24
+      ],
+      [
+       1.2,
+       4.29
+      ],
+      [
+       2.61,
+       4.38
+      ]
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail B, profile (all sides): [mm in from the side, mm above mid-thickness]. The front and back profiles differ."
+    },
+    "back": {
+     "v": [
+      [
+       0,
+       -1.44
+      ],
+      [
+       0.17,
+       -2.86
+      ],
+      [
+       0.97,
+       -4.01
+      ],
+      [
+       2.35,
+       -4.35
+      ],
+      [
+       3.79,
+       -4.38
+      ]
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail B: [mm in from the side, mm below mid-thickness, negative]. The front and back profiles differ."
+    }
+   },
+   "buttons": {
+    "action": {
+     "side": "left",
+     "center_from_top": {
+      "v": 34.28,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 6.9,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "34.28 +/- 3.45"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_up": {
+     "side": "left",
+     "center_from_top": {
+      "v": 48.43,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "48.43 +/- 5.6"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_down": {
+     "side": "left",
+     "center_from_top": {
+      "v": 62.63,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "62.63 +/- 5.6"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "side": {
+     "side": "right",
+     "center_from_top": {
+      "v": 55.53,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "right side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 17.7,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "55.53 +/- 8.85"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "camera_control": {
+     "side": "right",
+     "center_from_top": {
+      "v": 98.4,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "right side view, sheet 1, center line (Camera Control)"
+     },
+     "length": {
+      "v": 17.1,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "98.4 +/- 8.55"
+     },
+     "width": {
+      "v": 3.03,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.0,
+      "src": "iphone-17-pro.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    }
+   },
+   "camera_control_keepout": {
+    "length": {
+     "v": 25.0,
+     "src": "iphone-17-pro.pdf p3",
+     "how": "sheet 2, typical case keepout measured from the surface"
+    },
+    "half_height": {
+     "v": 4.22,
+     "src": "iphone-17-pro.pdf p3",
+     "how": "Detail E: half height 4.22 (section L-L reads 4.20; the recipe uses 4.22)"
+    },
+    "corner_r": {
+     "v": 2.2,
+     "src": "iphone-17-pro.pdf p3",
+     "how": "4X R2.20"
+    },
+    "flare_deg": {
+     "v": 55,
+     "src": "iphone-17-pro.pdf p3",
+     "how": "keepout opens outward at 55 degrees all around"
+    }
+   },
+   "usb_c": {
+    "center_x": {
+     "v": 35.92,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "bottom view, mm from the left edge (front view); equals width / 2"
+    },
+    "opening": {
+     "v": [
+      31.43,
+      40.42
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "bottom view: x range of the port opening"
+    },
+    "keepout_width": {
+     "v": 12.45,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_height": {
+     "v": 6.6,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_r": {
+     "v": 3.25,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail C: 2X R3.25"
+    },
+    "keepout_outward": {
+     "v": 14.0,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail C: keepout flush to product surface, required outward 14.0 mm"
+    },
+    "z_from_back": {
+     "v": 4.375,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "button and port center lines are at 4.375 = half of 8.75"
+    }
+   },
+   "speaker_mic": {
+    "hole_d": {
+     "v": 1.06,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "10X dia 1.06 at 15.40 17.65 19.91 22.16 24.42 and 47.43 49.69 51.94 54.20 56.45"
+    },
+    "groups": {
+     "v": [
+      [
+       15.4,
+       24.42
+      ],
+      [
+       47.43,
+       56.45
+      ]
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "bottom view: [first, last] hole center, mm from the left edge (front view)"
+    },
+    "z_from_back": {
+     "v": 4.375,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "button and port center lines are at 4.375 = half of 8.75"
+    }
+   },
+   "receiver": {
+    "from_top": {
+     "v": [
+      0.7,
+      1.25
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail A: receiver slot, mm in from the top housing edge"
+    },
+    "length": {
+     "v": 27.38,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail A: receiver slot length, centered on the width"
+    }
+   },
+   "camera": {
+    "frame": "back view: x mm from the back-view left edge (the side-button side), y mm down from the top",
+    "plateau_height": {
+     "v": 2.55,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail D: camera plateau height above the back glass"
+    },
+    "lens_glass_height": {
+     "v": 1.88,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail D: 1.88 to the rear camera glass (the 17 Pro sheet says from the back plate, the 17 Pro Max sheet says from the camera plateau; the case uses only the plateau height)"
+    },
+    "lenses": {
+     "v": [
+      [
+       14.37,
+       14.37,
+       16.2
+      ],
+      [
+       14.37,
+       33.61,
+       16.2
+      ],
+      [
+       32.36,
+       23.99,
+       16.2
+      ]
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail D: 3X dia 16.20 [x, y, d]"
+    },
+    "flash": {
+     "v": [
+      58.03,
+      13.82,
+      6.8
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail D"
+    },
+    "mic": {
+     "v": [
+      58.03,
+      23.99,
+      1.05
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail D"
+    },
+    "sensor": {
+     "v": [
+      58.03,
+      34.16,
+      6.65
+     ],
+     "src": "iphone-17-pro.pdf p2",
+     "how": "Detail D"
+    },
+    "plateau_outline": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "the plateau runs the full width; its lower edge is drawn but not dimensioned"
+    },
+    "opening_bound": {
+     "x": {
+      "v": [
+       0,
+       null
+      ],
+      "src": "iphone-17-pro.pdf p5",
+      "how": "full width"
+     },
+     "y_bottom": {
+      "v": 58.01,
+      "src": "iphone-17-pro.pdf p5",
+      "how": "sheet 4: the area marked do not obstruct with metal, which contains the whole drawn plateau"
+     },
+     "corner_r": {
+      "v": 12.0,
+      "src": "iphone-17-pro.pdf p5",
+      "how": "sheet 4: lower corners of that area"
+     },
+     "how": "The case opening uses this dimensioned area because the plateau's own lower edge has no number."
+    }
+   },
+   "sim_tray": {
+    "center_from_top": {
+     "v": 114.19,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "left side, covered by the case"
+    },
+    "length": {
+     "v": 16.1,
+     "src": "iphone-17-pro.pdf p2",
+     "how": "114.19 +/- 8.05"
+    },
+    "width": {
+     "v": 2.56,
+     "src": "iphone-17-pro.pdf p2"
+    }
+   }
+  },
+  "iphone_17_pro_max": {
+   "name": "iPhone 17 Pro Max",
+   "drawing": "iphone-17-pro-max.pdf",
+   "body": {
+    "width": {
+     "v": 77.98,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "overall width, front view, sheet 1"
+    },
+    "height": {
+     "v": 163.43,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "overall height, front view, sheet 1"
+    },
+    "depth": {
+     "v": 8.75,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "overall thickness without the camera plateau, side view, sheet 1"
+    }
+   },
+   "display": {
+    "glass_width": {
+     "v": 75.58,
+     "src": "iphone-17-pro-max.pdf p2"
+    },
+    "glass_height": {
+     "v": 161.03,
+     "src": "iphone-17-pro-max.pdf p2"
+    },
+    "housing_to_active_area": {
+     "v": 2.56,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail A"
+    },
+    "housing_to_flat": {
+     "v": 2.61,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail B: where the front face turns flat, mm in from the side"
+    }
+   },
+   "corner": {
+    "points": {
+     "v": [
+      [
+       0,
+       19.43
+      ],
+      [
+       0.04,
+       13.9
+      ],
+      [
+       0.92,
+       8.46
+      ],
+      [
+       3.8,
+       3.8
+      ],
+      [
+       8.46,
+       0.92
+      ],
+      [
+       13.9,
+       0.04
+      ],
+      [
+       19.43,
+       0
+      ]
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail A: [mm in from the side edge, mm down from the top edge] along the plan-view corner. Points are listed from the side tangent to the top tangent."
+    },
+    "radius": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "Apple gives no single corner radius; the corner is a continuous-curvature curve given by the points. The recipe draws a Catmull-Rom curve through them. tools/phone_devices.py reports the radius of the circle through the 45 degree point for reference."
+    }
+   },
+   "edge": {
+    "front": {
+     "v": [
+      [
+       0.01,
+       1.5
+      ],
+      [
+       0.15,
+       2.99
+      ],
+      [
+       0.9,
+       4.24
+      ],
+      [
+       1.2,
+       4.29
+      ],
+      [
+       2.61,
+       4.38
+      ]
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail B, profile (all sides): [mm in from the side, mm above mid-thickness]. The front and back profiles differ."
+    },
+    "back": {
+     "v": [
+      [
+       0,
+       -1.44
+      ],
+      [
+       0.17,
+       -2.86
+      ],
+      [
+       0.97,
+       -4.01
+      ],
+      [
+       2.35,
+       -4.35
+      ],
+      [
+       3.79,
+       -4.38
+      ]
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail B: [mm in from the side, mm below mid-thickness, negative]. The front and back profiles differ."
+    }
+   },
+   "buttons": {
+    "action": {
+     "side": "left",
+     "center_from_top": {
+      "v": 34.28,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 6.9,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "34.28 +/- 3.45"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_up": {
+     "side": "left",
+     "center_from_top": {
+      "v": 48.43,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "48.43 +/- 5.6"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_down": {
+     "side": "left",
+     "center_from_top": {
+      "v": 62.63,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "62.63 +/- 5.6"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "side": {
+     "side": "right",
+     "center_from_top": {
+      "v": 55.53,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "right side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 17.7,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "55.53 +/- 8.85"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "camera_control": {
+     "side": "right",
+     "center_from_top": {
+      "v": 111.82,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "right side view, sheet 1, center line (Camera Control)"
+     },
+     "length": {
+      "v": 17.1,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "111.82 +/- 8.55"
+     },
+     "width": {
+      "v": 3.13,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 4.375,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "button and port center lines are at 4.375 = half of 8.75"
+     },
+     "protrusion": {
+      "v": 0.0,
+      "src": "iphone-17-pro-max.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    }
+   },
+   "camera_control_keepout": {
+    "length": {
+     "v": 25.0,
+     "src": "iphone-17-pro-max.pdf p3",
+     "how": "sheet 2, typical case keepout measured from the surface"
+    },
+    "half_height": {
+     "v": 4.2,
+     "src": "iphone-17-pro-max.pdf p3",
+     "how": "Detail E: half height 4.20"
+    },
+    "corner_r": {
+     "v": 2.2,
+     "src": "iphone-17-pro-max.pdf p3",
+     "how": "4X R2.20"
+    },
+    "flare_deg": {
+     "v": 55,
+     "src": "iphone-17-pro-max.pdf p3",
+     "how": "keepout opens outward at 55 degrees all around"
+    }
+   },
+   "usb_c": {
+    "center_x": {
+     "v": 38.99,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "bottom view, mm from the left edge (front view); equals width / 2"
+    },
+    "opening": {
+     "v": [
+      34.49,
+      43.49
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "bottom view: 9.00 wide port centered at 38.99"
+    },
+    "keepout_width": {
+     "v": 12.45,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_height": {
+     "v": 6.6,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_r": {
+     "v": 3.25,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail C: 2X R3.25"
+    },
+    "keepout_outward": {
+     "v": 14.0,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail C: keepout flush to product surface, required outward 14.0 mm"
+    },
+    "z_from_back": {
+     "v": 4.375,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "button and port center lines are at 4.375 = half of 8.75"
+    }
+   },
+   "speaker_mic": {
+    "hole_d": {
+     "v": 1.53,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "12X dia 1.53 at 15.41 17.65 19.91 22.16 24.42 26.67 and 51.30 53.56 55.81 58.07 60.32 62.57"
+    },
+    "groups": {
+     "v": [
+      [
+       15.41,
+       26.67
+      ],
+      [
+       51.3,
+       62.57
+      ]
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "bottom view: [first, last] hole center, mm from the left edge (front view)"
+    },
+    "z_from_back": {
+     "v": 4.375,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "button and port center lines are at 4.375 = half of 8.75"
+    }
+   },
+   "receiver": {
+    "from_top": {
+     "v": [
+      0.7,
+      1.25
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail A: receiver slot, mm in from the top housing edge"
+    },
+    "length": {
+     "v": 27.38,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail A: receiver slot length, centered on the width"
+    }
+   },
+   "camera": {
+    "frame": "back view: x mm from the back-view left edge (the side-button side), y mm down from the top",
+    "plateau_height": {
+     "v": 2.55,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail D: camera plateau height above the back glass"
+    },
+    "lens_glass_height": {
+     "v": 1.88,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail D: 1.88 to the rear camera glass (the 17 Pro sheet says from the back plate, the 17 Pro Max sheet says from the camera plateau; the case uses only the plateau height)"
+    },
+    "lenses": {
+     "v": [
+      [
+       14.37,
+       14.37,
+       16.2
+      ],
+      [
+       14.37,
+       33.61,
+       16.2
+      ],
+      [
+       32.36,
+       23.99,
+       16.2
+      ]
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail D: 3X dia 16.20 [x, y, d]"
+    },
+    "flash": {
+     "v": [
+      64.16,
+      13.82,
+      6.8
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail D"
+    },
+    "mic": {
+     "v": [
+      64.16,
+      23.99,
+      1.15
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail D"
+    },
+    "sensor": {
+     "v": [
+      64.16,
+      34.16,
+      6.65
+     ],
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "Detail D"
+    },
+    "plateau_outline": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "the plateau runs the full width; its lower edge is drawn but not dimensioned"
+    },
+    "opening_bound": {
+     "x": {
+      "v": [
+       0,
+       null
+      ],
+      "src": "iphone-17-pro-max.pdf p5",
+      "how": "full width"
+     },
+     "y_bottom": {
+      "v": 58.01,
+      "src": "iphone-17-pro-max.pdf p5",
+      "how": "sheet 4: the area marked do not obstruct with metal, which contains the whole drawn plateau"
+     },
+     "corner_r": {
+      "v": 14.0,
+      "src": "iphone-17-pro-max.pdf p5",
+      "how": "sheet 4: lower corners of that area"
+     },
+     "how": "The case opening uses this dimensioned area because the plateau's own lower edge has no number."
+    }
+   },
+   "sim_tray": {
+    "center_from_top": {
+     "v": 127.6,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "left side, covered by the case"
+    },
+    "length": {
+     "v": 16.1,
+     "src": "iphone-17-pro-max.pdf p2",
+     "how": "127.60 +/- 8.05"
+    },
+    "width": {
+     "v": 2.56,
+     "src": "iphone-17-pro-max.pdf p2"
+    }
+   }
+  },
+  "iphone_17": {
+   "name": "iPhone 17",
+   "drawing": "iphone-17.pdf",
+   "body": {
+    "width": {
+     "v": 71.45,
+     "src": "iphone-17.pdf p2",
+     "how": "overall width, front view, sheet 1"
+    },
+    "height": {
+     "v": 149.61,
+     "src": "iphone-17.pdf p2",
+     "how": "overall height, front view, sheet 1"
+    },
+    "depth": {
+     "v": 7.95,
+     "src": "iphone-17.pdf p2",
+     "how": "overall thickness without the camera plateau, side view, sheet 1"
+    }
+   },
+   "display": {
+    "glass_width": {
+     "v": 69.45,
+     "src": "iphone-17.pdf p2"
+    },
+    "glass_height": {
+     "v": 147.61,
+     "src": "iphone-17.pdf p2"
+    },
+    "housing_to_active_area": {
+     "v": 2.44,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail A"
+    },
+    "housing_to_flat": {
+     "v": 2.41,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail B: where the front face turns flat, mm in from the side"
+    }
+   },
+   "corner": {
+    "points": {
+     "v": [
+      [
+       0,
+       19.23
+      ],
+      [
+       0.02,
+       14.53
+      ],
+      [
+       0.48,
+       9.87
+      ],
+      [
+       2.26,
+       5.56
+      ],
+      [
+       5.56,
+       2.26
+      ],
+      [
+       9.87,
+       0.48
+      ],
+      [
+       14.53,
+       0.02
+      ],
+      [
+       19.23,
+       0
+      ]
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail A: [mm in from the side edge, mm down from the top edge] along the plan-view corner. Points are listed from the side tangent to the top tangent."
+    },
+    "radius": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "Apple gives no single corner radius; the corner is a continuous-curvature curve given by the points. The recipe draws a Catmull-Rom curve through them. tools/phone_devices.py reports the radius of the circle through the 45 degree point for reference."
+    }
+   },
+   "edge": {
+    "front": {
+     "v": [
+      [
+       0,
+       1.69
+      ],
+      [
+       0,
+       2.27
+      ],
+      [
+       0.05,
+       2.85
+      ],
+      [
+       0.27,
+       3.39
+      ],
+      [
+       0.7,
+       3.78
+      ],
+      [
+       1.27,
+       3.93
+      ]
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail B, profile (all sides): [mm in from the side, mm above mid-thickness]. The profile is symmetric front to back."
+    },
+    "back": {
+     "v": [
+      [
+       0,
+       -1.69
+      ],
+      [
+       0,
+       -2.27
+      ],
+      [
+       0.05,
+       -2.85
+      ],
+      [
+       0.27,
+       -3.39
+      ],
+      [
+       0.7,
+       -3.78
+      ],
+      [
+       1.27,
+       -3.93
+      ]
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail B: [mm in from the side, mm below mid-thickness, negative]. The profile is symmetric front to back."
+    }
+   },
+   "buttons": {
+    "action": {
+     "side": "left",
+     "center_from_top": {
+      "v": 34.08,
+      "src": "iphone-17.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 6.9,
+      "src": "iphone-17.pdf p2",
+      "how": "34.08 +/- 3.45"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 3.97,
+      "src": "iphone-17.pdf p2",
+      "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_up": {
+     "side": "left",
+     "center_from_top": {
+      "v": 48.23,
+      "src": "iphone-17.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-17.pdf p2",
+      "how": "48.23 +/- 5.6"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 3.97,
+      "src": "iphone-17.pdf p2",
+      "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_down": {
+     "side": "left",
+     "center_from_top": {
+      "v": 62.43,
+      "src": "iphone-17.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-17.pdf p2",
+      "how": "62.43 +/- 5.6"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 3.97,
+      "src": "iphone-17.pdf p2",
+      "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "side": {
+     "side": "right",
+     "center_from_top": {
+      "v": 55.32,
+      "src": "iphone-17.pdf p2",
+      "how": "right side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 17.7,
+      "src": "iphone-17.pdf p2",
+      "how": "55.32 +/- 8.85"
+     },
+     "width": {
+      "v": 2.66,
+      "src": "iphone-17.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 3.97,
+      "src": "iphone-17.pdf p2",
+      "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-17.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "camera_control": {
+     "side": "right",
+     "center_from_top": {
+      "v": 98.2,
+      "src": "iphone-17.pdf p2",
+      "how": "right side view, sheet 1, center line (Camera Control)"
+     },
+     "length": {
+      "v": 17.1,
+      "src": "iphone-17.pdf p2",
+      "how": "98.2 +/- 8.55"
+     },
+     "width": {
+      "v": 3.03,
+      "src": "iphone-17.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 3.97,
+      "src": "iphone-17.pdf p2",
+      "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+     },
+     "protrusion": {
+      "v": 0.0,
+      "src": "iphone-17.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    }
+   },
+   "camera_control_keepout": {
+    "length": {
+     "v": 25.0,
+     "src": "iphone-17.pdf p3",
+     "how": "sheet 2, typical case keepout measured from the surface"
+    },
+    "half_height": {
+     "v": 4.2,
+     "src": "iphone-17.pdf p3",
+     "how": "Detail E: half height 4.20"
+    },
+    "corner_r": {
+     "v": 2.2,
+     "src": "iphone-17.pdf p3",
+     "how": "4X R2.20"
+    },
+    "flare_deg": {
+     "v": 55,
+     "src": "iphone-17.pdf p3",
+     "how": "keepout opens outward at 55 degrees all around"
+    }
+   },
+   "usb_c": {
+    "center_x": {
+     "v": 35.72,
+     "src": "iphone-17.pdf p2",
+     "how": "bottom view, mm from the left edge (front view); equals width / 2"
+    },
+    "opening": {
+     "v": [
+      31.23,
+      40.22
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "bottom view: x range of the port opening"
+    },
+    "keepout_width": {
+     "v": 12.45,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_height": {
+     "v": 6.6,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_r": {
+     "v": 3.25,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail C: 2X R3.25"
+    },
+    "keepout_outward": {
+     "v": 14.0,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail C: keepout flush to product surface, required outward 14.0 mm"
+    },
+    "z_from_back": {
+     "v": 3.97,
+     "src": "iphone-17.pdf p2",
+     "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+    }
+   },
+   "speaker_mic": {
+    "hole_d": {
+     "v": 1.35,
+     "src": "iphone-17.pdf p2",
+     "how": "8X dia 1.35: one group from 19.71 to 24.22, one from 47.23 to 56.25"
+    },
+    "groups": {
+     "v": [
+      [
+       19.71,
+       24.22
+      ],
+      [
+       47.23,
+       56.25
+      ]
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "bottom view: [first, last] hole center, mm from the left edge (front view)"
+    },
+    "z_from_back": {
+     "v": 3.97,
+     "src": "iphone-17.pdf p2",
+     "how": "button and port center lines at 3.97 from the back (half of 7.95 is 3.975)"
+    }
+   },
+   "receiver": {
+    "from_top": {
+     "v": [
+      0.45,
+      1.17
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail A: receiver slot, mm in from the top housing edge"
+    },
+    "length": {
+     "v": 14.46,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail A: receiver slot length, centered on the width"
+    }
+   },
+   "camera": {
+    "frame": "back view: x mm from the back-view left edge (the side-button side), y mm down from the top",
+    "plateau_height": {
+     "v": 1.78,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail D: plateau height above the back glass"
+    },
+    "lens_glass_height": {
+     "v": 3.45,
+     "src": "iphone-17.pdf p2",
+     "how": "Detail D: camera glass height above the back glass"
+    },
+    "plateau": {
+     "x": {
+      "v": [
+       1.18,
+       26.06
+      ],
+      "src": "iphone-17.pdf p2",
+      "how": "Detail D: outer edge of the plateau"
+     },
+     "y": {
+      "v": [
+       1.34,
+       43.62
+      ],
+      "src": "iphone-17.pdf p2",
+      "how": "Detail D: outer edge of the plateau"
+     },
+     "corner_r": {
+      "v": 12.44,
+      "src": "iphone-17.pdf p2",
+      "how": "derived: the plateau is a stadium, so the end radius is half its width (26.06 - 1.18) / 2"
+     },
+     "inner_x": {
+      "v": [
+       3.79,
+       23.45
+      ],
+      "src": "iphone-17.pdf p2",
+      "how": "Detail D: top face"
+     },
+     "inner_y": {
+      "v": [
+       3.97,
+       40.99
+      ],
+      "src": "iphone-17.pdf p2",
+      "how": "Detail D: top face"
+     }
+    },
+    "lenses": {
+     "v": [
+      [
+       13.62,
+       13.62,
+       16.0
+      ],
+      [
+       13.62,
+       31.34,
+       16.0
+      ]
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail D: 2X dia 16.00 [x, y, d]"
+    },
+    "flash": {
+     "v": [
+      30.41,
+      22.48,
+      6.28
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail D: outside the plateau, on the back glass"
+    },
+    "mic": {
+     "v": [
+      20.54,
+      22.48,
+      1.0
+     ],
+     "src": "iphone-17.pdf p2",
+     "how": "Detail D"
+    }
+   },
+   "sim_tray": {
+    "center_from_top": {
+     "v": 105.66,
+     "src": "iphone-17.pdf p2",
+     "how": "left side, covered by the case"
+    },
+    "length": {
+     "v": 19.64,
+     "src": "iphone-17.pdf p2",
+     "how": "105.66 +/- 9.82"
+    }
+   }
+  },
+  "iphone_air": {
+   "name": "iPhone Air",
+   "drawing": "iphone-air.pdf",
+   "body": {
+    "width": {
+     "v": 74.7,
+     "src": "iphone-air.pdf p2",
+     "how": "overall width, front view, sheet 1"
+    },
+    "height": {
+     "v": 156.18,
+     "src": "iphone-air.pdf p2",
+     "how": "overall height, front view, sheet 1"
+    },
+    "depth": {
+     "v": 5.64,
+     "src": "iphone-air.pdf p2",
+     "how": "overall thickness without the camera plateau, side view, sheet 1"
+    }
+   },
+   "display": {
+    "glass_width": {
+     "v": 72.42,
+     "src": "iphone-air.pdf p2"
+    },
+    "glass_height": {
+     "v": 153.9,
+     "src": "iphone-air.pdf p2"
+    },
+    "housing_to_active_area": {
+     "v": 2.58,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail A"
+    },
+    "housing_to_flat": {
+     "v": 2.58,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail B: where the front face turns flat, mm in from the side"
+    }
+   },
+   "corner": {
+    "points": {
+     "v": [
+      [
+       0,
+       19.36
+      ],
+      [
+       0.04,
+       13.85
+      ],
+      [
+       0.91,
+       8.43
+      ],
+      [
+       3.78,
+       3.78
+      ],
+      [
+       8.43,
+       0.91
+      ],
+      [
+       13.85,
+       0.04
+      ],
+      [
+       19.36,
+       0
+      ]
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail A: [mm in from the side edge, mm down from the top edge] along the plan-view corner. The drawing gives the points from 0.04 / 13.85 to 13.85 / 0.04. The tangent ends at 19.36 are not in the drawing: derived as 13.85 x 19.43 / 13.90 (the 17 Pro curve, which this one matches within 0.04)."
+    },
+    "radius": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "Apple gives no single corner radius; the corner is a continuous-curvature curve given by the points. The recipe draws a Catmull-Rom curve through them. tools/phone_devices.py reports the radius of the circle through the 45 degree point for reference."
+    }
+   },
+   "edge": {
+    "front": {
+     "v": [
+      [
+       0,
+       0.38
+      ],
+      [
+       0.02,
+       1.47
+      ],
+      [
+       0.47,
+       2.44
+      ],
+      [
+       1.49,
+       2.79
+      ],
+      [
+       2.58,
+       2.82
+      ]
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail B, profile (all sides): [mm in from the side, mm above mid-thickness]. The profile is symmetric front to back."
+    },
+    "back": {
+     "v": [
+      [
+       0,
+       -0.38
+      ],
+      [
+       0.02,
+       -1.47
+      ],
+      [
+       0.47,
+       -2.44
+      ],
+      [
+       1.49,
+       -2.79
+      ],
+      [
+       2.58,
+       -2.82
+      ]
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail B: [mm in from the side, mm below mid-thickness, negative]. The profile is symmetric front to back."
+    }
+   },
+   "buttons": {
+    "action": {
+     "side": "left",
+     "center_from_top": {
+      "v": 34.08,
+      "src": "iphone-air.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 6.9,
+      "src": "iphone-air.pdf p2",
+      "how": "34.08 +/- 3.45"
+     },
+     "width": {
+      "v": 2.35,
+      "src": "iphone-air.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 2.82,
+      "src": "not in drawing",
+      "how": "the left side view gives no height for the Action and volume buttons; 2.82 (mid-thickness) is assumed from the right side, and the slot height covers it"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-air.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_up": {
+     "side": "left",
+     "center_from_top": {
+      "v": 48.23,
+      "src": "iphone-air.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-air.pdf p2",
+      "how": "48.23 +/- 5.6"
+     },
+     "width": {
+      "v": 2.35,
+      "src": "iphone-air.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 2.82,
+      "src": "not in drawing",
+      "how": "the left side view gives no height for the Action and volume buttons; 2.82 (mid-thickness) is assumed from the right side, and the slot height covers it"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-air.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "volume_down": {
+     "side": "left",
+     "center_from_top": {
+      "v": 62.43,
+      "src": "iphone-air.pdf p2",
+      "how": "left side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 11.2,
+      "src": "iphone-air.pdf p2",
+      "how": "62.43 +/- 5.6"
+     },
+     "width": {
+      "v": 2.35,
+      "src": "iphone-air.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 2.82,
+      "src": "not in drawing",
+      "how": "the left side view gives no height for the Action and volume buttons; 2.82 (mid-thickness) is assumed from the right side, and the slot height covers it"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-air.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "side": {
+     "side": "right",
+     "center_from_top": {
+      "v": 55.33,
+      "src": "iphone-air.pdf p2",
+      "how": "right side view, sheet 1, center line"
+     },
+     "length": {
+      "v": 17.8,
+      "src": "iphone-air.pdf p2",
+      "how": "55.33 +/- 8.9"
+     },
+     "width": {
+      "v": 2.35,
+      "src": "iphone-air.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 2.82,
+      "src": "iphone-air.pdf p2",
+      "how": "right side view: button center lines at 2.82 = half of 5.64"
+     },
+     "protrusion": {
+      "v": 0.45,
+      "src": "iphone-air.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    },
+    "camera_control": {
+     "side": "right",
+     "center_from_top": {
+      "v": 104.77,
+      "src": "iphone-air.pdf p2",
+      "how": "right side view, sheet 1, center line (Camera Control)"
+     },
+     "length": {
+      "v": 17.1,
+      "src": "iphone-air.pdf p2",
+      "how": "104.77 +/- 8.55"
+     },
+     "width": {
+      "v": 2.53,
+      "src": "iphone-air.pdf p2",
+      "how": "extent across the thickness"
+     },
+     "z_from_back": {
+      "v": 2.82,
+      "src": "iphone-air.pdf p2",
+      "how": "right side view: button center lines at 2.82 = half of 5.64"
+     },
+     "protrusion": {
+      "v": 0.0,
+      "src": "iphone-air.pdf p2",
+      "how": "buttons stand 0.45 proud of the side; Camera Control is flush (0.00)"
+     }
+    }
+   },
+   "camera_control_keepout": {
+    "length": {
+     "v": 25.0,
+     "src": "iphone-air.pdf p3",
+     "how": "sheet 2, typical case keepout measured from the surface"
+    },
+    "half_height": {
+     "v": 2.91,
+     "src": "iphone-air.pdf p3",
+     "how": "Detail E: half height 2.91"
+    },
+    "corner_r": {
+     "v": 2.2,
+     "src": "iphone-air.pdf p3",
+     "how": "4X R2.20"
+    },
+    "flare_deg": {
+     "v": 55,
+     "src": "iphone-air.pdf p3",
+     "how": "keepout opens outward at 55 degrees all around"
+    }
+   },
+   "usb_c": {
+    "center_x": {
+     "v": 37.35,
+     "src": "iphone-air.pdf p2",
+     "how": "bottom view and Detail C: 37.35 = width / 2"
+    },
+    "opening": {
+     "v": [
+      33.05,
+      41.65
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "bottom view: x range of the port opening"
+    },
+    "keepout_width": {
+     "v": 12.45,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_height": {
+     "v": 6.6,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail C: recommended connector keepout"
+    },
+    "keepout_r": {
+     "v": 3.25,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail C: 2X R3.25"
+    },
+    "keepout_outward": {
+     "v": 14.0,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail C: keepout flush to product surface, required outward 14.0 mm"
+    },
+    "z_from_back": {
+     "v": 2.71,
+     "src": "iphone-air.pdf p2",
+     "how": "bottom view: 6x 2.71 to the port center line; the drawing does not say which face it is measured from, so the recipe sizes the port slots to cover 2.71 from either face (2.71 to 2.93 from the back)"
+    }
+   },
+   "speaker_mic": {
+    "hole_d": {
+     "v": 1.1,
+     "src": "iphone-air.pdf p2",
+     "how": "4X dia 1.10 ports at 24.34 26.33 48.38 50.36 (bottom mics share these positions)"
+    },
+    "groups": {
+     "v": [
+      [
+       24.34,
+       26.33
+      ],
+      [
+       48.38,
+       50.36
+      ]
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "bottom view: [first, last] hole center, mm from the left edge (front view)"
+    },
+    "z_from_back": {
+     "v": 2.71,
+     "src": "iphone-air.pdf p2",
+     "how": "bottom view: 6x 2.71 to the port center line; the drawing does not say which face it is measured from, so the recipe sizes the port slots to cover 2.71 from either face (2.71 to 2.93 from the back)"
+    }
+   },
+   "receiver": {
+    "from_top": {
+     "v": [
+      0.45,
+      1.31
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail A: receiver slot, mm in from the top housing edge"
+    },
+    "length": {
+     "v": 14.02,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail A: receiver slot length, centered on the width"
+    }
+   },
+   "camera": {
+    "frame": "back view: x mm from the back-view left edge (the side-button side), y mm down from the top",
+    "plateau_height": {
+     "v": 3.03,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail D: plateau height above the back glass"
+    },
+    "lens_glass_height": {
+     "v": 5.68,
+     "src": "iphone-air.pdf p2",
+     "how": "Detail D"
+    },
+    "lenses": {
+     "v": [
+      [
+       16.29,
+       16.29,
+       15.82
+      ]
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail D: [x, y, d]"
+    },
+    "mic": {
+     "v": [
+      51.34,
+      16.29,
+      2.3
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail D"
+    },
+    "flash": {
+     "v": [
+      58.42,
+      16.29,
+      6.3
+     ],
+     "src": "iphone-air.pdf p2",
+     "how": "Detail D"
+    },
+    "plateau_outline": {
+     "v": null,
+     "src": "not in drawing",
+     "how": "the plateau runs the full width; its corner radius is not given"
+    },
+    "opening_bound": {
+     "x": {
+      "v": [
+       0,
+       null
+      ],
+      "src": "iphone-air.pdf p5",
+      "how": "full width"
+     },
+     "y_bottom": {
+      "v": 34.17,
+      "src": "iphone-air.pdf p5",
+      "how": "sheet 4: lower edge of the marked area, which lines up with the drawn plateau"
+     },
+     "corner_r": {
+      "v": null,
+      "src": "not in drawing",
+      "how": "no radius given; the opening's corners are rounded by the camera margin"
+     }
+    }
+   },
+   "sim_tray": null
+  }
+ }
+}
