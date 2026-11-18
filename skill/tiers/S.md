@@ -12,7 +12,7 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   When the person answers, run: stone note "<their answer>", then run the NEXT line it prints.
 - If you lost track or your memory was cleared, run: stone status
 - For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
-- If the build says NEXT: stone colors, run it, then run the NEXT line it prints. If the person named colors for parts, map them: the part they named gets that color, rest= gets the other.
+- If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request.
 - Stop when stone says the part is ready.
 
 ## Steps
@@ -48,10 +48,11 @@ stone build -> FIX the figure needs photos, NEXT: stone find "Ada Lovelace"
 stone find "Ada Lovelace" -> NEXT: stone build
 stone build -> Part ready
 
-Request: A mini figure of Ada Lovelace, white with a red dress.
+Request: A mini figure of Ada Lovelace, white with a red dress, with "ADA" on the base.
 stone set figure name=ADA
 stone build -> Part ready, NEXT: stone colors
-stone colors -> 1 white 40% base, 2 red 30% middle (the dress), 3 skin 15% top, ... NEXT: stone colors 2=red rest=white
+stone colors -> a list of regions, like: 2  red     30% of surface  z 12-50 mm  bottom
+  NEXT: stone colors 2=red rest=white
 stone colors 2=red rest=white -> NEXT: none, the part is ready
 
 Request: A cover for the cable hole in my desk.

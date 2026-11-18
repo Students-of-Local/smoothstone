@@ -69,8 +69,13 @@ def openscad_env() -> dict[str, str]:
     return env
 
 
+def user_config_dir() -> Path:
+    """Machine-wide settings, such as the printer's filament slots: $XDG_CONFIG_HOME/smoothstone."""
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "smoothstone"
+
+
 def _toml(job: Path | None) -> dict:
-    for base in (Path.cwd(), job):
+    for base in (Path.cwd(), job, user_config_dir()):
         if base is None:
             continue
         f = base / "stone.toml"

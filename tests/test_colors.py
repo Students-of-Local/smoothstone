@@ -6,6 +6,8 @@ import pytest
 import trimesh
 
 from smoothstone import clean, cli, colors, config, recipes, scad
+from smoothstone import recipes as rc
+from smoothstone.job import Job
 from test_cli import status_json, stone
 
 
@@ -117,6 +119,16 @@ def test_filaments_from_stone_toml(tmp_path, monkeypatch):
     assert config.filaments(tmp_path) == ["white", "red", "matte black"]
 
 
+def test_filaments_from_the_machine_config(tmp_path, monkeypatch):
+    """The printer's slots are set once per machine, not per job: a K2 with red, white, blue, black."""
+    monkeypatch.chdir(tmp_path)
+    xdg = tmp_path / "xdg"
+    (xdg / "smoothstone").mkdir(parents=True)
+    (xdg / "smoothstone" / "stone.toml").write_text('[filaments]\n1 = "red"\n2 = "white"\n3 = "blue"\n4 = "black"\n')
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    assert config.filaments(tmp_path / "job") == ["red", "white", "blue", "black"]
+
+
 # the slicer repair (PR #4 review)
 
 
@@ -178,12 +190,13 @@ def test_a_mesh_left_unclean_fails_the_build_with_a_fix(jobenv, openscad, monkey
 # the command
 
 
-def test_build_with_a_color_word_goes_on_to_stone_colors(jobenv, openscad):
+def test_a_one_color_part_names_its_filament_and_is_done(jobenv, openscad):
     stone("new", "a small red plate with one hole")
     stone("set", "_demo", "w=50")
     text, code, nxt = stone("build")
     assert code == 0 and "Part ready" in text
-    assert nxt == "stone colors"
+    assert "This part prints in one color: red. Load that filament." in text
+    assert nxt == cli.DONE_NEXT
 
     text, code, nxt = stone("colors")
     assert code == 0, text
@@ -195,6 +208,7 @@ def test_build_with_a_color_word_goes_on_to_stone_colors(jobenv, openscad):
     assert code == 0, text
     assert "red is not in stone.toml [filaments], so it is filament 3" in text
     assert "filament 3 red: 100% of surface" in text
+    assert "In the slicer: filament 3 must be red." in text
     assert nxt == cli.DONE_NEXT
     f3 = jobenv / "stone-job" / "_demo.3mf"
     assert f3.is_file()
@@ -236,3 +250,63 @@ def test_colors_needs_a_passing_build_and_a_known_color(jobenv, openscad):
     text, code, nxt = stone("colors", "1=2")
     assert code == 0 and "filament 2 black: 100% of surface" in text
     assert json.loads((jobenv / "stone-job" / "status.json").read_text())["colors"]["filaments"] == ["white", "black"]
+
+
+# review round 1
+
+
+def ada_regions():
+    """Regions like a figure of Ada Lovelace in a red dress: base, dress, face, hair."""
+    def reg(n, rgb, share, base=False):
+        return {"n": n, "rgb": rgb, "share": share, "base": base, "color": None if rgb is None else colors.color_name(rgb),
+                "z0": 0, "z1": 10, "pos": "base" if base else "middle", "region": n - 1}
+    return [reg(1, None, 0.40, base=True), reg(2, [178, 32, 40], 0.30), reg(3, [232, 188, 152], 0.18),
+            reg(4, [40, 30, 28], 0.12)]
+
+
+def test_suggestion_follows_the_colors_the_request_names():
+    line = cli._suggest_line(ada_regions(), ["white", "black"], "A mini figure of Ada Lovelace, white with a red dress")
+    assert line == "stone colors 2=red rest=white"
+
+
+def test_suggestion_keeps_the_photo_colors_when_the_request_names_none():
+    line = cli._suggest_line(ada_regions(), ["white", "black"], "A mini figure of Ada Lovelace")
+    assert line == "stone colors 3=white rest=black"  # the red dress is nearer black than white
+
+
+def test_colors_refuses_when_the_plan_changed_after_the_build(jobenv, openscad):
+    stone("new", "a small plate with one hole")
+    stone("set", "_demo", "w=50")
+    stone("build")
+    stone("set", "_demo", "w=40")
+    text, code, nxt = stone("colors")
+    assert code == 1 and "FIX: the plan changed after the last build" in text
+    assert nxt == "stone build"
+
+
+def test_feet_beside_the_plinth_keep_their_color():
+    """A figure face with plinth faces on every side: the plinth must not vote it into palette color 0."""
+    m = trimesh.creation.icosphere(subdivisions=3, radius=10)
+    foot = int(np.argmin(np.linalg.norm(m.triangles_center - [0, 0, -10], axis=1)))
+    base = m.triangles_center[:, 2] < 0
+    base[foot] = False
+    near = set(m.face_adjacency[(m.face_adjacency == foot).any(1)].ravel()) - {foot}
+    assert len(near) == 3 and all(base[list(near)])
+    fig = np.zeros((~base).sum(), int)  # the head: palette color 0
+    fig[np.where(~base)[0] == foot] = 1  # the foot: palette color 1
+    labels = colors.figure_labels(m, fig, base, npal=2)
+    assert labels[foot] == 1
+    assert (labels[base] == 2).all() and set(labels[~base]) <= {0, 1}
+
+
+def test_only_a_figure_with_a_style_picture_goes_on_to_stone_colors(tmp_path, monkeypatch):
+    monkeypatch.delenv("STONE_RECIPES", raising=False)
+    job = Job(tmp_path / "job")
+    d = job.image_dir / "figure" / "abc123"
+    d.mkdir(parents=True)
+    params = {"figure": str(tmp_path / "elsewhere" / "abc123" / "figure.stl")}
+    fig = rc.load("figure")
+    assert not cli._many_colors(job, fig, params)  # no picture yet
+    (d / "style.png").write_bytes(b"png")
+    assert cli._many_colors(job, fig, params)
+    assert not cli._many_colors(job, rc.load("_demo"), params)

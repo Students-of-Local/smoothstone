@@ -84,22 +84,25 @@ The sentence from the vision model matters more than I expected, as without it t
 
 ## Colors
 
-A figure printed in one color looks unfinished, so after a passing build `stone colors` splits the part into regions by the colors of the figure's style picture, lists them and draws them numbered in `build/regions.png`. Then one line gives each region a filament, and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone reads the file back before it says so: watertight, clean for a slicer, the same faces as the STL. Put your loaded filaments in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on. When the request names a color, the build's NEXT line is `stone colors`.
+A figure printed in one color looks unfinished, so after a passing build of a figure `stone colors` splits it into regions by the colors of its style picture, lists them and draws them numbered in `build/regions.png`. Then one line gives each region a filament, and stone writes a 3MF next to the STL with every triangle painted. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer reads Bambu paint too. stone reads the file back before it says so: watertight, clean for a slicer, the same faces as the STL. Put your printer's filament slots in `stone.toml` as `[filaments]` with `1 = "white"`, `2 = "black"` and so on, in the job folder or once in `~/.config/smoothstone/stone.toml`. When a figure's request names colors, the build's NEXT line is `stone colors` and its suggestion follows those colors; any other part prints in one color, and the build names the filament to load.
 
 ```
 $ stone colors
 Color regions of figure.stl, largest first:
 1  white   48% of surface  z 0-12 mm  base
-2  black   20% of surface  z 12-52 mm  bottom
+2  black   18% of surface  z 12-52 mm  bottom
 3  skin    17% of surface  z 48-80 mm  middle
 4  white   14% of surface  z 61-90 mm  top
 5  black   2% of surface  z 61-70 mm  top
-Filaments: 1 white, 2 black (stone.toml [filaments])
+6  skin    1% of surface  z 24-30 mm  bottom
+7  skin    1% of surface  z 24-30 mm  bottom
+Filaments: 1 red, 2 white, 3 blue, 4 black (stone.toml [filaments])
 NEXT: stone colors 2=black 5=black rest=white
-$ stone colors 2=black rest=white
-filament 1 white: 80% of surface; filament 2 black: 20%
-Warning: the colors alternate on 19 layers: about 20 filament changes and 13 g purge.
+$ stone colors 2=black 5=black rest=white
+filament 2 white: 80% of surface; filament 4 black: 20%
+Warning: the colors alternate on 99 layers: about 100 filament changes and 65 g purge.
 3MF: stone-job/figure.3mf (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)
+In the slicer: filament 2 must be white, filament 4 must be black.
 NEXT: none, the part is ready
 ```
 

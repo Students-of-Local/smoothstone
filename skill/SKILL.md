@@ -44,13 +44,15 @@ tools/figure/setup.sh once first.
 
 ## Colors
 
-After a passing build, `stone colors` splits the part into color regions (for a figure, from the
-colors of its style picture), lists them largest first and draws them numbered in regions.png.
+After a passing build of a figure, `stone colors` splits it into color regions from the colors
+of its style picture, lists them largest first and draws them numbered in regions.png.
 `stone colors 2=black rest=white` then writes a 3MF next to the STL with each triangle painted
 with its filament. Orca, Bambu Studio and Creality Print open it with the paint, and PrusaSlicer
 reads Bambu paint too. The loaded filaments, in slot order, go in stone.toml:
-`[filaments]` with `1 = "white"` and `2 = "black"` (the default). When the request names colors,
-the build's NEXT line is stone colors.
+`[filaments]` with `1 = "white"` and `2 = "black"` (the default), in the job folder or once per
+machine in ~/.config/smoothstone/stone.toml. When a figure's request names colors, the build's
+NEXT line is stone colors, and the mapping it suggests follows those colors. Other parts print in
+one color, and the build names the filament to load.
 
 ## Measuring from a photo
 

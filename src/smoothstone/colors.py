@@ -170,8 +170,9 @@ def base_top(recipe: str, params: dict) -> float:
     return bh if bh > 0 else (8.0 if not params.get("name") else 12.0)
 
 
-def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None) -> np.ndarray:
-    """Majority vote over each face's edge neighbors; removes specks a picture leaves."""
+def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None, never: int | None = None) -> np.ndarray:
+    """Majority vote over each face's edge neighbors; removes specks a picture leaves. Faces in
+    `keep` hold their label, and no other face can take label `never` (the plinth's)."""
     adj = mesh.face_adjacency
     k = int(labels.max()) + 1
     for _ in range(rounds):
@@ -179,6 +180,8 @@ def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None) -> np.nd
         votes[np.arange(len(labels)), labels] += 1.5
         np.add.at(votes, (adj[:, 0], labels[adj[:, 1]]), 1)
         np.add.at(votes, (adj[:, 1], labels[adj[:, 0]]), 1)
+        if never is not None and never < k:
+            votes[:, never] = -1
         new = votes.argmax(1)
         if keep is not None:
             new[keep] = labels[keep]
@@ -301,6 +304,14 @@ def describe(mesh, region: np.ndarray, rgb: np.ndarray, base_region: int | None)
     return out
 
 
+def figure_labels(mesh, fig_labels: np.ndarray, base: np.ndarray, npal: int) -> np.ndarray:
+    """Palette label per face, smoothed. The plinth has a label of its own (npal) that votes for
+    nothing, so feet beside it keep their color instead of taking palette color 0."""
+    labels = np.full(len(mesh.faces), npal, int)
+    labels[~base] = fig_labels
+    return smooth_labels(mesh, labels, keep=base, never=npal)
+
+
 def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path | None, atlas: Path):
     """(face region numbers 1..R in face order, region list) for a part."""
     n = len(mesh.faces)
@@ -327,9 +338,7 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     sub.vertices = (sub.vertices - lo) / max(sub.extents[2], 1e-9)
     rgb_f = paint.face_colors(sub, Path(front), Path(back) if back else None, atlas)
     pal, lab_f = paint.palette(rgb_f, most=6)
-    labels = np.zeros(n, int)
-    labels[fig] = lab_f
-    labels = smooth_labels(mesh, labels, keep=base)
+    labels = figure_labels(mesh, lab_f, base, len(pal))
     reg = regions(mesh, labels, base=base if base.any() else None, lab=_lab(pal))
     R = int(reg.max()) + 1
     rgb: list = [None] * R

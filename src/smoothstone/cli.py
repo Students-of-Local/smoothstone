@@ -753,8 +753,13 @@ def cmd_build(args, job: Job) -> Out:
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
         if colortool.asks_for_color(job.request()):
-            out.add("The request names colors: stone colors splits the part into color regions.")
-            out.next = "stone colors"
+            if _many_colors(job, r, params):
+                out.add("The request names colors: stone colors splits the figure into color regions.")
+                out.next = "stone colors"
+            else:
+                named = colortool.request_colors(job.request())
+                out.add(f"This part prints in one color: {named[0]}. Load that filament."
+                        if named else "This part prints in one color.")
         out.stage = "done"
         out.result = f"build passed, {fmt_size(size) if size else ''}".rstrip(", ")
         job.update(builds=builds, failed_builds=0, passed=True)
@@ -1167,6 +1172,12 @@ def _style_pictures(job: Job, params: dict) -> tuple[Path | None, Path | None]:
     return None, None
 
 
+def _many_colors(job: Job, r: rc.Recipe, params: dict) -> bool:
+    """True when the part can have more than one color region: a figure with a style picture."""
+    is_fig = any(p.type == "image" and p.image_kind == "figure" for p in r.params)
+    return is_fig and _style_pictures(job, params)[0] is not None
+
+
 def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh):
     """(face region numbers, region list), cached in build/ for this exact STL."""
     import hashlib
@@ -1195,19 +1206,40 @@ def _fil_value(fil: list[str]) -> list[str]:
     return [f if re.fullmatch(r"[A-Za-z#0-9_-]+", f) else str(i) for i, f in enumerate(fil, 1)]
 
 
+NAMED_DE = 45.0  # a region takes a named color only when its photo color is this close (delta E)
+
+
 def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int, list[str]]:
-    """(region -> filament, rest filament, extra filaments) that keep the picture's colors, or
-    for a part without a picture, the color the request names."""
+    """(region -> filament, rest filament, extra filaments). When the request names colors, the
+    first is rest (and the base's), and a region takes another named color when that is the named
+    color nearest its photo color, under NAMED_DE. Otherwise the photo's colors, each mapped to the
+    nearest loaded filament."""
+    import numpy as np
+
     pick: dict[int, int] = {}
     extra: list[str] = []
-    if not any(d["rgb"] is not None for d in info):
-        want = colortool.request_colors(request)
-        if want:
-            n = _match_filament(want[0], fil)
+    named = colortool.request_colors(request)
+    if named:
+        allf = list(fil)
+        nums = []
+        for c in named:
+            n = _match_filament(c, allf)
             if n is None:
-                extra = [want[0]]
-                n = len(fil) + 1
-            return pick, n, extra
+                allf.append(c)
+                extra.append(c)
+                n = len(allf)
+            nums.append(n)
+        rest = nums[0]
+        ref = colortool._lab([colortool.NAMES[c] for c in named])
+        for d in info:
+            if d["rgb"] is None or d["base"]:
+                continue
+            dist = np.sqrt(((ref - colortool._lab(d["rgb"])) ** 2).sum(1))
+            k = int(dist.argmin())
+            if dist[k] < NAMED_DE and nums[k] != rest:
+                pick[d["n"]] = nums[k]
+        return pick, rest, extra
+    if not any(d["rgb"] is not None for d in info):
         return pick, 1, extra
     share: dict[int, float] = {}
     for d in info:
@@ -1258,6 +1290,15 @@ def cmd_colors(args, job: Job) -> Out:
     bd = job.build_dir
     stl = bd / "part.stl"
     built = read_json(bd / "params.json") or {}
+    if r is not None and stl.is_file() and built:
+        # the same check as stone done: the 3MF must be the part the plan describes
+        current = build_params(job, r, {k: v for k, v in plan["params"].items() if r.param(k)})
+        if built.get("recipe") != r.name or built.get("params") != current:
+            out.fix("the plan changed after the last build")
+            out.next = "stone build"
+            out.owns_next = False
+            out.result = "colors refused: the plan changed after the last build"
+            return out
     if r is None or not st.get("passed") or not stl.is_file() or built.get("recipe") != r.name:
         out.fix("stone colors needs a passing build first")
         out.next = "stone build" if plan else "stone recipes"
@@ -1378,6 +1419,9 @@ def cmd_colors(args, job: Job) -> Out:
                      views=(("front", 0.0), ("side", np.pi / 2), ("back", np.pi)))
     out.add(f"3MF: {final} (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)")
     out.add(f"Colors picture: {bd / 'colors.png'}")
+    used = sorted(set(int(x) for x in np.unique(face_fil)))
+    out.add("In the slicer: " + ", ".join(f"filament {i} must be {fil[i - 1]}" for i in used)
+            + ". The 3MF names slots, not colors; set them in stone.toml [filaments] to match the printer.")
     mapping = " ".join([f"{k}={_fil_value(fil)[v - 1]}" for k, v in sorted(assign.items())] + [f"rest={_fil_value(fil)[rest - 1]}"])
     job.update(colors={"mapping": mapping, "filaments": fil, "shares": shares, "file": str(final),
                        "changes": changes, "mixed_layers": mixed})

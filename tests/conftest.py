@@ -9,6 +9,12 @@ from smoothstone import config
 REPO = Path(__file__).resolve().parent.parent
 
 
+@pytest.fixture(autouse=True)
+def no_user_config(tmp_path_factory, monkeypatch):
+    """Keep the machine's own ~/.config/smoothstone/stone.toml out of every test."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("xdg")))
+
+
 @pytest.fixture
 def openscad():
     binary = config.find_openscad()
