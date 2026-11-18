@@ -48,8 +48,10 @@ counts as card "next"), the best pass rate and mean judge score so far and the s
   top 400 articles of 2026-10 with a photo, for Donovan's "5/5 perfection from the random pulled
   people". Research mode, with its likeness bar of 7; a run needs the craft judge at 8 too.
 - Figures on a host without the style model (Linux has no mflux): `stone build` reuses a figure from
-  the shared cache (~/.cache/stone-figure/<key>, `STONE_FIGURE_CACHE`) when the same photos and
-  settings were built before, so copy the key folder from a Mac job's image/figure/ into the cache.
+  the shared cache (~/.cache/stone-figure/<cache key>, `STONE_FIGURE_CACHE`) when the same photos
+  and mesh settings were built before (`figure.cache_key` of the job's image/figure/<key> folder).
+  Everything after the mesh (plinth, checks, parts, paint) still runs fresh. log.json says
+  `figure_from_cache` when a run used it.
 - A spec with `"colors": {"black": ["jacket"], "rest": "white"}` checks the painted 3MF: it reads back
   clean, its color edges pass, and every part prints in the color asked for.
 
