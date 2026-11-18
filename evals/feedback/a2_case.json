@@ -1,0 +1,7 @@
+{
+ "id": "a2_case",
+ "request": "A case for my phone.",
+ "expect": {
+  "asks": true
+ }
+}

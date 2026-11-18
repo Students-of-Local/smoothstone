@@ -8,8 +8,8 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   "Not placed yet", add those sizes to the stone set line first.
 - Think in at most 3 short lines, then call the tool.
 - Use the sizes in the request. Leave every other setting at its default.
-- Never make up a size the part has to fit. If the part must fit a real product and you have no
-  size for it, ask for the size or a photo with a ruler (stone measure).
+- If NEXT says ask the person, write that question as your reply, with no tool call, and stop.
+  When the person answers, run: stone note "<their answer>", then run the NEXT line it prints.
 - If you lost track or your memory was cleared, run: stone status
 - For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
 - Stop when stone says the part is ready.
@@ -46,3 +46,9 @@ stone set figure height=80 name=ADA
 stone build -> FIX the figure needs photos, NEXT: stone find "Ada Lovelace"
 stone find "Ada Lovelace" -> NEXT: stone build
 stone build -> Part ready
+
+Request: A cover for the cable hole in my desk.
+stone set panel -> FIX ... NEXT: ask the person: What are the measurements of the cable hole in your desk, in mm? ...
+Reply: What are the measurements of the cable hole in your desk, in mm?
+Person: It is a round hole, 60 mm across.
+stone note "It is a round hole, 60 mm across." -> NEXT: stone show panel

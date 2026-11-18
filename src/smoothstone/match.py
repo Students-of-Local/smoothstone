@@ -308,3 +308,33 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
         tail = " ".join(re.findall(r"[a-zA-Z]+", request[e0:e0 + 30])[:2])
         left.append((request[s0:e0].strip() + " " + tail).strip())
     return {p.name: out[p.name] for p in r.params if p.name in out}, left + asks
+
+
+# A part that has to fit a real thing: "a case for my phone", "a cover for the cable hole in my desk".
+FIT_RE = re.compile(r"\b(?:case|cover|lid|cap|mount|holder|bracket|adapter|sleeve|plug|grommet|insert|spacer|shim|"
+                    r"knob|clip|replacement)s?\s+(?:for|to fit|that fits)\s+(?P<thing>[^,.;!?]+)|"
+                    r"\b(?:to fit|that fits|fits)\s+(?P<thing2>[^,.;!?]+)", re.I)
+
+
+def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None) -> str | None:
+    """The question to ask when the part must fit something real and nothing says how big it is.
+
+    None when the request is not about a fit, or it has a number, or it names a product the
+    recipe knows (a choice option such as a phone model): those are sizes too."""
+    if r.name == "figure":
+        return None
+    m = FIT_RE.search(request)
+    if not m:
+        return None
+    text = " ".join([request, *(notes or [])])
+    if _numbers(text):
+        return None
+    low = text.lower()
+    for p in r.params:
+        if p.type == "choice" and any(len(str(c)) > 3 and str(c).lower().replace("_", " ") in low.replace("-", " ")
+                                      for c in p.choices):
+            return None
+    thing = (m.group("thing") or m.group("thing2") or "it").strip()
+    thing = re.sub(r"\bmy\b", "your", re.sub(r"\bour\b", "your", thing, flags=re.I), flags=re.I)
+    return (f"What are the measurements of {thing}, in mm? A photo with a ruler in it works too, "
+            f"or the exact product name and model.")

@@ -85,6 +85,17 @@ def pla_material():
     return m
 
 
+def paint_material():
+    """The mesh's own vertex colors (a painted figure or a multicolor print), matte PLA."""
+    m = pla_material()
+    n, l = nodes_of(m)
+    vc = n.new("ShaderNodeVertexColor")
+    vc.layer_name = obj.data.color_attributes[0].name
+    l.new(vc.outputs["Color"], n["Principled BSDF"].inputs["Base Color"])
+    n["Principled BSDF"].inputs["Roughness"].default_value = 0.5
+    return m
+
+
 def bed_material():
     m = bpy.data.materials.new("bed")
     n, l = nodes_of(m)
@@ -127,10 +138,29 @@ def bed_material():
     return m
 
 
-bpy.ops.wm.stl_import(filepath=STL)
-obj = bpy.context.selected_objects[0]
-obj.data.materials.clear()
-obj.data.materials.append(pla_material())
+TEXTURED = STL.lower().endswith((".glb", ".gltf"))
+if TEXTURED:  # a painted figure: keep its texture, make it matte
+    bpy.ops.import_scene.gltf(filepath=STL)
+    meshes = [o for o in bpy.context.selected_objects if o.type == "MESH"]
+    bpy.context.view_layer.objects.active = meshes[0]
+    if len(meshes) > 1:
+        bpy.ops.object.join()
+    obj = bpy.context.view_layer.objects.active
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    for m in obj.data.materials:
+        b = m.node_tree.nodes.get("Principled BSDF")
+        if b:
+            b.inputs["Roughness"].default_value = float(os.environ.get("STILL_ROUGH", "0.42"))
+            b.inputs["Metallic"].default_value = 0.0
+elif STL.lower().endswith(".ply"):
+    bpy.ops.wm.ply_import(filepath=STL)
+    obj = bpy.context.selected_objects[0]
+else:
+    bpy.ops.wm.stl_import(filepath=STL)
+    obj = bpy.context.selected_objects[0]
+if not TEXTURED:
+    obj.data.materials.clear()
+    obj.data.materials.append(paint_material() if obj.data.color_attributes else pla_material())
 lo = Vector([min(v.co[i] for v in obj.data.vertices) for i in range(3)])
 hi = Vector([max(v.co[i] for v in obj.data.vertices) for i in range(3)])
 size = hi - lo
