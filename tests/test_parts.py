@@ -175,12 +175,57 @@ def test_a_jacket_lip_boxed_in_under_the_hem_line_takes_the_jacket_color():
     loose = fil.copy()
     loose[tops] = 1
     assert C.boxed_slivers(cm, num, info, loose, {pants}, 1) == []
+    # a strip the picture shows in the rest filament's own color is a detail (a white shirt
+    # between black lapels under rest=white), never the garment's edge: it keeps the rest color
+    white = (250.0, 250.0, 250.0)
+    def shown(rgb):
+        return [dict(d, rgb=list(rgb) if d["n"] == rim else [15.0, 15.0, 15.0]) for d in info]
+    assert C.boxed_slivers(cm, num, shown(white), fil, named, 1, white) == []
+    # a strip in any other color is the edge: dark like its host, or skin where the neck's
+    # color bled onto a collar's top in the render (the Jensen job's regions 11 and 12)
+    for rgb in ((30.0, 30.0, 30.0), (215.0, 167.0, 144.0)):
+        assert [g[0] for g in C.boxed_slivers(cm, num, shown(rgb), fil, named, 1, white)] == [rim], rgb
+    # with no rest color to compare, the shape alone decides
+    assert [g[0] for g in C.boxed_slivers(cm, num, shown(white), fil, named, 1)] == [rim]
     # a lip 4 mm deep under the line is a piece of its own size, not a sliver: it stays rest
     m = _lathe([(0, -40), (4, -40), (4, 10), (4.5, 10), (4.5, 5), (5, 5), (5, 100), (0, 100)])
     cm, num, info = _zoned(m, 9.6, parts.LEGS, parts.TORSO, {parts.LEGS: "pants", parts.TORSO: "top"})
     fil = np.ones(len(info) + 1, int)
     fil[_all(info, "top")], fil[_n(info, "pants")] = 2, 3
     assert C.boxed_slivers(cm, num, info, fil, set(_all(info, "top")) | {_n(info, "pants")}, 1) == []
+
+
+def test_a_lip_beside_pants_named_the_rest_color_still_takes_the_jacket_color():
+    """Review of PR 25: with pants=white rest=white the pants are white by name, and a lip that
+    touches them is still boxed in by painted parts, so it takes the jacket's color."""
+    # pants (radius 4) up to 9, the jacket (5) from there; the picture shows the lip below the
+    # line at 9.6 black like the jacket, so it is a region apart from the blue pants it touches
+    m = _lathe([(0, -40), (4, -40), (4, 9), (5, 9), (5, 100), (0, 100)])
+    V, F = cut_iso(m.vertices, m.faces, np.asarray(m.vertices)[:, 2] - 9.6, 0.0, snap=0.02)
+    cm = C.load_stl_mesh(V, F)
+    zone = np.where(parts.side_of(cm, {"z": 9.6, "curve": None}) > 0, parts.TORSO, parts.LEGS)
+    c = cm.triangles_center
+    labels = ((np.hypot(c[:, 0], c[:, 1]) > 4.2) & (c[:, 2] < 9.6)).astype(int)
+    region = C.regions(cm, labels, min_share=0.0, zone=zone)
+    info = C.describe(cm, region, [None] * (int(region.max()) + 1), None)
+    seen = set()
+    for d in info:
+        zr = int(np.bincount(zone[region == d["region"]]).argmax())
+        d["part"] = "other" if zr in seen and zr != parts.TORSO else {parts.LEGS: "pants", parts.TORSO: "top"}[zr]
+        seen.add(zr)
+    num = np.zeros(int(region.max()) + 1, int)
+    for d in info:
+        num[d["region"]] = d["n"]
+    num = num[region]
+    lip = [d["n"] for d in info if d["part"] == "other"]
+    assert len(lip) == 1, info
+    pants, tops = _n(info, "pants"), _all(info, "top")
+    fil = np.ones(len(info) + 1, int)
+    fil[tops] = 2  # top=black, pants=white and rest=white are filament 1
+    got = C.boxed_slivers(cm, num, info, fil, set(tops) | {pants}, 1)
+    assert len(got) == 1 and got[0][0] == lip[0] and got[0][1] in tops, (got, info)
+    # unnamed, the white pants are the rest color round it, and the lip is no sliver
+    assert C.boxed_slivers(cm, num, info, fil, set(tops), 1) == []
 
 
 def test_a_collar_top_boxed_in_over_the_neck_line_is_the_jacket_not_a_ledge_of_the_head():
