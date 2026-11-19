@@ -34,7 +34,8 @@ def rejudge(rdir: Path) -> dict:
     exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
     if exp.get("recipe") != "figure":
         raise SystemExit(f"{log['spec']} is not a figure spec")
-    other = [w for w in log.get("why", []) if not w.startswith("likeness")]
+    # a passed run's why is ["all checks pass"] (likeness_run leaves it so), which is no failing check
+    other = [w for w in log.get("why", []) if not w.startswith("likeness") and w != "all checks pass"]
     grade = {"pass": not other, "why": other or ["all checks pass"]}
     grade = run.likeness_run(rdir, rdir / "job", spec["request"], grade, (exp.get("likeness") or {}).get("min"))
     if other:
@@ -46,24 +47,29 @@ def rejudge(rdir: Path) -> dict:
     return log
 
 
+REJUDGED = ("pass", "likeness")  # what a new likeness verdict decides; the rest is the run's own
+
+
 def replace_score(log: dict) -> None:
     """Put the run's new line where its old one was in scores.jsonl (appended if it had none),
-    written to a temp file and moved into place."""
-    line = json.dumps(run.score_line(log))
+    written to a temp file and moved into place. An old line keeps its sha, date and every other
+    field; only the pass and likeness the new verdict decides change."""
+    new = run.score_line(log)
     old = run.SCORES.read_text().splitlines() if run.SCORES.exists() else []
     lines, put = [], False
     for x in old:
         try:
-            mine = json.loads(x).get("run") == log["run_id"]
+            was = json.loads(x)
+            mine = was.get("run") == log["run_id"]
         except ValueError:
             mine = False
         if mine and not put:
-            lines.append(line)
+            lines.append(json.dumps({**was, **{k: new[k] for k in REJUDGED}}))
         if not mine:
             lines.append(x)
         put = put or mine
     if not put:
-        lines.append(line)
+        lines.append(json.dumps(new))
     tmp = run.SCORES.with_name(run.SCORES.name + ".tmp")
     tmp.write_text("".join(x + "\n" for x in lines))
     os.replace(tmp, run.SCORES)
