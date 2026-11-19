@@ -434,9 +434,14 @@ def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
         why.append(f"paint.npy has {len(num)} triangles, the 3MF {len(F)}")
         return {"why": why, "shares": shares, "parts": got}
     tally: dict[str, np.ndarray] = {}
-    for d in json.loads(rj.read_text())["regions"]:
+    regs = json.loads(rj.read_text())["regions"]
+    # a sliver boxed in by a part (a jacket's lip under the hem line) is that part's own edge
+    sj = job / "build" / "slivers.json"
+    host = {int(k): v for k, v in json.loads(sj.read_text()).items()} if sj.exists() else {}
+    part_of = {d["n"]: d.get("part") or "other" for d in regs}
+    for d in regs:
         sel = num == d["n"]
-        part = d.get("part") or "other"
+        part = part_of.get(host.get(d["n"]), part_of[d["n"]])
         t = tally.setdefault(part, np.zeros(len(fil) + 1))
         t += np.bincount(face_fil[sel], weights=area[sel], minlength=len(fil) + 1)
     for part, t in tally.items():
@@ -446,7 +451,13 @@ def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
     named = {q: str(c).lower() for c, ps in want.items() if c != "rest" for p in ps
              for q in (P.parts_of(p) or (_part_key(p),))}
     rest = str(want.get("rest", "")).lower()
+    plinth = got.get("base")
     for part, c in sorted(got.items()):
+        if part == "name" and "name" not in named:
+            # the name on the plinth takes a color that stands out from it, unless the request names one
+            if c == plinth:
+                why.append(f"name is {c}, the plinth's own color, so it does not read")
+            continue
         need = named.get(_part_key(part), rest)
         if need and c != need:
             why.append(f"{part} is {c} (want {need})")
