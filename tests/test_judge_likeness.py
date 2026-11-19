@@ -19,6 +19,11 @@ spec.loader.exec_module(run)
 DHH = "A mini figure of DHH, 90 mm tall, with \"DHH\" on the base."
 
 
+@pytest.fixture(autouse=True)
+def _no_photos_picked_by_hand(tmp_path, monkeypatch):
+    monkeypatch.setattr(jl, "REFS_FILE", tmp_path / "no_refs.json")
+
+
 def _job(tmp_path, renders=("k",)):
     job = tmp_path / "job"
     for k in renders:
@@ -264,3 +269,22 @@ def test_a_year_is_read_from_the_dates_commons_file_names_carry():
     assert jl._year("statue of liberty, new york city, 20231003 1512 1976.jpg") == 2023
     assert jl._year("jensen huang stanford 2026-04-30 011.jpg") == 2026
     assert jl._year("david heinemeier hansson (27225732035).jpg") == 0
+
+
+def test_a_subject_whose_free_photos_the_tool_used_up_is_judged_by_a_photo_picked_by_hand(tmp_path, monkeypatch):
+    """Every portrait of DHH on Commons was one the tool styled from, the rest are race cars, so
+    the judge had none to go by; evals/likeness_refs.json names one picked outside the tool."""
+    job = _job(tmp_path)
+    _found(job, "File:DHH racing.jpg", "File:David Heinemeier Hansson.jpg")
+    refs = tmp_path / "likeness_refs.json"
+    refs.write_text(json.dumps({"David Heinemeier Hansson": [
+        {"url": "https://dhh.dk/images/new-headshot.jpg", "source": "his own site, dhh.dk"}]}))
+    monkeypatch.setattr(jl, "REFS_FILE", refs)
+    asked = _fake(monkeypatch, "David Heinemeier Hansson", 7)
+    _article(monkeypatch, [], search=["File:Oreca 07 - David Heinemeier-Hansson at Le Mans 2023.jpg"],
+             title="David Heinemeier Hansson", lead="DHH_racing.jpg")
+    res = jl.judge(job, DHH)
+    assert res["score"] == 7
+    assert res["reference"]["photos"][0]["url"] == "https://dhh.dk/images/new-headshot.jpg"
+    prompt, shown = asked[1]
+    assert "dhh.dk" in prompt and shown == ["reference_1.jpg", "reference_2.jpg", "render.png"]
