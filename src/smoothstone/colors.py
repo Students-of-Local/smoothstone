@@ -22,6 +22,7 @@ from . import clean
 MIN_SHARE = 0.015  # a region under this share of the surface joins its neighbor...
 SPECK = 0.003  # ...unless it is at least this big and stands out from that neighbor (hands beside a jacket)
 CONTRAST = 50.0  # delta E (Lab) that counts as standing out; shading on one cloth stays well under it
+SAME_AS = 25.0  # delta E within which a picture color is that filament: a shaded white shirt is 15 to 21 from white, skin 33
 LIST_MAX = 8
 LAYER = 0.2  # mm
 PURGE_G = 0.65  # grams of purge per filament change, about what Orca's default flush uses
@@ -424,12 +425,15 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, l
     return out.reshape(-1)
 
 
-def boxed_slivers(mesh, num: np.ndarray, info: list[dict], fil: np.ndarray, named, rest: int) -> list[tuple[int, int]]:
+def boxed_slivers(mesh, num: np.ndarray, info: list[dict], fil: np.ndarray, named, rest: int,
+                  rest_rgb=None) -> list[tuple[int, int]]:
     """[(sliver, host)]: the regions that would take the rest color but lie boxed in between
     painted parts, each with the region it shares the longest boundary with, whose color it takes.
     A sliver is a region of no named part ("other"), under MIN_SHARE of the surface and SLIVER_MM
     across (area over boundary length), that the request gave no color (not in `named`), and whose
-    every neighbor is painted (fil[n] is not rest). Such a piece is a part's own edge that a line of
+    every neighbor is painted (not an unnamed part in the rest color; a part the request named
+    that color counts as painted), and whose picture color is not the rest filament's own color
+    (`rest_rgb`; a white shirt strip between lapels under a white rest stays white). Such a piece is a part's own edge that a line of
     the shape put on the other side: a jacket's lip below the hem's level, a collar's top above the
     neck's. Painted rest, it shows as a stripe of the wrong color along the garment's edge. A hand,
     a belt or a shirt hem is wider, a part with a name, or touches the rest color; any region
@@ -455,8 +459,11 @@ def boxed_slivers(mesh, num: np.ndarray, info: list[dict], fil: np.ndarray, name
         edge = float(shared[n].sum())
         if not len(nb) or area[n] >= MIN_SHARE * total or area[n] / edge >= SLIVER_MM:
             continue
-        if any(fil[m] == rest for m in nb):
+        if any(fil[m] == rest and m not in named for m in nb):  # an unnamed part in the rest color
             continue
+        own = d.get("rgb")
+        if own is not None and rest_rgb is not None and float(np.linalg.norm(_lab(own) - _lab(rest_rgb))) <= SAME_AS:
+            continue  # the picture shows it in the rest color: a detail (a shirt between lapels), not the edge
         out.append((n, int(nb[np.argmax(shared[n, nb])])))
     return out
 
