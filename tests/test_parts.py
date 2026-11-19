@@ -188,12 +188,14 @@ def test_anatomy_of_a_block_figure():
     assert names == {("hem", None), ("neck", None), ("wrist", -1), ("wrist", 1)}
 
 
-def _shorts_figure(belt):
+def _shorts_figure(belt, flap=False):
     """The block figure with its torso split at the hips. belt=False: shorts (18 x 10) from the
     legs up to 31.25 under a jacket (22 x 12) that overhangs them, so the jacket's hem is at 31.
     belt=True: a long coat (22 x 12) from the legs up, with a belt groove (21 x 11) at 30.5 to
     31.5: the coat's hem is at the legs. belt="low": the same coat with the belt groove at 28.75 to
-    29.65, under 1 mm above the legs' split at 27.9."""
+    29.65, under 1 mm above the legs' split at 27.9. flap=True (with belt=False): the jacket's
+    front hangs lower, a panel 16 mm wide down to 29.6 over the shorts' front, so its hem runs at
+    29.6 across the front and 31 everywhere else."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -210,6 +212,8 @@ def _shorts_figure(belt):
                 box([22, 12, 16.6], [0, 0, 39.7])]
     else:
         body = [box([18, 10, 3.5], [0, 0, 29.5]), box([22, 12, 17], [0, 0, 39.5])]
+        if flap:  # x -8 to 8, y -6 to -4.5 (into the shorts' front at -5), z 29.6 up into the jacket
+            body.append(box([16, 1.5, 1.6], [0, -5.25, 30.4]))
     arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
     hands = []
     for x in (-14.5, 14.5):
@@ -231,6 +235,35 @@ def test_a_jacket_over_shorts_has_its_hem_at_its_own_edge():
     a = parts.anatomy(_shorts_figure(belt=False), 8.0)
     assert 30.5 <= a["hem"] <= 31.5, a["hem"]
     assert sorted(w["side"] for w in a["wrists"]) == [-1, 1]
+
+
+def test_a_jacket_hem_lower_at_the_front_follows_its_groove_all_the_way_round():
+    """r3 (2026-11-18, Jensen in a black jacket over blue pants): stone colors failed "color
+    boundary is jagged: filament 3/4 at z 38 mm is 1.11 times its smoothed length". The jacket's
+    hem crease runs at 36.6 across the front and up to 38.5 at the back, with a slot under the
+    lip there. hem_fold found that crease (0.142 per mm) but passed on only its median, 37.75;
+    the hem's own groove search looked 1 mm each side of that, lost the front, found no groove
+    and cut a level plane through the slot in small jagged loops. The search must reach the
+    whole crease hem_fold found, so the hem follows it, and the front panel stays the jacket."""
+    m = _shorts_figure(belt=False, flap=True)
+    a = parts.anatomy(m, 8.0)
+    assert a.get("hem_fold") and 30.5 <= a["hem"] <= 31.5, a["hem"]
+    hem = next(ln for ln in a["lines"] if ln["name"] == "hem")
+    assert (hem["groove"] or {}).get("used"), hem["groove"]
+    cv = np.asarray(hem["curve"])
+    front = cv[np.argmin(np.abs(parts._BINS + np.pi / 2))]  # -90 degrees: the -y side, the panel
+    back = cv[np.argmin(np.abs(parts._BINS - np.pi / 2))]
+    assert front < 30.0 and back > 30.5, (front, back)
+    # painted by zone, the panel is the jacket's, not the shorts'
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    panel = (c[:, 1] < -5.9) & (np.abs(c[:, 0]) < 6.0) & (c[:, 2] > 29.8) & (c[:, 2] < 30.8)
+    assert panel.sum() > 10
+    torso = cm.area_faces[panel & (zone == parts.TORSO)].sum() / cm.area_faces[panel].sum()
+    assert torso > 0.95, torso
 
 
 def test_a_belt_on_a_long_coat_is_not_its_hem():
