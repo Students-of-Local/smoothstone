@@ -775,6 +775,61 @@ def test_a_color_the_request_names_is_never_given_up_for_a_rough_edge(jobenv, mo
         assert nxt != cli.DONE_NEXT, text  # never ready with the body's black given up
     assert nxt.startswith("ask the person"), (nxt, text)
     assert not (jobenv / "stone-job" / "figure.3mf").exists()
+    # review first-F1: the question offers only what the tools can carry out. The figure file was
+    # given, so no seed makes another; the person's color answer is a command that prints
+    assert "print it as it is" not in nxt and "another seed" not in nxt, nxt
+    pick = next(ln for ln in text.splitlines() if ln.startswith("If the person picks another color"))
+    cmd = pick.split(": ", 1)[1].replace("<color>", "white")
+    text, code, nxt = stone(*cmd.split()[1:])
+    assert nxt == cli.DONE_NEXT, text
+    assert "the person chose it" in text, text
+    assert (jobenv / "stone-job" / "figure.3mf").is_file()
+
+
+def test_a_named_part_the_figure_has_no_region_for_asks_for_another_figure(jobenv, monkeypatch, openscad, tmp_path):
+    """Review second-S1: shoes the region finder merged into the trousers have no region, so no
+    mapping can paint them black. NEXT asks for another figure, never for a mapping that cannot be.
+    Here the jacket has no region of its own."""
+    _named_figure_job(jobenv, monkeypatch, tmp_path)
+    real = cli._part_regions
+    monkeypatch.setattr(cli, "_part_regions", lambda info, key: [] if key == "top" else real(info, key))
+    text, code, nxt = stone("colors", "rest=white")
+    assert nxt.startswith("ask the person: the figure file has no separate jacket"), (nxt, text)
+    assert "stone set figure figure=" in text, text
+    assert not (jobenv / "stone-job" / "figure.3mf").exists()
+
+
+def test_a_named_color_that_fairing_shrinks_away_is_never_called_ready(jobenv, monkeypatch, openscad, tmp_path):
+    """Review first-F2: the named colors are checked on the paint itself after fairing, not only on
+    the mapping. A wide smoothing that leaves the black jacket mostly white asks the person."""
+    import numpy as np
+
+    from smoothstone import colors
+
+    nxt = _named_figure_job(jobenv, monkeypatch, tmp_path)
+    real_faults, real_cut = colors.edge_faults, colors.smooth_cut
+    calls = []
+
+    def rough_once(lines):  # the first paint has a jagged edge, so the edges are faired
+        calls.append(1)
+        out = real_faults(lines)
+        if len(calls) == 1 and lines:
+            out = out + [{**max(lines, key=lambda x: x["length"]), "ratio": 1.5}]
+        return out
+
+    def faired_away(vertices, faces, face_fil, radius, fixed=None):  # the faired paint loses the black
+        V, F, ff, parent = real_cut(vertices, faces, face_fil, radius=radius, fixed=fixed)
+        if radius > colors.FAIR_RADII[0]:
+            vals, n = np.unique(ff, return_counts=True)
+            ff = np.where(ff == ff, vals[np.argmax(n)], ff)
+        return V, F, ff, parent
+
+    monkeypatch.setattr(colors, "edge_faults", rough_once)
+    monkeypatch.setattr(colors, "smooth_cut", faired_away)
+    text, code, nxt = stone(*nxt.split()[1:])
+    assert "leaves the top with under 50% of its own color" in text, text
+    assert nxt.startswith("ask the person"), nxt
+    assert not (jobenv / "stone-job" / "figure.3mf").exists()
 
 
 def test_a_mapping_that_drops_a_named_color_is_refused(jobenv, monkeypatch, openscad, tmp_path):
@@ -787,6 +842,10 @@ def test_a_mapping_that_drops_a_named_color_is_refused(jobenv, monkeypatch, open
     assert not (jobenv / "stone-job" / "figure.3mf").exists()
     text, code, nxt = stone(*nxt.split()[1:])
     assert nxt == cli.DONE_NEXT, text
+    # naming the jacket's part with another color is no way around it while nobody asked the person
+    text, code, nxt = stone("colors", "top=white", "rest=white")
+    assert "the request makes the jacket black" in text and nxt != cli.DONE_NEXT, text
+    assert not (jobenv / "stone-job" / "figure.3mf").exists()
 
 
 def test_a_rough_edge_is_faired_before_any_color_is_given_up(jobenv, monkeypatch, openscad, tmp_path):

@@ -1616,6 +1616,26 @@ def _named_regions(info: list[dict], request: str) -> dict[int, str]:
     return out
 
 
+def _named_missing(info: list[dict], request: str) -> list[str]:
+    """The words of the parts the request gives a color that the figure has no region for (shoes
+    the region finder merged into the trousers): no mapping can paint those."""
+    pc = colortool.part_colors(request)
+    out = []
+    for k, c in pc.items():
+        if k.startswith("word:") or c == "picture" or k == "name" and not any(d.get("part") == "name" for d in info):
+            continue
+        regs = [d["n"] for d in info if d["base"]] if k == "base" else _part_regions(info, k)
+        if not regs:
+            out.append(pc.get(f"word:{k}", k))
+    return out
+
+
+def _person_may(st: dict) -> set:
+    """The parts the person may give another color than the request names: the ones stone asked
+    them about (asked_parts), and the ones they already chose for (person_parts)."""
+    return set(st.get("asked_parts") or []) | set(st.get("person_parts") or {})
+
+
 def _named_lost(info: list[dict], per, fil: list[str], request: str, skip: set = frozenset()) -> list[str]:
     """What a mapping gives up of the colors the request names: one line per named part that has a
     region in another color, or no region at all. `per` is the filament per region number; `skip`
@@ -1834,7 +1854,22 @@ def cmd_colors(args, job: Job) -> Out:
     # every part the request gives a color keeps it: a mapping that leaves one out is no print of
     # what the person asked for, so it is refused, never painted and called ready
     named = _named_regions(info, request)
-    lost = _named_lost(info, per, fil, request, skip=set(boxed))
+    part_at = {d["n"]: d.get("part") or ("base" if d["base"] else None) for d in info}
+    # a part stone asked the person about may take the color they pick (stone colors top=red):
+    # that is their choice, not a color given up. A mapping stone makes never does it on its own
+    chosen = {g for g in assign if g in named and part_at.get(g) in _person_may(st)}
+    lost = _named_lost(info, per, fil, request, skip=set(boxed) | chosen)
+    plan_params = (job.plan() or {}).get("params") or {}
+    made = "figure" not in plan_params  # the figure step made it, so another seed makes another
+
+    def ask_color(parts_w: list[str], keep: dict[int, int]) -> str:
+        """The stone colors line for the person's answer: the asked parts take the color they name."""
+        job.update(asked_parts=sorted(set(parts_w)))
+        return "stone colors " + " ".join(_mapping_items(info, keep, rest, names)
+                                          + [f"{w}=<color>" for w in parts_w] + [f"rest={names[rest - 1]}"])
+
+    def ask_seed() -> str:
+        return f"stone set seed={figure_seed(job, plan_params) + 1}, then stone build"
     if lost:
         (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
         if st.get("colors"):
@@ -1845,13 +1880,39 @@ def cmd_colors(args, job: Job) -> Out:
         fil_s = config.filaments(job.root) + extra_s
         per_s = np.array([0] + [pick_s.get(d, rest_s) for d in range(1, len(info) + 1)])
         sug = _suggest_line(info, config.filaments(job.root), request)
-        if not _named_lost(info, per_s, fil_s, request, skip=set(boxed)) and sug != "stone colors " + mapping_line(assign):
+        missing = _named_missing(info, request)
+        if missing:
+            # no mapping paints a part the figure has no region for: only another figure can
+            what = " and ".join(missing)
+            if made:
+                out.add(f"If the person wants the figure made again: {ask_seed()}")
+                out.next = (f"ask the person: the figure has no separate {what} to paint the color the request "
+                            f"names. Should I make the figure again from another seed?")
+            else:
+                out.add("If the person gives another figure: stone set figure figure=<path to the figure>, then stone build")
+                out.next = (f"ask the person: the figure file has no separate {what} to paint the color the request "
+                            f"names. Can you give a figure where the {what} is a part of its own?")
+            out.stage = "needs_person"
+        elif not _named_lost(info, per_s, fil_s, request, skip=set(boxed)) and sug != "stone colors " + mapping_line(assign):
             out.next = sug
         else:
+            words = [w for w, _ in _named_words(request)]
+            out.add(f"If the person picks another color for one of them: {ask_color(words, {})}")
             out.next = ("ask the person: the request gives " + ", ".join(f"the {w} {c}" for w, c in _named_words(request))
-                        + ", and I found no mapping that keeps them all. Which should I change?")
+                        + ", and I found no mapping that keeps them all. Which part should take another color, "
+                        "and which color?")
+            out.stage = "needs_person"
         out.result = "colors refused: " + lost[0]
         return out
+    picked = {}
+    for g in sorted(chosen):
+        f = fil[int(per[g]) - 1]
+        want = named[g]
+        if _match_filament(want, [f]) is None and (colortool.word_color(f) or f) != (colortool.word_color(want) or want):
+            picked[part_at[g]] = names[int(per[g]) - 1]
+            out.add(f"The {part_at[g]} takes {names[int(per[g]) - 1]}, not the {want} the request names: the person chose it.")
+    if picked:
+        job.update(person_parts={**(st.get("person_parts") or {}), **picked}, asked_parts=None)
     face_fil0 = per[num]
     # cut along smooth boundaries, so a color edge runs as a curve through the triangles
     # the plinth's edge and a figure's hem, neck and wrists are lines of the shape: keep them there
@@ -1899,11 +1960,16 @@ def cmd_colors(args, job: Job) -> Out:
         nxt = mapping_line({k: v for k, v in assign.items() if k not in drop}) if drop else failed
         part_of = {d["n"]: d.get("part") or d["color"] or "base" for d in info}
         if not drop and (held or any(per[g] != rest for g in named)):
-            what = ", ".join(sorted({part_of[g] for g in (held or named)}))
+            parts_w = sorted({part_at.get(g) or part_of[g] for g in (held or named)})
+            what = ", ".join(parts_w)
             out.add(f"The edge is at the {what}, whose color the request names, so no color is given up.")
+            keep = {k: v for k, v in assign.items() if (part_at.get(k) or part_of[k]) not in parts_w}
+            out.add(f"If the person picks another color for the {what}: {ask_color(parts_w, keep)}")
+            if made:
+                out.add(f"If the person wants the figure made again: {ask_seed()}")
             out.next = (f"ask the person: the color edge of the {what} is not clean enough to print even after "
-                        f"fairing (picture: {bd / 'boundaries.png'}). Should the {what} take another color, "
-                        "or should I print it as it is?")
+                        f"fairing (picture: {bd / 'boundaries.png'}). Should the {what} take another color"
+                        + (", or should I make the figure again from another seed?" if made else "?"))
             out.stage = "needs_person"
             return
         if drop:
@@ -1915,6 +1981,24 @@ def cmd_colors(args, job: Job) -> Out:
                     f"{names[rest - 1]}.")
         out.next = "stone colors " + nxt
 
+    if radius != colortool.FAIR_RADII[0] and not faults and not ledge:
+        # review first-F2: a wide fairing can shrink a small part the request colors away (black
+        # glasses under a 6 mm smoothing); its color is checked on the paint itself, not the mapping
+        a = cut.area_faces
+        thin = [g for g in named if g not in boxed and g not in chosen and a[reg_of == g].sum() > 0
+                and a[(reg_of == g) & (face_fil == per[g])].sum() < colortool.NAMED_KEPT * a[reg_of == g].sum()]
+        if thin:
+            (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
+            if st.get("colors"):
+                job.update(colors=None)
+            colortool.render_boundaries(V, F, fil_rgb[face_fil - 1], lines, bd / "boundaries.png", anatomy=anat_lines)
+            what = ", ".join(sorted({part_at.get(g) or str(g) for g in thin}))
+            out.fix(f"fairing the color edges over {radius:g} mm leaves the {what} with under "
+                    f"{colortool.NAMED_KEPT:.0%} of its own color; no file written")
+            out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
+            retry([], thin)
+            out.result = f"colors failed: the {what} lost its color to fairing"
+            return out
     if ledge:
         x = ledge[0]
         (job.root / f"{r.name}.3mf").unlink(missing_ok=True)

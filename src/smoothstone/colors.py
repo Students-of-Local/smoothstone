@@ -30,6 +30,7 @@ MANY_LAYERS = 10  # a warning from this many mixed layers
 MAX_FILAMENTS = 16
 EDGE_RADIUS = 1.5  # mm: color boundaries are smoothed over about this distance before the cut
 FAIR_RADII = (EDGE_RADIUS, 3.0, 6.0)  # mm: a boundary that is not smooth is cut again over these, in turn, before a color is given up
+NAMED_KEPT = 0.5  # share of a part the request colors that keeps its color after fairing
 EDGE_WINDOW = 2.0  # mm of arc length: the moving average a boundary is compared with
 JAGGED = 1.08  # a boundary this much longer than its smoothed self zigzags
 EDGE_SPAN = 5.0  # mm: the stretch the wobble check looks at
