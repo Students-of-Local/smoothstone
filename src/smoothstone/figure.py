@@ -350,6 +350,10 @@ def _run(cmd: list[str], log: Path, timeout: int) -> None:
             r = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
         except subprocess.TimeoutExpired as e:
             raise FigureProblem(f"{Path(cmd[0]).name} took over {timeout} s") from e
+        except FileNotFoundError as e:  # the program itself is missing (uv, or STONE_LIFT's)
+            f.write(f"not found: {cmd[0]}\n")
+            raise FigureProblem(f"{Path(cmd[0]).name} is not set up (command not found), run {SETUP} once",
+                                setup=True) from e
         f.write(f"exit {r.returncode} after {time.time() - t:.0f} s\n")
     name = Path(cmd[-1] if 'lift' in cmd[-1] else cmd[0]).name
     if r.returncode != 0:

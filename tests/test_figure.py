@@ -987,6 +987,16 @@ def test_a_figure_step_that_is_not_set_up_asks_the_person_instead_of_building_ag
     text, code, nxt = stone("build")
     assert code == 1 and nxt.startswith("ask the person") and "setup.sh" in nxt, text
     assert stone("status")[2] == nxt
+    assert nxt.endswith("When they say to go on: stone build"), nxt  # review of #37: a way to resume
+
+
+def test_a_lift_program_that_is_missing_is_a_setup_problem(tmp_path, monkeypatch):
+    """Review of #37: with no uv (or a STONE_LIFT that does not exist) the run raises
+    FileNotFoundError, which must take the setup path, not stone's internal error."""
+    monkeypatch.setenv("STONE_LIFT", str(tmp_path / "no-such-lift"))
+    with pytest.raises(figure.FigureProblem) as e:
+        figure.lift(tmp_path / "style.png", tmp_path / "lift.glb", 7)
+    assert e.value.setup and figure.SETUP in str(e.value)
 
 
 def test_the_same_failure_twice_in_a_row_asks_the_person(jobenv, monkeypatch):
@@ -1003,3 +1013,20 @@ def test_the_same_failure_twice_in_a_row_asks_the_person(jobenv, monkeypatch):
     stone("status")
     text, code, nxt = stone("build")
     assert code == 1 and nxt.startswith("ask the person") and "lift.py failed" in nxt, text
+    assert nxt.endswith("say to try again: stone build"), nxt
+
+
+def test_a_look_between_two_identical_failures_still_counts_them_in_a_row(jobenv, monkeypatch):
+    """Review of #37: build, then show (or a slip), then the same failing build must still stop:
+    a command that only looks does not end the run of failures."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _figure_with_photo()
+
+    def make(*a, **k):
+        raise figure.FigureProblem("lift.py failed, see lift.log")
+
+    monkeypatch.setattr(figure, "make", make)
+    assert stone("build")[2] == "stone build"
+    stone("show", "figure")
+    stone("bogus")
+    assert stone("build")[2].startswith("ask the person")
