@@ -122,6 +122,93 @@ def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it(
     assert C.ledge_faults(C.ledges(V, F, lab, [neck]))
 
 
+def _zoned(m, z, below, above, parts_by_zone):
+    """The mesh cut level at z, a zone per face by its side, regions per zone (nothing merged), the
+    region list with a part each (the largest region of a zone takes parts_by_zone[zone], the
+    rest "other", but every torso piece is the top, as name_parts makes it) and the region number
+    per face."""
+    V, F = cut_iso(m.vertices, m.faces, np.asarray(m.vertices)[:, 2] - z, 0.0, snap=0.02)
+    cm = C.load_stl_mesh(V, F)
+    zone = np.where(parts.side_of(cm, {"z": z, "curve": None}) > 0, above, below)
+    region = C.regions(cm, np.zeros(len(cm.faces), int), min_share=0.0, zone=zone)
+    info = C.describe(cm, region, [None] * (int(region.max()) + 1), None)
+    seen = set()
+    for d in info:  # largest first
+        zr = int(np.bincount(zone[region == d["region"]]).argmax())
+        d["part"] = "other" if zr in seen and zr != parts.TORSO else parts_by_zone[zr]
+        seen.add(zr)
+    num = np.zeros(int(region.max()) + 1, int)
+    for d in info:
+        num[d["region"]] = d["n"]
+    return cm, num[region], info
+
+
+def _n(info, part):
+    return next(d["n"] for d in info if d["part"] == part)
+
+
+def _all(info, part):
+    return [d["n"] for d in info if d["part"] == part]
+
+
+def test_a_jacket_lip_boxed_in_under_the_hem_line_takes_the_jacket_color():
+    """r3 (2026-11-18, Jensen in a black jacket over blue pants, rest white): the hem line ran in
+    the slot under the jacket's lip at the back, so the lip's rim fell on the pants side, a region
+    of its own that only the jacket touches. It took the rest color: a white stripe along the
+    bottom of the jacket. A sliver boxed in by painted parts takes the color round it."""
+    # pants (radius 4) up to the slot's top at 10; the jacket (5) above, its lip hanging to 9
+    # round a slot 0.5 mm wide; the hem line at 9.6, inside the slot
+    m = _lathe([(0, -40), (4, -40), (4, 10), (4.5, 10), (4.5, 9), (5, 9), (5, 100), (0, 100)])
+    cm, num, info = _zoned(m, 9.6, parts.LEGS, parts.TORSO, {parts.LEGS: "pants", parts.TORSO: "top"})
+    pants = _n(info, "pants")
+    rim = [d["n"] for d in info if d["part"] == "other"]
+    assert len(rim) == 1, info  # the fixture's decisive feature: the rim is a region of its own
+    rim = rim[0]
+    tops = _all(info, "top")
+    fil = np.ones(len(info) + 1, int)  # rest=white
+    fil[tops], fil[pants] = 2, 3  # top=black pants=blue
+    named = set(tops) | {pants}
+    got = C.boxed_slivers(cm, num, info, fil, named, 1)
+    assert len(got) == 1 and got[0][0] == rim and got[0][1] in tops, (got, info)
+    # a sliver the request names keeps its color; one beside the rest color is not boxed in
+    assert C.boxed_slivers(cm, num, info, fil, named | {rim}, 1) == []
+    loose = fil.copy()
+    loose[tops] = 1
+    assert C.boxed_slivers(cm, num, info, loose, {pants}, 1) == []
+    # a lip 4 mm deep under the line is a piece of its own size, not a sliver: it stays rest
+    m = _lathe([(0, -40), (4, -40), (4, 10), (4.5, 10), (4.5, 5), (5, 5), (5, 100), (0, 100)])
+    cm, num, info = _zoned(m, 9.6, parts.LEGS, parts.TORSO, {parts.LEGS: "pants", parts.TORSO: "top"})
+    fil = np.ones(len(info) + 1, int)
+    fil[_all(info, "top")], fil[_n(info, "pants")] = 2, 3
+    assert C.boxed_slivers(cm, num, info, fil, set(_all(info, "top")) | {_n(info, "pants")}, 1) == []
+
+
+def test_a_collar_top_boxed_in_over_the_neck_line_is_the_jacket_not_a_ledge_of_the_head():
+    """r3 (2026-11-18): stone colors failed "the neck color edge climbs onto a ledge: 0.69 mm2 of
+    up-facing filament 1 faces seen next to it at 345 degrees". The jacket's collar stands round
+    the neck with a gap, the neck line runs just over the gap's bottom, and the collar's top above
+    that line was a region of its own in the head zone that only the jacket touches. Painted the
+    rest color it is the head's color on the collar's top; boxed in, it takes the jacket's."""
+    # torso (6) to 10, a collar (4 to 4.5) up to 12 round a gap 0.5 mm wide down to 11, the neck
+    # (3.5) and a ball head; the neck line at 11.3, just over the gap's bottom
+    prof = [(0, -100), (6, -100), (6, 10), (4.5, 10), (4.5, 12), (4, 12), (4, 11), (3.5, 11), (3.5, 16)]
+    m = _lathe(prof + _head(3.5, 16, 5)[1:])
+    cm, num, info = _zoned(m, 11.3, parts.TORSO, parts.HEAD, {parts.TORSO: "top", parts.HEAD: "face"})
+    tops = _all(info, "top")
+    collar = [d["n"] for d in info if d["part"] == "other"]
+    assert len(collar) == 1, info
+    fil = np.ones(len(info) + 1, int)  # rest=white: the face and anything unnamed
+    fil[tops] = 2
+    neck = {**_line("neck", 11.3, 3.5), "rmax": 4.5 + parts.SNAP, "curve": None}
+    # painted rest, the collar's top is the head's color on a ledge: the fault the job showed
+    assert C.ledge_faults(C.ledges(cm.vertices, cm.faces, fil[num], [neck]))
+    got = C.boxed_slivers(cm, num, info, fil, set(tops), 1)
+    assert len(got) == 1 and got[0][0] == collar[0] and got[0][1] in tops, (got, info)
+    fil[collar[0]] = fil[got[0][1]]
+    found = C.ledges(cm.vertices, cm.faces, fil[num], [neck])
+    assert not C.ledge_faults(found), found
+
+
 def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
     m = cuff_figure()
     ln = parts.find_groove(m, _line("wrist", 10.0, 2.5))
@@ -188,12 +275,14 @@ def test_anatomy_of_a_block_figure():
     assert names == {("hem", None), ("neck", None), ("wrist", -1), ("wrist", 1)}
 
 
-def _shorts_figure(belt):
+def _shorts_figure(belt, flap=False):
     """The block figure with its torso split at the hips. belt=False: shorts (18 x 10) from the
     legs up to 31.25 under a jacket (22 x 12) that overhangs them, so the jacket's hem is at 31.
     belt=True: a long coat (22 x 12) from the legs up, with a belt groove (21 x 11) at 30.5 to
     31.5: the coat's hem is at the legs. belt="low": the same coat with the belt groove at 28.75 to
-    29.65, under 1 mm above the legs' split at 27.9."""
+    29.65, under 1 mm above the legs' split at 27.9. flap=True (with belt=False): the jacket's
+    front hangs lower, a panel 16 mm wide down to 29.6 over the shorts' front, so its hem runs at
+    29.6 across the front and 31 everywhere else."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -210,6 +299,8 @@ def _shorts_figure(belt):
                 box([22, 12, 16.6], [0, 0, 39.7])]
     else:
         body = [box([18, 10, 3.5], [0, 0, 29.5]), box([22, 12, 17], [0, 0, 39.5])]
+        if flap:  # x -8 to 8, y -6 to -4.5 (into the shorts' front at -5), z 29.6 up into the jacket
+            body.append(box([16, 1.5, 1.6], [0, -5.25, 30.4]))
     arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
     hands = []
     for x in (-14.5, 14.5):
@@ -231,6 +322,35 @@ def test_a_jacket_over_shorts_has_its_hem_at_its_own_edge():
     a = parts.anatomy(_shorts_figure(belt=False), 8.0)
     assert 30.5 <= a["hem"] <= 31.5, a["hem"]
     assert sorted(w["side"] for w in a["wrists"]) == [-1, 1]
+
+
+def test_a_jacket_hem_lower_at_the_front_follows_its_groove_all_the_way_round():
+    """r3 (2026-11-18, Jensen in a black jacket over blue pants): stone colors failed "color
+    boundary is jagged: filament 3/4 at z 38 mm is 1.11 times its smoothed length". The jacket's
+    hem crease runs at 36.6 across the front and up to 38.5 at the back, with a slot under the
+    lip there. hem_fold found that crease (0.142 per mm) but passed on only its median, 37.75;
+    the hem's own groove search looked 1 mm each side of that, lost the front, found no groove
+    and cut a level plane through the slot in small jagged loops. The search must reach the
+    whole crease hem_fold found, so the hem follows it, and the front panel stays the jacket."""
+    m = _shorts_figure(belt=False, flap=True)
+    a = parts.anatomy(m, 8.0)
+    assert a.get("hem_fold") and 30.5 <= a["hem"] <= 31.5, a["hem"]
+    hem = next(ln for ln in a["lines"] if ln["name"] == "hem")
+    assert (hem["groove"] or {}).get("used"), hem["groove"]
+    cv = np.asarray(hem["curve"])
+    front = cv[np.argmin(np.abs(parts._BINS + np.pi / 2))]  # -90 degrees: the -y side, the panel
+    back = cv[np.argmin(np.abs(parts._BINS - np.pi / 2))]
+    assert front < 30.0 and back > 30.5, (front, back)
+    # painted by zone, the panel is the jacket's, not the shorts'
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    panel = (c[:, 1] < -5.9) & (np.abs(c[:, 0]) < 6.0) & (c[:, 2] > 29.8) & (c[:, 2] < 30.8)
+    assert panel.sum() > 10
+    torso = cm.area_faces[panel & (zone == parts.TORSO)].sum() / cm.area_faces[panel].sum()
+    assert torso > 0.95, torso
 
 
 def test_a_belt_on_a_long_coat_is_not_its_hem():

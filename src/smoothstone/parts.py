@@ -34,6 +34,7 @@ ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the to
 ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
 ANKLE_SETTLED = 0.01  # the leg over a shoe holds its section within this share: the shoe's taper ended
 HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
+HEM_BAND_PAD = 0.25  # mm past the hem fold's groove, each way, that the hem's groove search reaches
 SNAP = 3.0  # mm: a color boundary this close to a line of the shape moves onto it
 BAND = 2.0  # mm each side of a line that keeps its color through the edge smoothing
 NECK_VALLEY = 1.25  # the neck section is at least this much smaller than the torso and the head
@@ -194,10 +195,11 @@ def anatomy(mesh, top: float) -> dict:
     split = _scan(top + 1.0, top + 0.6 * H, legs_apart) if legs_apart(top + 1.0) else None
     low = split + HEM_ABOVE if split is not None else None
     fold = hem_fold(mesh, low, low + HEM_FOLD * H, legs_apart) if low is not None else None
-    hem = fold if fold is not None else low
+    hem = fold[0] if fold is not None else low
     res["hem"] = hem
     if fold is not None:
         res["hem_fold"] = True
+        res["hem_band"] = fold[1]
     if split is not None:
         for side in (-1, 1):
             a = ankle(mesh, top, split, res["center"], side)
@@ -508,11 +510,16 @@ def _line_ring(mesh, z: float, pick) -> tuple[np.ndarray, float, float] | None:
     return c, float(np.linalg.norm(p - c, axis=1).max()), float(np.linalg.norm(np.diff(np.vstack([p, p[:1]]), axis=0), axis=1).sum())
 
 
-def hem_fold(mesh, lo: float, hi: float, legs_apart=None) -> float | None:
-    """The z of the top's own hem above the legs: the lowest groove in (lo, hi] that runs all the
-    way round the body (crease_loop costs under GROOVE_COST per mm, at least GROOVE_REACH of the
+def hem_fold(mesh, lo: float, hi: float, legs_apart=None) -> tuple[float, float] | None:
+    """(z, band) of the top's own hem above the legs: the lowest groove in (lo, hi] that runs all
+    the way round the body (crease_loop costs under GROOVE_COST per mm, at least GROOVE_REACH of the
     ring) where the body's section 1 mm above is at least HEM_STEP times the section 1 mm below: a
-    jacket's edge over shorts. A belt on a long coat is no hem: the coat below it is as wide.
+    jacket's edge over shorts. A belt on a long coat is no hem: the coat below it is as wide. z is
+    the groove's median height; band (at least 1 mm) reaches HEM_BAND_PAD past its lowest and
+    highest point, so the hem line's own groove search (find_groove) sees the whole groove this
+    found. A hem lower at the front than at the back reaches more than 1 mm from its median: a
+    narrower band cuts its low stretch off, the search finds no groove, and the hem falls back to a
+    level plane that runs through the slot under the jacket's lip in small jagged loops.
 
     lo is just above the legs' split. A groove whose section 1 mm below lies between the legs
     (legs_apart) is skipped, since the widest ring there is one leg and any groove would pass. The
@@ -552,7 +559,8 @@ def hem_fold(mesh, lo: float, hi: float, legs_apart=None) -> float | None:
         if legs_apart is not None and legs_apart(gz - 1.0):
             continue
         if steps(gz + 1.0, gz - 1.0):
-            return gz
+            reach = max(gz - float(P[:, 2].min()), float(P[:, 2].max()) - gz)
+            return gz, max(1.0, reach + HEM_BAND_PAD)
     return None
 
 
@@ -617,7 +625,8 @@ def find_lines(mesh, anat: dict) -> list[dict]:
         rg = _line_ring(mesh, z, widest)
         if rg is not None:
             out.append({"name": "hem", "z": z, "center": [float(rg[0][0]), float(rg[0][1])],
-                        "rmax": rg[1] + SNAP, "ring": rg[2], **({"band": 1.0} if anat.get("hem_fold") else {})})
+                        "rmax": rg[1] + SNAP, "ring": rg[2],
+                        **({"band": anat.get("hem_band", 1.0)} if anat.get("hem_fold") else {})})
         else:
             out.append({"name": "hem", "z": z, "center": [x0, 0.0], "rmax": 0.0, "ring": 0.0})
     if anat.get("neck") is not None:
