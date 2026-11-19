@@ -209,12 +209,23 @@ def part_colors(request: str, names=()) -> dict[str, str]:
     def give_list(i, c):
         """<part>, <part> and <part>, which are <color>: every part of the list ending at i."""
         give(i, c)
-        j = i - 1
-        while j >= 0 and words[j] in ("and", ",", "the", "his", "her", "their", "its"):
-            j -= 1
-            if j >= 0 and part_of(words[j]) and words[j + 1] in ("and", ",", "the", "his", "her", "their", "its"):
-                give(j, c)
+        # walk back part by part; each gap is the words between a part and the next ("," "and" "the")
+        chain, j = [], i - 1
+        while True:
+            gap = []
+            while j >= 0 and words[j] in ("and", ",", "the", "his", "her", "their", "its"):
+                gap.append(words[j])
                 j -= 1
+            if j < 0 or not part_of(words[j]) or not ({"and", ","} & set(gap)):
+                break
+            chain.append((j, gap))
+            j -= 1
+        # ", and" closes a list only after another comma ("jacket, pants, and shoes"); with no
+        # comma before it, it ends the clause before ("show his hands, and the jacket is blue")
+        for m, (j, gap) in enumerate(chain):
+            if "," in gap and "and" in gap and not (m + 1 < len(chain) and "," in chain[m + 1][1]):
+                break
+            give(j, c)
 
     for i, w in enumerate(words):
         p = part_of(w)

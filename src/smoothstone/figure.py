@@ -257,7 +257,7 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
             say(f"The render {how}, unlike the photo; styling again with seed {s + 1}.")
         else:
             say(f"The render {how}, unlike the photo, in all {STYLE_TRIES} tries; keeping the closest.")
-    shutil.copyfile(best[0], out)
+    _landed(out, lambda tmp: shutil.copyfile(best[0], tmp))
     out.with_name("check.json").write_text(json.dumps({"want": want, "kept": best[0].name,
                                                        "differs": best[1]}, indent=1))
     return out
@@ -289,6 +289,21 @@ def _lift_cmd() -> list[str]:
     return [uv, "run", "--project", str(lift), "python", str(lift / "lift.py")]
 
 
+def _landed(out: Path, write) -> Path:
+    """write(tmp) makes the step's output under a temporary name in out's folder (same suffix, so
+    a writer that goes by it still can); only a write that returns moves it onto out. The harness
+    kills a slow build mid-write, and the next run reuses out as done, so out is never half a file."""
+    tmp = out.with_name(f"{out.stem}.part{out.suffix}")
+    tmp.unlink(missing_ok=True)
+    try:
+        write(tmp)
+        if tmp.exists():
+            os.replace(tmp, out)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return out
+
+
 def _run(cmd: list[str], log: Path, timeout: int) -> None:
     t = time.time()
     with log.open("a") as f:
@@ -312,8 +327,8 @@ def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, e
            "--prompt", prompt(style_name, who, extra, glasses),
            "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed),
            "--low-ram",
-           "--output", str(out)]
-    _run(cmd, out.with_name("style.log"), timeout=1800)
+           "--output"]
+    _landed(out, lambda tmp: _run(cmd + [str(tmp)], out.with_name("style.log"), timeout=1800))
     if not out.exists():
         raise FigureProblem("the style model wrote no picture")
     return out
@@ -322,10 +337,10 @@ def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, e
 def lift(render: Path, out: Path, seed: int) -> Path:
     if out.exists():
         return out
-    _run(_lift_cmd() + [str(render), str(out), "--seed", str(seed),
-                        "--octree", os.environ.get("STONE_LIFT_OCTREE", "256"),
-                        "--chunks", os.environ.get("STONE_LIFT_CHUNKS", "4000")], out.with_name("lift.log"),
-         timeout=3600)
+    _landed(out, lambda tmp: _run(_lift_cmd() + [str(render), str(tmp), "--seed", str(seed),
+                                                 "--octree", os.environ.get("STONE_LIFT_OCTREE", "256"),
+                                                 "--chunks", os.environ.get("STONE_LIFT_CHUNKS", "4000")],
+                                  out.with_name("lift.log"), timeout=3600))
     if not out.exists():
         raise FigureProblem("the lift model wrote no mesh")
     return out
@@ -358,12 +373,15 @@ def repair(src: Path, out: Path, max_faces: int = 250_000) -> dict:
     cx, cy = feet[:, 0].mean(), feet[:, 1].mean()
     m.apply_translation([-cx, -cy, -lo[2]])
     m.apply_scale(1.0 / h)
-    m.export(out)
     lo, hi = m.bounds
     info = {"faces": len(m.faces), "watertight": bool(m.is_watertight),
             "width": float(hi[0] - lo[0]), "depth": float(hi[1] - lo[1]),
             "feet_w": float(np.ptp(feet[:, 0]) / h), "feet_d": float(np.ptp(feet[:, 1]) / h)}
-    out.with_suffix(".json").write_text(json.dumps(info, indent=1))
+
+    def write(tmp: Path) -> None:  # the mesh lands last: make() takes figure.stl as the step done
+        m.export(tmp)
+        _landed(out.with_suffix(".json"), lambda t: t.write_text(json.dumps(info, indent=1)))
+    _landed(out, write)
     return info
 
 
