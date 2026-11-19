@@ -41,7 +41,7 @@ SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under thi
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 NAME_OUT = 0.02  # mm: a plinth face with a corner this far out of the drum is a raised letter of the name
 NAME_CONTRAST = 3.0  # the name's color stands out from the plinth's by at least this contrast ratio (WCAG)
-REGIONS_VERSION = 4  # bump when find_regions changes what it returns, so a cached listing is redone
+REGIONS_VERSION = 5  # bump when find_regions changes what it returns, so a cached listing is redone
 
 # plain color names and a typical filament of each
 NAMES = {
@@ -1139,6 +1139,8 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
     edge near the line, the color of its upper face is the upper color; the faces of that color
     within LEDGE_MM of the edge that face up (normal z over LEDGE_NZ) and that a person sees are
     the fault (at a shoe's top, a cuff or on any line along a rim, only those the edge runs onto: _on_edge) (a strip tucked under a cuff's rim is hidden and counts as seen only where it is).
+    A neck line's "nostep" bins, where the shoulders' slope runs on into the head with no step for
+    the line to sit on (parts.neck_rim), are skipped; the PASS line counts them.
     Returns one entry per line: {"name", "side", "area" (seen mm2, worst 30 degree sector), "angle" (that sector's
     middle, degrees around the line's center, 0 = +x), "fil" (the upper color), "faces"}."""
     from scipy.spatial import cKDTree
@@ -1181,6 +1183,9 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
                 bad = cand[np.isfinite(dist)]
                 if ln["name"] in ("ankle", "wrist") or ln.get("rim"):
                     bad = _on_edge(mesh, bad, np.unique(ev[e]))
+                if ln.get("nostep"):  # where the neck slopes on into the head with no step (parts.neck_rim)
+                    b = (np.floor((np.degrees(np.arctan2(c[bad, 1] - cy, c[bad, 0] - cx)) + 180) / 10) * 10 - 180)
+                    bad = bad[~np.isin(b.astype(int), ln["nostep"])]
                 if len(bad):
                     th = np.degrees(np.arctan2(c[bad, 1] - cy, c[bad, 0] - cx)) % 360
                     sec = (th // 30).astype(int)

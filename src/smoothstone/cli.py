@@ -1891,8 +1891,11 @@ def cmd_colors(args, job: Job) -> Out:
     if anat_lines:
         grooves = [f"{x['name']}{'' if x.get('side') is None else (' left' if x['side'] < 0 else ' right')} "
                    f"{'up' if x['groove']['side'] > 0 else 'down'}" for x in anat_lines if (x.get("groove") or {}).get("used")]
+        nostep = [f"{x['name']} {len(x['nostep'])}" for x in anat_lines if x.get("nostep")]
         out.add("PASS ledges: no up-facing face of the wrong color is seen next to a part's edge"
-                + (f"; edges in the groove: {', '.join(grooves)}" if grooves else ""))
+                + (f"; edges in the groove: {', '.join(grooves)}" if grooves else "")
+                + (f"; bins of 10 degrees where the slope runs on into the head with no step, which the check "
+                   f"skips: {', '.join(nostep)} of 36" if nostep else ""))
     mixed, changes = colortool.layer_changes(cut, face_fil)
     if mixed >= colortool.MANY_LAYERS:
         out.add(f"Warning: the colors alternate on {mixed} layers: about {changes} filament changes "

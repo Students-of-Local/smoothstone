@@ -141,6 +141,99 @@ def test_a_neck_with_no_groove_ends_at_the_top_of_the_shoulders_slope():
     assert neck.get("rim") and 8.4 < float(np.median(neck["curve"])) < 9.9, neck
 
 
+_HEAD = [(6.0, 12.0)] + _arc((0.0, 12.0), 6.0, 0.0, 90.0, 12)[1:]
+# a step at the front: the neck's upright wall from z 7.5 to 9.5, then the head's underside
+_FRONT = [(0, 0), (8, 0), (8, 5), (6, 7.5), (6, 9.5), (4, 10.5)] + _HEAD
+# at the back one slope from z 5 on up into the head's underside at z 10.5, over 3 mm (GROOVE_BAND)
+# above the neck's level, so no groove runs all round
+_BACK = [(0, 0), (8, 0), (8, 5), (8 - 2 * 4.5 / 5.5, 7), (5, 8 + 2 / 3), (3.5, 10.5)] + _HEAD
+_STEP = [(0, 0), (8, 0), (8, 5), (5.5, 7.5), (5.5, 8.1), (4, 10.5)] + _HEAD  # the back with a riser in it
+
+
+def _by_angle(front, back, sections=120, step=0.1):
+    """A shape turned round z whose (r, z) profile is `front` at the front (-y) and `back` over
+    the back half (within 50 degrees of +y, eased over the next 12): the two profiles have the
+    same points, blended. Each segment is cut the same number of times all round."""
+    front, back = np.asarray(front, float), np.asarray(back, float)
+    n = [max(1, int(np.ceil(max(np.linalg.norm(f1 - f0), np.linalg.norm(b1 - b0)) / step)))
+         for f0, f1, b0, b1 in zip(front[:-1], front[1:], back[:-1], back[1:])]
+    rings = []
+    phi = np.linspace(0, 2 * np.pi, sections, endpoint=False)
+    for a in phi:
+        off = abs((np.degrees(a) - 90 + 180) % 360 - 180)
+        w = float(np.clip((62 - off) / 12, 0, 1))
+        w = w * w * (3 - 2 * w)
+        prof = front * (1 - w) + back * w
+        pts = [prof[0]]
+        for k in range(len(prof) - 1):
+            pts += [prof[k] + (prof[k + 1] - prof[k]) * j / n[k] for j in range(1, n[k] + 1)]
+        rings.append(np.array(pts))
+    P = np.stack(rings)  # sections x points x (r, z); the first and last points lie on the axis
+    m = P.shape[1]
+    V = [[0.0, 0.0, P[0, 0, 1]]]
+    for i in range(1, m - 1):
+        for j, a in enumerate(phi):
+            V.append([P[j, i, 0] * np.cos(a), P[j, i, 0] * np.sin(a), P[j, i, 1]])
+    V.append([0.0, 0.0, P[0, -1, 1]])
+    top = len(V) - 1
+
+    def vid(i, j):
+        return 1 + (i - 1) * sections + j % sections
+
+    F = []
+    for j in range(sections):
+        F.append([0, vid(1, j + 1), vid(1, j)])
+        F.append([top, vid(m - 2, j), vid(m - 2, j + 1)])
+        for i in range(1, m - 2):
+            F.append([vid(i, j), vid(i, j + 1), vid(i + 1, j + 1)])
+            F.append([vid(i, j), vid(i + 1, j + 1), vid(i + 1, j)])
+    mesh = C.load_stl_mesh(np.array(V), np.array(F))
+    if mesh.volume < 0:
+        mesh = C.load_stl_mesh(np.array(V), np.array(F)[:, ::-1])
+    return mesh
+
+
+_NECK_ANAT = {"top": 0.0, "height": 18.0, "center": 0.0, "hem": None, "neck": 7.0, "wrists": [], "ankles": []}
+
+
+def _back_bins():
+    """The neck's 10 degree bins (first degree from -180) whose middle is within 50 degrees of +y."""
+    return [b for b in range(-180, 180, 10) if abs((b + 5 - 90 + 180) % 360 - 180) < 50]
+
+
+def test_a_neck_that_slopes_on_into_the_head_with_no_step_is_skipped_only_where_it_does():
+    """Eval (Elon): behind the ears the shoulders' slope runs on up into the skull's underside
+    with no step for the neck's line to sit on. The rim walk took the line up to the skull there
+    and widened that rise, so in the bins beside it, where the neck does step, the edge rode up
+    onto the slope over the step (0.40 mm2 at 135 degrees). Where the walk runs all the way to the
+    head's overhang the line stays level and the ledge check skips that bin, and says so; where
+    there is a step the check holds. Here the front steps (slope to z 7.5, an upright wall to
+    z 9.5) and the back slopes from z 5 straight into the head's underside at z 10.5; the neck's
+    level is z 7."""
+    m = _by_angle(_FRONT, _BACK)
+    assert m.is_watertight
+    neck = next(ln for ln in parts.find_lines(m, _NECK_ANAT) if ln["name"] == "neck")
+    V, F, lab = _paint(m, neck)
+    found = C.ledges(V, F, lab, [neck])
+    assert not C.ledge_faults(found), found
+    back = _back_bins()
+    assert set(back) <= set(neck.get("nostep") or []), (neck.get("nostep"), back)
+    assert not set(neck.get("nostep") or []) & {b for b in range(-180, 180, 10) if (b + 5) % 360 > 200}
+
+    # the same neck with a riser in the back slope: a step, so no bin is skipped there, and a
+    # line kept level across the back (as it is where there is no step) rides onto the slope
+    m = _by_angle(_FRONT, _STEP)
+    neck = next(ln for ln in parts.find_lines(m, _NECK_ANAT) if ln["name"] == "neck")
+    assert not set(neck.get("nostep") or []) & set(back), neck.get("nostep")
+    deg = np.arange(-180, 180)
+    cv = np.asarray(neck["curve"], float)
+    cv[abs((deg + 0.5 - 90 + 180) % 360 - 180) < 50] = 7.0
+    level = {**neck, "curve": [float(v) for v in cv]}
+    V, F, lab = _paint(m, level)
+    bad = C.ledge_faults(C.ledges(V, F, lab, [level]))
+    assert bad and abs((bad[0]["angle"] - 90 + 180) % 360 - 180) < 60, bad
+
+
 def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it():
     """r3 (Donovan, 2026-11-18, black shoes under blue pants): a wrinkle of the trousers 1 mm over
     the shoe faces up and is blue, with blue trouser wall between it and the shoe's edge. The ledge

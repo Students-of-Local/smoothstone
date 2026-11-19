@@ -32,6 +32,8 @@ ANKLE_CREASE_BAND = 1.5  # mm each side of it
 ANKLE_RIM_GAP = 0.2  # mm: an up-facing face starting within this of the shoe's rim so far is still the shoe
 ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the top of the shoe
 ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
+NECK_DOWN_NZ = -0.2  # a face whose normal points down at least this much is an overhang
+NECK_HEAD_DOWN = 0.5  # share of the first mm over an overhang facing down for it to be the head's underside
 NECK_RIM_REACH = 4.0  # mm over a level neck line searched for the top of the shoulders' slope
 ANKLE_SETTLED = 0.01  # the leg over a shoe holds its section within this share: the shoe's taper ended
 HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
@@ -681,10 +683,13 @@ def find_lines(mesh, anat: dict) -> list[dict]:
             found = find_groove(mesh, ln, only)
             if ln["name"] == "neck" and found.get("curve") is None:
                 # no groove: where the shoulders slope on up past the plane, the neck's line runs
-                # along the top of that slope, where the neck stands up, as a shoe's rim does
-                rim = shoe_rim(mesh, found, fig, NECK_RIM_REACH)
+                # along the top of that slope, where the neck stands up, as a shoe's rim does;
+                # where it slopes on into the head with no step the line stays level (nostep)
+                rim, nostep = neck_rim(mesh, found, fig)
                 if rim is not None:
                     found = {**found, "curve": [round(float(v), 4) for v in rim], "rim": True, "groove": None}
+                if nostep:
+                    found = {**found, "nostep": nostep}
             res.append(found)
     return res + ankles
 
@@ -726,12 +731,10 @@ def ankle_line(mesh, anat: dict, a: dict) -> dict:
     return line
 
 
-def shoe_rim(mesh, line: dict, keep: np.ndarray, reach: float = ANKLE_RIM_REACH) -> np.ndarray | None:
-    """The top of a shoe whose rim is not level (a toe box rising to the tongue): 360 heights round
-    the leg's center. At each 10 degrees, from the ankle line up, the up-facing faces that start
-    within ANKLE_RIM_GAP of the rim so far are still the shoe; the first gap ends it, so a fold of
-    the trousers higher up keeps the trousers' color. None when the rim is level with the line.
-    The same walk finds the top of the shoulders' slope over a level neck line (reach mm up)."""
+def _rim_tops(mesh, line: dict, keep: np.ndarray, reach: float):
+    """The rim walk: at each 10 degrees round the line's center (bins from -180), from the line up,
+    the up-facing faces that start within ANKLE_RIM_GAP of the rim so far; the first gap ends it.
+    Returns (36 tops, face corner heights, face angles in degrees, face radii)."""
     z0, (cx, cy) = line["z"], line["center"]
     F = np.asarray(mesh.faces)
     fz = np.asarray(mesh.vertices, float)[F][:, :, 2]
@@ -749,12 +752,56 @@ def shoe_rim(mesh, line: dict, keep: np.ndarray, reach: float = ANKLE_RIM_REACH)
                 break
             top = max(top, float(fz[i].max()))
         tops[b] = top
+    return tops, fz, th, r
+
+
+def _rim_curve(tops: np.ndarray, z0: float) -> np.ndarray | None:
     if tops.max() - z0 < 0.1:
         return None
     deg = np.repeat(tops, 10)  # one value per degree, on _BINS (-180 to 179)
     # widen each rise by 8 degrees each way and smooth it, never below the rim itself
     wide = np.max([np.roll(deg, k) for k in range(-8, 9)], axis=0)
     return np.maximum(_gauss(wide, 3.0), deg) + 0.05
+
+
+def shoe_rim(mesh, line: dict, keep: np.ndarray, reach: float = ANKLE_RIM_REACH) -> np.ndarray | None:
+    """The top of a shoe whose rim is not level (a toe box rising to the tongue): 360 heights round
+    the leg's center. At each 10 degrees, from the ankle line up, the up-facing faces that start
+    within ANKLE_RIM_GAP of the rim so far are still the shoe; the first gap ends it, so a fold of
+    the trousers higher up keeps the trousers' color. None when the rim is level with the line."""
+    return _rim_curve(_rim_tops(mesh, line, keep, reach)[0], line["z"])
+
+
+def neck_rim(mesh, line: dict, keep: np.ndarray) -> tuple[np.ndarray | None, list[int]]:
+    """The top of the shoulders' slope over a level neck line with no groove: the rim walk of
+    shoe_rim, NECK_RIM_REACH mm up. A bin where the walk climbed and ran all the way to the head's
+    overhang has no step: no up-facing face lies between the walk's top and the first down-facing
+    face over it, and at least NECK_HEAD_DOWN of the area in the next mm faces down (the head's
+    underside, not a collar's thin lip with the neck rising again over it). There the neck slopes
+    into the head, so the line stays level and the ledge check skips the bin. Returns (360 heights
+    or None, the no-step bins as their first degree from -180)."""
+    z0 = line["z"]
+    tops, fz, th, r = _rim_tops(mesh, line, keep, NECK_RIM_REACH)
+    nz = mesh.face_normals[:, 2]
+    area = mesh.area_faces
+    nostep = []
+    for b in range(36):
+        if tops[b] - z0 < 0.05:
+            continue  # the walk never left the line: nothing up-facing to step from
+        inb = keep & (r < line["rmax"] + 1.0) & (th >= b * 10 - 180) & (th < b * 10 - 170) & \
+            (fz.min(1) >= tops[b] - 1e-6)
+        down = inb & (nz < NECK_DOWN_NZ)
+        if not down.any():
+            continue
+        zd = float(fz[down].min(1).min())
+        if (inb & (fz.min(1) < zd) & (nz > ANKLE_RIM_NZ)).any():
+            continue  # more of the slope beyond a gap: a step the walk stopped at
+        band = inb & (fz.min(1) < zd + 1.0)
+        if area[band & (nz < NECK_DOWN_NZ)].sum() < NECK_HEAD_DOWN * area[band].sum():
+            continue  # a collar's lip, with the neck rising again over it
+        nostep.append(b * 10 - 180)
+        tops[b] = z0
+    return _rim_curve(tops, z0), nostep
 
 
 def _ledge_curve(line: dict, z: float) -> bool:
