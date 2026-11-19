@@ -132,15 +132,29 @@ def tool_photos(job: Path) -> set[str]:
     return {_file_key(p.get("title", "")) for p in found.get("photos") or [] if p.get("title")}
 
 
-READABLE = {".jpg", ".jpeg", ".png", ".webp", ".gif"}  # what the judge can open; an SVG or TIFF it cannot
+READABLE = {"JPEG": ".jpg", "MPO": ".jpg", "PNG": ".png", "WEBP": ".webp", "GIF": ".gif"}  # what the
+# judge can open, by the format in the bytes (a camera's MPO is a JPEG with a second frame); an SVG or TIFF it cannot
 
 
-def _hash(data: bytes) -> int | None:
-    """A 16 x 16 average hash: the same picture re-encoded, resized or in another format keeps it."""
+def _suffix(data: bytes) -> str | None:
+    """The file suffix for a picture's own format, read from its bytes, never its link (a link
+    with no suffix or the wrong one); None for a format the judge cannot read or no picture."""
     import io
     from PIL import Image
     try:
-        im = Image.open(io.BytesIO(data)).convert("L").resize((16, 16))
+        return READABLE.get(Image.open(io.BytesIO(data)).format or "")
+    except Exception:
+        return None
+
+
+def _hash(data: bytes) -> int | None:
+    """A 16 x 16 average hash, upright by the photo's EXIF orientation. The same picture
+    re-encoded, resized, in another format, or turned upright from a phone's EXIF keeps it; a
+    crop of it does not, so a crop is never caught as the same picture."""
+    import io
+    from PIL import Image, ImageOps
+    try:
+        im = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("L").resize((16, 16))
     except Exception:  # not a picture PIL reads: it matches nothing
         return None
     px = list(im.tobytes())
@@ -285,50 +299,64 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
     lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1]).replace("_", " ")
     lead_is_tools = _stem(_file_key(ref["url"])) in {_stem(a) for a in avoid}  # Wikidata's photo, which the tool put first
     hand = [h for h in picked_by_hand(ref["title"]) if _stem(h["file"]) not in {_stem(a) for a in avoid}]
-    room = REFERENCES - len(hand) - (0 if lead_is_tools else 1)
-    others = other_references(ref, avoid | {_file_key(ref["url"])}, room) if room > 0 else []
-    photos = hand + ([] if lead_is_tools else [{"file": lead, "url": ref["url"]}]) + others
-    if not photos:
-        raise JudgeProblem(f"no photo of {title!r} apart from the ones the tool styled from")
-    if lead_is_tools:
-        ref = {**ref, "instead_of": lead, "url": photos[0]["url"]}
-    if lead_is_tools or len(photos) > 1:
-        ref = {**ref, "photos": photos}
+    lead_photo = {"file": lead, "url": ref["url"]}
     owners = owner_photos(job)
+    got: dict[str, tuple[bytes, str] | None] = {}
 
-    def fetch(url: str, stem: str) -> Path | None:
-        """The photo saved under its own format, or None: a format the judge cannot read, a link
-        that moved, or a photo the owner gave the tool."""
-        ext = Path(urllib.parse.urlparse(url).path).suffix.lower() or ".jpg"
-        if ext not in READABLE:
-            return None
-        try:
-            data = _get(url)
-        except OSError:
-            return None
-        if _same_picture(data, owners):
-            return None
-        (t / f"{stem}{ext}").write_bytes(data)
-        return t / f"{stem}{ext}"
+    def fetch(url: str) -> tuple[bytes, str] | None:
+        """The photo's bytes and suffix, each link downloaded once, or None: a format the judge
+        cannot read, a link that moved, or a photo the owner gave the tool."""
+        if url not in got:
+            try:
+                data = _get(url)
+            except OSError:
+                data = b""
+            ext = _suffix(data)
+            got[url] = (data, ext) if ext and not _same_picture(data, owners) else None
+        return got[url]
+
+    # The hand picks and the lead are checked before the search, so a slot one of them leaves
+    # (the owner's own photo, a format the judge cannot read) goes to another photo of the subject.
+    candidates = hand + ([] if lead_is_tools else [lead_photo])
+    listed = len(candidates)
+    photos = [ph for ph in candidates if fetch(ph["url"])]
+    room = REFERENCES - len(photos)
+    if room > 0:
+        others = other_references(ref, avoid | {_file_key(ref["url"])}, room + 2)
+        listed += len(others)
+        for ph in others:
+            if len(photos) >= REFERENCES:  # the first that can be used fill the room
+                break
+            if fetch(ph["url"]):
+                photos.append(ph)
+    if not photos:
+        if not listed:
+            raise JudgeProblem(f"no photo of {title!r} apart from the ones the tool styled from")
+        raise JudgeProblem(f"no photo of {title!r} could be used (format, link, or the owner's own)")
+    one = len(photos) == 1 and photos[0] is lead_photo
+    if not any(ph is lead_photo for ph in photos):  # the lead is not shown
+        ref = {**ref, "instead_of": lead, "url": photos[0]["url"]}
+    if not one:
+        ref = {**ref, "photos": photos}
 
     with tempfile.TemporaryDirectory(prefix="likeness-") as tmp:
         t = Path(tmp)
-        if ref.get("photos"):
+
+        def save(ph: dict, stem: str) -> Path:
+            data, ext = fetch(ph["url"])
+            (t / f"{stem}{ext}").write_bytes(data)
+            return t / f"{stem}{ext}"
+
+        if not one:
             lines = []
-            for ph in ref["photos"]:
-                name = fetch(ph["url"], f"reference_{len(lines) + 1}")
-                if name is None:  # the others still judge
-                    continue
+            for k, ph in enumerate(photos, 1):
+                name = save(ph, f"reference_{k}")
                 where = f"picked by hand, from {ph['source']}" if ph.get("source") else \
                     "found by searching Wikimedia Commons for the subject's name"
                 lines.append(f"  {name}: a photo {where}, file \"{ph['file']}\".")
-            if not lines:
-                raise JudgeProblem(f"no reference photo of {title!r} could be downloaded")
             refs, several = "\n".join(lines), SEVERAL
         else:
-            name = fetch(ref["url"], "reference")
-            if name is None:
-                raise JudgeProblem(f"the photo of {title!r} could not be used (format, link, or the owner's own)")
+            name = save(photos[0], "reference")
             refs = (f"  {name}: a reference photo of the request's subject, the lead image of "
                     f"the Wikipedia\n    article \"{ref['title']}\" ({ref['caption'] or 'no caption'}).")
             several = ""

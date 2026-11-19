@@ -24,6 +24,42 @@ def _no_photos_picked_by_hand(tmp_path, monkeypatch):
     monkeypatch.setattr(jl, "REFS_FILE", tmp_path / "no_refs.json")
 
 
+def _canvas(seed: int, size=(64, 64)):
+    """A picture whose look is set by seed: bright blocks at places the seed picks."""
+    import random
+    from PIL import Image, ImageDraw
+    rng = random.Random(seed)
+    w, h = size
+    im = Image.new("RGB", size, (20, 20, 20))
+    d = ImageDraw.Draw(im)
+    for k in range(6):
+        x, y = rng.randrange(w - 14), rng.randrange(h - 10)
+        d.rectangle([x, y, x + 14, y + 10], fill=(230, 200 - 30 * (k % 3), 160))
+    return im
+
+
+def _picture(seed: int, fmt="JPEG") -> bytes:
+    """A small picture whose look is set by seed; the same seed in another format or size is the
+    same picture."""
+    import io
+    im = _canvas(seed)
+    if fmt == "PNG":
+        im = im.resize((128, 128))
+    buf = io.BytesIO()
+    im.save(buf, fmt)
+    return buf.getvalue()
+
+
+def _served(url: str) -> bytes:
+    """What a photo link serves: a picture of its own (seeded by the link) in the format its
+    suffix names, or an SVG's text."""
+    import zlib
+    path = urllib.parse.urlparse(url).path.lower()
+    if path.endswith(".svg"):
+        return b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
+    return _picture(zlib.crc32(url.encode()), "PNG" if path.endswith(".png") else "JPEG")
+
+
 def _job(tmp_path, renders=("k",)):
     job = tmp_path / "job"
     for k in renders:
@@ -47,7 +83,7 @@ def _fake(monkeypatch, title, score, conflicts=()):
             assert "David+Heinemeier+Hansson" in url or "Elon+Musk" in url
             return json.dumps({"query": {"pages": {"1": {"title": title, "description": "Danish programmer",
                                                          "original": {"source": "https://up/x/ref.jpg"}}}}}).encode()
-        return b"jpeg"
+        return _served(url)
 
     monkeypatch.setattr(jl, "claude", claude)
     monkeypatch.setattr(jl, "_get", get)
@@ -139,7 +175,7 @@ def test_a_run_the_judge_could_not_answer_is_judged_again_and_scored(tmp_path, m
     _fake(monkeypatch, "Elon Musk", 9)
     monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
         "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
-        if "api.php" in url else b"jpeg")
+        if "api.php" in url else _served(url))
     log = rj.rejudge(rdir)
     assert log["pass"] and log["likeness"] == 9 and log["rejudged"]
     assert json.loads((tmp_path / "scores.jsonl").read_text())["pass"] == 1
@@ -153,7 +189,7 @@ def test_rejudging_never_passes_a_run_that_failed_another_check(tmp_path, monkey
     _fake(monkeypatch, "Elon Musk", 9)
     monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
         "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
-        if "api.php" in url else b"jpeg")
+        if "api.php" in url else _served(url))
     log = rj.rejudge(rdir)
     assert not log["pass"] and log["why"][0] == "height 80 mm, asked 90"
 
@@ -171,7 +207,7 @@ def test_a_rejudged_run_replaces_its_own_score_line(tmp_path, monkeypatch):
     _fake(monkeypatch, "Elon Musk", 9)
     monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
         "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
-        if "api.php" in url else b"jpeg")
+        if "api.php" in url else _served(url))
     rj.rejudge(rdir)
     lines = [json.loads(x) for x in scores.read_text().splitlines()]
     assert [x["run"] for x in lines] == ["q", "r", "s"]
@@ -209,7 +245,7 @@ def _article(monkeypatch, files, search=(), title="Elon Musk", lead="Elon_Musk_r
         if "api.php" in url:
             return json.dumps({"query": {"pages": {"1": {"title": title, "description": "someone",
                                                          "original": {"source": "https://up/x/" + lead}}}}}).encode()
-        return b"jpeg"
+        return _served(url)
     monkeypatch.setattr(jl, "_get", get)
 
 
@@ -325,24 +361,6 @@ def test_a_year_still_to_come_or_run_on_from_a_word_is_no_year():
     assert jl._year("img_2019.jpg") == 0
 
 
-def _picture(seed: int, fmt="JPEG") -> bytes:
-    """A small picture whose look is set by seed; the same seed in another format or size is the
-    same picture."""
-    import io
-    from PIL import Image, ImageDraw
-    im = Image.new("RGB", (64, 64), (20, 20, 20))
-    d = ImageDraw.Draw(im)
-    for k in range(6):
-        x = (seed * 37 + k * 11) % 50
-        y = (seed * 53 + k * 17) % 50
-        d.rectangle([x, y, x + 14, y + 10], fill=(230, 200 - 30 * (k % 3), 160))
-    if fmt == "PNG":
-        im = im.resize((128, 128))
-    buf = io.BytesIO()
-    im.save(buf, fmt)
-    return buf.getvalue()
-
-
 def test_a_photo_picked_by_hand_that_the_tool_styled_from_is_never_a_reference(tmp_path, monkeypatch):
     """Review of PR 24 (second-S1): the hand-picked DHH headshot skipped the check that keeps out
     the tool's own photos, so a job built from that headshot was judged against its own source."""
@@ -373,9 +391,66 @@ def test_a_reference_that_is_the_photo_the_owner_gave_is_never_shown(tmp_path, m
     pics = {"new-headshot.jpg": _picture(1), "DHH_racing.jpg": _picture(2),
             "David_Heinemeier_Hansson_2015.jpg": _picture(3)}
     monkeypatch.setattr(jl, "_get", lambda url, timeout=60: pics.get(url.rsplit("/", 1)[-1]) or get(url, timeout))
-    jl.judge(job, DHH)
+    res = jl.judge(job, DHH)
     prompt, shown = asked[1]
     assert "dhh.dk" not in prompt and len([s for s in shown if s.startswith("reference")]) == 2
+    assert "dhh.dk" not in json.dumps(res["reference"])  # first-F1: nor in the reference the result records
+
+
+def test_a_lead_that_is_the_photo_the_owner_gave_leaves_its_place_to_another_photo(tmp_path, monkeypatch):
+    """Review of PR 29 (first-F1, first-F3): the owner gives the tool the article's lead photo
+    under a new name. It was left out only when downloaded, after the search had been asked for
+    the other places, so it stayed in the reference and its place went unfilled."""
+    job = _job(tmp_path)
+    lead = "https://up/x/Elon_Musk_ref.jpg"
+    (job / "image" / "source.png").write_bytes(_picture(__import__("zlib").crc32(lead.encode()), "PNG"))
+    asked = _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Elon Musk 2018.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert asked[1][1] == ["reference_1.jpg", "render.png"]
+    assert "Elon_Musk_ref" not in json.dumps(res["reference"]) and "Elon Musk ref" not in asked[1][0]
+    assert res["reference"]["url"] == "https://up/x/Elon_Musk_2018.jpg"
+    _article(monkeypatch, [], search=["File:Elon Musk 2018.jpg", "File:Elon Musk 2016.jpg", "File:Elon Musk 2014.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert asked[3][1] == ["reference_1.jpg", "reference_2.jpg", "reference_3.jpg", "render.png"]
+    assert [p["file"] for p in res["reference"]["photos"]] == ["Elon Musk 2018.jpg", "Elon Musk 2016.jpg",
+                                                               "Elon Musk 2014.jpg"]
+
+
+def test_a_reference_is_saved_in_the_format_its_bytes_are_not_its_link(tmp_path, monkeypatch):
+    """Review of PR 29 (first-F2): the suffix came from the link, so a hand-picked link with none
+    that serves a PNG was saved as .jpg, and one that serves an SVG passed as a picture."""
+    job = _job(tmp_path)
+    refs = tmp_path / "likeness_refs.json"
+    refs.write_text(json.dumps({"Elon Musk": [{"url": "https://site/photo?id=3", "source": "a site"},
+                                              {"url": "https://site/drawing?id=4", "source": "a site"}]}))
+    monkeypatch.setattr(jl, "REFS_FILE", refs)
+    asked = _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Elon Musk 2018.jpg"])
+    article = jl._get
+    served = {"https://site/photo?id=3": _picture(7, "PNG"), "https://site/drawing?id=4": _served("x.svg")}
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: served.get(url) or article(url, timeout))
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert asked[1][1] == ["reference_1.png", "reference_2.jpg", "reference_3.jpg", "render.png"]
+    assert "drawing" not in json.dumps(res["reference"])
+
+
+def test_a_phone_photo_turned_by_its_exif_is_the_same_picture_as_its_upright_copy(tmp_path):
+    """Review of PR 29 (second-S1): a phone JPEG is stored on its side with EXIF Orientation 6 and
+    its web copy has the turn in its pixels, so the hash missed it and the judge was shown it."""
+    import io
+    from PIL import Image
+    im = _canvas(11, (96, 64))
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", exif=exif.tobytes())
+    job = _job(tmp_path)
+    (job / "image" / "source.jpg").write_bytes(buf.getvalue())
+    web = io.BytesIO()
+    im.transpose(Image.Transpose.ROTATE_270).resize((128, 192)).save(web, "JPEG")
+    assert jl._same_picture(web.getvalue(), jl.owner_photos(job))
+    assert not jl._same_picture(_picture(12), jl.owner_photos(job))
 
 
 def test_each_reference_keeps_its_own_format_and_one_the_judge_cannot_read_is_left_out(tmp_path, monkeypatch):
