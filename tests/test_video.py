@@ -1,6 +1,7 @@
 """stone video: the plan read from a run log, the checks that keep the clip honest, the CLI, and
 the turntable's framing."""
 import importlib.util
+import json
 import shutil
 import subprocess
 import sys
@@ -340,7 +341,8 @@ def test_a_series_clip_runs_24_to_34_seconds_with_a_full_turn_each(tmp_path):
         runs.append(video.Run(video.make_plan(job, log), log, video.label_of(job), _frames(video.SERIES_TURN, (40, 60)),
                               _frames(video.SERIES_TURN, (20, 60)), []))
     sh = video.compose_series(runs)
-    assert video.SERIES[0] <= len(sh.frames) / video.FPS <= video.SERIES[1]
+    lo, hi = video.series_window(3)
+    assert lo <= len(sh.frames) / video.FPS <= hi
 
 
 def test_the_label_falls_back_from_the_base_name_to_the_found_subject(tmp_path):
@@ -378,3 +380,90 @@ def test_stone_video_with_runs_makes_one_series_clip(jobenv, monkeypatch, tmp_pa
     text, code = cli.run(["video", str(log), "--with", str(other)])
     assert code == 0, text
     assert seen["items"][1] == (other / "job", other / "log.json") and seen["items"][0][1] == log
+
+
+def test_stone_video_with_runs_honors_an_explicit_turn_of_144(jobenv, monkeypatch, tmp_path):
+    """F6: --turn 144, the single-run default, was read as unset and a series turned 120 frames."""
+    cli.run(["new", "a mini figure"])
+    log = tmp_path / "log.json"
+    log.write_text("{}")
+    other = tmp_path / "other"
+    (other / "job").mkdir(parents=True)
+    (other / "log.json").write_text("{}")
+    seen = {}
+
+    def fake_series(items, out, turn):
+        seen["turn"] = turn
+        return {"clip": str(out / "clip.mp4"), "seconds": 28.0, "faults": [],
+                "spec": {"width": 1080, "height": 1920, "lufs": -16.0}}
+
+    def fake_make(job_root, log_path, out, turn):
+        seen["turn"] = turn
+        return {"clip": str(out / "clip.mp4"), "seconds": 15.7, "faults": [],
+                "spec": {"width": 1080, "height": 1920, "lufs": -16.0}}
+
+    monkeypatch.setattr(video, "make_series", fake_series)
+    monkeypatch.setattr(video, "make", fake_make)
+    cli.run(["video", str(log), "--with", str(other), "--turn", str(video.TURN)])
+    assert seen["turn"] == video.TURN
+    cli.run(["video", str(log), "--with", str(other)])
+    assert seen["turn"] == video.SERIES_TURN
+    cli.run(["video", str(log)])
+    assert seen["turn"] == video.TURN
+
+
+def _series_runs(tmp_path, n):
+    people = (("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"), ("DHH", "DHH"), ("Lisa Su", "LISA"))
+    runs = []
+    for k, (who, name) in enumerate(people[:n]):
+        job, log = _series_run(tmp_path, k, who, name)
+        runs.append(video.Run(video.make_plan(job, log), log, video.label_of(job), _frames(video.SERIES_TURN, (40, 60)),
+                              _frames(video.SERIES_TURN, (20, 60)), []))
+    return runs
+
+
+def test_the_series_window_for_three_runs_is_24_to_34_seconds():
+    assert video.series_window(3) == (24.0, 34.0)
+
+
+@pytest.mark.parametrize("n", [2, 4])
+def test_a_series_of_two_or_four_runs_fits_its_own_window(tmp_path, n):
+    """F9: the window was 24 to 34 s for any count, so two runs (about 18.7 s) always ran short."""
+    try:
+        video.mono(30)
+    except video.VideoProblem:
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    sh = video.compose_series(_series_runs(tmp_path, n))
+    lo, hi = video.series_window(n)
+    assert sh.faults == []
+    assert lo <= len(sh.frames) / video.FPS <= hi
+
+
+@pytest.mark.parametrize("n", [2, 4])
+def test_make_series_checks_the_clip_against_the_window_for_its_count(tmp_path, monkeypatch, n):
+    """F9: make_series passed the three-run window to check_clip for two and four runs."""
+    try:
+        video.mono(30)
+    except video.VideoProblem:
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    items = []
+    for k, (who, name) in enumerate((("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"), ("DHH", "DHH"),
+                                     ("Lisa Su", "LISA"))[:n]):
+        job, log = _series_run(tmp_path, k, who, name)
+        (tmp_path / f"log{k}.json").write_text(json.dumps(log))
+        items.append((job, tmp_path / f"log{k}.json"))
+    seen = {}
+
+    def fake_check(mp4, duration):
+        seen["window"] = duration
+        return {}, []
+
+    monkeypatch.setattr(video, "paint_npz", lambda job_root, out: {"filaments": []})
+    monkeypatch.setattr(video, "turntable", lambda mesh, d, turn, log=None, size=None: _frames(turn, (40, 60)))
+    monkeypatch.setattr(video, "soundtrack", lambda *a, **k: None)
+    monkeypatch.setattr(video, "encode", lambda *a, **k: None)
+    monkeypatch.setattr(video, "stills", lambda *a, **k: None)
+    monkeypatch.setattr(video, "check_clip", fake_check)
+    rep = video.make_series(items, tmp_path / "out", turn=video.SERIES_TURN)
+    assert seen["window"] == video.series_window(n)
+    assert rep["faults"] == []

@@ -1215,12 +1215,13 @@ def cmd_video(args, job: Job) -> Out:
             out.next = nxt
             return out
     from . import video
+    turn = args.turn if args.turn is not None else video.SERIES_TURN if others else video.TURN
     try:
         if others:
             items = [(job.root, log)] + [(r / "job", r / "log.json") for r in others]
-            rep = video.make_series(items, dest, turn=args.turn if args.turn != 144 else video.SERIES_TURN)
+            rep = video.make_series(items, dest, turn=turn)
         else:
-            rep = video.make(job.root, log, dest, turn=args.turn)
+            rep = video.make(job.root, log, dest, turn=turn)
     except video.VideoProblem as e:
         out.fix(str(e))
         out.next = nxt
@@ -1896,7 +1897,8 @@ def make_parser() -> Parser:
     s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")
     s.add_argument("log", nargs="?", help="the run log (default: log.json beside the job)")
     s.add_argument("--out", help="output folder (default: <job>/video)")
-    s.add_argument("--turn", type=_turn_frames, default=144, help="frames in one turn of the figure (8 or more)")
+    s.add_argument("--turn", type=_turn_frames, default=None,
+                   help="frames in one turn of the figure (8 or more; 144 for one run, 120 each in a series)")
     s.add_argument("--with", dest="runs", action="append", metavar="RUN",
                    help="another finished run (a folder with job/ and log.json); the clip shows every figure")
     return p

@@ -152,6 +152,28 @@ def test_rejudging_never_passes_a_run_that_failed_another_check(tmp_path, monkey
     assert not log["pass"] and log["why"][0] == "height 80 mm, asked 90"
 
 
+def test_a_rejudged_run_replaces_its_own_score_line(tmp_path, monkeypatch):
+    """F3: run.py had scored the unjudged run pass=0, and rejudge added a second line, so it counted twice."""
+    rj = _rejudge_module()
+    scores = tmp_path / "scores.jsonl"
+    other = {"spec": "f4_dhh", "pass": 1, "run": "q"}
+    first = {"spec": "f3_elon", "pass": 0, "run": "r"}
+    scores.write_text(json.dumps(other) + "\n" + json.dumps(first) + "\n" + json.dumps({**other, "run": "s"}) + "\n")
+    monkeypatch.setattr(rj.run, "SCORES", scores)
+    spec_text = (ROOT / "evals" / "figure" / "f3_elon.json").read_bytes()
+    rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (Not logged in)"], spec_text)
+    _fake(monkeypatch, "Elon Musk", 9)
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
+        "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
+        if "api.php" in url else b"jpeg")
+    rj.rejudge(rdir)
+    lines = [json.loads(x) for x in scores.read_text().splitlines()]
+    assert [x["run"] for x in lines] == ["q", "r", "s"]
+    assert lines[0] == other and lines[2] == {**other, "run": "s"}
+    assert lines[1]["pass"] == 1 and lines[1]["likeness"] == 9 and lines[1]["spec"] == "f3_elon"
+    assert not list(tmp_path.glob("scores.jsonl.*"))
+
+
 def test_a_spec_changed_since_the_run_is_not_rejudged(tmp_path, monkeypatch):
     rj = _rejudge_module()
     rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (x)"], b"an older spec")

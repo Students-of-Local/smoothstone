@@ -12,7 +12,8 @@ must match, `sum` adds parameters, `image_used` means that image parameter was s
 ## The ratchet
 
 Every run appends one line to `scores.jsonl` (date, git sha, suite, spec, card, driver, pass, total,
-judge score). The file is only appended to. `floor.json` holds, per suite and card (the next driver
+judge score). Runs only append; evals/rejudge.py replaces the line of a run it judges again, so
+the run counts once. `floor.json` holds, per suite and card (the next driver
 counts as card "next"), the best pass rate and mean judge score so far and the specs that passed.
 
 - `uv run python evals/ratchet.py <runs dir>`: below the floor it names the specs that regressed and

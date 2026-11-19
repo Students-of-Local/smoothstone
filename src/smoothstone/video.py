@@ -865,7 +865,7 @@ def atoms(path: Path) -> list[str]:
 
 
 def check_clip(mp4: Path, duration: tuple[float, float] = DURATION) -> tuple[dict, list[str]]:
-    """(facts, faults) for the delivery spec: 1080 x 1920, 30 fps, 13 to 16 s (a series: SERIES),
+    """(facts, faults) for the delivery spec: 1080 x 1920, 30 fps, 13 to 16 s (a series: series_window),
     H.264 yuv420p, faststart, AAC 48 kHz, -16 LUFS within 1, true peak under -1.5 dB, quiet first
     and last 10 ms."""
     pr = json.loads(subprocess.run([ffprobe(), "-v", "error", "-show_streams", "-show_format", "-of", "json",
@@ -971,9 +971,17 @@ def make(job_root: Path, log_path: Path, out: Path, turn: int = TURN) -> dict:
 # The same honesty as one figure: each run's terminal lines check against that run's own log, and
 # each figure turns from its own painted 3MF. The cold open puts them side by side.
 
-SERIES = (24.0, 34.0)  # seconds, for two to four figures
 SERIES_TURN = 120  # frames for each figure's own turn (4 s)
 HOOK3_S, PAIR_S, END3_S = 2.2, 1.4, 2.6
+SERIES_RUN = ((24.0 - HOOK3_S - END3_S) / 3, (34.0 - HOOK3_S - END3_S) / 3)  # seconds per figure
+
+
+def series_window(n: int) -> tuple[float, float]:
+    """The clip length for n figures: the cold open and end card plus each figure's own time,
+    solved so three figures run 24 to 34 s."""
+    lo, hi = SERIES_RUN
+    return round(HOOK3_S + END3_S + n * lo, 3), round(HOOK3_S + END3_S + n * hi, 3)
+
 FAST_CPF = 9  # characters typed per frame in a series: the same lines, typed faster
 ROW_END = 1250  # the three-up tiles end where the turntable tile does
 
@@ -1168,7 +1176,7 @@ def make_series(items: list[tuple[Path, Path]], out: Path, turn: int = SERIES_TU
     soundtrack(out / "clip.wav", sh.marks, sh.taps, total)
     mp4 = out / "clip.mp4"
     encode(sh.frames, out / "clip.wav", mp4, total)
-    facts, bad = check_clip(mp4, SERIES)
+    facts, bad = check_clip(mp4, series_window(len(runs)))
     at = {"card_hook": (sh.marks["hook"] + FADE + 1) / FPS, "card_end": (sh.marks["end"] + FADE + 1) / FPS}
     for k in range(len(runs)):
         nxt = sh.marks.get(f"pair_{k}", sh.marks[f"turntable_{k}"])

@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -64,13 +65,32 @@ def run_stone(command: str, env: dict, cwd: Path) -> str:
         argv = argv[1:]
     if not argv:
         return "FIX: empty command.\nNEXT: stone status"
+    # its own process group, so a timeout also stops the models it started (mflux, the lift)
+    p = subprocess.Popen([STONE, *argv], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+                         cwd=cwd, start_new_session=True)
     try:
-        p = subprocess.run([STONE, *argv], capture_output=True, text=True, env=env, cwd=cwd,
-                           timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "900")))
+        stdout, stderr = p.communicate(timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "900")))
     except subprocess.TimeoutExpired:  # a figure build takes about 430 s; its style and lift are kept
+        stop_group(p)
         return f"FIX: the command ran too long, and what it finished is kept.\nNEXT: stone {shlex.join(argv)}"
-    out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr and not p.stdout else "")
+    out = (stdout or "") + (("\n" + stderr) if stderr and not stdout else "")
     return out.strip()[:3000]
+
+
+def stop_group(p: subprocess.Popen) -> None:
+    """SIGTERM stone's whole process group, give it 5 s, then SIGKILL whatever is left of it."""
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(p.pid, sig)
+        except ProcessLookupError:  # the group is gone
+            break
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+    for f in (p.stdout, p.stderr):
+        if f:
+            f.close()
 
 
 def last_next(text: str) -> str | None:
@@ -330,7 +350,13 @@ SCORES = Path(os.environ.get("STONE_SCORES", str(ROOT / "evals" / "scores.jsonl"
 
 
 def append_score(log: dict) -> None:
-    """One line per run in evals/scores.jsonl. The file is only ever appended to."""
+    """One more line in evals/scores.jsonl; only rejudge.py replaces a run's line."""
+    with SCORES.open("a") as f:
+        f.write(json.dumps(score_line(log)) + "\n")
+
+
+def score_line(log: dict) -> dict:
+    """A run's line in evals/scores.jsonl."""
     try:
         head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
                               text=True).stdout.strip() or None
@@ -339,8 +365,7 @@ def append_score(log: dict) -> None:
     line = {"date": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sha": head, "suite": log.get("suite"),
             "spec": log["spec"], "card": log["card"], "driver": log["driver"], "pass": int(bool(log["pass"])),
             "total": 1, "judge": log.get("judge"), "likeness": log.get("likeness"), "run": log["run_id"]}
-    with SCORES.open("a") as f:
-        f.write(json.dumps(line) + "\n")
+    return line
 
 
 def _part_key(name: str) -> str:

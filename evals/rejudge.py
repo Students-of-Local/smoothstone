@@ -4,8 +4,9 @@ uv run python evals/rejudge.py <run dir> [<run dir> ...]
 
 A run on a host whose `claude` is not signed in fails with "the judge could not answer". Copy its
 log.json and job/image/figure here and rejudge it: the other checks keep their verdict, only the
-likeness is asked again, log.json is rewritten with "rejudged" set, and one more line goes to
-scores.jsonl. A spec edited since the run is refused, as its verdict would not be the run's.
+likeness is asked again, log.json is rewritten with "rejudged" set, and the run's line in
+scores.jsonl is replaced, so it counts once. A spec edited since the run is refused, as its verdict
+would not be the run's.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -40,8 +42,31 @@ def rejudge(rdir: Path) -> dict:
     log.update({k: grade[k] for k in ("pass", "why", "likeness")})
     log["rejudged"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
-    run.append_score(log)
+    replace_score(log)
     return log
+
+
+def replace_score(log: dict) -> None:
+    """Put the run's new line where its old one was in scores.jsonl (appended if it had none),
+    written to a temp file and moved into place."""
+    line = json.dumps(run.score_line(log))
+    old = run.SCORES.read_text().splitlines() if run.SCORES.exists() else []
+    lines, put = [], False
+    for x in old:
+        try:
+            mine = json.loads(x).get("run") == log["run_id"]
+        except ValueError:
+            mine = False
+        if mine and not put:
+            lines.append(line)
+        if not mine:
+            lines.append(x)
+        put = put or mine
+    if not put:
+        lines.append(line)
+    tmp = run.SCORES.with_name(run.SCORES.name + ".tmp")
+    tmp.write_text("".join(x + "\n" for x in lines))
+    os.replace(tmp, run.SCORES)
 
 
 def main() -> int:
