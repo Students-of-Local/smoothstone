@@ -231,10 +231,14 @@ def anatomy(mesh, top: float) -> dict:
     start = low if low is not None else top + 1.0
     x0 = res["center"]
     for side in (-1, 1):
-        def hand(z, side=side):
+        def hand(z, side=side, tol=1e-6):
             return any(not p["stands"] and (p["cx"] - x0) * side > 0
-                       for p in _pieces(mesh, _below(mesh, fig, z), top, min_area))
+                       for p in _pieces(mesh, _below(mesh, fig, z, tol), top, min_area))
         w = _scan(start, hi, hand)
+        # the wrist line cuts with ON_LINE of snap: a hand that joins its arm within that over the
+        # level is not loose at the line, which then finds no hand; step down to where it is
+        while w is not None and not hand(w, tol=ON_LINE):
+            w = round(w - 0.1, 6) if w - 0.1 >= start else None
         if w is not None:
             res["wrists"].append({"z": w, "side": side})
     res["lines"] = find_lines(mesh, res)

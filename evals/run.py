@@ -148,7 +148,9 @@ def main():
     rdir = Path(a.out) / run_id
     job = rdir / "job"
     rdir.mkdir(parents=True)
-    env = {**os.environ, "STONE_JOB": str(job), "STONE_TIER": a.card if a.card != "none" else "S"}
+    # the figure's seed is the run's, so the seeds of a case are different figures (Donovan, 2026-11-19)
+    env = {**os.environ, "STONE_JOB": str(job), "STONE_TIER": a.card if a.card != "none" else "S",
+           "STONE_FIGURE_SEED": str(a.seed)}
 
     # the environment, set up before the model starts: the job with the request (and picture)
     new = ["new", spec["request"]]
@@ -167,7 +169,7 @@ def main():
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
     log = {"run_id": run_id, "spec": spec["id"], "suite": spec_path.parent.name, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
-           "seed": a.seed, "driver": a.driver, "card": a.card, "card_sha256": card_sha, "compact_at": a.compact_at,
+           "seed": a.seed, "figure_seed": a.seed, "driver": a.driver, "card": a.card, "card_sha256": card_sha, "compact_at": a.compact_at,
            "model": a.model_name if a.driver == "lfm3" else None, "sampling": SAMPLING if a.driver == "lfm3" else None,
            "harness": HARNESS, "max_steps": MAX_STEPS, "max_new_tokens": MAX_NEW, "setup": setup,
            "system_sha256": sha(system.encode()), "steps": [], "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
