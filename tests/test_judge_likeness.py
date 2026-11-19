@@ -94,3 +94,15 @@ def test_a_reply_of_the_wrong_shape_is_a_judge_problem():
     with pytest.raises(jl.JudgeProblem):
         jl.parse('{"score": 11, "conflicts": []}')
     assert jl.parse('ok {"score": 7, "conflicts": [{"feature": "hair", "what": "lighter"}]}')["score"] == 7
+
+
+def test_a_spec_can_set_a_higher_likeness_bar(tmp_path, monkeypatch):
+    """Owner: "Those things look nothing like elon". The chibi Elon he saw was judged 5 to 7, so
+    the spec for that fault asks 8, above the judge's own bar."""
+    job = _job(tmp_path)
+    _fake(monkeypatch, "Elon Musk", 7, [{"feature": "face", "what": "a generic cartoon face"}])
+    grade = run.likeness_run(tmp_path, job, "A mini figure of Elon Musk", {"pass": True, "why": ["all checks pass"]},
+                             least=8)
+    assert not grade["pass"] and grade["why"] == ["likeness 7/10, the spec asks 8: face: a generic cartoon face"]
+    _fake(monkeypatch, "Elon Musk", 8)
+    assert run.likeness_run(tmp_path, job, "A mini figure of Elon Musk", {"pass": True, "why": []}, least=8)["pass"]

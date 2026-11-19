@@ -1,0 +1,15 @@
+{
+ "id": "r4_elon_likeness",
+ "request": "A mini figure of Elon Musk, 90 mm tall, with \"ELON\" on the base.",
+ "why": "The tool's chibi Elon passed every check and the likeness judge's own bar, yet the owner said: those things look nothing like elon though this needs to be way better, and furthermore the best. A chibi face is a generic cartoon face; the blind judge scored it 5 to 7. The figure must be recognizably the person, so this spec asks 8.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "ELON"
+  },
+  "likeness": {
+   "min": 8
+  }
+ }
+}
