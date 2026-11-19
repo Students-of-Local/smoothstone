@@ -183,6 +183,19 @@ class Plan:
     paint: str  # what the colors command asked, in words
     photos: list[Path] = field(default_factory=list)
     style: Path | None = None
+    gpu: bool = False  # the figure step ran (its image models use the Mac's GPU, not the CPU)
+
+
+def where(gpu: bool, sep: str = ", ") -> str:
+    """Where the work ran, in the clip's words. Only the small model runs on a CPU; a figure's
+    image models (FLUX.2 klein, Hunyuan) run on the Mac's GPU, so a figure clip says both."""
+    return sep.join(["the model on a CPU", "the figure on a GPU"] if gpu else ["on a CPU", "no cloud"])
+
+
+def claim_faults(fr: "Frame", gpu: bool) -> list[str]:
+    """Text that says the work ran on a CPU when the figure step used the GPU."""
+    return [f"the clip says {s!r}, but the figure step ran on a GPU" for _, _, s, _ in fr.texts
+            if gpu and "CPU" in s and "GPU" not in s]
 
 
 def make_plan(job_root: Path, log: dict) -> Plan:
@@ -228,7 +241,7 @@ def make_plan(job_root: Path, log: dict) -> Plan:
     asked = [a.split("=", 1) for a in subs[i_colors][1] if "=" in a and not a.startswith("-")]
     paint = ", ".join(("the rest" if k == "rest" else k) + " " + v for k, v in asked)
     return Plan(request, model, date, ws1, find, design, [(build_c, checks_b), (col_c, checks_c)], paint,
-                photos, style)
+                photos, style, (job_root / "image" / "figure").is_dir())
 
 
 def wrap(text: str, cols: int, rows: int = 2) -> list[str]:
@@ -552,6 +565,7 @@ class Shots:
     taps: list[float] = field(default_factory=list)
     marks: dict = field(default_factory=dict)  # name -> first frame of a card
     rows: list[dict] = field(default_factory=list)  # every terminal line shown, with its source
+    gpu: bool = False  # a figure step ran on the GPU: no frame may say the work ran on a CPU alone
     _last: object = None
     _fade: int = 0
     _from: object = None
@@ -559,7 +573,7 @@ class Shots:
     def emit(self, fr: Frame):
         from PIL import Image
 
-        for f in layout_faults(fr):
+        for f in layout_faults(fr) + claim_faults(fr, self.gpu):
             if f not in self.faults:
                 self.faults.append(f)
         im = fr.im
@@ -617,7 +631,7 @@ def legend(fr: Frame, inner, filaments):
 def compose(plan: Plan, turn_frames: list[Path], filaments=()) -> Shots:
     from PIL import Image
 
-    sh = Shots()
+    sh = Shots(gpu=plan.gpu)
     term1 = [GAP, BODY, W - GAP, H - GAP]
     size = model_size(plan.model)
     tiles = [Image.open(p) for p in turn_frames]
@@ -627,7 +641,7 @@ def compose(plan: Plan, turn_frames: list[Path], filaments=()) -> Shots:
     n_hook = round(HOOK_S * FPS)
     k0 = len(tiles) * 7 // 8  # a three-quarter view turning to the front
     for i in range(n_hook):
-        fr = desktop(4, plan, f"a {size} model made this", "from one sentence, on a CPU, no cloud")
+        fr = desktop(4, plan, f"a {size} model made this", where(True) if plan.gpu else "from one sentence, " + where(False))
         inner = figure_tile(fr, tiles[(k0 + i) % len(tiles)], TURN_BOX)
         legend(fr, inner, filaments)
         box = fr.tile([GAP, TURN_BOX[3] + IN, W - GAP, H - GAP])
@@ -726,9 +740,10 @@ def compose(plan: Plan, turn_frames: list[Path], filaments=()) -> Shots:
     figure_tile(fr, tiles[0], [GAP, BAR[1] + GAP, W - GAP, split], focused=False)
     box = fr.tile([GAP, split + IN, W - GAP, H - GAP], focused=True)
     fr.text((W // 2, split + 150), size, mono(200, "Bold"), ACCENT, "mm", box)
-    fr.text((W // 2, split + 285), "a tiny model ran every step", mono(36, "Bold"), STRONG, "mm", box)
+    fr.text((W // 2, split + 285), "a tiny model " + ("drove" if plan.gpu else "ran") + " every step", mono(36, "Bold"),
+            STRONG, "mm", box)
     fr.text((W // 2, split + 345), "one sentence \u2192 a painted, printable figure", mono(30), FG, "mm", box)
-    fr.text((W // 2, split + 400), "on a CPU \u00b7 local \u00b7 no cloud", mono(30), GREEN, "mm", box)
+    fr.text((W // 2, split + 400), where(plan.gpu, " \u00b7 ") + " \u00b7 local", mono(30), GREEN, "mm", box)
     fr.text((W // 2, split + 500), "smoothstone", mono(44, "Bold"), PURPLE, "mm", box)
     sh.hold(fr, END_S)
     return sh
@@ -1103,7 +1118,8 @@ def _img(f):
 def compose_series(runs: list[Run]) -> Shots:
     from PIL import Image
 
-    sh = Shots()
+    gpu = any(r.plan.gpu for r in runs)
+    sh = Shots(gpu=gpu)
     n = len(runs)
     p0 = runs[0].plan
     size = model_size(p0.model)
@@ -1113,7 +1129,7 @@ def compose_series(runs: list[Run]) -> Shots:
     # 0. the cold open: every painted figure turning, side by side
     sh.card("hook")
     for i in range(round(HOOK3_S * FPS)):
-        fr = desktop(4, p0, f"a {size} model made {words}", "one sentence each, on a CPU, no cloud")
+        fr = desktop(4, p0, f"a {size} model made {words}", where(True) if gpu else "one sentence each, " + where(False))
         for r, box in zip(runs, cols):
             figure_tile(fr, _img(r.narrow[(len(r.narrow) * 7 // 8 + i) % len(r.narrow)]), box)
         inner = fr.tile([GAP, ROW_END + IN, W - GAP, H - GAP])
@@ -1203,9 +1219,10 @@ def compose_series(runs: list[Run]) -> Shots:
         figure_tile(fr, _img(r.narrow[0]), box, focused=False)
     box = fr.tile([GAP, split + IN, W - GAP, H - GAP], focused=True)
     fr.text((W // 2, split + 150), size, mono(200, "Bold"), ACCENT, "mm", box)
-    fr.text((W // 2, split + 285), "a tiny model ran every step", mono(36, "Bold"), STRONG, "mm", box)
+    fr.text((W // 2, split + 285), "a tiny model " + ("drove" if gpu else "ran") + " every step", mono(36, "Bold"),
+            STRONG, "mm", box)
     fr.text((W // 2, split + 345), f"{n} sentences → {n} painted, printable figures", mono(30), FG, "mm", box)
-    fr.text((W // 2, split + 400), "on a CPU · local · no cloud", mono(30), GREEN, "mm", box)
+    fr.text((W // 2, split + 400), where(gpu, " · ") + " · local", mono(30), GREEN, "mm", box)
     fr.text((W // 2, split + 500), "smoothstone", mono(44, "Bold"), PURPLE, "mm", box)
     sh.hold(fr, END3_S)
     return sh
