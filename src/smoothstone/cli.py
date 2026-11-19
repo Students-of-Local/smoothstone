@@ -1015,6 +1015,16 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
         job.log("figure failed:\n" + traceback.format_exc())
         out.add(f"Recipe: {r.name}")
         out.fix(str(e))
+        if e.setup:
+            # the tools miss a part: a build again fails the same way, so stop and ask
+            out.add(f"This is the computer's setup, not the request: stone build again fails the same way. "
+                    f"The person runs {config.REPO_ROOT / figuretool.SETUP} once, then says to go on.")
+            out.next = (f"ask the person: the figure tools on this computer are not set up ({e}). "
+                        f"Please run {config.REPO_ROOT / figuretool.SETUP}, then tell me to go on.")
+            out.stage = "needs_setup"
+            out.result = f"figure not set up: {e}"[:120]
+            out.code = 1
+            return None
         out.next = "stone build"
         out.stage = "build_failed"
         out.result = f"figure failed: {e}"[:120]
@@ -2234,6 +2244,15 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
+def _fail_key(cmd: str, out: Out) -> str | None:
+    """What makes a failure the same as the last: the command and its first FIX line. None when
+    the command did not fail."""
+    first = next((ln for ln in out.lines if ln and ln.startswith("FIX: ")), None)
+    if out.code == 0 or first is None:
+        return None
+    return f"{cmd}: {first}"
+
+
 def run(argv: list[str]) -> tuple[str, int]:
     argv = _tidy(argv)
     parser = make_parser()
@@ -2260,11 +2279,21 @@ def run(argv: list[str]) -> tuple[str, int]:
         out.next = "stone status"
         out.owns_next = False
         cmd = "error"
+    fail = None
+    if job.exists() and cmd not in ("status",) and out.raw is None:
+        fail = _fail_key(cmd, out)
+        prev = job.status().get("last_fail")
+        if fail and fail == prev and not out.next.startswith("ask the person"):
+            # the same failure twice in a row: a third try fails the same way, so stop and ask
+            first = next(ln for ln in out.lines if ln and ln.startswith("FIX: "))[5:]
+            out.add(f"FIX: stone {cmd} failed this same way twice in a row; do not run it again")
+            out.next = f"ask the person: stone {cmd} fails the same way every time ({first[:140]}). What should I do?"
+            out.stage = out.stage or "stuck"
     text = out.render()
     if job.exists() and cmd not in ("status",) and out.raw is None:
         job.log(f"{cmdline}\n{text}")
         s = job.status()
-        upd = {"last_command": cmdline}
+        upd = {"last_command": cmdline, "last_fail": fail}
         if out.result:
             upd["last_result"] = out.result
         early = s.get("stage") in EARLY_STAGES and not job.plan()
