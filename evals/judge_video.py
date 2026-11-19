@@ -55,6 +55,8 @@ List in faults only what you judge to be wrong."""
 def build_prompt(pictures: list[Path], report: dict) -> str:
     """The judge's prompt for this clip. Parts the paint does not name are the job's main filament,
     the one covering the most surface."""
+    if report.get("runs"):
+        return build_series_prompt(pictures, report)
     cmds = [r["text"] for r in report["rows"] if r["kind"] == "cmd"]
     seen = list(dict.fromkeys(cmds))
     req = next((r["text"] for r in report["rows"] if r["kind"] == "req"), "")
@@ -64,6 +66,49 @@ def build_prompt(pictures: list[Path], report: dict) -> str:
     return PROMPT.format(request=req, paint=f"{report.get('paint_words') or ''} ({paint})", main=main,
                          commands="\n".join(f"  {c}" for c in seen),
                          pictures="\n".join(str(p) for p in pictures))
+
+
+SERIES_PROMPT = """You are a strict video editor checking a {seconds:.0f} second vertical clip (1080 x 1920)
+of {n} figures before it is posted on X. Read every picture listed below with the Read tool: a
+contact sheet of one frame a second, then full-size frames at each card change and at four angles
+of each turning figure (figN_turn_* is figure N).
+
+The clip claims, for each figure:
+{figures}
+
+Name a fault for any of these, with the picture and where in it:
+1. a figure's colors differ from its own paint above in any frame (a wrong color, a color on the
+   wrong part, a stray patch);
+2. a terminal command not in that figure's list, or a typo in one;
+3. any text in the top 200 px or the bottom 300 px of a 1080 x 1920 frame (X covers those);
+4. text cut off at a tile or window border, or a missing-glyph box (a hollow rectangle);
+5. anything that is not a straight cut or a short fade: a spin of the camera, a zoom, a flash.
+A turntable that turns the figure itself is expected, not a fault. The cold open and the end card
+show every figure at once, small.
+
+Pictures:
+{pictures}
+
+Reply with only JSON: {{"score": 0-10, "faults": ["picture: what is wrong"], "notes": ["optional"]}}.
+List in faults only what you judge to be wrong."""
+
+
+def build_series_prompt(pictures: list[Path], report: dict) -> str:
+    figs = []
+    for k, run in enumerate(report["runs"]):
+        fils = run["paint"]["filaments"]
+        paint = ", ".join(f"{n} {int(round(s * 100))}% of the surface" for n, _, s in fils)
+        main = max(fils, key=lambda f: f[2])[0] if fils else "main"
+        cmds = list(dict.fromkeys(r["text"] for r in report["rows"] if r.get("run") == k and r["kind"] == "cmd"))
+        figs.append(f"- figure {k + 1} ({run['label']}), stills fig{k + 1}_terminal, fig{k + 1}_pair and "
+                    f"fig{k + 1}_turn_*:\n"
+                    f"  request: {run['request']}\n"
+                    f"  painted exactly: {run.get('paint_words') or ''} ({paint}); every part not named there is "
+                    f"the {main} filament, and no other color is on it.\n"
+                    f"  its terminal commands, in order, each sent by the model (lines starting with # are captions):\n"
+                    + "\n".join(f"    {c}" for c in cmds))
+    return SERIES_PROMPT.format(seconds=report.get("seconds", 30), n=len(report["runs"]), figures="\n".join(figs),
+                                pictures="\n".join(str(p) for p in pictures))
 
 
 def control_caught(faults: list[str]) -> bool:

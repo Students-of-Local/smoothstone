@@ -141,6 +141,20 @@ def test_the_judge_is_told_the_main_filament_not_white():
     assert "Every part not named there is the gray" in prompt and "white" not in prompt
 
 
+def test_the_judge_of_a_series_is_told_each_figure_its_own_paint_and_commands():
+    report = {"runs": [
+        {"label": "JENSEN", "request": "Jensen, jacket black", "paint_words": "jacket black",
+         "paint": {"filaments": [["white", [240, 240, 240], 0.8], ["black", [20, 20, 20], 0.2]]}},
+        {"label": "ELON", "request": "Elon, hair brown", "paint_words": "hair brown",
+         "paint": {"filaments": [["white", [240, 240, 240], 0.9], ["brown", [110, 70, 40], 0.1]]}}],
+        "rows": [{"run": 0, "kind": "cmd", "text": "stone colors jacket=black"},
+                 {"run": 1, "kind": "cmd", "text": "stone colors hair=brown"}]}
+    prompt = judge_video().build_prompt([Path("/s/sheet.png")], report)
+    jensen, elon = prompt.split("figure 1 (JENSEN)")[1].split("figure 2 (ELON)")
+    assert "jacket black" in jensen and "stone colors jacket=black" in jensen and "hair=brown" not in jensen
+    assert "hair brown" in elon and "stone colors hair=brown" in elon and "fig2_turn" in elon
+
+
 def test_stone_video_turns_the_figure_at_least_8_frames(jobenv, tmp_path):
     """second-F15: --turn 0 gave Blender nothing to render and crashed in compose."""
     cli.run(["new", "a mini figure"])
@@ -265,3 +279,102 @@ def _prism(r, z0, z1, n=32, phase=0.0):
         j = (i + 1) % n
         F += [[i, j, n + i], [j, n + j, n + i], [2 * n, j, i], [2 * n + 1, n + i, n + j]]
     return V, np.array(F)
+
+
+# ---- several figures in one clip ---------------------------------------------------------------------
+
+def _series_run(tmp_path, k, who, name):
+    """A finished run of one figure: its job with a found photo and a style render, and its log."""
+    job = tmp_path / f"run{k}" / "job"
+    (job / "image" / "found").mkdir(parents=True)
+    Image.new("RGB", (300, 400), (90, 60, 40)).save(job / "image" / "found" / "photo_1.jpg")
+    style = job / "image" / "figure" / "k" / "style.png"
+    style.parent.mkdir(parents=True)
+    Image.new("RGB", (300, 400), (240, 240, 240)).save(style)
+    (job / "image" / "figure" / "latest.txt").write_text(str(style.with_name("figure.stl")))
+    (job / "plan.json").write_text(f'{{"recipe": "figure", "params": {{"name": "{name}", "height": 90}}}}')
+    log = log_of(("stone status", "Tier: S\nNEXT: stone recipes"),
+                 (f'stone find "{who}"', f"Found 3 free-licensed photos\nphoto_1.jpg: CC BY 4.0, by A\nNEXT: stone build"),
+                 ("stone build", "Figure: chibi person\nSize: 61.0 x 61.0 x 90.0 mm\nPASS watertight: closed\n"
+                  "NEXT: stone colors"),
+                 ("stone colors jacket=black rest=white", "filament 1 white: 82%\nPASS color_edges: smooth\n"
+                  "NEXT: none, the part is ready"))
+    log["setup"] = f"Request: A mini figure of {who}, 90 mm tall, with \"{name}\" on the base.\n"
+    return job, log
+
+
+def _frames(n, size):
+    return [Image.new("RGBA", size, (200, 200, 200, 255)) for _ in range(n)]
+
+
+def test_three_runs_make_one_clip_and_each_line_checks_against_its_own_run(tmp_path):
+    """Owner: "Have the video include three figures, Jensen, Elon, and DHH"."""
+    try:
+        video.mono(30)
+    except video.VideoProblem:
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    runs = []
+    for k, (who, name) in enumerate((("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"), ("DHH", "DHH"))):
+        job, log = _series_run(tmp_path, k, who, name)
+        runs.append(video.Run(video.make_plan(job, log), log, video.label_of(job), _frames(16, (300, 700)),
+                              _frames(16, (300, 700)), [("white", [240, 240, 240], 0.8)]))
+    assert [r.label for r in runs] == ["JENSEN", "ELON", "DHH"]
+    sh = video.compose_series(runs)
+    assert sh.faults == []
+    assert {r["run"] for r in sh.rows} == {0, 1, 2}
+    assert video.series_row_faults(sh.rows, [r.log for r in runs]) == []
+    swapped = [runs[1].log, runs[0].log, runs[2].log]
+    assert any("never sent" in f or "not the run's request" in f for f in video.series_row_faults(sh.rows, swapped))
+    for k in range(3):
+        assert {f"terminal_{k}", f"pair_{k}", f"turntable_{k}"} <= set(sh.marks)
+
+
+def test_a_series_clip_runs_24_to_34_seconds_with_a_full_turn_each(tmp_path):
+    try:
+        video.mono(30)
+    except video.VideoProblem:
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    runs = []
+    for k, (who, name) in enumerate((("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"), ("DHH", "DHH"))):
+        job, log = _series_run(tmp_path, k, who, name)
+        runs.append(video.Run(video.make_plan(job, log), log, video.label_of(job), _frames(video.SERIES_TURN, (40, 60)),
+                              _frames(video.SERIES_TURN, (20, 60)), []))
+    sh = video.compose_series(runs)
+    assert video.SERIES[0] <= len(sh.frames) / video.FPS <= video.SERIES[1]
+
+
+def test_the_label_falls_back_from_the_base_name_to_the_found_subject(tmp_path):
+    job = tmp_path / "job"
+    (job / "image" / "found").mkdir(parents=True)
+    (job / "image" / "found" / "found.json").write_text('{"subject": "Elon Musk"}')
+    assert video.label_of(job) == "Elon Musk"
+    (job / "plan.json").write_text('{"params": {"name": "ELON"}}')
+    assert video.label_of(job) == "ELON"
+
+
+def test_stone_video_with_a_missing_run_says_which(jobenv, tmp_path):
+    cli.run(["new", "a mini figure"])
+    log = tmp_path / "log.json"
+    log.write_text("{}")
+    text, code = cli.run(["video", str(log), "--with", str(tmp_path / "nowhere")])
+    assert code == 1 and "FIX: no run at" in text and "nowhere" in text
+
+
+def test_stone_video_with_runs_makes_one_series_clip(jobenv, monkeypatch, tmp_path):
+    cli.run(["new", "a mini figure"])
+    log = tmp_path / "log.json"
+    log.write_text("{}")
+    other = tmp_path / "other"
+    (other / "job").mkdir(parents=True)
+    (other / "log.json").write_text("{}")
+    seen = {}
+
+    def fake_series(items, out, turn):
+        seen.update(items=items, out=out, turn=turn)
+        return {"clip": str(out / "clip.mp4"), "seconds": 28.0, "faults": [],
+                "spec": {"width": 1080, "height": 1920, "lufs": -16.0}}
+
+    monkeypatch.setattr(video, "make_series", fake_series)
+    text, code = cli.run(["video", str(log), "--with", str(other)])
+    assert code == 0, text
+    assert seen["items"][1] == (other / "job", other / "log.json") and seen["items"][0][1] == log

@@ -447,10 +447,10 @@ def blender() -> str:
     return b
 
 
-def turntable(npz: Path, out: Path, frames: int = TURN, log=None) -> list[Path]:
-    """frames PNGs of the figure turning once, front first. Reuses frames rendered from the same
-    mesh, script and size (out/stamp.json)."""
-    w, h = turn_size()
+def turntable(npz: Path, out: Path, frames: int = TURN, log=None, size=None) -> list[Path]:
+    """frames PNGs of the figure turning once, front first, size (w, h) or the turntable tile's.
+    Reuses frames rendered from the same mesh, script and size (out/stamp.json)."""
+    w, h = size or turn_size()
     script = Path(__file__).with_name("turntable_blender.py")
     stamp = {"mesh": hashlib.sha256(npz.read_bytes()).hexdigest()[:16],
              "script": hashlib.sha256(script.read_bytes()).hexdigest()[:16], "frames": frames, "size": [w, h]}
@@ -742,6 +742,14 @@ def soundtrack(path: Path, marks: dict, taps: list[float], total: float, seed: i
         return lowpass(s, 1500) * env(n, int(0.04 * SR), int(0.06 * SR))
 
     t_of = {k: v / FPS for k, v in marks.items()}
+    order = sorted(t_of.items(), key=lambda kv: kv[1])  # a series has terminal_0, pair_0, turntable_0, ...
+
+    def after(name):
+        later = [t for k, t in order if t > t_of[name]]
+        return later[0] if later else total
+
+    def of(*bases):
+        return [(k, t) for k, t in order if k.split("_")[0] in bases]
     tt = np.arange(N) / SR
     bed = sum(a * np.sin(2 * np.pi * f * tt + ph) for f, a, ph in [(55, 1.0, 0), (82.4, 0.6, 1.1), (110, 0.35, 2.3)])
     bed = lowpass(bed * (1 + 0.2 * np.sin(2 * np.pi * 0.13 * tt)), 300) * env(N, int(0.8 * SR), int(1.0 * SR))
@@ -752,23 +760,24 @@ def soundtrack(path: Path, marks: dict, taps: list[float], total: float, seed: i
         f = 880 * (1.0, 1.06, 0.94, 1.12)[i % 4]
         put(partials(0.12, [(f, 1.0, 60), (2.4 * f, 0.2, 90)], attack=0.002), t0 + rng.uniform(0, 0.01),
             pan=rng.uniform(-0.2, 0.2), gain=0.05 * rng.uniform(0.8, 1.0))
-    for k, g in (("photos", 1.0), ("design", 0.85), ("turntable", 0.8), ("end", 0.9)):
-        if k in t_of:
-            put(thump(), t_of[k], gain=0.5 * g)
-    if "hook" in t_of:  # a bright chord under the cold open, after the first 10 ms stay quiet
+    gains = {"photos": 1.0, "design": 0.85, "pair": 0.85, "turntable": 0.8, "end": 0.9}
+    for k, t in order:
+        if k.split("_")[0] in gains:
+            put(thump(), t, gain=0.5 * gains[k.split("_")[0]])
+    for _, th in of("hook"):  # a bright chord under the cold open, after the first 10 ms stay quiet
         for f, pan in ((392.0, -0.25), (493.9, 0.0), (587.3, 0.25)):
-            put(partials(1.1, [(f, 1.0, 4), (2 * f, 0.2, 9)], attack=0.03), t_of["hook"] + 0.08, pan=pan, gain=0.07)
-    if "photos" in t_of:
-        put(partials(0.35, [(330, 1.0, 22), (660, 0.3, 35)]), t_of["photos"] + 0.55, pan=-0.15, gain=0.14)
-    if "design" in t_of:
-        t, nxt = t_of["design"] + 0.3, t_of.get("turntable", total) - 0.4
+            put(partials(1.1, [(f, 1.0, 4), (2 * f, 0.2, 9)], attack=0.03), th + 0.08, pan=pan, gain=0.07)
+    for _, tp in of("photos"):
+        put(partials(0.35, [(330, 1.0, 22), (660, 0.3, 35)]), tp + 0.55, pan=-0.15, gain=0.14)
+    for name, td in of("design", "pair"):
+        t, nxt = td + 0.3, after(name) - 0.4
         for k, f in enumerate([659.3, 784.0, 880.0, 1046.5, 1174.7, 1318.5]):
             if t >= nxt:
                 break
             put(partials(0.9, [(f, 1.0, 6), (2 * f, 0.25, 12), (3 * f, 0.06, 20)]), t, pan=-0.3 + 0.12 * k, gain=0.09)
             t += 0.32
-    if "turntable" in t_of:
-        t0, t1 = t_of["turntable"], t_of.get("end", total)
+    for name, t0 in of("turntable"):
+        t1 = after(name)
         t, k = t0 + 0.2, 0
         song = [440, 523, 392, 587, 494, 330, 440, 659, 523, 392]
         while t < t1 - 0.4:
@@ -781,8 +790,8 @@ def soundtrack(path: Path, marks: dict, taps: list[float], total: float, seed: i
         th = np.arange(n) / SR
         hum = (np.sin(2 * np.pi * 58 * th) + 0.3 * np.sin(2 * np.pi * 116 * th)) * (1 + 0.05 * np.sin(np.pi * th))
         put(lowpass(hum, 300) * env(n, int(0.5 * SR), int(0.5 * SR)), t0, gain=0.03)
-    if "end" in t_of:
-        put(partials(0.8, [(196, 1.0, 14), (547, 0.45, 26), (1180, 0.15, 40)], attack=0.002), t_of["end"] + 0.12,
+    for _, te in of("end"):
+        put(partials(0.8, [(196, 1.0, 14), (547, 0.45, 26), (1180, 0.15, 40)], attack=0.002), te + 0.12,
             gain=0.2)
     st = np.stack([L, R], 1)
     st *= 10 ** (-3.0 / 20) / np.abs(st).max()  # headroom; the loudness is set at the encode
@@ -855,9 +864,10 @@ def atoms(path: Path) -> list[str]:
             f.seek(size - 8, 1)
 
 
-def check_clip(mp4: Path) -> tuple[dict, list[str]]:
-    """(facts, faults) for the delivery spec: 1080 x 1920, 30 fps, 13 to 16 s, H.264 yuv420p,
-    faststart, AAC 48 kHz, -16 LUFS within 1, true peak under -1.5 dB, quiet first and last 10 ms."""
+def check_clip(mp4: Path, duration: tuple[float, float] = DURATION) -> tuple[dict, list[str]]:
+    """(facts, faults) for the delivery spec: 1080 x 1920, 30 fps, 13 to 16 s (a series: SERIES),
+    H.264 yuv420p, faststart, AAC 48 kHz, -16 LUFS within 1, true peak under -1.5 dB, quiet first
+    and last 10 ms."""
     pr = json.loads(subprocess.run([ffprobe(), "-v", "error", "-show_streams", "-show_format", "-of", "json",
                                     str(mp4)], capture_output=True, text=True).stdout or "{}")
     v = next((s for s in pr.get("streams", []) if s.get("codec_type") == "video"), {})
@@ -889,8 +899,8 @@ def check_clip(mp4: Path) -> tuple[dict, list[str]]:
         bad.append(f"frame rate {facts['fps']}")
     if facts["video"] != "h264" or facts["pix_fmt"] != "yuv420p":
         bad.append(f"video {facts['video']} {facts['pix_fmt']}, not h264 yuv420p")
-    if not DURATION[0] <= dur <= DURATION[1]:
-        bad.append(f"{dur:.2f} s long, not {DURATION[0]:.0f} to {DURATION[1]:.0f} s")
+    if not duration[0] <= dur <= duration[1]:
+        bad.append(f"{dur:.2f} s long, not {duration[0]:.0f} to {duration[1]:.0f} s")
     if facts["audio"] != "aac" or facts["sample_rate"] != SR:
         bad.append(f"audio {facts['audio']} at {facts['sample_rate']} Hz, not AAC at 48 kHz")
     if abs(lufs - LUFS) > LUFS_TOL:
@@ -953,5 +963,223 @@ def make(job_root: Path, log_path: Path, out: Path, turn: int = TURN) -> dict:
     report = {"clip": str(mp4), "log": str(log_path), "job": str(job_root), "seconds": round(total, 3),
               "frames": len(sh.frames), "marks": sh.marks, "paint": paint, "paint_words": plan.paint, "spec": facts,
               "faults": faults + bad, "rows": sh.rows, "stills": sorted(at)}
+    (out / "report.json").write_text(json.dumps(report, indent=1))
+    return report
+
+
+# ---- several figures in one clip ---------------------------------------------------------------------
+# The same honesty as one figure: each run's terminal lines check against that run's own log, and
+# each figure turns from its own painted 3MF. The cold open puts them side by side.
+
+SERIES = (24.0, 34.0)  # seconds, for two to four figures
+SERIES_TURN = 120  # frames for each figure's own turn (4 s)
+HOOK3_S, PAIR_S, END3_S = 2.2, 1.4, 2.6
+FAST_CPF = 9  # characters typed per frame in a series: the same lines, typed faster
+ROW_END = 1250  # the three-up tiles end where the turntable tile does
+
+
+@dataclass
+class Run:
+    plan: Plan
+    log: dict
+    label: str  # the base name ("ELON"), else the found subject
+    wide: list  # turntable frames for its own card (paths or images)
+    narrow: list  # the same turn at the three-up tile size
+    filaments: list = field(default_factory=list)
+
+
+def label_of(job_root: Path) -> str:
+    try:
+        name = (json.loads((job_root / "plan.json").read_text()).get("params") or {}).get("name")
+        if name:
+            return str(name)
+    except (OSError, ValueError):
+        pass
+    try:
+        return str(json.loads((job_root / "image" / "found" / "found.json").read_text())["subject"])
+    except (OSError, ValueError, KeyError):
+        return job_root.parent.name
+
+
+def columns(n: int, y0: int, y1: int) -> list[list[int]]:
+    """n tiles side by side between y0 and y1, Hyprland gaps between them."""
+    cell = (W - 2 * GAP - (n - 1) * IN) // n
+    return [[GAP + k * (cell + IN), y0, GAP + k * (cell + IN) + cell, y1] for k in range(n)]
+
+
+def narrow_size(n: int) -> tuple[int, int]:
+    x0, y0, x1, y1 = columns(n, BODY, ROW_END)[0]
+    return x1 - x0 - 2 * BORDER + 1, y1 - y0 - 2 * BORDER + 1
+
+
+def _img(f):
+    from PIL import Image
+
+    return f if hasattr(f, "size") else Image.open(f)
+
+
+def compose_series(runs: list[Run]) -> Shots:
+    from PIL import Image
+
+    sh = Shots()
+    n = len(runs)
+    p0 = runs[0].plan
+    size = model_size(p0.model)
+    cols = columns(n, BODY, ROW_END)
+    words = {2: "both", 3: "all three", 4: "all four"}.get(n, f"all {n}")
+
+    # 0. the cold open: every painted figure turning, side by side
+    sh.card("hook")
+    for i in range(round(HOOK3_S * FPS)):
+        fr = desktop(4, p0, f"a {size} model made {words}", "one sentence each, on a CPU, no cloud")
+        for r, box in zip(runs, cols):
+            figure_tile(fr, _img(r.narrow[(len(r.narrow) * 7 // 8 + i) % len(r.narrow)]), box)
+        inner = fr.tile([GAP, ROW_END + IN, W - GAP, H - GAP])
+        for r, box in zip(runs, cols):
+            fr.text(((box[0] + box[2]) // 2, ROW_END + IN + 70), r.label, mono(40, "Bold"), PURPLE, "mm", inner)
+        fr.text((W // 2, ROW_END + IN + 170), f"{n} sentences in, {n} painted figures out", mono(32, "Bold"),
+                STRONG, "mm", inner)
+        fr.text((W // 2, ROW_END + IN + 230), f"{p0.model} picked every command", mono(30), GREEN, "mm", inner)
+        sh.emit(fr)
+
+    for k, r in enumerate(runs):
+        plan, ws = r.plan, k + 1
+
+        # 1. the request and the model's own commands, typed fast
+        def term(lines, cursor=True):
+            fr = desktop(ws, plan, f"{k + 1} of {n}: {r.label}", f"{plan.model} picks every command")
+            draw_term(fr, [GAP, BODY, W - GAP, H - GAP], lines, cursor=cursor)
+            return fr
+
+        sh.card(f"terminal_{k}")
+        lines = [("out", "# the request, typed by a person:")]
+        req = plan.request
+        for i in range(0, len(req) + FAST_CPF, FAST_CPF):
+            if i and (i // FAST_CPF) % 2 == 0:
+                sh.taps.append(len(sh.frames) / FPS)
+            sh.emit(term(lines + [("req", req[:i])]))
+        lines += [("req", req), ("out", f"# from here on, {plan.model} alone:")]
+        sh.rows.append({"run": k, "kind": "req", "text": req})
+        sh.hold(term(lines), 0.2)
+        for cmd, outs in plan.ws1:
+            for c in range(FAST_CPF, len(cmd) + FAST_CPF, FAST_CPF):
+                sh.taps.append(len(sh.frames) / FPS)
+                sh.emit(term(lines + [("cmd", cmd[:c])]))
+            lines.append(("cmd", cmd))
+            lines += [("out", o) for o in outs]
+            sh.rows += [{"run": k, "kind": "cmd", "text": cmd}] + [
+                {"run": k, "kind": "out", "cmd": cmd, "text": o} for o in outs]
+            sh.hold(term(lines + [("cmd", "")]), 0.2)
+        sh.hold(term(lines + [("cmd", "")]), 0.25)
+
+        # 2. the photo it found beside the design drawn from it
+        if plan.photos and plan.style:
+            sh.card(f"pair_{k}")
+            fr = desktop(ws, plan, "a free photo in, a design out", "photos credited, from Wikimedia Commons")
+            end = 1180
+            mid = GAP + (W - 2 * GAP - IN) // 2
+            picture(fr, Image.open(plan.photos[0]).convert("RGB"), [GAP, BODY, mid, end], bias=0.2)
+            picture(fr, Image.open(plan.style).convert("RGB"), [mid + IN, BODY, W - GAP, end], focused=True,
+                    how="fit", fill=(253, 253, 253))
+            shown = []
+            if plan.find:
+                cmd, outs = plan.find
+                shown += [(cmd, [o for o in outs if not o.startswith("NEXT:")][:1])]
+            if plan.design:
+                shown += [plan.design]
+            feed = []
+            for cmd, outs in shown:
+                feed += [("cmd", cmd)] + [("out", o) for o in outs]
+                sh.rows += [{"run": k, "kind": "cmd", "text": cmd}] + [
+                    {"run": k, "kind": "out", "cmd": cmd, "text": o} for o in outs]
+            draw_term(fr, [GAP, end + IN, W - GAP, H - GAP], feed, focused=False, short=True)
+            sh.hold(fr, PAIR_S)
+
+        # 3. the painted figure turning once, and the checks it passed
+        sh.card(f"turntable_{k}")
+        cb = [GAP, TURN_BOX[3] + IN, W - GAP, H - GAP]
+        feed = []
+        for cmd, outs in plan.checks:
+            feed += [("cmd", cmd)] + [("out", o) for o in outs]
+            sh.rows += [{"run": k, "kind": "cmd", "text": cmd}] + [
+                {"run": k, "kind": "out", "cmd": cmd, "text": o} for o in outs]
+        total = FADE + len(r.wide)
+        step = max(1, (total - 24) // max(1, len(feed)))
+        for i in range(total):
+            fr = desktop(ws, plan, f"{r.label}: painted and print-ready", plan.paint)
+            inner = figure_tile(fr, _img(r.wide[(i - FADE) % len(r.wide)]), TURN_BOX)
+            legend(fr, inner, r.filaments)
+            draw_term(fr, cb, feed[:min(len(feed), 1 + i // step)], focused=False, short=True)
+            sh.emit(fr)
+
+    # 4. the end card: every figure from the front
+    sh.card("end")
+    fr = Frame()
+    bar(fr, 4, p0.date, p0.model)
+    split = 1000
+    for r, box in zip(runs, columns(n, BAR[1] + GAP, split)):
+        figure_tile(fr, _img(r.narrow[0]), box, focused=False)
+    box = fr.tile([GAP, split + IN, W - GAP, H - GAP], focused=True)
+    fr.text((W // 2, split + 150), size, mono(200, "Bold"), ACCENT, "mm", box)
+    fr.text((W // 2, split + 285), "a tiny model ran every step", mono(36, "Bold"), STRONG, "mm", box)
+    fr.text((W // 2, split + 345), f"{n} sentences → {n} painted, printable figures", mono(30), FG, "mm", box)
+    fr.text((W // 2, split + 400), "on a CPU · local · no cloud", mono(30), GREEN, "mm", box)
+    fr.text((W // 2, split + 500), "smoothstone", mono(44, "Bold"), PURPLE, "mm", box)
+    sh.hold(fr, END3_S)
+    return sh
+
+
+def series_row_faults(rows: list[dict], logs: list[dict]) -> list[str]:
+    """row_faults for each run's own rows against that run's own log."""
+    out = []
+    for k, log in enumerate(logs):
+        out += [f"figure {k + 1}: {f}" for f in row_faults([r for r in rows if r.get("run") == k], log)]
+    return out
+
+
+def make_series(items: list[tuple[Path, Path]], out: Path, turn: int = SERIES_TURN) -> dict:
+    """One clip of several finished painted jobs, each from its own run log: out/clip.mp4 and the
+    same report as make(), with "runs" naming each job and log."""
+    if not 2 <= len(items) <= 4:
+        raise VideoProblem("a series clip takes two to four runs")
+    if turn < 8:
+        raise VideoProblem(f"--turn {turn} is too few frames: one turn takes at least 8")
+    runs, info = [], []
+    out.mkdir(parents=True, exist_ok=True)
+    for k, (job_root, log_path) in enumerate(items):
+        try:
+            log = json.loads(Path(log_path).read_text())
+        except (OSError, ValueError, UnicodeDecodeError):
+            raise VideoProblem(f"the run log {log_path} is not JSON") from None
+        if not isinstance(log, dict):
+            raise VideoProblem(f"the run log {log_path} is not JSON")
+        plan = make_plan(job_root, log)
+        d = out / f"run{k + 1}"
+        d.mkdir(exist_ok=True)
+        paint = paint_npz(job_root, d / "mesh.npz")
+        wide = turntable(d / "mesh.npz", d / "turn", turn, log=d / "blender.log")
+        narrow = turntable(d / "mesh.npz", d / "turn3", turn, log=d / "blender3.log", size=narrow_size(len(items)))
+        runs.append(Run(plan, log, label_of(job_root), wide, narrow, paint["filaments"]))
+        info.append({"job": str(job_root), "log": str(log_path), "label": runs[-1].label, "request": plan.request,
+                     "paint": paint, "paint_words": plan.paint})
+    sh = compose_series(runs)
+    faults = sh.faults + series_row_faults(sh.rows, [r.log for r in runs])
+    total = len(sh.frames) / FPS
+    soundtrack(out / "clip.wav", sh.marks, sh.taps, total)
+    mp4 = out / "clip.mp4"
+    encode(sh.frames, out / "clip.wav", mp4, total)
+    facts, bad = check_clip(mp4, SERIES)
+    at = {"card_hook": (sh.marks["hook"] + FADE + 1) / FPS, "card_end": (sh.marks["end"] + FADE + 1) / FPS}
+    for k in range(len(runs)):
+        nxt = sh.marks.get(f"pair_{k}", sh.marks[f"turntable_{k}"])
+        at[f"fig{k + 1}_terminal"] = (nxt - 2) / FPS
+        if f"pair_{k}" in sh.marks:
+            at[f"fig{k + 1}_pair"] = (sh.marks[f"pair_{k}"] + FADE + 1) / FPS
+        t0 = sh.marks[f"turntable_{k}"] + FADE
+        for deg in (0, 90, 180, 270):
+            at[f"fig{k + 1}_turn_{deg:03d}"] = (t0 + round(deg / 360 * len(runs[k].wide)) + 0.5) / FPS
+    stills(mp4, out / "stills", at)
+    report = {"clip": str(mp4), "seconds": round(total, 3), "frames": len(sh.frames), "marks": sh.marks,
+              "runs": info, "spec": facts, "faults": faults + bad, "rows": sh.rows, "stills": sorted(at)}
     (out / "report.json").write_text(json.dumps(report, indent=1))
     return report

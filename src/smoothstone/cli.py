@@ -1208,9 +1208,19 @@ def cmd_video(args, job: Job) -> Out:
         out.fix(f"no run log at {log}: pass the log.json the model run wrote, stone video <log.json>")
         out.next = nxt
         return out
+    others = [Path(r).expanduser() for r in args.runs or []]
+    for r in others:
+        if not (r / "job").is_dir() or not (r / "log.json").is_file():
+            out.fix(f"no run at {r}: --with takes a run folder holding job/ and log.json")
+            out.next = nxt
+            return out
     from . import video
     try:
-        rep = video.make(job.root, log, dest, turn=args.turn)
+        if others:
+            items = [(job.root, log)] + [(r / "job", r / "log.json") for r in others]
+            rep = video.make_series(items, dest, turn=args.turn if args.turn != 144 else video.SERIES_TURN)
+        else:
+            rep = video.make(job.root, log, dest, turn=args.turn)
     except video.VideoProblem as e:
         out.fix(str(e))
         out.next = nxt
@@ -1887,6 +1897,8 @@ def make_parser() -> Parser:
     s.add_argument("log", nargs="?", help="the run log (default: log.json beside the job)")
     s.add_argument("--out", help="output folder (default: <job>/video)")
     s.add_argument("--turn", type=_turn_frames, default=144, help="frames in one turn of the figure (8 or more)")
+    s.add_argument("--with", dest="runs", action="append", metavar="RUN",
+                   help="another finished run (a folder with job/ and log.json); the clip shows every figure")
     return p
 
 
