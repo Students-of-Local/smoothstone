@@ -1,0 +1,11 @@
+{
+ "id": "g4_hazel",
+ "request": "I'd like a small statue of Amelia Earhart for my desk, 80 mm high, with her first name AMELIA on the base.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 80,
+   "name": "AMELIA"
+  }
+ }
+}

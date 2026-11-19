@@ -1,0 +1,14 @@
+{
+ "id": "g1_ash",
+ "request": "mini figure of albert einstein, 100mm tall. all grey but the hair, which is white",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 100
+  },
+  "colors": {
+   "white": ["hair"],
+   "rest": "grey"
+  }
+ }
+}
