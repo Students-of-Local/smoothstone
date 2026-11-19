@@ -41,6 +41,7 @@ class Out:
     result: str = ""  # short text for status.json last_result
     stage: str | None = None  # new stage for status.json, None keeps it
     owns_next: bool = True  # False: do not overwrite status next after a plan exists
+    raw: str | None = None  # machine output (show --json): printed as is, no NEXT line, no job update
 
     def add(self, *lines: str) -> "Out":
         self.lines.extend(lines)
@@ -52,6 +53,8 @@ class Out:
         return self
 
     def render(self) -> str:
+        if self.raw is not None:
+            return self.raw
         body = [ln for ln in self.lines if ln is not None]
         room = MAX_LINES - 1
         if len(body) > room:
@@ -330,10 +333,43 @@ def example_items(r: rc.Recipe, limit: int | None = None) -> list[str]:
     return items[:limit] if limit else items
 
 
+def show_json(r: rc.Recipe | None, name: str, job: Job, t: str) -> Out:
+    """stone show --json: one JSON object for programs such as Gantrel Studio. Read only."""
+    out = Out(owns_next=False)
+    if r is None:
+        names = [x.name for x in rc.visible(rc.load_all(), t, show_all=name.startswith("_"))]
+        out.raw = json.dumps({"error": f'no recipe "{name}"', "closest": rc.closest(name, names)})
+        out.code = 1
+        return out
+    data = read_json(r.path / "recipe.json") or {}
+    request = job.request() if job.exists() else ""
+    sug = match.suggest_full(r, request)[0] if request else {}
+    current: dict = {}
+    if job.exists():
+        built = read_json(job.build_dir / "params.json") or {}
+        plan = job.plan() or {}
+        if built.get("recipe") == r.name and isinstance(built.get("params"), dict):
+            current = built["params"]
+        elif plan.get("recipe") == r.name:
+            current = r.merged(plan.get("params") or {})
+    out.raw = json.dumps({
+        "name": r.name,
+        "title": r.title,
+        "summary": r.summary,
+        "tier": r.tier,
+        "params": list(data.get("params") or []),
+        "from_request": sug,
+        "current": current,
+    }, ensure_ascii=False)
+    return out
+
+
 def cmd_show(args, job: Job) -> Out:
     out = Out(owns_next=False, stage="show")
     t = config.tier(job.root)
     r = rc.load(args.recipe)
+    if getattr(args, "json", False):
+        return show_json(r, args.recipe, job, t)
     if r is None:
         return unknown_recipe(args.recipe, out, t)
     out.add(f"{r.name}: {r.title}")
@@ -1778,6 +1814,7 @@ def make_parser() -> Parser:
 
     s = sub.add_parser("show", parents=[common], help="show a recipe's parameters")
     s.add_argument("recipe")
+    s.add_argument("--json", action="store_true", help="print the recipe and the job's values as one JSON object")
 
     s = sub.add_parser("set", parents=[common], help="set recipe parameters")
     s.add_argument("items", nargs="*")
@@ -1903,7 +1940,7 @@ def run(argv: list[str]) -> tuple[str, int]:
         out.owns_next = False
         cmd = "error"
     text = out.render()
-    if job.exists() and cmd not in ("status",):
+    if job.exists() and cmd not in ("status",) and out.raw is None:
         job.log(f"{cmdline}\n{text}")
         s = job.status()
         upd = {"last_command": cmdline}

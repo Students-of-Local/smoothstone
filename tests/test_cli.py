@@ -417,6 +417,38 @@ def test_show_names_numbers_it_could_not_place(jobenv):
     assert "Not placed yet: 7 rubber feet." in text, text
 
 
+def test_show_json_gives_programs_the_schema_and_the_job_values(jobenv, recipes_root):
+    """Gantrel Studio builds its sliders from stone show --json. It must be one JSON object, with the
+    recipe's params unchanged, what the request named and the values the job holds, and never move the job."""
+    text, code = cli.run(["show", "_demo", "--json"])
+    d = json.loads(text)
+    assert code == 0 and d["name"] == "_demo" and d["tier"]
+    raw = json.loads((recipes_root / "_demo" / "recipe.json").read_text())["params"]
+    assert d["params"] == raw
+    assert d["from_request"] == {} and d["current"] == {}
+
+    stone("new", "a plate 50 mm wide with 7 rubber feet")
+    before = status_json(jobenv)
+    d = json.loads(cli.run(["show", "_demo", "--json"])[0])
+    assert d["from_request"] == {"w": 50.0}
+    assert d["current"] == {}
+    assert status_json(jobenv) == before  # read only: no stage, NEXT or last_command change
+
+    stone("set", "_demo", "w=40")
+    d = json.loads(cli.run(["show", "_demo", "--json"])[0])
+    assert d["current"]["w"] == 40.0 and set(d["current"]) == {p["name"] for p in raw}
+    built = jobenv / "stone-job" / "build" / "params.json"
+    built.parent.mkdir(parents=True, exist_ok=True)
+    built.write_text(json.dumps({"recipe": "_demo", "params": {"w": 45.0, "d": 30}}))
+    d = json.loads(cli.run(["show", "_demo", "--json"])[0])
+    assert d["current"] == {"w": 45.0, "d": 30}  # the built values win over the plan
+
+    text, code = cli.run(["show", "_dmeo", "--json"])
+    assert code == 1 and "_demo" in json.loads(text)["closest"]
+    text, code, nxt = stone("show", "_demo")  # text output is unchanged without the flag
+    assert "w = 60  (number, 10..200 mm) width along X" in text
+
+
 def test_status_repeats_what_is_not_placed(jobenv):
     """Held-out 1: compaction right after stone show lost the sizes the matcher missed."""
     stone("new", "a plate 50 mm wide with 7 rubber feet")
