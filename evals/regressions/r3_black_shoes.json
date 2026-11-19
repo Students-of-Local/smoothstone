@@ -1,0 +1,17 @@
+{
+ "id": "r3_black_shoes",
+ "request": "A mini figure of Jensen Huang, 90 mm tall, with \"JENSEN\" on the base, all white but the jacket and shoes, which are black, and the pants, which are blue.",
+ "why": "The owner asked for the Jensen figure with a black jacket and then wrote: \"Make his pants blue too!\" The shoes and pants were one color region on the sculpt, so the blue ran down over the shoes. He chose black shoes, cut at the ankle and painted like the jacket.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "JENSEN"
+  },
+  "colors": {
+   "black": ["jacket", "shoes"],
+   "blue": ["pants"],
+   "rest": "white"
+  }
+ }
+}

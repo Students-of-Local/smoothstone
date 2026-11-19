@@ -123,10 +123,11 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
 # SPEC3 A: the anatomy of a figure from its shape
 
 
-def block_figure():
+def block_figure(shoes=False):
     """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
     a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
-    the neck between the torso and the head (48 to 52)."""
+    the neck between the torso and the head (48 to 52). shoes=True: each leg stands in a shoe
+    (8 x 9, up to z 11) wider than the leg, as the Jensen sculpt's are."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -135,6 +136,8 @@ def block_figure():
     disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
     disc.apply_translation([0, 0, 4])
     legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    if shoes:
+        legs += [box([8, 9, 3.5], [x, 1, 9.25]) for x in (-5, 5)]
     torso = box([22, 12, 20], [0, 0, 38])
     arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
     hands = []
@@ -267,6 +270,44 @@ def test_part_names_of_a_block_figure():
     parts.name_parts(m, region, info, zone, a, look="a man in a black jacket and jeans")
     got = sorted(d["part"] for d in info)
     assert got == sorted(["base", "jeans", "jacket", "hands", "hands", "face"]), got
+
+
+def test_a_shoe_wider_than_its_leg_gets_its_own_line_and_zone():
+    """f3 (Donovan, 2026-11-18): "Make his pants blue too!", then black shoes. The sculpt's shoes
+    and pants were one color region, so the blue pants ran down over the shoes. Each leg needs a
+    line at its shoe's top and a shoes zone under it, on that leg alone."""
+    m = block_figure(shoes=True)
+    a = parts.anatomy(m, 8.0)
+    assert sorted(x["side"] for x in a["ankles"]) == [-1, 1], a["ankles"]
+    for x in a["ankles"]:
+        assert 10.8 <= x["z"] <= 11.3, x
+    assert {(ln["name"], ln.get("side")) for ln in a["lines"] if ln["name"] == "ankle"} == {("ankle", -1), ("ankle", 1)}
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    assert cm.is_watertight and abs(cm.volume - m.volume) < 1e-3 * m.volume
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    shoe = zone == parts.SHOES
+    assert c[shoe, 2].max() <= 11.3 and c[shoe, 2].min() >= 8.0
+    assert (c[shoe, 0] < 0).any() and (c[shoe, 0] > 0).any()  # both feet
+    low = ~base & (c[:, 2] < 10.8) & (np.abs(c[:, 0]) < 10)
+    assert (zone[low] == parts.SHOES).all()  # nothing of the pants left on a shoe
+    region = zone.copy()
+    _, region = np.unique(region, return_inverse=True)
+    region = region.reshape(-1)
+    base_region = int(region[base][0])
+    palette = {parts.LEGS: [40, 80, 200], parts.TORSO: [20, 20, 20], parts.HANDS: [225, 180, 150],
+               parts.HEAD: [225, 180, 150], parts.SHOES: [20, 20, 20]}
+    rgb = [None if r == base_region else palette[int(np.bincount(zone[region == r]).argmax())]
+           for r in range(int(region.max()) + 1)]
+    info = C.describe(cm, region, rgb, base_region)
+    parts.name_parts(cm, region, info, zone, a, look="a man in a black jacket, blue pants and black shoes")
+    assert "shoes" in {d["part"] for d in info}, [d["part"] for d in info]
+
+
+def test_straight_legs_have_no_shoe_line():
+    assert parts.anatomy(block_figure(), 8.0)["ankles"] == []
 
 
 # SPEC3 E2: odd regions (the square notch on the back of the neck)
