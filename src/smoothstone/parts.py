@@ -789,14 +789,17 @@ def neck_lift(mesh, line: dict, keep: np.ndarray) -> dict:
         if area <= colors.LEDGE_AREA:
             break
         start, tops = _lift_tops(mesh, cur, keep, NECK_RIM_REACH)
-        if not (tops - start > 0.1).any():
+        rise = tops - start > 0.1
+        if not rise.any():
             break
         cv = np.asarray(cur["curve"], float)
-        deg = np.repeat(np.where(tops - start > 0.1, tops, -np.inf), 10)
+        # widen each rise by 8 degrees each way and smooth it, never below the walk's top itself
+        # nor the groove: a max with the widened steps would put their cliffs into the edge
+        deg = np.repeat(np.where(rise, tops + 0.05, -np.inf), 10)
         wide = np.max([np.roll(deg, k) for k in range(-8, 9)], axis=0)
-        has = np.isfinite(wide)
-        new = np.where(has, np.maximum(_gauss(np.where(has, wide, cv), 3.0), wide) + 0.05, cv)
-        cur = {**cur, "curve": [round(float(v), 4) for v in np.maximum(new, cv)], "lifted": True}
+        smooth = _gauss(np.where(np.isfinite(wide), wide, cv), 3.0)
+        new = np.maximum(np.maximum(smooth, deg), cv)
+        cur = {**cur, "curve": [round(float(v), 4) for v in new], "lifted": True}
         a = _ledge_area(mesh, cur)
         if a < area:
             best, area = cur, a
