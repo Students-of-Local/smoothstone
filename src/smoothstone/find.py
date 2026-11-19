@@ -37,6 +37,16 @@ WIKIDATA = "https://www.wikidata.org/w/api.php"
 HUMAN = "Q5"
 # taxon, breed, dog breed, cat breed, horse breed, animal known by a common name, individual animal
 ANIMAL = {"Q16521", "Q38829", "Q39367", "Q43577", "Q1160573", "Q55983715", "Q26401003"}
+# fictional human, character, comics, film, television, animated, video game and literary character,
+# mascot character
+CHARACTER = {"Q15632617", "Q95074", "Q1114461", "Q15773347", "Q15773317", "Q15711870", "Q1569167",
+             "Q3658341", "Q386208"}
+# never what a figure is of: given and family names, disambiguation pages, genes, proteins, works
+# (video game, film, television series, song, album, single, literary work) and Wikimedia lists
+NOT_A_SUBJECT = {"Q12308941", "Q11879590", "Q202444", "Q101352", "Q4167410", "Q7187", "Q8054", "Q7889",
+                 "Q11424", "Q5398426", "Q7366", "Q482994", "Q134556", "Q7725634", "Q13406463", "Q4167836"}
+SEARCH_HITS = 15  # Batman the character is 8th or later after a city and a province
+SUBJECT_WEIGHT = 1.5  # a person, animal or character is what a figure is usually of
 
 
 def _wd(**params) -> dict:
@@ -46,14 +56,52 @@ def _wd(**params) -> dict:
 def _entities(ids: list[str]) -> dict:
     if not ids:
         return {}
-    return _wd(action="wbgetentities", ids="|".join(ids), props="labels|aliases|claims").get("entities") or {}
+    return _wd(action="wbgetentities", ids="|".join(ids),
+               props="labels|aliases|claims|sitelinks").get("entities") or {}
 
 
-def _kind(ent: dict) -> str:
-    """person, animal or object, from what Wikidata says the entity is an instance of (P31)."""
-    p31 = {((c.get("mainsnak") or {}).get("datavalue") or {}).get("value", {}).get("id")
-           for c in (ent.get("claims") or {}).get("P31", [])}
-    return "person" if HUMAN in p31 else "animal" if p31 & ANIMAL else "object"
+def _p31(ent: dict) -> set[str]:
+    return {((c.get("mainsnak") or {}).get("datavalue") or {}).get("value", {}).get("id")
+            for c in (ent.get("claims") or {}).get("P31", [])} - {None}
+
+
+def _kind(ent: dict, character_classes: set[str] = frozenset()) -> str:
+    """person, animal, character or object, from what Wikidata says the entity is an instance of
+    (P31). character_classes adds classes known as characters by their label (anthropomorphic dog)."""
+    p31 = _p31(ent)
+    if HUMAN in p31:
+        return "person"
+    if p31 & (CHARACTER | set(character_classes)):
+        return "character"
+    return "animal" if p31 & ANIMAL else "object"
+
+
+# what a class's English label says: a character, or never a figure's subject (a work, a name,
+# a disease, a band, a company); a character's label wins ("film character" is a character)
+CLASS_WORDS = {
+    "character": re.compile(r"\b(?:character|fictional|anthropomorphic|superhero|mascot|pok\u00e9mon)\b", re.I),
+    "not": re.compile(r"\b(?:film|movie|series|episode|video game|album|song|single|novel|book|franchise|"
+                      r"name|surname|disambiguation|gene|protein|disease|disorder|syndrome|musical group|band|"
+                      r"company|business|software|website|television program|agency|organi[sz]ation|department|"
+                      r"ministry|government|institution|university|school|political party)s?\b", re.I),
+}
+
+
+def _classes(ents: list[dict]) -> dict[str, set[str]]:
+    """{"character": classes, "not": classes} of ents, read from the classes' English labels in one
+    lookup (a class already known either way is not looked up)."""
+    ids = sorted(set().union(set(), *(_p31(e) for e in ents)) - CHARACTER - ANIMAL - NOT_A_SUBJECT - {HUMAN})
+    out = {"character": set(), "not": set()}
+    if not ids:
+        return out
+    got = _wd(action="wbgetentities", ids="|".join(ids[:50]), props="labels", languages="en").get("entities") or {}
+    for i, e in got.items():
+        label = ((e.get("labels") or {}).get("en") or {}).get("value", "")
+        if CLASS_WORDS["character"].search(label):
+            out["character"].add(i)
+        elif CLASS_WORDS["not"].search(label):
+            out["not"].add(i)
+    return out
 
 
 def _label(ent: dict) -> str:
@@ -61,10 +109,10 @@ def _label(ent: dict) -> str:
     return (labels.get("en") or next(iter(labels.values()), {})).get("value", "")
 
 
-def _pack(ent: dict) -> dict:
+def _pack(ent: dict, character_classes: set[str] = frozenset()) -> dict:
     p18 = (ent.get("claims") or {}).get("P18") or []
     image = ((p18[0].get("mainsnak") or {}).get("datavalue") or {}).get("value") if p18 else None
-    return {"id": ent.get("id"), "label": _label(ent), "kind": _kind(ent), "image": image}
+    return {"id": ent.get("id"), "label": _label(ent), "kind": _kind(ent, character_classes), "image": image}
 
 
 def _bare(s: str) -> str:
@@ -82,25 +130,34 @@ def _names(ent: dict) -> set[str]:
 def resolve(query: str) -> dict | None:
     """The Wikidata entity a figure of query means: {id, label, kind, image}, or None.
 
-    A figure is of someone or some creature, so the first person or animal among the matches
-    wins over a gene or a song with the same name. When none is, a nickname or initials name a
-    person only when they are that person's alias or initials ("DHH"), never a loose text match.
+    The candidates are the name search's matches that can be a figure's subject (never a given
+    name, a gene or a video game), and the people whose alias or initials are the query ("DHH"),
+    never a loose text match. The best known wins, by Wikipedia sitelinks, with a person, animal or
+    character weighted over a thing: "Big Ben" is the tower, not a little known man of that name,
+    and "Yoda" the character, not a worm genus. Ties keep the search's order.
     """
     try:
         hits = [h["id"] for h in _wd(action="wbsearchentities", search=query, language="en",
-                                     limit="7").get("search") or []]
+                                     limit=str(SEARCH_HITS)).get("search") or []]
         ents = _entities(hits)
-        for i in hits:
-            if i in ents and _kind(ents[i]) != "object":
-                return _pack(ents[i])
         found = _wd(action="query", list="search", srsearch=f"{query} haswbstatement:P31={HUMAN}",
                     srlimit="5").get("query", {}).get("search") or []
         people = _entities([h["title"] for h in found])
-        for h in found:
-            ent = people.get(h["title"])
-            if ent and _bare(query) in _names(ent):
-                return _pack(ent)
-        return _pack(ents[hits[0]]) if hits and hits[0] in ents else None
+        cands = [ents[i] for i in hits if i in ents]
+        have = {e.get("id") for e in cands}
+        cands += [people[h["title"]] for h in found if h["title"] in people and h["title"] not in have
+                  and _bare(query) in _names(people[h["title"]])]
+        cls = _classes(cands)
+        chars, never = cls["character"], NOT_A_SUBJECT | cls["not"]
+        cands = [e for e in cands if HUMAN in _p31(e) or not (_p31(e) & never) or _p31(e) & (CHARACTER | chars)]
+        if not cands:
+            return _pack(ents[hits[0]]) if hits and hits[0] in ents else None
+
+        def score(rank_ent):
+            rank, ent = rank_ent
+            weight = SUBJECT_WEIGHT if _kind(ent, chars) != "object" else 1.0
+            return (len(ent.get("sitelinks") or {}) * weight, -rank)
+        return _pack(max(enumerate(cands), key=score)[1], chars)
     except Exception:  # offline or an odd reply: search Commons by the words alone
         return None
 
@@ -203,7 +260,12 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     return got
 
 
-SUBJECT = re.compile(r"\b(?:of|like|looks like|resembling|shaped like)\s+(.+)", re.S)
+NOUN = (r"(?:figure|figurine|statue|statuette|bust|sculpture|model|miniature|mini|replica|toy|doll|print|"
+        r"keychain|ornament|chibi|version)s?")
+FIGURE_OF = re.compile(rf"\b{NOUN}\s+of\s+(.+)", re.S)  # lower case: "Statue of Liberty" is a name
+FIGURE_AT = re.compile(rf"\b{NOUN}\b")
+LIKE = re.compile(r"\b(?:looks like|look like|resembling|shaped like|like)\s+(.+?)(?=\blike\b|$)", re.S)
+CAPITAL_OF = re.compile(r"\bof\s+((?:the\s+)?[A-Z].*)", re.S)
 # where the subject's phrase ends: a comma, a size, "with ...", "in his ...", a quote or a bracket
 PHRASE_END = re.compile(r"[,;:(\"\u201c]|\.(?:\s|$)|\d|\s(?:with|in|on|that|who|which|wearing|holding|"
                         r"standing|sitting|for|about|around|at|from|and|to)\s", re.I)
@@ -213,21 +275,48 @@ FILLER = {"a", "an", "the", "one", "some", "little", "small", "tiny", "mini", "c
           "favorite", "favourite", "famous"}
 
 
-def subject_from_request(request: str) -> str | None:
-    """'A mini figure of Jensen Huang, 80 mm tall' -> 'Jensen Huang'; 'of a golden retriever' ->
-    'golden retriever'. A name in capitals wins ('my favorite astronaut Neil Armstrong'); one's
-    own pet or self ('of my dog') is None, since only the owner's photo can show it."""
-    m = SUBJECT.search(request)
-    if not m:
-        return None
-    phrase = PHRASE_END.split(m.group(1), maxsplit=1)[0].strip(" .'")
-    stop = {"A", "An", "The", "My", "Me", "It", "This", "That", "Our", "Your"}
-    for run in CAPS.findall(" " + phrase):
-        name = " ".join(w for w in run.split() if w not in stop)
-        if name:
-            return name
+STOP = {"A", "An", "The", "My", "Me", "It", "This", "That", "Our", "Your", "Could", "Can", "Would", "Will",
+        "Please", "Make", "Print", "Build", "Create", "I", "We"}
+
+
+def _capitals(text: str, last: bool = False) -> str | None:
+    """The first (or last) run of capitalized words in text, without sentence words like "A"."""
+    names = [" ".join(w for w in run.split() if w not in STOP) for run in CAPS.findall(" " + text)]
+    names = [n for n in names if n]
+    return (names[-1] if last else names[0]) if names else None
+
+
+def _phrase(text: str) -> str | None:
+    """A subject phrase: the name in capitals in it, or its words; None for one's own (my dog)."""
+    phrase = PHRASE_END.split(text, maxsplit=1)[0].strip(" .'")
+    name = _capitals(phrase)
+    if name:
+        return name
     words = re.findall(r"[a-z][a-z'-]*", phrase.lower())
     if any(w in OWN for w in words):
         return None
     words = [w for w in words if w not in FILLER][:4]
     return " ".join(words) or None
+
+
+def subject_from_request(request: str) -> str | None:
+    """What a figure request is of: 'A mini figure of Jensen Huang, 80 mm tall' -> 'Jensen Huang';
+    'of a golden retriever' -> 'golden retriever'; 'a Babe Ruth figurine' -> 'Babe Ruth'; 'a toy that
+    looks like Albert Einstein' -> 'Albert Einstein'. A name in capitals wins ('my favorite astronaut
+    Neil Armstrong'); one's own pet or self ('of my dog') is None, since only the owner's photo can
+    show it. An "of" that is not the figure's ('the front of the base') names nothing."""
+    m = FIGURE_OF.search(request)
+    if m:
+        return _phrase(m.group(1))
+    m = FIGURE_AT.search(request)
+    if m:  # a name just before the figure word, in the same clause: "Michelangelo's David as a statue"
+        clause = re.split(r"[.?!;,:\"\u201c]", request[:m.start()])[-1]
+        name = _capitals(clause, last=True)
+        if name:
+            return name
+    for m in LIKE.finditer(request):
+        first = re.findall(r"[A-Za-z']+", m.group(1))[:1]
+        if first and first[0].lower() not in OWN:
+            return _phrase(m.group(1))
+    m = CAPITAL_OF.search(request)
+    return _phrase(m.group(1)) if m else None

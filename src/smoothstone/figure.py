@@ -63,6 +63,8 @@ LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
                "hairstyle, the same face shape, expression and skin tone. "),
     "animal": "Keep the likeness from the first photo exactly: the same fur colors, markings, ears and face. ",
+    "character": ("Keep the likeness from the first picture exactly: the same face, colors, costume, "
+                  "markings and proportions of this character. "),
     "object": "",
 }
 # only for a person the description says wears glasses: a style model draws whatever a prompt
@@ -217,7 +219,8 @@ def screen(photos: list[Path], who: str, folder: Path, say=print) -> tuple[list[
             return photos, None
         folder.mkdir(parents=True, exist_ok=True)
         memo.write_text(json.dumps(seen))
-    keep = [(p, t) for p, t in zip(photos, seen) if t.get("face")]
+    # a photo the owner gave is theirs to trust: a small or side-on face can read as none
+    keep = [(p, t) for p, t in zip(photos, seen) if t.get("face") or p.name.startswith("source.")]
     if not keep:
         raise FigureProblem(f"none of the {len(photos)} photos shows the {who}'s face; "
                             "give one with stone image <path to photo>")
@@ -233,11 +236,12 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
     """style(), then the render checked against the photo: one that added or left out glasses,
     a beard or a hat is styled again with the next seed, and the closest of STYLE_TRIES is kept."""
     best = None
-    for i in range(STYLE_TRIES if want else 1):
+    check = bool(want) and any(k in want for k in KEEP)  # nothing to hold a render to otherwise
+    for i in range(STYLE_TRIES if check else 1):
         s = seed + i
-        o = out.with_name(f"style-{s}.png") if want else out
+        o = out.with_name(f"style-{s}.png") if check else out
         style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"))
-        if not want:
+        if not check:
             return o
         got = (traits([o], who, out.with_name("check.log")) or [None])[0]
         if got is None:  # the check could not run: keep this one

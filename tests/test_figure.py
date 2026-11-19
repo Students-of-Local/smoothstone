@@ -563,3 +563,36 @@ def test_face_crop_fails_open_without_a_face_or_a_venv(tmp_path, monkeypatch):
     photo = tmp_path / "p.jpg"
     photo.write_bytes(b"p")
     assert figure.face_crop(photo, tmp_path / "face.png") is None
+
+
+def test_a_fictional_character_is_styled_as_that_character(jobenv, monkeypatch):
+    """Review of PR 23: Mario or a superhero is no human on Wikidata, and was styled as an object."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A chibi figure of Snoopy, 70 mm tall")
+    job = cli.Job(jobenv / "stone-job")
+    found = job.image_dir / "found"
+    found.mkdir(parents=True)
+    (found / "found.json").write_text(json.dumps({"query": "Snoopy", "kind": "character"}))
+    assert cli.figure_who(job, "chibi") == "character"
+    p = figure.prompt("chibi", "character")
+    assert "this exact character" in p and "costume" in p
+
+
+def test_the_owners_own_photo_is_never_stopped_by_the_face_check(tmp_path, monkeypatch):
+    """Review of PR 23: a small or side-on photo the owner gave read as no face, with no way on."""
+    photo = tmp_path / "source.jpg"
+    photo.write_bytes(b"me")
+    calls = _models(tmp_path, monkeypatch, lambda n: {"face": False} if n == "source.jpg" else BARE)
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert calls[0][0] == "source.jpg"
+
+
+def test_a_render_is_checked_only_for_what_the_photo_check_answered(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    asked = []
+    _models(tmp_path, monkeypatch, lambda n: {"face": True})
+    real = figure.traits
+    monkeypatch.setattr(figure, "traits", lambda images, who, log: (asked.append(images), real(images, who, log))[1])
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert len(asked) == 1  # the photo only: no glasses, beard or hat answer to hold a render to

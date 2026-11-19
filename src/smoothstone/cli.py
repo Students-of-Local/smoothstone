@@ -976,7 +976,7 @@ def figure_who(job: Job, style: str) -> str:
     if style == "object":
         return "object"
     found = read_json(job.image_dir / "found" / "found.json") or {}
-    if found.get("kind") in ("person", "animal", "object") and not list(job.image_dir.glob("source.*")):
+    if found.get("kind") in ("person", "animal", "character", "object") and not list(job.image_dir.glob("source.*")):
         return found["kind"]  # what Wikidata says the found subject is
     words = set(re.findall(r"[a-z]+", job.request().lower())) if job.exists() else set()
     return "animal" if words & ANIMALS else "person"
