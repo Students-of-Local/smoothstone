@@ -1020,6 +1020,10 @@ SUPERSAMPLE = 3  # panels are drawn 3x and averaged down: antialiased edges
 CREASE = 60.0  # degrees: faces meeting at a sharper angle keep a hard edge in smooth shading
 
 
+CORNER_CHUNK = 1 << 16  # corners per block in corner_normals (about 400k pairs, 10 MB a pair array)
+PIXEL_CHUNK = 1 << 16  # hit pixels per block when a view blends corner normals
+
+
 def corner_normals(v, f, crease: float = CREASE) -> np.ndarray:
     """Per face corner normals (faces, 3, 3) for smooth shading, in the faces' own order: each
     corner averages the area-weighted normals of the faces round its vertex that meet its face at
@@ -1037,12 +1041,19 @@ def corner_normals(v, f, crease: float = CREASE) -> np.ndarray:
     order = np.argsort(cv, kind="stable")
     deg = np.bincount(cv, minlength=len(v))
     start = np.concatenate([[0], np.cumsum(deg)[:-1]])
-    k = np.repeat(np.arange(3 * nf), deg[cv])  # every (corner, corner at the same vertex) pair
-    off = np.arange(len(k)) - np.repeat(np.cumsum(deg[cv]) - deg[cv], deg[cv])
-    j = cf[order[start[cv[k]] + off]]
-    keep = (n[j] * n[cf[k]]).sum(1) > np.cos(np.radians(crease))
-    w = (area[j] * keep)[:, None] * n[j]
-    acc = np.stack([np.bincount(k, weights=w[:, a], minlength=3 * nf) for a in range(3)], 1)
+    cos = np.cos(np.radians(crease))
+    acc = np.zeros((3 * nf, 3))
+    for c0 in range(0, 3 * nf, CORNER_CHUNK):  # in blocks, so a big sculpt never holds every pair
+        c1 = min(c0 + CORNER_CHUNK, 3 * nf)
+        cnt = deg[cv[c0:c1]]
+        k = np.repeat(np.arange(c0, c1), cnt)  # every (corner, corner at the same vertex) pair
+        off = np.arange(len(k)) - np.repeat(np.cumsum(cnt) - cnt, cnt)
+        j = cf[order[start[cv[k]] + off]]
+        nj = n[j]
+        keep = np.einsum("ij,ij->i", nj, n[cf[k]]) > cos
+        nj *= (area[j] * keep)[:, None]
+        for a in range(3):
+            acc[c0:c1, a] = np.bincount(k - c0, weights=nj[:, a], minlength=c1 - c0)
     norm = np.linalg.norm(acc, axis=1)
     acc = np.where(norm[:, None] > 1e-30, acc / (norm[:, None] + 1e-30), n[cf])
     return acc.reshape(nf, 3, 3)
@@ -1081,19 +1092,23 @@ def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, s
     fid = idbuf[hit]
     if cn is None:
         nn = n[fid]
-    else:  # the corner normals blended at each pixel by its barycentric weights
+    else:  # the corner normals blended at each pixel by its barycentric weights, in blocks
         yy, xx = np.nonzero(hit)
-        px_, py_ = xx + 0.5, yy + 0.5
-        x0, y0 = sx[fid, 0], sy[fid, 0]
-        x1, y1, x2, y2 = sx[fid, 1], sy[fid, 1], sx[fid, 2], sy[fid, 2]
-        den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
-        den = np.where(np.abs(den) < 1e-12, 1e-12, den)
-        w0 = ((y1 - y2) * (px_ - x2) + (x2 - x1) * (py_ - y2)) / den
-        w1 = ((y2 - y0) * (px_ - x2) + (x0 - x2) * (py_ - y2)) / den
-        w = np.clip(np.stack([w0, w1, 1 - w0 - w1], 1), 0, 1)
-        w /= w.sum(1, keepdims=True) + 1e-12
-        rc = cn[fid] @ _rot(az, elev).T
-        nn = (w[:, :, None] * rc).sum(1)
+        rcv = cn @ _rot(az, elev).T  # once per view, not per pixel
+        nn = np.empty((len(fid), 3))
+        for s0 in range(0, len(fid), PIXEL_CHUNK):
+            s1 = s0 + PIXEL_CHUNK
+            fc = fid[s0:s1]
+            px_, py_ = xx[s0:s1] + 0.5, yy[s0:s1] + 0.5
+            x0, y0 = sx[fc, 0], sy[fc, 0]
+            x1, y1, x2, y2 = sx[fc, 1], sy[fc, 1], sx[fc, 2], sy[fc, 2]
+            den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+            den = np.where(np.abs(den) < 1e-12, 1e-12, den)
+            w0 = ((y1 - y2) * (px_ - x2) + (x2 - x1) * (py_ - y2)) / den
+            w1 = ((y2 - y0) * (px_ - x2) + (x0 - x2) * (py_ - y2)) / den
+            w = np.clip(np.stack([w0, w1, 1 - w0 - w1], 1), 0, 1)
+            w /= w.sum(1, keepdims=True) + 1e-12
+            nn[s0:s1] = np.einsum("pi,pij->pj", w, rcv[fc])
         nn /= np.linalg.norm(nn, axis=1)[:, None] + 1e-12
     shade = 0.35 + 0.65 * np.clip(-nn[:, 1] * 0.7 + nn[:, 2] * 0.3, 0, 1)
     img[hit] = face_rgb[fid] * shade[:, None]

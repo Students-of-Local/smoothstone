@@ -74,3 +74,26 @@ def test_a_sub_nozzle_crease_like_the_r1_fist_corner_is_blended():
     cn = C.corner_normals(v, f)
     at_bend = cn[1, 1]  # face 1's corner at vertex 2, on the bend
     assert np.allclose(at_bend, cn[2, 0]), "both faces at the bend share one normal"
+
+
+def test_smooth_light_costs_little_memory_over_flat():
+    # a big sculpt goes through stone colors: the per-pair and per-pixel blocks stay bounded
+    import tracemalloc
+
+    m = trimesh.creation.icosphere(subdivisions=6, radius=20)
+    v, f = np.asarray(m.vertices), np.asarray(m.faces)
+    rgb = np.full((len(f), 3), 200.0)
+
+    def peak(fn):
+        tracemalloc.start()
+        try:
+            out = fn()
+            return out, tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+
+    cn, p_cn = peak(lambda: C.corner_normals(v, f))
+    assert p_cn <= 800 * len(f), p_cn / len(f)  # bytes per face
+    _, p_flat = peak(lambda: C._panel(v, f, rgb, 30, 15, v.mean(0), 25, 360))
+    _, p_smooth = peak(lambda: C._panel(v, f, rgb, 30, 15, v.mean(0), 25, 360, cn=cn))
+    assert p_smooth <= 1.3 * p_flat, (p_smooth / 1e6, p_flat / 1e6)

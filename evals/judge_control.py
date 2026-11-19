@@ -25,8 +25,8 @@ from smoothstone import colors as C  # noqa: E402
 
 
 def seed_tab(V, F, face_fil, line: dict, depth: float, length: float) -> np.ndarray:
-    """face_fil with a tab of the line's other color: faces of the lower-numbered side within
-    `depth` of the line and within `length`/2 of its middle point take the other side's color."""
+    """face_fil with a tab across the line: the faces within `depth` of the line, within `length`/2
+    of its middle point, that have the color most common there take the line's other color."""
     pts = np.asarray(line["pts"], float)
     a, b = line["pair"]
     mid = pts[len(pts) // 2]
@@ -35,12 +35,36 @@ def seed_tab(V, F, face_fil, line: dict, depth: float, length: float) -> np.ndar
     # distance from each face center to the nearest line point of the stretch
     d = np.min(np.linalg.norm(cen[:, None, :] - near[None, :, :], axis=2), axis=1)
     out = face_fil.copy()
-    # the side that is not the jacket: the color covering more of the faces near the stretch
+    # the majority color near the stretch gives up the tab
     sel = d <= depth
     side = a if (face_fil[sel] == a).sum() >= (face_fil[sel] == b).sum() else b
     other = b if side == a else a
     out[sel & (face_fil == side)] = other
     return out
+
+
+def painted_3mf(job: Path) -> Path:
+    """The job's painted 3MF: figure.3mf, else <recipe>.3mf. Never another .3mf that sits in the
+    job, such as a reference print file."""
+    names = ["figure.3mf"]
+    try:
+        recipe = json.loads((job / "plan.json").read_text()).get("recipe")
+        if recipe:
+            names.append(f"{recipe}.3mf")
+    except (OSError, ValueError):
+        pass
+    for n in names:
+        if (job / n).exists():
+            return job / n
+    raise SystemExit(f"no painted 3MF in {job}: looked for {', '.join(names)}; run stone colors first")
+
+
+def pick_line(pick: list, n: int, most: int = 6) -> dict:
+    """Line n (1-based) of the boundaries.png rows: render_boundaries draws only the first `most`."""
+    top = min(len(pick), most)
+    if not 1 <= n <= top:
+        raise SystemExit(f"--line {n}: boundaries.png shows lines 1 to {top}")
+    return pick[n - 1]
 
 
 def main() -> None:
@@ -52,7 +76,7 @@ def main() -> None:
     ap.add_argument("--length", type=float, default=2.5)
     a = ap.parse_args()
     job = Path(a.job)
-    f3 = next(iter(sorted(job.glob("*.3mf"))))
+    f3 = painted_3mf(job)
     V, F, codes, main = C.read_3mf(f3)
     st = json.loads((job / "status.json").read_text())["colors"]
     fil = [str(x) for x in st["filaments"]]
@@ -62,7 +86,7 @@ def main() -> None:
     C.mark_grooves(lines, anat)
     pick = sorted([ln for ln in lines if ln["length"] >= C.EDGE_MIN],
                   key=lambda ln: (-((ln.get("ratio") or 0) > C.JAGGED), -ln["length"]))
-    target = pick[a.line - 1]
+    target = pick_line(pick, a.line)
     seeded = seed_tab(V, F, face_fil, target, a.depth, a.length) if a.depth > 0 else face_fil
     flipped = int((seeded != face_fil).sum())
     fil_rgb = np.array([C.filament_rgb(f) or (150, 150, 150) for f in fil], float)

@@ -172,7 +172,7 @@ def anatomy(mesh, top: float) -> dict:
 
     split = _scan(top + 1.0, top + 0.6 * H, legs_apart) if legs_apart(top + 1.0) else None
     low = split + HEM_ABOVE if split is not None else None
-    fold = hem_fold(mesh, low, low + HEM_FOLD * H) if low is not None else None
+    fold = hem_fold(mesh, low, low + HEM_FOLD * H, legs_apart) if low is not None else None
     hem = fold if fold is not None else low
     res["hem"] = hem
     if fold is not None:
@@ -482,17 +482,33 @@ def _line_ring(mesh, z: float, pick) -> tuple[np.ndarray, float, float] | None:
     return c, float(np.linalg.norm(p - c, axis=1).max()), float(np.linalg.norm(np.diff(np.vstack([p, p[:1]]), axis=0), axis=1).sum())
 
 
-def hem_fold(mesh, lo: float, hi: float) -> float | None:
+def hem_fold(mesh, lo: float, hi: float, legs_apart=None) -> float | None:
     """The z of the top's own hem above the legs: the lowest groove in (lo, hi] that runs all the
     way round the body (crease_loop costs under GROOVE_COST per mm, at least GROOVE_REACH of the
     ring) where the body's section 1 mm above is at least HEM_STEP times the section 1 mm below: a
-    jacket's edge over shorts. A belt on a long coat is no hem: the coat below it is as wide."""
+    jacket's edge over shorts. A belt on a long coat is no hem: the coat below it is as wide.
+
+    lo is just above the legs' split. A groove whose section 1 mm below lies between the legs
+    (legs_apart) is skipped, since the widest ring there is one leg and any groove would pass. The
+    groove search runs only at a scan height where the section 2 mm above already steps out from
+    the one 2 mm below (or at lo), so a figure with no such step, in trousers or a long coat, costs
+    a few sections and no crease_loop."""
+    rings_at: dict[float, np.ndarray | None] = {}
 
     def body(z):
-        rings = _rings(mesh, z)
-        return max(rings, key=_ring_area) if rings else None
+        z = round(float(z), 3)
+        if z not in rings_at:
+            rings = _rings(mesh, z)
+            rings_at[z] = max(rings, key=_ring_area) if rings else None
+        return rings_at[z]
+
+    def steps(za, zb):
+        a, b = body(za), body(zb)
+        return a is not None and b is not None and _ring_area(a) >= HEM_STEP * _ring_area(b)
 
     for z in np.arange(lo + 0.5, hi, 0.5):
+        if not steps(z + 2.0, max(z - 2.0, lo)):
+            continue
         p = body(z)
         if p is None:
             continue
@@ -507,8 +523,9 @@ def hem_fold(mesh, lo: float, hi: float) -> float | None:
         if length <= 0 or cost / length > GROOVE_COST or length < GROOVE_REACH * ring:
             continue
         gz = float(np.median(P[:, 2]))
-        a, b = body(gz + 1.0), body(gz - 1.0)
-        if a is not None and b is not None and _ring_area(a) >= HEM_STEP * _ring_area(b):
+        if legs_apart is not None and legs_apart(gz - 1.0):
+            continue
+        if steps(gz + 1.0, gz - 1.0):
             return gz
     return None
 
