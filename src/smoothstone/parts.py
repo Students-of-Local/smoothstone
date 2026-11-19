@@ -49,7 +49,8 @@ CLEAR = 3.0  # mm around the frames where the picture's frame color is face pain
 # the words for each part, the first the default name; a request or look.txt may use any
 PART_WORDS = {
     "top": ("top", "jacket", "shirt", "dress", "sweater", "coat", "t-shirt", "tshirt", "hoodie",
-            "blazer", "suit", "vest", "blouse", "robe", "uniform", "jersey", "cardigan"),
+            "blazer", "suit", "vest", "blouse", "robe", "uniform", "jersey", "cardigan", "tracksuit",
+            "jumpsuit", "overalls", "coveralls", "onesie", "spacesuit", "wetsuit"),
     "pants": ("pants", "jeans", "trousers", "legs", "skirt", "shorts", "leggings"),
     "shoes": ("shoes", "shoe", "boots", "boot", "sneakers", "feet", "sandals"),
     "hands": ("hands", "hand", "gloves", "glove"),
@@ -59,6 +60,9 @@ PART_WORDS = {
     "base": ("base", "plinth", "stand", "name"),
 }
 WORD_PART = {w: p for p, ws in PART_WORDS.items() for w in ws}
+# a garment that is more than one part: a black suit is a black jacket and black pants
+COVERS = {w: ("top", "pants") for w in ("suit", "tracksuit", "jumpsuit", "overalls", "coveralls",
+                                         "onesie", "spacesuit", "wetsuit")}
 
 
 def part_of(word: str) -> str | None:
@@ -67,6 +71,15 @@ def part_of(word: str) -> str | None:
     if w.endswith("s") and w not in WORD_PART and w[:-1] in WORD_PART:
         w = w[:-1]
     return WORD_PART.get(w)
+
+
+def parts_of(word: str) -> tuple[str, ...]:
+    """Every part a word names: ("top", "pants") for "suit", ("top",) for "jacket", () for none."""
+    w = word.strip().lower()
+    if w in COVERS:
+        return COVERS[w]
+    p = part_of(w)
+    return (p,) if p else ()
 
 
 def look_words(look: str) -> dict[str, str]:

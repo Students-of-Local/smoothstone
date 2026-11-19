@@ -750,3 +750,24 @@ def test_numbered_regions_past_the_listing_take_the_rest_color():
     line = cli._suggest_line(regs, FIL, "A vase with stripes")
     keys = [i.split("=")[0] for i in line.split()[2:]]
     assert keys and all(k == "rest" or int(k) <= colors.LIST_MAX for k in keys), line
+
+
+def test_a_color_after_a_list_of_parts_paints_every_part_in_it():
+    """"the jacket and shoes, which are black" gave the shoes black and left the jacket to the
+    photo's color; Jensen's jacket only came out black because it is black in his photo."""
+    pc = lambda r: {k: v for k, v in colors.part_colors(r).items() if not k.startswith("word:")}
+    assert pc("all white but the jacket and shoes, which are black") == {"top": "black", "shoes": "black"}
+    assert pc("all white but the jacket and shoes, which are black, and the pants, which are blue.") == \
+        {"top": "black", "shoes": "black", "pants": "blue"}
+    assert pc("all white but the hair, the jacket and the shoes, which are red") == \
+        {"hair": "red", "top": "red", "shoes": "red"}
+
+
+def test_a_suit_is_the_jacket_and_the_pants():
+    pc = lambda r: {k: v for k, v in colors.part_colors(r).items() if not k.startswith("word:")}
+    assert pc("a figure of him in a black suit") == {"top": "black", "pants": "black"}
+    assert pc("in a black racing suit, white everywhere else") == {"top": "black", "pants": "black"}
+    assert pc("all white but the suit and shoes, which are black") == \
+        {"top": "black", "pants": "black", "shoes": "black"}
+    assert pc("a grey suit and red shoes") == {"top": "gray", "pants": "gray", "shoes": "red"}
+    assert pc("a blue jumpsuit") == {"top": "blue", "pants": "blue"}

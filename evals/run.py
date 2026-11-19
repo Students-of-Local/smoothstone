@@ -403,7 +403,10 @@ def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
         t += np.bincount(face_fil[sel], weights=area[sel], minlength=len(fil) + 1)
     for part, t in tally.items():
         got[part] = fil[int(t[1:].argmax())]
-    named = {_part_key(p): str(c).lower() for c, ps in want.items() if c != "rest" for p in ps}
+    from smoothstone import parts as P
+
+    named = {q: str(c).lower() for c, ps in want.items() if c != "rest" for p in ps
+             for q in (P.parts_of(p) or (_part_key(p),))}
     rest = str(want.get("rest", "")).lower()
     for part, c in sorted(got.items()):
         need = named.get(_part_key(part), rest)

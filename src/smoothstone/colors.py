@@ -193,17 +193,27 @@ def part_colors(request: str, names=()) -> dict[str, str]:
     "the jacket in black" or "the jacket, which is black"; "picture" for a part after "all
     <color> but" with no color of its own (it keeps its color from the picture). Keys are parts
     (parts.part_of), the word the request used under "word:<part>"."""
-    from .parts import part_of
+    from .parts import part_of, parts_of
 
     words = re.findall(r"[a-z]+(?:-[a-z]+)?|[,.;]", without_names(request, names).lower())
     out: dict[str, str] = {}
     used: dict[str, str] = {}
 
     def give(i, c):
-        p = part_of(words[i])
-        if p and p not in out:
-            out[p] = c
-            used[p] = words[i]
+        for p in parts_of(words[i]):  # a suit is the jacket and the pants
+            if p not in out:
+                out[p] = c
+                used[p] = words[i]
+
+    def give_list(i, c):
+        """<part>, <part> and <part>, which are <color>: every part of the list ending at i."""
+        give(i, c)
+        j = i - 1
+        while j >= 0 and words[j] in ("and", ",", "the", "his", "her", "their", "its"):
+            j -= 1
+            if j >= 0 and part_of(words[j]) and words[j + 1] in ("and", ",", "the", "his", "her", "their", "its"):
+                give(j, c)
+                j -= 1
 
     for i, w in enumerate(words):
         p = part_of(w)
@@ -231,7 +241,7 @@ def part_colors(request: str, names=()) -> dict[str, str]:
                     break
                 c = word_color(words[j])
                 if c:
-                    give(i, c)
+                    give_list(i, c)
                     break
     # all <color> but / except (for) the <part> (and the <part>): those keep the picture's color
     for i, w in enumerate(words):
@@ -239,10 +249,10 @@ def part_colors(request: str, names=()) -> dict[str, str]:
             for j in range(i + 1, min(len(words), i + 8)):
                 if words[j] in ".;":
                     break
-                p = part_of(words[j])
-                if p and p not in out:
-                    out[p] = "picture"
-                    used[p] = words[j]
+                for p in parts_of(words[j]):
+                    if p not in out:
+                        out[p] = "picture"
+                        used[p] = words[j]
     out.update({f"word:{p}": w for p, w in used.items()})
     return out
 
