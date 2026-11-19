@@ -106,3 +106,54 @@ def test_a_spec_can_set_a_higher_likeness_bar(tmp_path, monkeypatch):
     assert not grade["pass"] and grade["why"] == ["likeness 7/10, the spec asks 8: face: a generic cartoon face"]
     _fake(monkeypatch, "Elon Musk", 8)
     assert run.likeness_run(tmp_path, job, "A mini figure of Elon Musk", {"pass": True, "why": []}, least=8)["pass"]
+
+
+def _rejudge_module():
+    s = importlib.util.spec_from_file_location("rejudge", ROOT / "evals" / "rejudge.py")
+    m = importlib.util.module_from_spec(s)
+    s.loader.exec_module(m)
+    return m
+
+
+def _run_dir(tmp_path, why, spec_text):
+    rdir = tmp_path / "run"
+    _job(rdir)
+    sha = __import__("hashlib").sha256(spec_text).hexdigest()
+    (rdir / "log.json").write_text(json.dumps({"run_id": "r", "spec": "f3_elon", "suite": "figure", "card": "S",
+                                               "driver": "lfm3", "spec_sha256": sha, "pass": False, "why": why}))
+    return rdir
+
+
+def test_a_run_the_judge_could_not_answer_is_judged_again_and_scored(tmp_path, monkeypatch):
+    """On the Mac `claude` was not signed in: Elon's run passed every check and failed unjudged."""
+    rj = _rejudge_module()
+    monkeypatch.setattr(rj.run, "SCORES", tmp_path / "scores.jsonl")
+    spec_text = (ROOT / "evals" / "figure" / "f3_elon.json").read_bytes()
+    rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (Not logged in)"], spec_text)
+    _fake(monkeypatch, "Elon Musk", 9)
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
+        "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
+        if "api.php" in url else b"jpeg")
+    log = rj.rejudge(rdir)
+    assert log["pass"] and log["likeness"] == 9 and log["rejudged"]
+    assert json.loads((tmp_path / "scores.jsonl").read_text())["pass"] == 1
+
+
+def test_rejudging_never_passes_a_run_that_failed_another_check(tmp_path, monkeypatch):
+    rj = _rejudge_module()
+    monkeypatch.setattr(rj.run, "SCORES", tmp_path / "scores.jsonl")
+    spec_text = (ROOT / "evals" / "figure" / "f3_elon.json").read_bytes()
+    rdir = _run_dir(tmp_path, ["height 80 mm, asked 90", "likeness: the judge could not answer (x)"], spec_text)
+    _fake(monkeypatch, "Elon Musk", 9)
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
+        "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
+        if "api.php" in url else b"jpeg")
+    log = rj.rejudge(rdir)
+    assert not log["pass"] and log["why"][0] == "height 80 mm, asked 90"
+
+
+def test_a_spec_changed_since_the_run_is_not_rejudged(tmp_path, monkeypatch):
+    rj = _rejudge_module()
+    rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (x)"], b"an older spec")
+    with pytest.raises(SystemExit, match="changed since run"):
+        rj.rejudge(rdir)
