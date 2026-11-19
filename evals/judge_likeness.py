@@ -132,6 +132,33 @@ def tool_photos(job: Path) -> set[str]:
     return {_file_key(p.get("title", "")) for p in found.get("photos") or [] if p.get("title")}
 
 
+READABLE = {".jpg", ".jpeg", ".png", ".webp", ".gif"}  # what the judge can open; an SVG or TIFF it cannot
+
+
+def _hash(data: bytes) -> int | None:
+    """A 16 x 16 average hash: the same picture re-encoded, resized or in another format keeps it."""
+    import io
+    from PIL import Image
+    try:
+        im = Image.open(io.BytesIO(data)).convert("L").resize((16, 16))
+    except Exception:  # not a picture PIL reads: it matches nothing
+        return None
+    px = list(im.tobytes())
+    mean = sum(px) / len(px)
+    return sum(1 << k for k, v in enumerate(px) if v > mean)
+
+
+def _same_picture(data: bytes, owners: list[int]) -> bool:
+    h = _hash(data)
+    return h is not None and any(bin(h ^ o).count("1") <= 20 for o in owners)  # 20 of 256 bits
+
+
+def owner_photos(job: Path) -> list[int]:
+    """Hashes of the photos the owner gave the tool (image/source.*): the tool styled from them,
+    so a reference that is one of them, under any name, measures copying, not likeness."""
+    return [h for f in sorted((job / "image").glob("source.*")) if (h := _hash(f.read_bytes())) is not None]
+
+
 COMMONS = "https://commons.wikimedia.org/w/api.php"
 REFERENCES = 3
 REFS_FILE = Path(__file__).with_name("likeness_refs.json")
@@ -257,7 +284,7 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
     avoid = tool_photos(job)
     lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1]).replace("_", " ")
     lead_is_tools = _stem(_file_key(ref["url"])) in {_stem(a) for a in avoid}  # Wikidata's photo, which the tool put first
-    hand = picked_by_hand(ref["title"])
+    hand = [h for h in picked_by_hand(ref["title"]) if _stem(h["file"]) not in {_stem(a) for a in avoid}]
     room = REFERENCES - len(hand) - (0 if lead_is_tools else 1)
     others = other_references(ref, avoid | {_file_key(ref["url"])}, room) if room > 0 else []
     photos = hand + ([] if lead_is_tools else [{"file": lead, "url": ref["url"]}]) + others
@@ -267,15 +294,30 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
         ref = {**ref, "instead_of": lead, "url": photos[0]["url"]}
     if lead_is_tools or len(photos) > 1:
         ref = {**ref, "photos": photos}
+    owners = owner_photos(job)
+
+    def fetch(url: str, stem: str) -> Path | None:
+        """The photo saved under its own format, or None: a format the judge cannot read, a link
+        that moved, or a photo the owner gave the tool."""
+        ext = Path(urllib.parse.urlparse(url).path).suffix.lower() or ".jpg"
+        if ext not in READABLE:
+            return None
+        try:
+            data = _get(url)
+        except OSError:
+            return None
+        if _same_picture(data, owners):
+            return None
+        (t / f"{stem}{ext}").write_bytes(data)
+        return t / f"{stem}{ext}"
+
     with tempfile.TemporaryDirectory(prefix="likeness-") as tmp:
         t = Path(tmp)
         if ref.get("photos"):
             lines = []
-            for k, ph in enumerate(ref["photos"], 1):
-                name = t / f"reference_{k}.jpg"
-                try:
-                    name.write_bytes(_get(ph["url"]))
-                except OSError:  # a link that moved: the others still judge
+            for ph in ref["photos"]:
+                name = fetch(ph["url"], f"reference_{len(lines) + 1}")
+                if name is None:  # the others still judge
                     continue
                 where = f"picked by hand, from {ph['source']}" if ph.get("source") else \
                     "found by searching Wikimedia Commons for the subject's name"
@@ -284,9 +326,10 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
                 raise JudgeProblem(f"no reference photo of {title!r} could be downloaded")
             refs, several = "\n".join(lines), SEVERAL
         else:
-            ext = Path(urllib.parse.urlparse(ref["url"]).path).suffix.lower() or ".jpg"
-            (t / f"reference{ext}").write_bytes(_get(ref["url"]))
-            refs = (f"  {t / f'reference{ext}'}: a reference photo of the request's subject, the lead image of "
+            name = fetch(ref["url"], "reference")
+            if name is None:
+                raise JudgeProblem(f"the photo of {title!r} could not be used (format, link, or the owner's own)")
+            refs = (f"  {name}: a reference photo of the request's subject, the lead image of "
                     f"the Wikipedia\n    article \"{ref['title']}\" ({ref['caption'] or 'no caption'}).")
             several = ""
         shutil.copy(render, t / "render.png")

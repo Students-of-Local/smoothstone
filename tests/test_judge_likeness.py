@@ -323,3 +323,69 @@ def test_one_searched_photo_still_tells_the_judge_it_may_not_show_the_subject(tm
 def test_a_year_still_to_come_or_run_on_from_a_word_is_no_year():
     assert jl._year("elon musk 2099.jpg") == 0
     assert jl._year("img_2019.jpg") == 0
+
+
+def _picture(seed: int, fmt="JPEG") -> bytes:
+    """A small picture whose look is set by seed; the same seed in another format or size is the
+    same picture."""
+    import io
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (64, 64), (20, 20, 20))
+    d = ImageDraw.Draw(im)
+    for k in range(6):
+        x = (seed * 37 + k * 11) % 50
+        y = (seed * 53 + k * 17) % 50
+        d.rectangle([x, y, x + 14, y + 10], fill=(230, 200 - 30 * (k % 3), 160))
+    if fmt == "PNG":
+        im = im.resize((128, 128))
+    buf = io.BytesIO()
+    im.save(buf, fmt)
+    return buf.getvalue()
+
+
+def test_a_photo_picked_by_hand_that_the_tool_styled_from_is_never_a_reference(tmp_path, monkeypatch):
+    """Review of PR 24 (second-S1): the hand-picked DHH headshot skipped the check that keeps out
+    the tool's own photos, so a job built from that headshot was judged against its own source."""
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg", "File:new-headshot.jpg")
+    refs = tmp_path / "likeness_refs.json"
+    refs.write_text(json.dumps({"Elon Musk": [{"url": "https://dhh.dk/images/new-headshot.jpg", "source": "a site"}]}))
+    monkeypatch.setattr(jl, "REFS_FILE", refs)
+    _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Elon Musk 2018.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert [p["file"] for p in res["reference"]["photos"]] == ["Elon Musk 2018.jpg"]
+
+
+def test_a_reference_that_is_the_photo_the_owner_gave_is_never_shown(tmp_path, monkeypatch):
+    """Review of PR 24 (second-S1): the owner gives the tool the same headshot the judge would go
+    by (`stone image new-headshot.jpg`, kept as image/source.*), re-encoded or not."""
+    job = _job(tmp_path)
+    (job / "image" / "source.png").write_bytes(_picture(1, "PNG"))
+    refs = tmp_path / "likeness_refs.json"
+    refs.write_text(json.dumps({"David Heinemeier Hansson": [
+        {"url": "https://dhh.dk/images/new-headshot.jpg", "source": "his own site, dhh.dk"}]}))
+    monkeypatch.setattr(jl, "REFS_FILE", refs)
+    asked = _fake(monkeypatch, "David Heinemeier Hansson", 9)
+    _article(monkeypatch, [], search=["File:David Heinemeier Hansson 2015.jpg"],
+             title="David Heinemeier Hansson", lead="DHH_racing.jpg")
+    get = jl._get
+    pics = {"new-headshot.jpg": _picture(1), "DHH_racing.jpg": _picture(2),
+            "David_Heinemeier_Hansson_2015.jpg": _picture(3)}
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: pics.get(url.rsplit("/", 1)[-1]) or get(url, timeout))
+    jl.judge(job, DHH)
+    prompt, shown = asked[1]
+    assert "dhh.dk" not in prompt and len([s for s in shown if s.startswith("reference")]) == 2
+
+
+def test_each_reference_keeps_its_own_format_and_one_the_judge_cannot_read_is_left_out(tmp_path, monkeypatch):
+    """Review of PR 24 (first-F1): with several photos every file was named .jpg, so a PNG lead was
+    sent to the judge as a JPEG and an SVG lead as a picture it cannot read."""
+    job = _job(tmp_path)
+    asked = _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Elon Musk 2018.jpg"], lead="Elon_Musk_ref.png")
+    jl.judge(job, "A mini figure of Elon Musk")
+    assert asked[1][1] == ["reference_1.png", "reference_2.jpg", "render.png"]
+    _article(monkeypatch, [], search=["File:Elon Musk 2018.jpg"], lead="Elon_Musk_ref.svg")
+    jl.judge(job, "A mini figure of Elon Musk")
+    assert asked[3][1] == ["reference_1.jpg", "render.png"]
