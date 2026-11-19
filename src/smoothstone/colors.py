@@ -41,7 +41,7 @@ SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under thi
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 NAME_OUT = 0.02  # mm: a plinth face with a corner this far out of the drum is a raised letter of the name
 NAME_CONTRAST = 3.0  # the name's color stands out from the plinth's by at least this contrast ratio (WCAG)
-REGIONS_VERSION = 5  # bump when find_regions changes what it returns, so a cached listing is redone
+REGIONS_VERSION = 6  # bump when find_regions changes what it returns, so a cached listing is redone
 
 # plain color names and a typical filament of each
 NAMES = {

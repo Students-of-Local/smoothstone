@@ -255,9 +255,24 @@ HAND_REACH = 8.0  # mm from a hand's axis: the faces below a cuff line that can 
 TOUCH_STEP = 0.1  # mm between the sections that follow a hand up from its wrist level to its cuff
 TOUCH_BELOW = 1.0  # mm under the wrist level where a hand's edge still follows the line where it touches the body
 HAIR_SECTOR = 10  # degrees round the head's axis per sample of the picture's hair edge
-HAIR_ORDER = 2  # harmonics in the hairline's series; 3 swings 15 mm on DHH's 16 samples
+HAIR_ORDER = 6  # harmonics in the hairline's series: 2 cannot hold it over the ears and down to the nape behind them
+HAIR_SMOOTH = 0.01  # the cost of the hairline leaving a plane's section of the head (_huber_fit)
 HAIR_MISS = 0.25  # a sector whose best split leaves more of its area than this on the wrong side gives no sample
-HAIR_GAP = 120  # degrees: a wider run with no sample holds the back's lowest height
+HAIR_FRONT = 60  # degrees each side of the face where the picture's hair edge sets the hairline
+HAIR_BLEND = 30  # degrees behind the ears over which the hairline goes from over the ears down to the nape
+HAIR_EAR_GAP = 0.5  # mm: at the sides the hairline passes this far over the ears' top
+HAIR_BROW = 3.0  # mm: at the middle of the face the hairline stays this far over the ears' top (the brows)
+HAIR_NAPE = 1.0  # mm: at the back the hairline is this far over the head's underside (the nape)
+HAIR_ROUGH_R = 1.0  # mm: the spread of the normals within this is how ridged the surface is...
+HAIR_TEX_R = 2.5  # mm: ...averaged over this
+HAIR_ROUGH_MIN = 0.02  # ridged hair is at least this ridged (the level is 0.038 on DHH, 0.059 on Elon)
+HAIR_ROUGH_RATIO = 2.0  # the picture's hair at the crown this many times as ridged as the face's skin: ridged hair
+HAIR_RUN = 3.0  # mm of smooth that ends the ridged hair going down
+HAIR_RUN_FACE = 4.0  # the same at the face, where a fringe's smooth top can lie over its ridged lip
+HAIR_LIP = 2.0  # mm: a line this close over the underside of an overhanging lock goes down to its bottom
+HAIR_LIP_DEPTH = 0.7  # mm: a lock stands this far proud of the skin under it (Elon's temple 0.8 to 1.4; DHH's temple notch 0.5)
+HAIR_EAR_TEX = 0.07  # an ear is more ridged than this...
+HAIR_EAR_AREA = 10.0  # ...over at least this many mm2
 HAIR_CROWN = 1.5  # mm under the figure's top: the crown, whose color is the hair's
 HAIR_NECK = 1.0  # mm: the hairline stays at least this far above the neck line
 
@@ -1178,19 +1193,31 @@ def _fourier(th: np.ndarray, order: int, rho: np.ndarray | None = None) -> np.nd
     return np.stack(cols, 1)
 
 
-def _huber_fit(th: np.ndarray, z: np.ndarray, order: int, rho: np.ndarray | None = None) -> np.ndarray:
+def _huber_fit(th: np.ndarray, z: np.ndarray, order: int, rho: np.ndarray | None = None,
+               weight: np.ndarray | None = None, robust: np.ndarray | None = None) -> np.ndarray:
     """Coefficients of _fourier fitted with Huber weights (iteratively reweighted), so samples far
-    off the line (a blotch under it) barely pull it."""
+    off the line (a blotch under it) barely pull it; `weight` scales each sample's say, and only
+    the `robust` ones (all by default) are weighed down when far off. Harmonic
+    k costs HAIR_SMOOTH (k (k**2 - 1))**2 its square: over a few mm the edge must stay near a plane
+    (the wobble limit), and a plane cuts a round head in a first harmonic alone."""
     A = _fourier(th, order, rho)
+    w0 = np.ones(len(z)) if weight is None else np.asarray(weight, float)
     w = np.ones(len(z))
     coef = np.zeros(A.shape[1])
+    k = np.r_[0, np.repeat(np.arange(1, order + 1), 2)].astype(float)
+    # a plane cuts a round head in z = a + b cos(theta - t0), which z''' + z' = 0 holds for: harmonic k
+    # leaves that by k (k**2 - 1), so the line leaves a plane only where the samples make it
+    pen = np.diag(HAIR_SMOOTH * (k * (k * k - 1)) ** 2)
     for _ in range(30):
-        sw = np.sqrt(w)
-        coef = np.linalg.lstsq(A * sw[:, None], z * sw, rcond=None)[0]
+        sw = np.sqrt(w * w0)
+        Aw = A * sw[:, None]
+        coef = np.linalg.solve(Aw.T @ Aw + pen, Aw.T @ (z * sw))
         r = z - A @ coef
         scale = max(1.4826 * float(np.median(np.abs(r - np.median(r)))), 0.05)
         c = 1.345 * scale
         w = np.minimum(1.0, c / np.maximum(np.abs(r), 1e-12))
+        if robust is not None:
+            w = np.where(robust, w, 1.0)
     return coef
 
 
@@ -1240,17 +1267,153 @@ def hair_samples(mesh, labels: np.ndarray, head: np.ndarray, center, hair: int) 
     return np.array(out_t), np.array(out_z), np.array(out_r)
 
 
+def head_texture(mesh, head: np.ndarray) -> np.ndarray:
+    """Per face of the head, how ridged the surface is: one minus the length of the area-weighted
+    mean normal within HAIR_ROUGH_R mm (0 on a plane, more where strands and grooves turn the
+    normal about), averaged over HAIR_TEX_R mm so a lock and the grooves beside it read alike.
+    0 off the head."""
+    import scipy.sparse as sp
+    from scipy.spatial import cKDTree
+
+    idx = np.nonzero(head)[0]
+    out = np.zeros(len(head))
+    if len(idx) < 10:
+        return out
+    c = mesh.triangles_center[idx]
+    a = mesh.area_faces[idx]
+    nrm = mesh.face_normals[idx]
+    tree = cKDTree(c)
+    n = len(idx)
+
+    def near(r):
+        p = tree.query_pairs(r, output_type="ndarray")
+        i = np.r_[p[:, 0], p[:, 1], np.arange(n)]
+        j = np.r_[p[:, 1], p[:, 0], np.arange(n)]
+        return sp.csr_matrix((np.ones(len(i)), (i, j)), shape=(n, n))
+
+    W = near(HAIR_ROUGH_R)
+    rough = 1.0 - np.linalg.norm(W @ (nrm * a[:, None]), axis=1) / (W @ a)
+    W = near(HAIR_TEX_R)
+    out[idx] = (W @ (rough * a)) / (W @ a)
+    return out
+
+
+def _ears(mesh, head: np.ndarray, tex: np.ndarray, center, zmid: float) -> list[dict]:
+    """The ears: pieces of the head more ridged than HAIR_EAR_TEX, of at least HAIR_EAR_AREA mm2,
+    on a side of the head (HAIR_FRONT to 135 degrees from the face) and centered under the head's
+    middle height. Each: {"x" (its side, +1 or -1), "top" (its highest point), "span" (its least
+    and most angle from the face, degrees), "sel" (its faces)}."""
+    import scipy.sparse as sp
+    from scipy.sparse.csgraph import connected_components
+
+    hi = head & (tex > HAIR_EAR_TEX)
+    adj = mesh.face_adjacency
+    e = adj[hi[adj[:, 0]] & hi[adj[:, 1]]]
+    n = len(hi)
+    _, comp = connected_components(sp.coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n)), directed=False)
+    c = mesh.triangles_center
+    a = mesh.area_faces
+    fz = np.asarray(mesh.vertices)[mesh.faces][:, :, 2]
+    phi = _from_face(c, center)
+    out = []
+    for k in np.unique(comp[hi]):
+        sel = hi & (comp == k)
+        if a[sel].sum() < HAIR_EAR_AREA:
+            continue
+        cc = (c[sel] * a[sel, None]).sum(0) / a[sel].sum()
+        p = float(_from_face(cc[None], center)[0])
+        if not (HAIR_FRONT <= p <= 135) or cc[2] > zmid:
+            continue
+        out.append({"x": 1 if cc[0] > center[0] else -1, "top": float(fz[sel].max()),
+                    "span": (float(phi[sel].min()), float(phi[sel].max())), "sel": sel})
+    return out
+
+
+def _from_face(X: np.ndarray, center) -> np.ndarray:
+    """Degrees round the head's axis from the face (which looks to -y), 0 to 180 either way."""
+    th = np.degrees(np.arctan2(X[:, 1] - center[1], X[:, 0] - center[0]))
+    return np.abs((th + 90 + 180) % 360 - 180)
+
+
+def _nape(mesh, head: np.ndarray, sector: np.ndarray, zmid: float) -> float | None:
+    """The lowest point of the head's underside in a sector: the lowest face facing down (normal z
+    under -0.2) under the head's middle height with at least half the area of the mm over it
+    facing down too (the skull or the hair over the neck, not a thin lip)."""
+    nz = mesh.face_normals[:, 2]
+    a = mesh.area_faces
+    fz = np.asarray(mesh.vertices)[mesh.faces][:, :, 2].min(1)
+    k = head & sector & (mesh.triangles_center[:, 2] < zmid)
+    down = np.nonzero(k & (nz < -0.2))[0]
+    for i in down[np.argsort(fz[down])]:
+        band = k & (fz >= fz[i]) & (fz < fz[i] + 1.0)
+        if a[band & (nz < -0.2)].sum() >= 0.5 * a[band].sum():
+            return float(fz[i])
+    return None
+
+
+def _rough_bottom(c: np.ndarray, a: np.ndarray, rough: np.ndarray, sel: np.ndarray, start: float,
+                  run_mm: float = HAIR_RUN) -> float:
+    """How far the hair runs down in a sector from `start` (the height the picture or a person's
+    hair gives it): going down in 1 mm slices from there, the lowest slice that is mostly ridged
+    before `run_mm` of smooth ends the ridged mass; `start` itself when the hair is not ridged
+    just under it."""
+    bottom = start
+    run = 0.0
+    if not sel.any():
+        return bottom
+    for z0 in np.arange(start - 1.0, float(c[sel, 2].min()) - 1.0, -1.0):
+        s = sel & (c[:, 2] >= z0) & (c[:, 2] < z0 + 1.0)
+        if a[s].sum() <= 0:
+            continue
+        if a[s & rough].sum() >= 0.5 * a[s].sum():
+            bottom, run = z0, 0.0
+        else:
+            run += 1.0
+            if run >= run_mm:
+                break
+    return bottom
+
+
+def _lip(c: np.ndarray, a: np.ndarray, rad: np.ndarray, down: np.ndarray, sel: np.ndarray, start: float,
+         floor: float) -> float:
+    """Where hair standing proud of the skin ends in a sector: when `start` lies on the underside of
+    a lock (0.5 mm slices mostly facing down, stepping in toward the axis by HAIR_LIP_DEPTH or more)
+    or within HAIR_LIP over it, the bottom of that underside, the crease where the lock meets the
+    skin, kept over `floor`; else `start`. An underside that runs on down past HAIR_LIP / 2 under
+    `floor` is not a lock's (a brow, a cheek, the skull over the neck), and leaves `start` too. A
+    line part way down a lock leaves its lower edge in the skin's color."""
+    top = bottom = None
+    for z0 in np.arange(start, floor - HAIR_LIP / 2, -0.5):
+        s = sel & (c[:, 2] >= z0) & (c[:, 2] < z0 + 0.5)
+        A = a[s].sum()
+        if A > 0 and a[s & down].sum() >= 0.5 * A:
+            top = float(rad[s].max()) if top is None else max(top, float(rad[s].max()))
+            bottom = (float(z0), float(rad[s].max()))
+        elif bottom is not None:
+            return max(bottom[0], floor) if top - bottom[1] >= HAIR_LIP_DEPTH else start
+        elif z0 < start - HAIR_LIP:
+            break
+    return start
+
+
 def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | None:
-    """The hairline: a smooth closed curve z(theta) round the head's axis, a Fourier series of
-    HAIR_ORDER fitted with Huber weights to the picture's hair edge (hair_samples), so it sits high
-    at the forehead and low at the back and sides, and blotches under the edge barely move it. Each
-    harmonic k is scaled by (r / R)**k, R the samples' median radius, so off that circle the line
-    is a smooth height over x and y (hair_height). It does not move onto creases: on the Elon
-    sculpt the fringe's crease wanders 0.17 mm from a plane on its own, over WOBBLE. A
-    run of over HAIR_GAP degrees with no sample holds the lowest height the fit reaches over the
-    back half (hair at the back goes down, not up). The hair's color is the crown's; a head whose
-    lower half is mostly that color too (bald, or a hood) has none. None when the head has no
-    neck line or too few samples."""
+    """The hairline: a smooth closed curve round the head's axis, a Fourier series of HAIR_ORDER
+    fitted with Huber weights to a height per HAIR_SECTOR degrees. Each harmonic k is scaled by
+    (r / R)**k, R the samples' median radius, so off that circle the line is a smooth height over
+    x and y (hair_height). It does not move onto creases: on the Elon sculpt the fringe's crease
+    wanders 0.17 mm from a plane on its own, over WOBBLE.
+
+    The heights: within HAIR_FRONT degrees of the face the picture's hair edge (hair_samples), as
+    the face shows where the hair starts. Round the rest, a person's hair: just over the ears at
+    the sides (HAIR_EAR_GAP over their top, held over their width) and down to the nape at the
+    back (HAIR_NAPE over the head's underside), blended between. The sculpt can only take it lower:
+    where the sculpt's ridged hair (head_texture over a level set between the face's skin and the
+    picture's hair) runs on down past that, as long hair over the ears does, the height is the
+    ridged mass's bottom. Smooth sculpt proves nothing: smooth locks are still hair.
+
+    The hair's color is the crown's; a head whose lower half is mostly that color too (bald, or a
+    hood) has none. None when the head has no neck line or the picture too few samples at the
+    face."""
     neck = _line(anat, "neck")
     if neck is None or neck.get("z") is None:
         return None
@@ -1264,31 +1427,149 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
     crown = head & (c[:, 2] > zt - HAIR_CROWN)
     hair = _dominant(labels, a, crown)
     nz = float(np.max(neck["curve"])) if neck.get("curve") is not None else float(neck["z"])
-    lower = head & (c[:, 2] < nz + 0.5 * (zt - nz))
+    zmid = nz + 0.5 * (zt - nz)
+    lower = head & (c[:, 2] < zmid)
     if hair is None or _dominant(labels, a, lower) == hair:
         return None
     th, z, rs = hair_samples(mesh, labels, head, center, hair)
-    order = HAIR_ORDER
-    if len(th) < 2 * order + 3:
+    front = _from_face(np.c_[np.cos(th), np.sin(th)], (0.0, 0.0)) <= HAIR_FRONT
+    th, z, rs = th[front], z[front], rs[front]
+    if len(th) < 3:
         return None
-    R = float(np.median(rs))
-    coef = _huber_fit(th, z, order, rs / R)
-    t = np.sort(th)
-    gaps = np.diff(np.r_[t, t[0] + 2 * np.pi])
-    if gaps.max() > np.radians(HAIR_GAP):
-        back = _fourier(_BINS[_BINS > 0], order) @ coef  # the back is +y: the face looks to -y
-        g = int(gaps.argmax())
-        fill = t[g] + np.arange(np.radians(HAIR_SECTOR), gaps[g], np.radians(HAIR_SECTOR))
-        fill = (fill + np.pi) % (2 * np.pi) - np.pi
-        coef = _huber_fit(np.r_[th, fill], np.r_[z, np.full(len(fill), float(back.min()))], order,
-                          np.r_[rs / R, np.ones(len(fill))])
-    r = float(np.hypot(c[head, 0] - center[0], c[head, 1] - center[1]).max())
+    # the sculpt: ridged hair, with the level between the face's skin and the picture's hair
+    tex = head_texture(mesh, head)
+    phi = _from_face(c, center)
+    skin = head & (phi < 40) & (c[:, 2] < float(np.median(z)))
+    crown_hair = head & (c[:, 2] > zt - 0.2 * (zt - nz)) & (labels == hair)
+    rough = np.zeros(len(head), bool)
+    if skin.any() and crown_hair.any():
+        lo, hi = float(np.percentile(tex[skin], 25)), float(np.median(tex[crown_hair]))
+        # ridged hair at the crown: the level between it and the skin; else, over the skin's by
+        # HAIR_ROUGH_RATIO (a sculpt with a smooth crown can still have a ridged fringe); never under
+        # HAIR_ROUGH_MIN, so on a head smooth all over the crown's curve is not taken for ridges
+        lvl = np.sqrt(lo * hi) if hi > HAIR_ROUGH_RATIO * lo else HAIR_ROUGH_RATIO * lo
+        rough = head & (tex > max(lvl, HAIR_ROUGH_MIN))
+    ears = _ears(mesh, head, tex, center, zmid)
+    by_ear = np.zeros(len(head), bool)  # the ears and 2 mm round them
+    if ears:
+        from scipy.spatial import cKDTree
+
+        ear = np.zeros(len(head), bool)
+        for e in ears:
+            ear |= e["sel"]
+        d, _ = cKDTree(c[ear]).query(c[head], distance_upper_bound=2.0)
+        by_ear[np.nonzero(head)[0][np.isfinite(d)]] = True
+        rough &= ~by_ear
+    down = mesh.face_normals[:, 2] < NECK_DOWN_NZ
+    thf = np.degrees(np.arctan2(c[:, 1] - center[1], c[:, 0] - center[0]))
+    rad = np.hypot(c[:, 0] - center[0], c[:, 1] - center[1])
+    napes = {}
+    for b in range(-180, 180, HAIR_SECTOR):
+        napes[b] = _nape(mesh, head, (thf >= b) & (thf < b + HAIR_SECTOR), zmid)
+    found = [v for v in napes.values() if v is not None]
+    nape_all = float(np.median(found)) if found else nz
+    # nowhere under the nape: the lowest of the head's underside round the back (it never goes
+    # lower at the sides or the face)
+    tm_b = np.radians(np.array(list(napes)) + HAIR_SECTOR / 2)
+    at_back = [v for v, p in zip(napes.values(), _from_face(np.c_[np.cos(tm_b), np.sin(tm_b)], (0.0, 0.0)))
+               if v is not None and p >= 150]
+    nape_low = min(at_back) if at_back else nz
+    ear_lvl = {}
+    for x in (1, -1):
+        side = [e for e in ears if e["x"] == x] or ears
+        if side:
+            ear_lvl[x] = (max(e["top"] for e in side) + HAIR_EAR_GAP, max(e["span"][1] for e in side) + 5.0)
+        else:  # no ears found: the brow's height, a little over halfway up from the neck
+            ear_lvl[x] = (nz + 0.55 * (zt - nz), 110.0)
+    ear_front = {}
+    for x in (1, -1):
+        side = [e for e in ears if e["x"] == x] or ears
+        ear_front[x] = min(e["span"][0] for e in side) if side else 90.0
+    pic_at = {int(round(np.degrees(t) - HAIR_SECTOR / 2)): (float(zz), float(rr)) for t, zz, rr in zip(th, z, rs)}
+
+    def sample(b, zz, sel):
+        near = sel & (np.abs(c[:, 2] - zz) < 0.5)
+        rr = float(np.median(rad[near])) if near.any() else float(np.median(rad[sel])) if sel.any() else float(np.median(rs))
+        return np.radians(b + HAIR_SECTOR / 2), zz, rr
+
+    bins = []
+    for b in range(-180, 180, HAIR_SECTOR):
+        tm = np.radians(b + HAIR_SECTOR / 2)
+        bins.append((b, float(_from_face(np.c_[[np.cos(tm)], [np.sin(tm)]], (0.0, 0.0))[0]),
+                     1 if np.cos(tm) >= 0 else -1, head & (thf >= b) & (thf < b + HAIR_SECTOR)))
+    front = []
+    for b, p, x, sel in bins:  # the face: the picture's edge, or the ridged hair's bottom where lower
+        if p > HAIR_FRONT:
+            continue
+        zz, rr = pic_at.get(b, (None, None))
+        rb = _rough_bottom(c, a, rough, sel, zz if zz is not None else zt, HAIR_RUN_FACE)
+        if zz is None and rb < zt - 1.0 or zz is not None and rb < zz:
+            # never into the brows: HAIR_BROW over the ears' top at the middle of the face, down to
+            # just over them (HAIR_EAR_GAP) at its edge, where a fringe can sweep down to the temple
+            u = float(np.clip((p - 30.0) / (HAIR_FRONT - 30.0), 0.0, 1.0))
+            rb = max(rb, ear_lvl[x][0] + (HAIR_BROW - HAIR_EAR_GAP) * (1.0 - u))
+            if zz is None or rb < zz:
+                zz = rb
+                rr = sample(b, zz, sel)[2]
+        if zz is not None:
+            u = float(np.clip((p - 30.0) / (HAIR_FRONT - 30.0), 0.0, 1.0))
+            zl = _lip(c, a, rad, down, sel & ~by_ear, zz, ear_lvl[x][0] + (HAIR_BROW - HAIR_EAR_GAP) * (1.0 - u))
+            lip = zl < zz
+            if lip:
+                zz = zl
+                rr = sample(b, zz, sel)[2]
+            front.append((np.radians(b + HAIR_SECTOR / 2), zz, rr, p, x, lip))
+    edge = {}
+    for x in (1, -1):  # the face's edge on each side: its samples within 20 degrees of HAIR_FRONT
+        zs = [f[1] for f in front if f[4] == x and f[3] > HAIR_FRONT - 20]
+        edge[x] = float(np.median(zs)) if zs else None
+    t2 = [f[0] for f in front]
+    z2 = [f[1] for f in front]
+    r2 = [f[2] for f in front]
+    ear_bins = []
+    for b, p, x, sel in bins:  # round the rest, a person's hair: over the ears, down to the nape
+        if p <= HAIR_FRONT:
+            continue
+        side, end = ear_lvl[x]
+        start = ear_front[x]
+        if p < start and edge.get(x) is not None:  # the temple: from the face's edge down to over the ear
+            u = float(np.clip((p - HAIR_FRONT) / max(start - HAIR_FRONT, 1.0), 0.0, 1.0))
+            side = edge[x] + (side - edge[x]) * u * u * (3 - 2 * u)
+        back = (napes[b] if napes[b] is not None else nape_all) + HAIR_NAPE
+        w = float(np.clip((p - end) / HAIR_BLEND, 0.0, 1.0))
+        w = w * w * (3 - 2 * w)
+        target = _rough_bottom(c, a, rough, sel, (1 - w) * side + w * back)
+        if w == 0.0:  # at the temples and over the ears a lock that overhangs ends at its crease
+            target = _lip(c, a, rad, down, sel & ~by_ear, target, ear_lvl[x][0])
+        tt, zz, rr = sample(b, target, sel)
+        t2.append(tt)
+        z2.append(zz)
+        r2.append(rr)
+        if w == 0.0 and p >= start and target >= side - 1e-9:
+            ear_bins.append(len(t2) - 1)
+    w2 = np.ones(len(t2))
+    # the face's samples come from the picture: robust there, but for a lock's crease, which is the sculpt's
+    noisy = np.r_[[not f[5] for f in front], np.zeros(len(t2) - len(front), bool)]
+    t2, z2, r2 = np.array(t2), np.array(z2), np.array(r2)
+    order = HAIR_ORDER
+    R = float(np.median(r2))
+    coef = _huber_fit(t2, z2, order, r2 / R, w2, noisy)
+    for _ in range(8):
+        # held over the ears: a sample the fit dips under there counts for more
+        fit = _fourier(t2, order, r2 / R) @ coef
+        low = [i for i in ear_bins if fit[i] < z2[i] - 0.05]
+        if not low:
+            break
+        w2[low] *= 3.0
+        coef = _huber_fit(t2, z2, order, r2 / R, w2, noisy)
+    r = float(rad[head].max())
     line = {"name": "hair", "center": [float(center[0]), float(center[1])], "R": R, "order": order,
-            "coef": [float(v) for v in coef], "zmin": nz + HAIR_NECK, "zmax": zt - 0.5}
+            "coef": [float(v) for v in coef], "zmin": max(nz + HAIR_NECK, nape_low + HAIR_NAPE), "zmax": zt - 0.5}
     curve = hair_height(line, np.c_[center[0] + R * np.cos(_BINS), center[1] + R * np.sin(_BINS), np.zeros(360)])
     return {**line, "z": float(np.median(curve)), "rmax": r + SNAP, "ring": 2 * np.pi * r,
             "curve": [round(float(v), 4) for v in curve],
-            "groove": None, "label": int(hair), "samples": len(th)}
+            "groove": None, "label": int(hair), "samples": len(th), "ears": len(ears),
+            "ridged": bool(rough.any())}
 
 
 def cut_hair(V, F, line: dict):
@@ -1532,12 +1813,19 @@ def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, ana
             d["part"], d["extra"] = "top", True
     head = sorted([d for d in info if zr[d["region"]] == HEAD and not d["base"]], key=lambda d: -d["share"])
     face = None
+    crowned = None
+    if anat.get("hairline") is not None:
+        # the hair is cut along its own line, so the region at the crown is the hair even where it
+        # is most of the head and its picture color is near the skin's
+        crowned = next((d for d in head if d["z1"] >= zt - 1.0), None)
     for d in head:
+        if d is crowned:
+            continue
         if d["rgb"] is not None and np.linalg.norm(_lab(d["rgb"])[0] - skin) < 40 and (region == d["region"]).any():
             face = d
             break
     if face is None and head:
-        face = head[0]
+        face = next((d for d in head if d is not crowned), None)
     if face is not None:
         face["part"] = "face"
     for d in head:

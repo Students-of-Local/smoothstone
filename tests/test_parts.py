@@ -396,11 +396,19 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
 # SPEC3 A: the anatomy of a figure from its shape
 
 
-def block_figure(shoes=False, flare=False):
+GRAIN = 0.03
+
+
+def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False):
     """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
     a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
     the neck between the torso and the head (48 to 52). shoes=True: each leg stands in a shoe
-    (8 x 9, up to z 11) wider than the leg, as the Jensen sculpt's are."""
+    (8 x 9, up to z 11) wider than the leg, as the Jensen sculpt's are. On the head (a finer ball
+    then): cap, a function of the angle round the head giving the height the ridged hair comes
+    down to (24 strands 0.15 mm high); lock, a function of the angle giving the height a smooth
+    lock ends at, standing 1 mm proud of the skin with its underside sloping in over 3 mm
+    (over the head's top where there is none); ears=True, a flat ear on each side, 105 degrees from the face (a disc 3.6 mm
+    across, top at 56.8)."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -425,9 +433,30 @@ def block_figure(shoes=False, flare=False):
         hands.append(h)
     neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
     neck.apply_translation([0, 0, 50])
-    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head = trimesh.creation.icosphere(subdivisions=5 if cap or lock else 4, radius=7)
+    v = np.array(head.vertices)
+    th, z = np.arctan2(v[:, 1], v[:, 0]), v[:, 2] + 58.5
+    out = np.zeros(len(v))
+    if cap is not None:
+        out += 0.15 * np.clip((z - cap(th)) / 0.3, 0.0, 1.0) * np.sin(24 * th)
+    if lock is not None:
+        zb = lock(th)
+        u = np.clip(np.nan_to_num((z - zb) / 3.0, nan=0.0), 0.0, 1.0)
+        t = np.clip((65.0 - z) / 3.0, 0.0, 1.0)  # into the crown again at the top
+        out += 1.0 * u * u * (3 - 2 * u) * t * t * (3 - 2 * t)
+    if cap is not None or lock is not None:  # a sculpt's skin is never smooth: GRAIN mm of grain
+        out += np.random.default_rng(7).normal(0.0, GRAIN, len(v))
+    head = trimesh.Trimesh(v * ((7.0 + out) / 7.0)[:, None], head.faces)
     head.apply_translation([0, 0, 58.5])
-    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    flaps = []
+    if ears:
+        for x in (-6.3, 6.3):
+            e = trimesh.creation.cylinder(radius=1.8, height=1.0, sections=48)
+            e.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0]))
+            e.apply_transform(trimesh.transformations.rotation_matrix(np.radians(15), [0, 0, 1]))
+            e.apply_translation([x * np.cos(np.radians(15)), abs(x) * np.sin(np.radians(15)), 55.0])
+            flaps.append(e)
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head, *flaps], engine="manifold")
     # fine faces, as a sculpted figure has, so lines and pieces are resolved
     v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
     return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
@@ -978,4 +1007,9 @@ def test_the_hair_ends_on_a_smooth_line_fitted_to_the_picture_and_leaves_its_blo
     cross = (hair[adj[:, 0]] != hair[adj[:, 1]]) & head[adj[:, 0]] & head[adj[:, 1]]
     P = mesh.vertices[np.unique(mesh.face_adjacency_edges[cross])]
     off = np.abs(P[:, 2] - _hair_true(np.arctan2(P[:, 1], P[:, 0])))
+    phi = np.degrees(np.abs(np.angle(np.exp(1j * (np.arctan2(P[:, 1], P[:, 0]) + np.pi / 2)))))
+    for lo in range(0, 180, 10):
+        k = (phi >= lo) & (phi < lo + 10)
+        if k.any():
+            print("PHI", lo, round(float(off[k].max()), 2), round(float(np.median(P[k, 2])), 2))
     assert off.max() < 0.4, f"the hair's edge strays {off.max():.2f} mm from the line"
