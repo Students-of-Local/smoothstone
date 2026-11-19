@@ -211,3 +211,18 @@ quadric pass if a sliver is left), and checks run on the shipped STL, including 
 (`clean.slicer_view`: float32 merge, collapsed and zero-area faces, edges not shared by exactly two
 faces). The figure went from 13 bad faces to none, volume within 0.01%. Every image-free recipe still
 passes. Tests: tests/test_clean.py.
+
+## 2026-11-18 blind set 7 sealed, and figures that look like the person
+
+evals/heldout7 holds six figure requests a fresh writer wrote before this tuning (commit 9953437). I have not read them. They run once, after the tool is frozen. Hashes:
+
+```
+649ecb122bd2f76fe3e7ce4ba6bd7fc7e94e50bac651a97796d6d89d8ddfacc0  g1_ash.json
+37326fb93f1e0be8abde98270505ed9fe87aef124907297edab022392fdc0a98  g2_beech.json
+359aa6616e2e9f411e8fb032dfdb210723fa661f5fabfad3a8b1f943f2bc2b84  g3_cedar.json
+ba5902852e15892f02a18333513e7b226e7615baaadab18487f2e6f8c4b0b8c1  g4_hazel.json
+be92ecd7bd9c7d3a74bed345deffc3f4a9b935412058434010d340c78684b535  g5_oak.json
+04e9a2ade3cfd62b421ff1f727e450b6b839a3c24c9cb70a05114319faeb4fa9  g6_yew.json
+```
+
+The owner said the chibi Elon figures "look nothing like elon". A blind Opus likeness judge (evals/judge_likeness.py: a Wikipedia reference image the tool did not pick) scored the chibi 5. With a face crop as the first style picture, a large real head and no LFM3-VL description in the prompt, the same photo scored 9 on two seeds. That look is now the person default (7231dcb). Cold LFM3-1.7B runs, card S, seed 1: Elon 9, Jensen 9, DHH 7 (his hair came out darker than the photo). The Mac's claude is not signed in, so those runs were judged here with evals/rejudge.py. r4_elon_likeness asks 8 for Elon.
