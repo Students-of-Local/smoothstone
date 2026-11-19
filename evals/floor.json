@@ -1,9 +1,21 @@
 {
  "figure/S": {
-  "judge": null,
-  "passing": [],
-  "rate": 0.5,
-  "total": 2
+  "judge": 9.0,
+  "passing": [
+   "f1_jensen",
+   "f2_jensen_colors"
+  ],
+  "rate": 1.0,
+  "total": 5
+ },
+ "regressions/S": {
+  "judge": 9.0,
+  "passing": [
+   "r1_collar_sawtooth",
+   "r2_creality_open_edges"
+  ],
+  "rate": 1.0,
+  "total": 5
  },
  "regressions/next": {
   "judge": 7.0,
