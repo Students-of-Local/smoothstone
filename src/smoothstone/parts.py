@@ -27,6 +27,9 @@ HEM_ABOVE = 0.5  # mm above the last level where the legs are apart: one ring, n
 HEM_FOLD = 0.15  # share of the figure's height above the leg split searched for the top's own hem
 ANKLE_REACH = 0.45  # share of the legs' height (plinth to split) searched for the top of each shoe
 ANKLE_STEP = 1.08  # a leg's section 0.5 mm under a shoe's top is at least this much bigger than 0.5 mm over
+ANKLE_RIM_GAP = 0.2  # mm: an up-facing face starting within this of the shoe's rim so far is still the shoe
+ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the top of the shoe
+ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
 ANKLE_SETTLED = 0.01  # the leg over a shoe holds its section within this share: the shoe's taper ended
 HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
 SNAP = 3.0  # mm: a color boundary this close to a line of the shape moves onto it
@@ -658,7 +661,41 @@ def ankle_line(mesh, anat: dict, a: dict) -> dict:
     found = find_groove(mesh.submesh([np.nonzero(keep)[0]], append=True), line)
     if found.get("curve") is not None and not _ledge_curve(found, a["z"]):
         return found
-    return {**line, "groove": found.get("groove")}
+    line = {**line, "groove": found.get("groove")}
+    rim = shoe_rim(mesh, line, keep)
+    if rim is not None:
+        line = {**line, "curve": [round(float(v), 4) for v in rim], "rim": True}
+    return line
+
+
+def shoe_rim(mesh, line: dict, keep: np.ndarray) -> np.ndarray | None:
+    """The top of a shoe whose rim is not level (a toe box rising to the tongue): 360 heights round
+    the leg's center. At each 10 degrees, from the ankle line up, the up-facing faces that start
+    within ANKLE_RIM_GAP of the rim so far are still the shoe; the first gap ends it, so a fold of
+    the trousers higher up keeps the trousers' color. None when the rim is level with the line."""
+    z0, (cx, cy) = line["z"], line["center"]
+    F = np.asarray(mesh.faces)
+    fz = np.asarray(mesh.vertices, float)[F][:, :, 2]
+    c = mesh.triangles_center
+    r = np.hypot(c[:, 0] - cx, c[:, 1] - cy)
+    sel = keep & (mesh.face_normals[:, 2] > ANKLE_RIM_NZ) & (r < line["rmax"] + 1.0) & \
+        (fz.max(1) > z0) & (fz.min(1) < z0 + ANKLE_RIM_REACH)
+    th = np.degrees(np.arctan2(c[:, 1] - cy, c[:, 0] - cx))
+    tops = np.full(36, z0)
+    for b in range(36):
+        inb = np.nonzero(sel & (th >= b * 10 - 180) & (th < b * 10 - 170))[0]
+        top = z0
+        for i in inb[np.argsort(fz[inb].min(1))]:
+            if fz[i].min() > top + ANKLE_RIM_GAP:
+                break
+            top = max(top, float(fz[i].max()))
+        tops[b] = top
+    if tops.max() - z0 < 0.1:
+        return None
+    deg = np.repeat(tops, 10)  # one value per degree, on _BINS (-180 to 179)
+    # widen each rise by 8 degrees each way and smooth it, never below the rim itself
+    wide = np.max([np.roll(deg, k) for k in range(-8, 9)], axis=0)
+    return np.maximum(_gauss(wide, 3.0), deg) + 0.05
 
 
 def _ledge_curve(line: dict, z: float) -> bool:
@@ -736,7 +773,7 @@ def cut(V, F, anat: dict):
     # no cut runs where the leg's zone ends
     for ln in [x for x in lines if x["name"] == "ankle"]:
         d = field(ln, V)
-        inside = leg_vertices(V, anat, ln["side"]) & (np.abs(V[:, 2] - ln["z"]) < 3.0)
+        inside = leg_vertices(V, anat, ln["side"]) & (V[:, 2] > ln["z"] - 3.0) & (V[:, 2] < ln["z"] + ANKLE_RIM_REACH + 0.5)
         V, F = cut_iso(V, F, np.where(inside, d, np.sign(V[:, 2] - ln["z"])), 0.0, snap=0.02, slope=d)
         V = V.astype(np.float32).astype(float)
     return V, F
