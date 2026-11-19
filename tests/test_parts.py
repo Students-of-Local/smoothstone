@@ -1,5 +1,6 @@
 """Parts of a figure from its shape: grooves, the side a color edge slips to, the ledge check."""
 import numpy as np
+import pytest
 import trimesh
 
 from smoothstone import colors as C
@@ -482,3 +483,87 @@ def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
         side, seen = parts.choose_side(m, ring + [0.0, 0.0, eps], (0.0, 0.0))
         got.add((side, seen[1][0], seen[-1][0]))
     assert len(got) == 1 and next(iter(got))[0] == -1, got
+
+
+def _shoe_figure(kind):
+    """block_figure with other shoes: "seam", a plain shoe (8 x 9, top at 11) with a sole seam 0.75
+    deep and 0.5 tall whose middle is 1.5 mm under its top; "low", a plain shoe only 2 mm tall;
+    "sloped", a shoe whose top rises from 10.4 at the heel to 11.6 at the toe."""
+    def box(ext, at):
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        return b
+
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    for x in (-5, 5):
+        if kind == "seam":
+            legs += [box([8, 9, 1.25], [x, 1, 8.625]), box([6.5, 7.5, 0.5], [x, 1, 9.5]), box([8, 9, 1.25], [x, 1, 10.375])]
+        elif kind == "low":
+            legs += [box([8, 9, 2.0], [x, 1, 9.0])]
+        else:
+            pts = [[x + sx * 4, y, z] for sx in (-1, 1) for y, z in ((-3.5, 8), (5.5, 8), (-3.5, 10.4), (5.5, 11.6))]
+            legs.append(trimesh.convex.convex_hull(np.array(pts)))
+    torso = box([22, 12, 20], [0, 0, 38])
+    arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
+    hands = []
+    for x in (-14.5, 14.5):
+        h = trimesh.creation.icosphere(subdivisions=4, radius=2.5)
+        h.apply_translation([x, 0, 32.5])
+        hands.append(h)
+    neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+@pytest.mark.parametrize("kind,top", [("seam", 11.0), ("low", 10.0)])
+def test_a_sole_seam_or_a_low_shoe_keeps_the_shoe_line_at_the_shoes_top(kind, top):
+    """Review of #14: the crease search under the step must not settle on a sole seam, or on the
+    plinth's corner under a low shoe, and leave the shoe's upper the pants' color."""
+    m = _shoe_figure(kind)
+    a = parts.anatomy(m, 8.0)
+    for ln in [x for x in a["lines"] if x["name"] == "ankle"]:
+        assert ln["curve"] is not None and abs(np.median(ln["curve"]) - top) < 0.3, (ln["z"], ln["curve"][:3])
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    upper = ~base & (c[:, 2] > top - 1.2) & (c[:, 2] < top - 0.1) & (np.abs(np.abs(c[:, 0]) - 5) < 4.5)
+    assert upper.any() and (zone[upper] == parts.SHOES).all()
+
+
+def test_a_shoe_rim_line_is_its_own_course_and_its_edge_follows_the_shape(monkeypatch):
+    """Review of #14: with no groove at a sloped shoe's top, the line follows the rim. It must not
+    keep the groove dict of the search it rejected, and a color edge along the rim follows the
+    shape, so the wobble limit for flat cuts does not apply to it."""
+    real = parts.find_groove
+
+    def no_ankle_groove(mesh, ln, only=None):
+        if ln["name"] == "ankle":
+            return {**ln, "curve": None, "groove": {"cost": 0.1, "length": 30.0, "used": True}}
+        return real(mesh, ln, only)
+
+    monkeypatch.setattr(parts, "find_groove", no_ankle_groove)
+    m = _shoe_figure("sloped")
+    a = parts.anatomy(m, 8.0)
+    rims = [x for x in a["lines"] if x["name"] == "ankle"]
+    assert len(rims) == 2
+    for ln in rims:
+        assert ln.get("rim") and ln["groove"] is None, ln.get("groove")
+        cv = np.asarray(ln["curve"])
+        assert cv.max() - cv.min() > 0.2  # it rises toward the toe
+        # a color edge laid along the rim, just inside the shoe's outline
+        th = np.radians(np.arange(-180, 180, 5))
+        cx, cy = ln["center"]
+        r = max(ln["rmax"] - 1.5, 1.0)
+        pts = np.c_[cx + r * np.cos(th), cy + r * np.sin(th), cv[np.arange(-180, 180, 5) + 180]]
+        edge = [{"pts": pts, "wobble": 1.0, "ratio": 1.0}]
+        C.mark_grooves(edge, a["lines"])
+        assert edge[0].get("groove") == "ankle"
+        assert C.edge_faults(edge) == []

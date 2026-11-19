@@ -903,11 +903,12 @@ ON_GROOVE = 0.1  # mm: a color edge this close to a groove line (most of its len
 
 def mark_grooves(lines: list[dict], anatomy: list[dict]) -> None:
     """Set ln["groove"] to the anatomy line's name on each color edge that runs in a sculpted groove
-    (parts.find_groove): 80% of its points within ON_GROOVE mm of the groove line. Such an edge
-    follows the shape, so it is not flat like a plane and the wobble limit does not apply to it."""
+    (parts.find_groove) or along a shoe's rim (parts.shoe_rim): 80% of its points within ON_GROOVE mm
+    of that line. Such an edge follows the shape, so it is not flat like a plane and the wobble limit
+    does not apply to it."""
     from . import parts
 
-    grooves = [g for g in anatomy or [] if (g.get("groove") or {}).get("used")]
+    grooves = [g for g in anatomy or [] if (g.get("groove") or {}).get("used") or g.get("rim")]
     for ln in lines:
         p = ln["pts"]
         for g in grooves:

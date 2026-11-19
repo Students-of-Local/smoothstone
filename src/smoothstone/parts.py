@@ -680,7 +680,8 @@ def ankle_line(mesh, anat: dict, a: dict) -> dict:
     line = {**line, "groove": found.get("groove")}
     rim = shoe_rim(mesh, line, keep)
     if rim is not None:
-        line = {**line, "curve": [round(float(v), 4) for v in rim], "rim": True}
+        # the rim is its own course, not the groove the search rejected
+        line = {**line, "curve": [round(float(v), 4) for v in rim], "rim": True, "groove": None}
     return line
 
 
