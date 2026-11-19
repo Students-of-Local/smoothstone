@@ -459,6 +459,7 @@ def test_make_series_checks_the_clip_against_the_window_for_its_count(tmp_path, 
         return {}, []
 
     monkeypatch.setattr(video, "paint_npz", lambda job_root, out: {"filaments": []})
+    monkeypatch.setattr(video, "painted_design", lambda style, npz, top, out: style)  # no mesh.npz written
     monkeypatch.setattr(video, "turntable", lambda mesh, d, turn, log=None, size=None: _frames(turn, (40, 60)))
     monkeypatch.setattr(video, "soundtrack", lambda *a, **k: None)
     monkeypatch.setattr(video, "encode", lambda *a, **k: None)
@@ -467,3 +468,71 @@ def test_make_series_checks_the_clip_against_the_window_for_its_count(tmp_path, 
     rep = video.make_series(items, tmp_path / "out", turn=video.SERIES_TURN)
     assert seen["window"] == video.series_window(n)
     assert rep["faults"] == []
+
+
+def _painted_blocks(tmp_path):
+    """A block figure on a plinth as stone video reads a painted 3MF (mesh.npz): plinth z 0 to 8 and
+    a head z 36 to 48 in the rest color (white, filament 1), legs z 8 to 20 painted blue
+    (filament 3), a torso z 20 to 36 black (filament 2); and its drawing, 200 x 400, where the legs
+    and the torso are both drawn black and the head is skin."""
+    import trimesh
+
+    parts = [([30, 30, 8], [0, 0, 4], 1), ([8, 6, 12], [0, 0, 14], 3), ([12, 8, 16], [0, 0, 28], 2),
+             ([10, 8, 12], [0, 0, 42], 1)]
+    Vs, Fs, fil, off = [], [], [], 0
+    for ext, at, k in parts:
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        Vs.append(b.vertices)
+        Fs.append(b.faces + off)
+        fil += [k] * len(b.faces)
+        off += len(b.vertices)
+    npz = tmp_path / "mesh.npz"
+    np.savez(npz, V=np.vstack(Vs), F=np.vstack(Fs), fil=np.array(fil, np.int32),
+             rgb=np.array([[240, 240, 240], [25, 25, 28], [40, 80, 200]], np.uint8), rest=np.int32(1))
+    img = np.full((400, 200, 3), 255, np.uint8)
+    img[300:380, 70:130] = (20, 20, 22)  # legs, drawn black
+    img[190:300, 55:145] = (20, 20, 22)  # torso
+    img[110:190, 65:135] = (225, 180, 150)  # head
+    style = tmp_path / "style.png"
+    Image.fromarray(img).save(style)
+    return npz, style
+
+
+def test_the_design_card_shows_each_painted_part_in_its_filament_color(tmp_path):
+    """Judge of the Jensen clip: the design card showed black pants on a figure printed with blue
+    ones, because the card was the drawing as the model drew it. The drawing must show each part
+    painted off the rest color in that part's filament color, and leave the rest as drawn."""
+    npz, style = _painted_blocks(tmp_path)
+    out = video.painted_design(style, npz, 8.0, tmp_path / "design.png")
+    assert out == tmp_path / "design.png"
+    a = np.asarray(Image.open(out).convert("RGB")).astype(int)
+    legs, torso, head = a[330:370, 85:115].reshape(-1, 3), a[220:280, 75:125].reshape(-1, 3), a[130:170, 80:120].reshape(-1, 3)
+    assert (legs[:, 2] > legs[:, 0] + 100).mean() > 0.9, legs.mean(0)  # blue, as printed
+    assert legs.mean(0)[2] > 150
+    assert torso.mean() < 60, torso.mean(0)  # still black
+    assert np.abs(head - [225, 180, 150]).max() == 0  # the rest is left as drawn
+    assert (a[:100] == 255).all()  # and so is the backdrop
+
+
+def test_stone_video_puts_the_painted_design_on_the_design_card(tmp_path, monkeypatch):
+    npz, style = _painted_blocks(tmp_path)
+    plan = video.Plan("A figure", "LFM3", "", [], None, ("stone build", []), [], "legs blue", [], style)
+    monkeypatch.setattr(video, "make_plan", lambda job_root, log: plan)
+    monkeypatch.setattr(video, "paint_npz", lambda job_root, out: (shutil.copy(npz, out), {"filaments": []})[1])
+    monkeypatch.setattr(video, "plinth_top", lambda job_root: 8.0)
+    monkeypatch.setattr(video, "turntable", lambda *a, **k: [])
+    seen = {}
+
+    def stop(p, frames, filaments=()):
+        seen["style"] = p.style
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(video, "compose", stop)
+    log = tmp_path / "log.json"
+    log.write_text("{}")
+    with pytest.raises(RuntimeError, match="stop"):
+        video.make(tmp_path, log, tmp_path / "out")
+    assert seen["style"] == tmp_path / "out" / "design.png"
+    a = np.asarray(Image.open(seen["style"]).convert("RGB")).astype(int)
+    assert a[350, 100, 2] > a[350, 100, 0] + 100
