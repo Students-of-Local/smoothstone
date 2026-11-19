@@ -12,7 +12,9 @@ reference, and with none there is no verdict: a render compared with its own sou
 copying, not likeness. A lead image can also be old or miss the subject (DHH's is him in a racing
 suit), so up to two more photos named for the subject, from the article and a Commons search,
 newest first by the year in the file name, go with it; the judge leaves out any that do not show
-the subject, goes by the newest where they differ, and with none usable there is no verdict.
+the subject, goes by the newest where they differ, and with none usable there is no verdict. For a
+subject whose free photos the tool used up (DHH's portraits on Commons are all its own), photos
+picked by hand outside the tool go first (likeness_refs.json).
 Both run as `claude -p` on Donovan's sign-in (ANTHROPIC_API_KEY unset). The verdict is {"score": 1-10, "conflicts": [...],
 "reference": {...}}, saved as likeness.json next to the run; a score under PASS fails it.
 """
@@ -129,6 +131,18 @@ def tool_photos(job: Path) -> set[str]:
 
 COMMONS = "https://commons.wikimedia.org/w/api.php"
 REFERENCES = 3
+REFS_FILE = Path(__file__).with_name("likeness_refs.json")
+
+
+def picked_by_hand(title: str) -> list[dict]:
+    """Photos of a subject picked outside the tool, for one whose free photos the tool used up
+    (likeness_refs.json: {article title: [{"url", "source"}]}), as [{"file", "url", "source"}]."""
+    try:
+        refs = json.loads(REFS_FILE.read_text())
+    except (OSError, ValueError):
+        return []
+    return [{"file": _file_key(r["url"]), "url": r["url"], "source": r.get("source", "")}
+            for r in refs.get(title) or [] if r.get("url")]
 
 
 NOISE = {"cropped", "crop", "jpg", "jpeg", "png", "file", "image", "photo", "the", "and", "with", "from"}
@@ -222,8 +236,10 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
     avoid = tool_photos(job)
     lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1]).replace("_", " ")
     lead_is_tools = _file_key(ref["url"]) in avoid  # Wikidata's photo, which the tool put first
-    others = other_references(ref, avoid | {_file_key(ref["url"])}, REFERENCES - (0 if lead_is_tools else 1))
-    photos = ([] if lead_is_tools else [{"file": lead, "url": ref["url"]}]) + others
+    hand = picked_by_hand(ref["title"])
+    room = REFERENCES - len(hand) - (0 if lead_is_tools else 1)
+    others = other_references(ref, avoid | {_file_key(ref["url"])}, room) if room > 0 else []
+    photos = hand + ([] if lead_is_tools else [{"file": lead, "url": ref["url"]}]) + others
     if not photos:
         raise JudgeProblem(f"no photo of {title!r} apart from the ones the tool styled from")
     if lead_is_tools:
@@ -237,7 +253,8 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
             for k, ph in enumerate(ref["photos"], 1):
                 name = t / f"reference_{k}.jpg"
                 name.write_bytes(_get(ph["url"]))
-                lines.append(f"  {name}: a photo of the request's subject from Wikimedia Commons, file \"{ph['file']}\".")
+                where = ph.get("source") or "Wikimedia Commons"
+                lines.append(f"  {name}: a photo of the request's subject from {where}, file \"{ph['file']}\".")
             refs, several = "\n".join(lines), SEVERAL if len(lines) > 1 else ""
         else:
             ext = Path(urllib.parse.urlparse(ref["url"]).path).suffix.lower() or ".jpg"
