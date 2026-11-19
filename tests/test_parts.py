@@ -108,6 +108,39 @@ def test_ledge_check_fails_a_plane_cut_through_the_collar_and_passes_the_groove(
     assert worst < C.JAGGED
 
 
+def test_a_sleeve_sloping_in_past_its_cuff_rim_is_not_a_ledge_of_the_hand():
+    """Eval (DHH): the cuff's color edge ran in the groove under the sleeve's rim, yet the ledge
+    check failed it (0.34 mm2 at 45 degrees): above the rim the arm bends toward the body, so the
+    sleeve's own outside faces up there, and every up-facing sleeve face within 2 mm counted as
+    the sleeve's color climbing onto a ledge. The rim's underside and lip stand between them and
+    the edge; only faces the edge runs onto are a ledge. Here a hand (radius 2.5) under a sleeve
+    rim that overhangs it by 1.5 mm at z 10, with a 0.5 mm upright lip, and the sleeve's outside
+    sloping in at 45 degrees from z 10.5 to 12."""
+    m = _lathe([(0, 0), (2.5, 0), (2.5, 10), (4, 10), (4, 10.5), (2.5, 12), (2.5, 16), (0, 16)])
+    cuff = {**_line("wrist", 10.0, 2.5), "side": 1, "curve": None}
+    V, F, lab = _paint(m, cuff)
+    found = C.ledges(V, F, lab, [cuff])
+    assert not C.ledge_faults(found), found
+
+
+def test_a_neck_with_no_groove_ends_at_the_top_of_the_shoulders_slope():
+    """Eval (Elon): the neck's line was a level plane (the groove search found none), and at the
+    sides the shoulders slope on up past it to where the neck stands up, so the head's color lay
+    on 1.64 mm2 of that up-facing slope next to the edge. With no groove, the line runs along the
+    top of the slope, as a shoe's rim does. Here shoulders (radius 8, top at z 5) slope in at 45
+    degrees and round off into an upright neck (radius 4) at z 8.4 to 9.8; the neck's level is
+    halfway up the slope, at z 7."""
+    prof = [(0, 0), (8, 0), (8, 5)] + _arc((6.0, 9.828), 2.0, 225, 180) + [(4, 13), (0, 13)]
+    m = _lathe(prof)
+    anat = {"top": 0.0, "height": 13.0, "center": 0.0, "hem": None, "neck": 7.0, "wrists": [], "ankles": []}
+    neck = next(ln for ln in parts.find_lines(m, anat) if ln["name"] == "neck")
+    assert not (neck.get("groove") or {}).get("used"), neck.get("groove")
+    V, F, lab = _paint(m, neck)
+    found = C.ledges(V, F, lab, [neck])
+    assert not C.ledge_faults(found), found
+    assert neck.get("rim") and 8.4 < float(np.median(neck["curve"])) < 9.9, neck
+
+
 def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it():
     """r3 (Donovan, 2026-11-18, black shoes under blue pants): a wrinkle of the trousers 1 mm over
     the shoe faces up and is blue, with blue trouser wall between it and the shoe's edge. The ledge
@@ -784,3 +817,72 @@ def test_a_shoe_rim_line_is_its_own_course_and_its_edge_follows_the_shape(monkey
         C.mark_grooves(edge, a["lines"])
         assert edge[0].get("groove") == "ankle"
         assert C.edge_faults(edge) == []
+
+
+def _hair_true(th):
+    """The fixture's hairline round the head's axis: high at the front (-y), low at the back, and
+    lower again over the ears (+-x)."""
+    return 59.5 - 1.5 * np.sin(th) - 0.6 * np.cos(2 * th)
+
+
+def _hair_picture(c):
+    """The fake picture's colors at points c on the block figure: brown hair above _hair_true with
+    the bleed a picture has under it (an ear blotch on each side joined to the hair by a thin
+    streak, and a loose blotch on the forehead), skin on the rest of the head and the hands, a
+    black jacket and blue jeans."""
+    th = np.arctan2(c[:, 1], c[:, 0])
+    z = c[:, 2]
+    zl = _hair_true(th)
+    out = np.where((z < 28.0)[:, None], [[40, 50, 120]], [[25, 25, 28]]).astype(float)
+    skin = (z > 50.0) | ((np.abs(c[:, 0]) > 12.0) & (z < 36.0))
+    out[skin] = [225, 180, 150]
+    head = z > 50.0
+    hair = head & (z > zl)
+    for t in (0.0, np.pi):  # the ear blotches and their streaks
+        d = np.abs(np.angle(np.exp(1j * (th - t))))
+        zc = _hair_true(np.array([t]))[0] - 3.0
+        hair |= head & (np.hypot(d * 7.0, z - zc) < 1.5)
+        hair |= head & (d * 7.0 < 0.5) & (z > zc) & (z <= zl)
+    d = np.abs(np.angle(np.exp(1j * (th + np.pi / 2))))
+    hair |= head & (np.hypot(d * 7.0, z - (_hair_true(np.array([-np.pi / 2]))[0] - 2.5)) < 1.0)
+    out[hair] = [95, 60, 30]
+    return out, hair, head & (z < zl - 0.6) & hair
+
+
+def test_the_hair_ends_on_a_smooth_line_fitted_to_the_picture_and_leaves_its_blotches(monkeypatch, tmp_path):
+    """Eval (Elon, DHH): the hair's edge came straight from the picture, so it was ragged (wobble
+    0.40 and 0.43 mm, over 0.15) and every blotch the picture left on the ears and the face that
+    touched the hair was painted brown. The hair must end on one smooth line round the head,
+    fitted to the picture's edge with the blotches and streaks under it left out, and nothing under
+    that line is hair."""
+    from smoothstone import paint
+
+    m = block_figure()
+    top_z, H = 65.5, 65.5 - 8.0
+
+    def fake(sub, front, back, atlas):
+        # undo the scaling to unit height: the figure's top vertex is the head's top at (0, 0, 65.5)
+        V = np.asarray(sub.vertices, float)
+        t = V[V[:, 2].argmax()]
+        c = (sub.triangles_center - t) * H + np.array([0.0, 0.0, top_z])
+        return _hair_picture(c)[0]
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    res = C.find_regions(m, "figure", {"base": "round", "name": ""}, tmp_path / "front.png", None,
+                         tmp_path / "atlas.png")
+    mesh, num, info = res["mesh"], res["num"], res["regions"]
+    hair_n = [d["n"] for d in info if d["part"] == "hair"]
+    assert len(hair_n) == 1, [(d["n"], d["part"]) for d in info]
+    hair = num == hair_n[0]
+    c = mesh.triangles_center
+    _, _, blotch = _hair_picture(c)
+    assert blotch.any()
+    assert not (hair & blotch).any(), f"{int((hair & blotch).sum())} blotch faces are hair"
+    # the hair's edge: corners shared by hair and other head faces lie on the true line
+    head = c[:, 2] > 50.0
+    adj = mesh.face_adjacency
+    cross = (hair[adj[:, 0]] != hair[adj[:, 1]]) & head[adj[:, 0]] & head[adj[:, 1]]
+    P = mesh.vertices[np.unique(mesh.face_adjacency_edges[cross])]
+    off = np.abs(P[:, 2] - _hair_true(np.arctan2(P[:, 1], P[:, 0])))
+    assert off.max() < 0.4, f"the hair's edge strays {off.max():.2f} mm from the line"
