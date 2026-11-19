@@ -20,11 +20,19 @@ import re
 
 import numpy as np
 
-BASE, LEGS, TORSO, HANDS, HEAD = range(5)
-ZONES = ("base", "legs", "torso", "hands", "head")
+BASE, LEGS, TORSO, HANDS, HEAD, SHOES = range(6)
+ZONES = ("base", "legs", "torso", "hands", "head", "shoes")
 PIECE_MIN = 0.0005  # share of the figure's surface: a smaller loose piece is noise, not a hand
 HEM_ABOVE = 0.5  # mm above the last level where the legs are apart: one ring, not two
 HEM_FOLD = 0.15  # share of the figure's height above the leg split searched for the top's own hem
+ANKLE_REACH = 0.45  # share of the legs' height (plinth to split) searched for the top of each shoe
+ANKLE_STEP = 1.08  # a leg's section 0.5 mm under a shoe's top is at least this much bigger than 0.5 mm over
+ANKLE_CREASE_BELOW = 1.0  # mm under the steepest step: the middle of the band searched for the hem's crease
+ANKLE_CREASE_BAND = 1.5  # mm each side of it
+ANKLE_RIM_GAP = 0.2  # mm: an up-facing face starting within this of the shoe's rim so far is still the shoe
+ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the top of the shoe
+ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
+ANKLE_SETTLED = 0.01  # the leg over a shoe holds its section within this share: the shoe's taper ended
 HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
 SNAP = 3.0  # mm: a color boundary this close to a line of the shape moves onto it
 BAND = 2.0  # mm each side of a line that keeps its color through the edge smoothing
@@ -161,7 +169,7 @@ def anatomy(mesh, top: float) -> dict:
     fig = _figure_faces(mesh, top)
     zt = float(mesh.vertices[:, 2].max())
     H = zt - top
-    res = {"top": float(top), "height": zt, "hem": None, "neck": None, "wrists": [],
+    res = {"top": float(top), "height": zt, "hem": None, "neck": None, "wrists": [], "ankles": [],
            "center": float((mesh.bounds[0, 0] + mesh.bounds[1, 0]) / 2)}
     if not fig.any() or H <= 5:
         return res
@@ -177,6 +185,11 @@ def anatomy(mesh, top: float) -> dict:
     res["hem"] = hem
     if fold is not None:
         res["hem_fold"] = True
+    if split is not None:
+        for side in (-1, 1):
+            a = ankle(mesh, top, split, res["center"], side)
+            if a is not None:
+                res["ankles"].append({"z": a[0], "steep": a[1], "side": side})
 
     # the neck: the deepest valley of the section area between the torso and the head
     lo = hem if hem is not None else top + 0.25 * H
@@ -530,6 +543,48 @@ def hem_fold(mesh, lo: float, hi: float, legs_apart=None) -> float | None:
     return None
 
 
+def _leg_ring(mesh, z: float, x0: float, side: int):
+    """The largest ring of the section at z on one side of the mirror plane: that leg, or None."""
+    rings = [p for p in _rings(mesh, z) if (p[:, 0].mean() - x0) * side > 0]
+    return max(rings, key=_ring_area) if rings else None
+
+
+def ankle(mesh, top: float, split: float, x0: float, side: int) -> tuple[float, float] | None:
+    """The z of the top of a shoe on one leg: in the lowest ANKLE_REACH of the legs, the height
+    where the leg's section steps in the most going up (the shoe wider than the leg over it), when
+    the section 0.5 mm under it is at least ANKLE_STEP times the one 0.5 mm over it, raised to where
+    that taper ends. Returns (that height, the steepest step's) or None: a leg that narrows evenly to
+    the plinth has no shoe line. The step can be a trouser hem flaring over the shoe; ankle_line
+    looks for the crease under it first."""
+    def area(z):
+        p = _leg_ring(mesh, z, x0, side)
+        return _ring_area(p) if p is not None else None
+
+    best, at = ANKLE_STEP, None
+    for z in np.arange(top + 1.0, top + ANKLE_REACH * (split - top), 0.25):
+        a, b = area(z - 0.5), area(z + 0.5)
+        if a is not None and b:
+            if a / b >= best:
+                best, at = a / b, float(z)
+    if at is None:
+        return None
+    # the shoe's top is where its taper ends: the first height over the steepest step where the
+    # section holds within ANKLE_SETTLED over the next 0.3 mm
+    for z in np.arange(at, at + 1.0, 0.05):
+        a, b = area(z), area(z + 0.3)
+        if a and b and abs(a - b) / a < ANKLE_SETTLED:
+            return round(float(z), 3), at
+    return at, at
+
+
+def leg_vertices(V: np.ndarray, anat: dict, side: int) -> np.ndarray:
+    """The vertices of one leg, from the plinth's top (its sole's own corners included) to the hem:
+    the side of the mirror plane, and low. Plinth faces in it are the base zone all the same."""
+    V = np.asarray(V, float)
+    hi = anat.get("hem") if anat.get("hem") is not None else anat["top"] + 0.5 * (anat["height"] - anat["top"])
+    return ((V[:, 0] - anat["center"]) * side > 0) & (V[:, 2] >= anat["top"] - 1e-6) & (V[:, 2] < hi)
+
+
 def find_lines(mesh, anat: dict) -> list[dict]:
     """The hem, the neck and each wrist as lines: {"name", "z", "center", "rmax", "ring"}, each on
     its groove when one is near (find_groove)."""
@@ -577,6 +632,7 @@ def find_lines(mesh, anat: dict) -> list[dict]:
             line.update(center=[float(ctr[0]), float(ctr[1])], rmax=r + SNAP, ring=2 * np.pi * r * 0.8)
             seeds[id(line)] = sel
         out.append(line)
+    ankles = [ankle_line(mesh, anat, a) for a in anat.get("ankles", [])]
     res = []
     for ln in out:
         if all(abs(ln["z"] - o["z"]) > 0.2 or (ln["name"], ln.get("side")) != (o["name"], o.get("side")) for o in res):
@@ -589,7 +645,80 @@ def find_lines(mesh, anat: dict) -> list[dict]:
                 def only(cand, seed=seed, wz=ln["z"]):
                     return _hand_mask(mesh, seed, cand, wz, fig)
             res.append(find_groove(mesh, ln, only))
-    return res
+    return res + ankles
+
+
+def ankle_line(mesh, anat: dict, a: dict) -> dict:
+    """The top of one shoe as a line, on its groove when one runs round that leg within 1 mm. The
+    groove is searched on that leg's own faces, so the loop cannot cross to the other leg."""
+    line = {"name": "ankle", "side": a["side"], "z": a["z"], "center": [anat["center"] + a["side"], 0.0],
+            "rmax": 0.0, "ring": 0.0, "band": 1.0, "curve": None, "groove": None}
+    p = _leg_ring(mesh, a["z"], anat["center"], a["side"])
+    if p is None:
+        return line
+    ctr = p.mean(0)
+    line.update(center=[float(ctr[0]), float(ctr[1])], rmax=float(np.linalg.norm(p - ctr, axis=1).max()) + 1.0,
+                ring=float(np.linalg.norm(np.diff(np.vstack([p, p[:1]]), axis=0), axis=1).sum()))
+    keep = leg_vertices(mesh.vertices, anat, a["side"])[np.asarray(mesh.faces)].all(1)
+    if not keep.any():
+        return line
+    leg = mesh.submesh([np.nonzero(keep)[0]], append=True)
+    # the crease where a trouser hem meets the shoe, under the hem's flare (the steepest step)
+    zc = a.get("steep", a["z"]) - ANKLE_CREASE_BELOW
+    near = {**line, "z": zc, "band": ANKLE_CREASE_BAND}
+    q = _leg_ring(mesh, zc, anat["center"], a["side"])  # the crease is as wide as the flare's foot
+    if q is not None:
+        qc = q.mean(0)
+        near.update(center=[float(qc[0]), float(qc[1])], rmax=float(np.linalg.norm(q - qc, axis=1).max()) + 1.0,
+                    ring=float(np.linalg.norm(np.diff(np.vstack([q, q[:1]]), axis=0), axis=1).sum()))
+    crease = find_groove(leg, near)
+    if crease.get("curve") is not None and not _ledge_curve(crease, zc):
+        return crease
+    found = find_groove(leg, line)
+    if found.get("curve") is not None and not _ledge_curve(found, a["z"]):
+        return found
+    line = {**line, "groove": found.get("groove")}
+    rim = shoe_rim(mesh, line, keep)
+    if rim is not None:
+        # the rim is its own course, not the groove the search rejected
+        line = {**line, "curve": [round(float(v), 4) for v in rim], "rim": True, "groove": None}
+    return line
+
+
+def shoe_rim(mesh, line: dict, keep: np.ndarray) -> np.ndarray | None:
+    """The top of a shoe whose rim is not level (a toe box rising to the tongue): 360 heights round
+    the leg's center. At each 10 degrees, from the ankle line up, the up-facing faces that start
+    within ANKLE_RIM_GAP of the rim so far are still the shoe; the first gap ends it, so a fold of
+    the trousers higher up keeps the trousers' color. None when the rim is level with the line."""
+    z0, (cx, cy) = line["z"], line["center"]
+    F = np.asarray(mesh.faces)
+    fz = np.asarray(mesh.vertices, float)[F][:, :, 2]
+    c = mesh.triangles_center
+    r = np.hypot(c[:, 0] - cx, c[:, 1] - cy)
+    sel = keep & (mesh.face_normals[:, 2] > ANKLE_RIM_NZ) & (r < line["rmax"] + 1.0) & \
+        (fz.max(1) > z0) & (fz.min(1) < z0 + ANKLE_RIM_REACH)
+    th = np.degrees(np.arctan2(c[:, 1] - cy, c[:, 0] - cx))
+    tops = np.full(36, z0)
+    for b in range(36):
+        inb = np.nonzero(sel & (th >= b * 10 - 180) & (th < b * 10 - 170))[0]
+        top = z0
+        for i in inb[np.argsort(fz[inb].min(1))]:
+            if fz[i].min() > top + ANKLE_RIM_GAP:
+                break
+            top = max(top, float(fz[i].max()))
+        tops[b] = top
+    if tops.max() - z0 < 0.1:
+        return None
+    deg = np.repeat(tops, 10)  # one value per degree, on _BINS (-180 to 179)
+    # widen each rise by 8 degrees each way and smooth it, never below the rim itself
+    wide = np.max([np.roll(deg, k) for k in range(-8, 9)], axis=0)
+    return np.maximum(_gauss(wide, 3.0), deg) + 0.05
+
+
+def _ledge_curve(line: dict, z: float) -> bool:
+    """A groove curve that strays more than 2 mm from the step it was found for: not the shoe's top."""
+    cv = np.asarray(line["curve"], float)
+    return bool(np.abs(cv - z).max() > 2.0)
 
 
 def _line(anat: dict, name: str, side: int | None = None) -> dict | None:
@@ -619,6 +748,8 @@ def all_lines(anat: dict) -> list[dict]:
             out.append({"name": name, "z": anat[name], "curve": None})
     for w in anat.get("wrists", []):
         out.append({"name": "wrist", "side": w["side"], "z": w["z"], "curve": None})
+    for a in anat.get("ankles", []):
+        out.append({"name": "ankle", "side": a["side"], "z": a["z"], "curve": None})
     return out
 
 
@@ -632,7 +763,7 @@ def cut(V, F, anat: dict):
     lines = all_lines(anat)
     for ln in lines:
         curved = ln.get("curve") is not None
-        if ln["name"] == "wrist" and curved:
+        if (ln["name"] == "wrist" and curved) or ln["name"] == "ankle":
             continue
         if not curved:
             if any(abs(ln["z"] - z) <= 0.2 for z in done):
@@ -654,6 +785,13 @@ def cut(V, F, anat: dict):
             continue
         vr = _with_ring(F, hf, len(V))[0]
         V, F = cut_masked(V, F, field(ln, V), vr)
+        V = V.astype(np.float32).astype(float)
+    # a shoe line cuts only its own leg; every other vertex keeps the side of the line's level, so
+    # no cut runs where the leg's zone ends
+    for ln in [x for x in lines if x["name"] == "ankle"]:
+        d = field(ln, V)
+        inside = leg_vertices(V, anat, ln["side"]) & (V[:, 2] > ln["z"] - 3.0) & (V[:, 2] < ln["z"] + ANKLE_RIM_REACH + 0.5)
+        V, F = cut_iso(V, F, np.where(inside, d, np.sign(V[:, 2] - ln["z"])), 0.0, snap=0.02, slope=d)
         V = V.astype(np.float32).astype(float)
     return V, F
 
@@ -729,6 +867,10 @@ def zones(mesh, anat: dict, base: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         zone[side_of(mesh, hem) < 0] = LEGS
     if neck is not None:
         zone[side_of(mesh, neck) > 0] = HEAD
+    for a in [x for x in all_lines(anat) if x["name"] == "ankle"]:
+        # the legs are apart this low, so the side of a face's center is its leg
+        own = (c[:, 0] - anat["center"]) * a["side"] > 0
+        zone[own & (zone == LEGS) & (side_of(mesh, a) < 0)] = SHOES
     hand = np.full(len(mesh.faces), -1, int)
     for i, m in enumerate(hands(mesh, anat)):
         zone[m] = HANDS
@@ -760,6 +902,10 @@ def snap(mesh, labels: np.ndarray, zone: np.ndarray, hand: np.ndarray, anat: dic
     if neck is not None:
         d = field(neck, c)
         lines.append((d, (zone == TORSO) & (d > -SNAP), (zone == HEAD) & (d < SNAP)))
+    for a in [x for x in all_lines(anat) if x["name"] == "ankle"]:
+        d = field(a, c)
+        own = (c[:, 0] - anat["center"]) * a["side"] > 0
+        lines.append((d, own & (zone == SHOES) & (d > -SNAP), own & (zone == LEGS) & (d < SNAP)))
     wl = _wrist_lines(anat)
     for i in range(int(hand.max()) + 1 if len(hand) else 0):
         hm = hand == i
@@ -971,6 +1117,8 @@ def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, ana
     for d in info:
         if zr[d["region"]] == HANDS:
             d["part"] = "hands"
+        elif zr[d["region"]] == SHOES and not d["base"]:
+            d["part"] = "shoes"
     skin = _lab([NAMES["skin"]])[0]
     # the garment between hem and neck, body and arms: every region of it, not just the largest, so
     # sleeves of another shade are the jacket too. Skin there is bare arms, not the garment. These

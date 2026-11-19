@@ -1,5 +1,6 @@
 """Parts of a figure from its shape: grooves, the side a color edge slips to, the ledge check."""
 import numpy as np
+import pytest
 import trimesh
 
 from smoothstone import colors as C
@@ -107,6 +108,20 @@ def test_ledge_check_fails_a_plane_cut_through_the_collar_and_passes_the_groove(
     assert worst < C.JAGGED
 
 
+def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it():
+    """r3 (Donovan, 2026-11-18, black shoes under blue pants): a wrinkle of the trousers 1 mm over
+    the shoe faces up and is blue, with blue trouser wall between it and the shoe's edge. The ledge
+    check failed it, so the shoes fell back to white. Only a ledge the edge runs onto is a fault."""
+    m = _lathe([(0, 0), (4.6, 0), (4.6, 11.2), (4.0, 11.2), (4.0, 16), (0, 16)])
+    ankle = {**_line("ankle", 10.0, 4.6), "curve": None}
+    V, F, lab = _paint(m, ankle)
+    found = C.ledges(V, F, lab, [ankle])
+    assert not C.ledge_faults(found), found
+    # the same shape at a collar is the collar's top painted the head's color: still a fault
+    neck = {**ankle, "name": "neck"}
+    assert C.ledge_faults(C.ledges(V, F, lab, [neck]))
+
+
 def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
     m = cuff_figure()
     ln = parts.find_groove(m, _line("wrist", 10.0, 2.5))
@@ -123,10 +138,11 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
 # SPEC3 A: the anatomy of a figure from its shape
 
 
-def block_figure():
+def block_figure(shoes=False, flare=False):
     """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
     a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
-    the neck between the torso and the head (48 to 52)."""
+    the neck between the torso and the head (48 to 52). shoes=True: each leg stands in a shoe
+    (8 x 9, up to z 11) wider than the leg, as the Jensen sculpt's are."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -135,6 +151,13 @@ def block_figure():
     disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
     disc.apply_translation([0, 0, 4])
     legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    if shoes:
+        legs += [box([8, 8.5 if flare else 9, 3.5], [x, 0.25 if flare else 1, 9.25]) for x in (-5, 5)]
+    if flare:  # each trouser hem flares out over its shoe: 7.8 x 8.2 at the shoe's top to the leg at 12.4
+        for x in (-5, 5):
+            pts = [[x + sx * 3.9, 0.25 + sy * 4.1, 10.9] for sx in (-1, 1) for sy in (-1, 1)]
+            pts += [[x + sx * 3.0, sy * 3.0, 12.4] for sx in (-1, 1) for sy in (-1, 1)]
+            legs.append(trimesh.convex.convex_hull(np.array(pts)))
     torso = box([22, 12, 20], [0, 0, 38])
     arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
     hands = []
@@ -267,6 +290,63 @@ def test_part_names_of_a_block_figure():
     parts.name_parts(m, region, info, zone, a, look="a man in a black jacket and jeans")
     got = sorted(d["part"] for d in info)
     assert got == sorted(["base", "jeans", "jacket", "hands", "hands", "face"]), got
+
+
+def test_a_shoe_wider_than_its_leg_gets_its_own_line_and_zone():
+    """f3 (Donovan, 2026-11-18): "Make his pants blue too!", then black shoes. The sculpt's shoes
+    and pants were one color region, so the blue pants ran down over the shoes. Each leg needs a
+    line at its shoe's top and a shoes zone under it, on that leg alone."""
+    m = block_figure(shoes=True)
+    a = parts.anatomy(m, 8.0)
+    assert sorted(x["side"] for x in a["ankles"]) == [-1, 1], a["ankles"]
+    for x in a["ankles"]:
+        assert 10.8 <= x["z"] <= 11.3, x
+    assert {(ln["name"], ln.get("side")) for ln in a["lines"] if ln["name"] == "ankle"} == {("ankle", -1), ("ankle", 1)}
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    assert cm.is_watertight and abs(cm.volume - m.volume) < 1e-3 * m.volume
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    shoe = zone == parts.SHOES
+    assert c[shoe, 2].max() <= 11.3 and c[shoe, 2].min() >= 8.0
+    assert (c[shoe, 0] < 0).any() and (c[shoe, 0] > 0).any()  # both feet
+    low = ~base & (c[:, 2] < 10.8) & (np.abs(c[:, 0]) < 10)
+    assert (zone[low] == parts.SHOES).all()  # nothing of the pants left on a shoe
+    region = zone.copy()
+    _, region = np.unique(region, return_inverse=True)
+    region = region.reshape(-1)
+    base_region = int(region[base][0])
+    palette = {parts.LEGS: [40, 80, 200], parts.TORSO: [20, 20, 20], parts.HANDS: [225, 180, 150],
+               parts.HEAD: [225, 180, 150], parts.SHOES: [20, 20, 20]}
+    rgb = [None if r == base_region else palette[int(np.bincount(zone[region == r]).argmax())]
+           for r in range(int(region.max()) + 1)]
+    info = C.describe(cm, region, rgb, base_region)
+    parts.name_parts(cm, region, info, zone, a, look="a man in a black jacket, blue pants and black shoes")
+    assert "shoes" in {d["part"] for d in info}, [d["part"] for d in info]
+
+
+def test_a_trouser_hem_flaring_over_the_shoe_stays_the_trousers_color():
+    """r3, the blind judge on the first black-shoes run: "black band painted on the bottom of the
+    pant legs above the shoes; the blue stops short of the hem". The hem's flare was the steepest
+    step, so the shoe line sat on top of it. The line is the crease where the hem meets the shoe."""
+    m = block_figure(shoes=True, flare=True)
+    a = parts.anatomy(m, 8.0)
+    ankles = [ln for ln in a["lines"] if ln["name"] == "ankle"]
+    assert len(ankles) == 2
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    shoe = zone == parts.SHOES
+    assert shoe.any() and c[shoe, 2].max() <= 11.4, c[shoe, 2].max()  # not up the flare (11 to 12.4)
+    flare = ~base & (c[:, 2] > 11.4) & (c[:, 2] < 12.3) & (np.abs(c[:, 0]) < 10)
+    assert (zone[flare] == parts.LEGS).all()
+
+
+def test_straight_legs_have_no_shoe_line():
+    assert parts.anatomy(block_figure(), 8.0)["ankles"] == []
 
 
 # SPEC3 E2: odd regions (the square notch on the back of the neck)
@@ -403,3 +483,87 @@ def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
         side, seen = parts.choose_side(m, ring + [0.0, 0.0, eps], (0.0, 0.0))
         got.add((side, seen[1][0], seen[-1][0]))
     assert len(got) == 1 and next(iter(got))[0] == -1, got
+
+
+def _shoe_figure(kind):
+    """block_figure with other shoes: "seam", a plain shoe (8 x 9, top at 11) with a sole seam 0.75
+    deep and 0.5 tall whose middle is 1.5 mm under its top; "low", a plain shoe only 2 mm tall;
+    "sloped", a shoe whose top rises from 10.4 at the heel to 11.6 at the toe."""
+    def box(ext, at):
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        return b
+
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    for x in (-5, 5):
+        if kind == "seam":
+            legs += [box([8, 9, 1.25], [x, 1, 8.625]), box([6.5, 7.5, 0.5], [x, 1, 9.5]), box([8, 9, 1.25], [x, 1, 10.375])]
+        elif kind == "low":
+            legs += [box([8, 9, 2.0], [x, 1, 9.0])]
+        else:
+            pts = [[x + sx * 4, y, z] for sx in (-1, 1) for y, z in ((-3.5, 8), (5.5, 8), (-3.5, 10.4), (5.5, 11.6))]
+            legs.append(trimesh.convex.convex_hull(np.array(pts)))
+    torso = box([22, 12, 20], [0, 0, 38])
+    arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
+    hands = []
+    for x in (-14.5, 14.5):
+        h = trimesh.creation.icosphere(subdivisions=4, radius=2.5)
+        h.apply_translation([x, 0, 32.5])
+        hands.append(h)
+    neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+@pytest.mark.parametrize("kind,top", [("seam", 11.0), ("low", 10.0)])
+def test_a_sole_seam_or_a_low_shoe_keeps_the_shoe_line_at_the_shoes_top(kind, top):
+    """Review of #14: the crease search under the step must not settle on a sole seam, or on the
+    plinth's corner under a low shoe, and leave the shoe's upper the pants' color."""
+    m = _shoe_figure(kind)
+    a = parts.anatomy(m, 8.0)
+    for ln in [x for x in a["lines"] if x["name"] == "ankle"]:
+        assert ln["curve"] is not None and abs(np.median(ln["curve"]) - top) < 0.3, (ln["z"], ln["curve"][:3])
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    upper = ~base & (c[:, 2] > top - 1.2) & (c[:, 2] < top - 0.1) & (np.abs(np.abs(c[:, 0]) - 5) < 4.5)
+    assert upper.any() and (zone[upper] == parts.SHOES).all()
+
+
+def test_a_shoe_rim_line_is_its_own_course_and_its_edge_follows_the_shape(monkeypatch):
+    """Review of #14: with no groove at a sloped shoe's top, the line follows the rim. It must not
+    keep the groove dict of the search it rejected, and a color edge along the rim follows the
+    shape, so the wobble limit for flat cuts does not apply to it."""
+    real = parts.find_groove
+
+    def no_ankle_groove(mesh, ln, only=None):
+        if ln["name"] == "ankle":
+            return {**ln, "curve": None, "groove": {"cost": 0.1, "length": 30.0, "used": True}}
+        return real(mesh, ln, only)
+
+    monkeypatch.setattr(parts, "find_groove", no_ankle_groove)
+    m = _shoe_figure("sloped")
+    a = parts.anatomy(m, 8.0)
+    rims = [x for x in a["lines"] if x["name"] == "ankle"]
+    assert len(rims) == 2
+    for ln in rims:
+        assert ln.get("rim") and ln["groove"] is None, ln.get("groove")
+        cv = np.asarray(ln["curve"])
+        assert cv.max() - cv.min() > 0.2  # it rises toward the toe
+        # a color edge laid along the rim, just inside the shoe's outline
+        th = np.radians(np.arange(-180, 180, 5))
+        cx, cy = ln["center"]
+        r = max(ln["rmax"] - 1.5, 1.0)
+        pts = np.c_[cx + r * np.cos(th), cy + r * np.sin(th), cv[np.arange(-180, 180, 5) + 180]]
+        edge = [{"pts": pts, "wobble": 1.0, "ratio": 1.0}]
+        C.mark_grooves(edge, a["lines"])
+        assert edge[0].get("groove") == "ankle"
+        assert C.edge_faults(edge) == []
