@@ -1630,12 +1630,6 @@ def _named_missing(info: list[dict], request: str) -> list[str]:
     return out
 
 
-def _person_may(st: dict) -> set:
-    """The parts the person may give another color than the request names: the ones stone asked
-    them about (asked_parts), and the ones they already chose for (person_parts)."""
-    return set(st.get("asked_parts") or []) | set(st.get("person_parts") or {})
-
-
 def _named_lost(info: list[dict], per, fil: list[str], request: str, skip: set = frozenset()) -> list[str]:
     """What a mapping gives up of the colors the request names: one line per named part that has a
     region in another color, or no region at all. `per` is the filament per region number; `skip`
@@ -1855,21 +1849,18 @@ def cmd_colors(args, job: Job) -> Out:
     # what the person asked for, so it is refused, never painted and called ready
     named = _named_regions(info, request)
     part_at = {d["n"]: d.get("part") or ("base" if d["base"] else None) for d in info}
-    # a part stone asked the person about may take the color they pick (stone colors top=red):
-    # that is their choice, not a color given up. A mapping stone makes never does it on its own
-    chosen = {g for g in assign if g in named and part_at.get(g) in _person_may(st)}
-    lost = _named_lost(info, per, fil, request, skip=set(boxed) | chosen)
+    lost = _named_lost(info, per, fil, request, skip=set(boxed))
     plan_params = (job.plan() or {}).get("params") or {}
     made = "figure" not in plan_params  # the figure step made it, so another seed makes another
 
-    def ask_color(parts_w: list[str], keep: dict[int, int]) -> str:
-        """The stone colors line for the person's answer: the asked parts take the color they name."""
-        job.update(asked_parts=sorted(set(parts_w)))
-        return "stone colors " + " ".join(_mapping_items(info, keep, rest, names)
-                                          + [f"{w}=<color>" for w in parts_w] + [f"rest={names[rest - 1]}"])
-
-    def ask_seed() -> str:
-        return f"stone set seed={figure_seed(job, plan_params) + 1}, then stone build"
+    def ask_answers(what: str) -> None:
+        """The person's answers, as commands that carry them out. No stone colors line gives a named
+        part another color: only the person changes what the request asks for (review second-F1)."""
+        out.add(f"If the person wants the {what} in another color, that is a new request: "
+                'stone new --force "<the request, with the color they name>", and the figure is made again.')
+        if made:
+            out.add(f"If the person wants the figure made again: stone set seed="
+                    f"{figure_seed(job, plan_params) + 1}, then stone build")
     if lost:
         (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
         if st.get("colors"):
@@ -1885,7 +1876,8 @@ def cmd_colors(args, job: Job) -> Out:
             # no mapping paints a part the figure has no region for: only another figure can
             what = " and ".join(missing)
             if made:
-                out.add(f"If the person wants the figure made again: {ask_seed()}")
+                out.add(f"If the person wants the figure made again: stone set seed="
+                        f"{figure_seed(job, plan_params) + 1}, then stone build")
                 out.next = (f"ask the person: the figure has no separate {what} to paint the color the request "
                             f"names. Should I make the figure again from another seed?")
             else:
@@ -1896,23 +1888,13 @@ def cmd_colors(args, job: Job) -> Out:
         elif not _named_lost(info, per_s, fil_s, request, skip=set(boxed)) and sug != "stone colors " + mapping_line(assign):
             out.next = sug
         else:
-            words = [w for w, _ in _named_words(request)]
-            out.add(f"If the person picks another color for one of them: {ask_color(words, {})}")
+            ask_answers("parts")
             out.next = ("ask the person: the request gives " + ", ".join(f"the {w} {c}" for w, c in _named_words(request))
                         + ", and I found no mapping that keeps them all. Which part should take another color, "
                         "and which color?")
             out.stage = "needs_person"
         out.result = "colors refused: " + lost[0]
         return out
-    picked = {}
-    for g in sorted(chosen):
-        f = fil[int(per[g]) - 1]
-        want = named[g]
-        if _match_filament(want, [f]) is None and (colortool.word_color(f) or f) != (colortool.word_color(want) or want):
-            picked[part_at[g]] = names[int(per[g]) - 1]
-            out.add(f"The {part_at[g]} takes {names[int(per[g]) - 1]}, not the {want} the request names: the person chose it.")
-    if picked:
-        job.update(person_parts={**(st.get("person_parts") or {}), **picked}, asked_parts=None)
     face_fil0 = per[num]
     # cut along smooth boundaries, so a color edge runs as a curve through the triangles
     # the plinth's edge and a figure's hem, neck and wrists are lines of the shape: keep them there
@@ -1963,10 +1945,7 @@ def cmd_colors(args, job: Job) -> Out:
             parts_w = sorted({part_at.get(g) or part_of[g] for g in (held or named)})
             what = ", ".join(parts_w)
             out.add(f"The edge is at the {what}, whose color the request names, so no color is given up.")
-            keep = {k: v for k, v in assign.items() if (part_at.get(k) or part_of[k]) not in parts_w}
-            out.add(f"If the person picks another color for the {what}: {ask_color(parts_w, keep)}")
-            if made:
-                out.add(f"If the person wants the figure made again: {ask_seed()}")
+            ask_answers(what)
             out.next = (f"ask the person: the color edge of the {what} is not clean enough to print even after "
                         f"fairing (picture: {bd / 'boundaries.png'}). Should the {what} take another color"
                         + (", or should I make the figure again from another seed?" if made else "?"))
