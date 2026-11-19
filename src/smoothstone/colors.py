@@ -41,7 +41,7 @@ SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under thi
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 NAME_OUT = 0.02  # mm: a plinth face with a corner this far out of the drum is a raised letter of the name
 NAME_CONTRAST = 3.0  # the name's color stands out from the plinth's by at least this contrast ratio (WCAG)
-REGIONS_VERSION = 6  # bump when find_regions changes what it returns, so a cached listing is redone
+REGIONS_VERSION = 7  # bump when find_regions changes what it returns, so a cached listing is redone
 
 # plain color names and a typical filament of each
 NAMES = {
@@ -413,14 +413,15 @@ def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None, never: i
 
 
 def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, lab=None, zone=None,
-            name=None) -> np.ndarray:
+            name=None, keep=None) -> np.ndarray:
     """Connected regions of equal label over face adjacency, numbered from 0. Regions under
     `min_share` of the surface join the neighbor they share the longest edge with, except that with
     `lab` (a Lab color per label) a region of at least SPECK that differs from that neighbor by more
     than CONTRAST stays its own: white hands on a black jacket are small but not noise. Faces in the
     `base` mask are one region of their own that never merges, and so are the faces in the `name`
     mask (the name's letters on the plinth, every letter in one region). With `zone` (a part of the
-    body per face), a region never spans two zones and joins only a neighbor in its own zone."""
+    body per face), a region never spans two zones and joins only a neighbor in its own zone. A
+    region of label `keep` (a beard's hair color) at least SPECK stays its own whatever it touches."""
     import scipy.sparse as sp
     from scipy.sparse.csgraph import connected_components
 
@@ -478,6 +479,8 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, l
                 and comp_label[j] < len(lab)
                 and np.linalg.norm(lab[comp_label[i]] - lab[comp_label[j]]) > CONTRAST):
             continue  # small but plainly a different color from what it touches: keep it
+        if keep is not None and comp_label[i] == keep and comp_label[j] != keep and area[i] >= SPECK * area.sum():
+            continue  # a beard of the hair's color: brown on light skin is under CONTRAST
         # i joins j
         alive[i] = False
         parent[i] = j
@@ -632,7 +635,8 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     pal, lab_f = paint.palette(rgb_f, most=6)
     labels = figure_labels(mesh, lab_f, base, len(pal))
     zone = None
-    hair = parts.hairline(mesh, labels, anat, base) if anat is not None else None
+    beard = parts.has_beard(look)
+    hair = parts.hairline(mesh, labels, anat, base, beard) if anat is not None else None
     if hair is not None:
         # the hair ends on a smooth line, not on the picture's ragged edge: cut it in
         V, F, par = parts.cut_hair(mesh.vertices, mesh.faces, hair)
@@ -646,11 +650,12 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
         labels, band = parts.snap(mesh, labels, zone, hand, anat)
         fixed |= band
         if hair is not None:
-            labels, band = parts.snap_hair(mesh, labels, zone, hair)
+            labels, band = parts.snap_hair(mesh, labels, zone, hair, beard)
             fixed |= band
     plain = base & ~letters
     reg = regions(mesh, labels, base=plain if plain.any() else None, lab=_lab(pal), zone=zone,
-                  name=letters if letters.any() else None)
+                  name=letters if letters.any() else None,
+                  keep=int(hair["label"]) if beard and hair is not None else None)
 
     def listing(reg):
         R = int(reg.max()) + 1

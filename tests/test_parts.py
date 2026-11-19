@@ -201,6 +201,25 @@ def _back_bins():
     return [b for b in range(-180, 180, 10) if abs((b + 5 - 90 + 180) % 360 - 180) < 50]
 
 
+# the neck's upright wall from z 7.5 straight into the chin's long underside at z 9.5, with no taper
+_JAW = [(0, 0), (8, 0), (8, 5), (6, 7.5), (6, 9.5), (9, 9.9)] + _HEAD
+
+
+def test_a_neck_wall_that_rises_straight_into_the_jaw_is_a_step():
+    """Review (PR 33, second-F5): a bin was taken for a slope running on into the head when no
+    up-facing face lay between the slope's top and the first down-facing face over it, so an
+    upright neck wall rising straight into the jaw's underside, with nothing facing up between,
+    was skipped by the ledge check and its line left as a plane through the slope. A wall of any
+    real height between the slope's top and the head's underside is a step."""
+    m = _by_angle(_JAW, _BACK)
+    assert m.is_watertight
+    neck = next(ln for ln in parts.find_lines(m, _NECK_ANAT) if ln["name"] == "neck")
+    skipped = set(neck.get("nostep") or [])
+    front = {b for b in range(-180, 180, 10) if abs((b + 5 + 90 + 180) % 360 - 180) < 50}
+    assert not skipped & front, sorted(skipped & front)
+    assert set(_back_bins()) <= skipped, (sorted(skipped), _back_bins())
+
+
 def test_a_neck_that_slopes_on_into_the_head_with_no_step_is_skipped_only_where_it_does():
     """Eval (Elon): behind the ears the shoulders' slope runs on up into the skull's underside
     with no step for the neck's line to sit on. The rim walk took the line up to the skull there
@@ -1013,6 +1032,52 @@ def test_the_hair_ends_on_a_smooth_line_fitted_to_the_picture_and_leaves_its_blo
     face = phi < parts.HAIR_FRONT
     assert face.any()
     assert off[face].max() < 0.4, f"the hair's edge strays {off[face].max():.2f} mm from the picture's line at the face"
+
+
+def test_a_beard_the_look_names_keeps_the_hair_color_under_the_hairline(monkeypatch, tmp_path):
+    """Review (PR 33, first-F1): under the hairline every face of the hair's picture color took
+    the head's other color, so a brown goatee under brown hair was painted skin and a request for
+    a beard could not be honored. When the figure step's look gives the figure a beard, the
+    hair's color holds under the line except next to it; with no beard in the look (Elon, DHH)
+    the hair-colored shading on the jaw is still skin."""
+    from smoothstone import paint
+
+    assert parts.has_beard("He has short brown hair and a full brown beard.")
+    assert parts.has_beard("a goatee and a moustache")
+    assert not parts.has_beard("This person has short hair, has no facial hair, and wears glasses.")
+    assert not parts.has_beard("clean-shaven, with light stubble")
+    m = block_figure()
+    top_z, H = 65.5, 65.5 - 8.0
+
+    def fake(sub, front, back, atlas):
+        V = np.asarray(sub.vertices, float)
+        t = V[V[:, 2].argmax()]
+        c = (sub.triangles_center - t) * H + np.array([0.0, 0.0, top_z])
+        out = np.where((c[:, 2] < 28.0)[:, None], [[40, 50, 120]], [[25, 25, 28]]).astype(float)
+        out[(c[:, 2] > 50.0) | ((np.abs(c[:, 0]) > 12.0) & (c[:, 2] < 36.0))] = [225, 180, 150]
+        th = np.arctan2(c[:, 1], c[:, 0])
+        out[(c[:, 2] > 50.0) & (c[:, 2] > 59.0)] = [95, 60, 30]
+        chin = (c[:, 2] > 52.5) & (c[:, 2] < 56.0) & (np.abs(np.angle(np.exp(1j * (th + np.pi / 2)))) < 1.3)
+        out[chin] = [95, 60, 30]
+        return out
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    for look, kept in (("He has short brown hair and a short brown beard.", True), ("", False)):
+        res = C.find_regions(m, "figure", {"base": "round", "name": ""}, tmp_path / "front.png", None,
+                             tmp_path / "atlas.png", look=look)
+        mesh, num = res["mesh"], res["num"]
+        c = mesh.triangles_center
+        th = np.arctan2(c[:, 1], c[:, 0])
+        front = np.abs(np.angle(np.exp(1j * (th + np.pi / 2))))
+        chin = (c[:, 2] > 53.3) & (c[:, 2] < 55.5) & (front < 1.0)
+        cheek = (c[:, 2] > 56.6) & (c[:, 2] < 57.6) & (front < 0.6)
+        assert chin.any() and cheek.any()
+        apart = np.isin(num[chin], np.unique(num[cheek]), invert=True).mean()
+        if kept:
+            assert apart > 0.9, f"only {apart:.0%} of the beard keeps its own color"
+        else:
+            assert apart < 0.1, f"{apart:.0%} of the jaw's hair-colored shading is not skin"
 
 
 def test_the_hair_is_level_across_the_back_and_drops_to_it_just_behind_the_ears(monkeypatch, tmp_path):

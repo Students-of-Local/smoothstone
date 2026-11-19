@@ -34,6 +34,7 @@ ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the to
 ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
 NECK_DOWN_NZ = -0.2  # a face whose normal points down at least this much is an overhang
 NECK_HEAD_DOWN = 0.5  # share of the first mm over an overhang facing down for it to be the head's underside
+NECK_WALL = 0.5  # mm: a wall taller than this between the slope's top and the head's underside is a step
 NECK_RIM_REACH = 4.0  # mm over a level neck line searched for the top of the shoulders' slope
 ANKLE_SETTLED = 0.01  # the leg over a shoe holds its section within this share: the shoe's taper ended
 HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
@@ -794,8 +795,8 @@ def shoe_rim(mesh, line: dict, keep: np.ndarray, reach: float = ANKLE_RIM_REACH)
 def neck_rim(mesh, line: dict, keep: np.ndarray) -> tuple[np.ndarray | None, list[int]]:
     """The top of the shoulders' slope over a level neck line with no groove: the rim walk of
     shoe_rim, NECK_RIM_REACH mm up. A bin where the walk climbed and ran all the way to the head's
-    overhang has no step: no up-facing face lies between the walk's top and the first down-facing
-    face over it, and at least NECK_HEAD_DOWN of the area in the next mm faces down (the head's
+    overhang has no step: the first down-facing face over the walk's top starts within NECK_WALL
+    of it (no upright wall between), no up-facing face lies between them, and at least NECK_HEAD_DOWN of the area in the next mm faces down (the head's
     underside, not a collar's thin lip with the neck rising again over it). There the neck slopes
     into the head, so the line stays level and the ledge check skips the bin. Returns (360 heights
     or None, the no-step bins as their first degree from -180)."""
@@ -813,6 +814,8 @@ def neck_rim(mesh, line: dict, keep: np.ndarray) -> tuple[np.ndarray | None, lis
         if not down.any():
             continue
         zd = float(fz[down].min(1).min())
+        if zd - tops[b] > NECK_WALL:
+            continue  # an upright wall between the slope's top and the overhang: a step
         if (inb & (fz.min(1) < zd) & (nz > ANKLE_RIM_NZ)).any():
             continue  # more of the slope beyond a gap: a step the walk stopped at
         band = inb & (fz.min(1) < zd + 1.0)
@@ -1238,11 +1241,36 @@ def hair_height(line: dict, X: np.ndarray) -> np.ndarray:
     return np.clip(z, line["zmin"], line["zmax"])
 
 
-def hair_samples(mesh, labels: np.ndarray, head: np.ndarray, center, hair: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _split_beard(h: np.ndarray, a: np.ndarray) -> tuple[int, float]:
+    """(k, cost) for faces sorted up by height, h True for the hair's color: the bottom-up run of
+    the rest (the neck), hair (a beard), the rest (the face) and hair, any of them empty, that puts
+    the least area on the wrong side; k is the first face of the top run of hair."""
+    INF = float("inf")
+    dp = np.array([0.0, INF, INF, INF])
+    back = np.zeros((len(h), 4), np.int8)
+    for i in range(len(h)):
+        wrong = np.array([a[i] if h[i] else 0.0, 0.0 if h[i] else a[i]] * 2)
+        best = np.minimum.accumulate(dp)
+        # on a tie the later run, so the top run of hair is as long as it can be
+        arg = np.array([j - int(np.argmin(dp[:j + 1][::-1])) for j in range(4)], np.int8)
+        dp, back[i] = best + wrong, arg
+    s, k = 3, len(h)
+    for i in range(len(h) - 1, -1, -1):  # back[i, s]: the run face i - 1 is in when face i is in s
+        if s < 3:
+            break
+        k = i
+        s = int(back[i, s])
+    return k, float(dp[3])
+
+
+def hair_samples(mesh, labels: np.ndarray, head: np.ndarray, center, hair: int,
+                 beard: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(angles, heights, radii) of the picture's hair edge: in each HAIR_SECTOR degree sector of the head
     round its axis, the height that best splits hair above from the rest below (the least area on
-    the wrong side). A sector whose best split still leaves over HAIR_MISS of its area on the wrong
-    side, or with no hair or nothing else in it, gives none."""
+    the wrong side). With a `beard` a run of the hair's color lower down may be the beard, with the
+    face between (_split_beard), so the edge is the hair's, not the beard's bottom. A sector whose
+    best split still leaves over HAIR_MISS of its area on the wrong side, or with no hair or nothing
+    else in it, gives none."""
     c = mesh.triangles_center
     a = mesh.area_faces
     th = np.arctan2(c[:, 1] - center[1], c[:, 0] - center[0])
@@ -1261,7 +1289,12 @@ def hair_samples(mesh, labels: np.ndarray, head: np.ndarray, center, hair: int) 
         # cost of splitting under sorted face k: hair below it plus the rest from it up
         cost = np.r_[0.0, np.cumsum(ah)] + (ao.sum() - np.r_[0.0, np.cumsum(ao)])
         k = int(np.argmin(cost[1:-1])) + 1
-        if cost[k] > HAIR_MISS * a[idx].sum():
+        miss = cost[k]
+        if beard:
+            k, miss = _split_beard(h, a[idx])
+            if not 0 < k < len(idx):
+                continue
+        if miss > HAIR_MISS * a[idx].sum():
             continue
         zk = 0.5 * (c[idx[k - 1], 2] + c[idx[k], 2])
         out_t.append(s0 + np.radians(HAIR_SECTOR) / 2)
@@ -1400,7 +1433,7 @@ def _lip(c: np.ndarray, a: np.ndarray, rad: np.ndarray, down: np.ndarray, sel: n
     return start
 
 
-def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | None:
+def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray, beard: bool = False) -> dict | None:
     """The hairline: a smooth closed curve round the head's axis, a Fourier series of HAIR_ORDER
     fitted with Huber weights to a height per HAIR_SECTOR degrees. Each harmonic k is scaled by
     (r / R)**k, R the samples' median radius, so off that circle the line is a smooth height over
@@ -1418,7 +1451,8 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
 
     The hair's color is the crown's; a head whose lower half is mostly that color too (bald, or a
     hood) has none. None when the head has no neck line or the picture too few samples at the
-    face."""
+    face. With a `beard` (has_beard) a run of the hair's color under the face is the beard, not
+    the hair's edge."""
     neck = _line(anat, "neck")
     if neck is None or neck.get("z") is None:
         return None
@@ -1436,7 +1470,7 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
     lower = head & (c[:, 2] < zmid)
     if hair is None or _dominant(labels, a, lower) == hair:
         return None
-    th, z, rs = hair_samples(mesh, labels, head, center, hair)
+    th, z, rs = hair_samples(mesh, labels, head, center, hair, beard)
     front = _from_face(np.c_[np.cos(th), np.sin(th)], (0.0, 0.0)) <= HAIR_FRONT
     th, z, rs = th[front], z[front], rs[front]
     if len(th) < 3:
@@ -1598,10 +1632,24 @@ def cut_hair(V, F, line: dict):
     return np.asarray(V2, np.float32).astype(float), F2, par
 
 
-def snap_hair(mesh, labels: np.ndarray, zone: np.ndarray, line: dict) -> tuple[np.ndarray, np.ndarray]:
+_BEARD = re.compile(r"\b(beard|goatee|mo?ustache|sideburns)\b")
+_SHAVEN = re.compile(r"\b(no|without|not?)\b[^.,;]*\b(facial hair|beard|goatee|mo?ustache)\b|clean[- ]shaven")
+
+
+def has_beard(look: str) -> bool:
+    """True when the figure step's look gives the figure facial hair (a beard, goatee, moustache),
+    and does not deny it ("has no facial hair", "clean-shaven"). Stubble is not a beard."""
+    t = (look or "").lower()
+    return bool(_BEARD.search(t)) and not _SHAVEN.search(t)
+
+
+def snap_hair(mesh, labels: np.ndarray, zone: np.ndarray, line: dict,
+              beard: bool = False) -> tuple[np.ndarray, np.ndarray]:
     """(labels, fixed): on the head, the faces above the hairline in pieces (connected above it)
     that the picture calls hair in part are all hair; under it nothing is, a hair-colored face
-    there taking the head's main other color. `fixed` marks the head faces within BAND of it."""
+    there taking the head's main other color. With a `beard` that holds only within BAND of the
+    line: lower on the face the picture's hair color is the beard and stays. `fixed` marks the
+    head faces within BAND of the line."""
     import scipy.sparse as sp
     from scipy.sparse.csgraph import connected_components
 
@@ -1617,6 +1665,8 @@ def snap_hair(mesh, labels: np.ndarray, zone: np.ndarray, line: dict) -> tuple[n
     ids = np.unique(comp[above & (labels == hair)])
     labels[above & np.isin(comp, ids)] = hair
     below = head & (side < 0)
+    if beard:
+        below &= np.abs(field(line, mesh.triangles_center)) < BAND
     other = _dominant(labels, mesh.area_faces, below & (labels != hair))
     if other is not None:
         labels[below & (labels == hair)] = other
@@ -1776,7 +1826,8 @@ def merge_odd(mesh, region: np.ndarray, labels: np.ndarray, zone: np.ndarray, ke
 def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, anat: dict,
                look: str = "", glasses: set[int] | None = None) -> None:
     """Set d["part"] on each region entry: base, shoes, pants, top, hands, face, hair, glasses or
-    other, with the words look.txt uses ("jacket" for top)."""
+    other, with the words look.txt uses ("jacket" for top). With a beard in the look, a region of
+    the hair's own color lower on the head is the hair too (PART_WORDS: a beard is hair)."""
     from .colors import NAMES, _lab
 
     words = look_words(look)
@@ -1834,10 +1885,17 @@ def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, ana
         face = next((d for d in head if d is not crowned), None)
     if face is not None:
         face["part"] = "face"
+    hair = None
     for d in head:
         if d is not face and d["z1"] >= zt - 1.0:
             d["part"] = "hair"
+            hair = d
             break
+    if hair is not None and hair["rgb"] is not None and has_beard(look):
+        for d in head:  # the beard: the hair's own color lower on the head
+            if d["part"] == "other" and d["rgb"] is not None and \
+                    np.linalg.norm(_lab(d["rgb"])[0] - _lab(hair["rgb"])[0]) < 10:
+                d["part"] = "hair"
     neck = anat.get("neck")
     for d in head:
         if d["part"] != "other":
