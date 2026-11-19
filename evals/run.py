@@ -407,7 +407,16 @@ def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
 
         vol = float(trimesh.load(stl, process=False).volume)
     why += C.check_3mf(f3, len(F), len(fil), volume=vol)
-    worst, _ = C.color_edges(V, F, face_fil)
+    worst, lines = C.color_edges(V, F, face_fil)
+    pn, rj = job / "build" / "paint.npy", job / "build" / "regions.json"
+    if pn.exists() and rj.exists():
+        # the outline of the name raised on the plinth is the shape's own crease: not judged
+        regs = json.loads(rj.read_text())["regions"]
+        num0 = np.load(pn)
+        if len(num0) == len(F):
+            C.mark_name_edges(lines, F, num0, next((d["n"] for d in regs if d.get("part") == "name"), None),
+                              next((d["n"] for d in regs if d.get("base")), None))
+            worst = C.worst_ratio(lines)
     if worst > C.JAGGED:
         why.append(f"color edges jagged ({worst:.2f}, max {C.JAGGED})")
     if (st.get("wobble") or 0) > C.WOBBLE:

@@ -790,3 +790,181 @@ def test_a_comma_and_ends_a_clause_so_the_part_before_it_keeps_its_color():
     assert pc("the jacket, pants, and shoes are black") == {"top": "black", "pants": "black", "shoes": "black"}
     assert pc("the jacket and pants are black") == {"top": "black", "pants": "black"}
     assert pc("his hands, and the jacket and pants are blue") == {"top": "blue", "pants": "blue"}
+
+
+# the name on the plinth: its raised letters are a region of their own, in a color that stands out
+
+
+def _plinth(openscad, tmp_path, name="JO", base="round", height=40):
+    """The figure recipe built with a thin post for the figure: (mesh, params)."""
+    # a tall ellipsoid of small curved triangles (none coplanar, so the build keeps them all):
+    # paint by face can zigzag on it
+    fig = trimesh.creation.icosphere(subdivisions=4)
+    fig.apply_scale([0.15, 0.15, 0.5])
+    fig.apply_translation([0, 0, 0.5])
+    fig.export(tmp_path / "fig.stl")
+    r = rc.load("figure")
+    params = r.merged({"figure": str(tmp_path / "fig.stl"), "height": height, "name": name, "base": base,
+                       "quality": 48})
+    out = tmp_path / f"part_{base}_{name or 'none'}.stl"
+    run = scad.build_stl(openscad, r, params, out)
+    assert run.ok, run.log
+    return colors.load_stl(out), params
+
+
+def _painted_regions(monkeypatch, tmp_path, mesh, params):
+    """find_regions with a picture that paints the post's lower half black and the rest white."""
+    from smoothstone import paint
+
+    def fake(sub, front, back, atlas):
+        z = sub.triangles_center[:, 2]
+        return np.where(z[:, None] < 0.5, [[25, 25, 28]], [[240, 240, 240]]).astype(float)
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    return colors.find_regions(mesh, "figure", params, tmp_path / "front.png", None, tmp_path / "atlas.png")
+
+
+def jensen_named():
+    """jensen_regions with the name JENSEN raised on the plinth, a region of its own."""
+    return jensen_regions() + [{"n": 9, "rgb": None, "share": 0.01, "base": False, "part": "name", "color": None,
+                                "z0": 3, "z1": 9, "pos": "name", "region": 8}]
+
+
+@pytest.mark.parametrize("base", ["round", "hex"])
+def test_the_raised_name_is_found_by_its_shape_on_a_round_or_hex_plinth(openscad, tmp_path, base):
+    """Jensen r3 (2026-11-19): the name JENSEN was painted white on the white plinth, so only its
+    edges showed and it read "JE NSI N". Its letters are the faces that stand out of the drum."""
+    mesh, params = _plinth(openscad, tmp_path, base=base)
+    got = colors.name_faces(mesh, "figure", params)
+    assert got.any()
+    c = mesh.triangles_center
+    # 40 mm tall with a name: a 12 mm plinth, its lip 2.4 mm, its top chamfer 1.2 mm
+    assert ((c[got, 2] > 2.4) & (c[got, 2] < 10.8)).all()
+    assert (c[got, 1] < 0).all()  # on the front
+    import scipy.sparse as sp
+    from scipy.sparse.csgraph import connected_components
+    adj = mesh.face_adjacency
+    both = got[adj[:, 0]] & got[adj[:, 1]]
+    idx = np.full(len(got), -1)
+    idx[got] = np.arange(got.sum())
+    g = sp.coo_matrix((np.ones(both.sum()), (idx[adj[both, 0]], idx[adj[both, 1]])), shape=(got.sum(),) * 2)
+    assert connected_components(g, directed=False)[0] == 2  # J and O, each a piece of its own
+    # every other face of the drum's band is the drum itself
+    r = np.hypot(c[:, 0], c[:, 1])
+    band = (c[:, 2] > 2.5) & (c[:, 2] < 10.7) & (r > 5)
+    assert band[got].all() and (band & ~got).sum() > 0
+
+
+def test_the_name_is_a_region_of_its_own_and_not_the_plinth(openscad, tmp_path, monkeypatch):
+    mesh, params = _plinth(openscad, tmp_path)
+    res = _painted_regions(monkeypatch, tmp_path, mesh, params)
+    info = res["regions"]
+    name = [d for d in info if d.get("part") == "name"]
+    assert len(name) == 1 and not name[0]["base"], info
+    letters = colors.name_faces(res["mesh"], "figure", params)
+    assert (res["num"][letters] == name[0]["n"]).all()
+    base = next(d["n"] for d in info if d["base"])
+    assert not (res["num"][letters] == base).any()
+    # small as it is, the name is no sliver to merge: it is the name
+    per = np.ones(len(info) + 1, int)
+    assert colors.boxed_slivers(res["mesh"], res["num"], info, per, set(), 1) == []
+
+
+def test_the_name_takes_black_on_a_white_plinth_with_a_black_jacket_in_the_palette():
+    info = jensen_named()
+    per = np.ones(len(info) + 1, int)  # rest=white, the plinth too
+    per[4] = 2  # jacket=black
+    assert cli._name_filament(info, per, ["white", "black"], "") == 2
+    # the darkest color of the palette that stands out 3:1: black, not the blue pants
+    per[5] = 3
+    assert cli._name_filament(info, per, ["white", "black", "blue"], "") == 2
+    # only light colors in the palette: black, added as a filament
+    per[4], per[5] = 2, 2
+    assert cli._name_filament(info, per, ["white", "yellow"], "") == "black"
+    # a dark plinth takes the lightest palette color that stands out, else white
+    dark = np.full(len(info) + 1, 2)
+    dark[4] = 1
+    assert cli._name_filament(info, dark, ["white", "black"], "") == 1
+    dark[4] = 3
+    assert cli._name_filament(info, dark, ["red", "black", "blue"], "") == "white"
+    assert colors.contrast_ratio(colors.NAMES["white"], colors.NAMES["black"]) > 15
+    # a print in one color stays in one color: the name adds no filament to it
+    assert cli._name_filament(info, np.ones(len(info) + 1, int), ["white", "black"], "") == 1
+
+
+def test_the_name_takes_a_color_the_request_names():
+    pc = lambda r: {k: v for k, v in colors.part_colors(r).items() if not k.startswith("word:")}
+    assert pc("with the name in red") == {"name": "red"}
+    assert pc("red lettering on the base") == {"name": "red"}
+    assert pc("a black jacket and gold letters") == {"top": "black", "name": "yellow"}
+    assert pc("the text is blue") == {"name": "blue"}
+    assert pc("a red label") == {"name": "red"}
+    info = jensen_named()
+    per = np.ones(len(info) + 1, int)
+    per[4] = 2
+    assert cli._name_filament(info, per, ["white", "black", "red"], "a black jacket with red lettering") == 3
+    assert cli._name_filament(info, per, ["white", "black"], "a black jacket with red lettering") == "red"
+    line = cli._suggest_line(info, FIL, "Jensen Huang in a black jacket with the name in red, white everywhere else")
+    assert line == "stone colors jacket=black name=red rest=white", line
+    # with no color for it, the name is not in the line: stone colors gives it one that stands out
+    line = cli._suggest_line(info, FIL, "Jensen Huang in a black jacket, white everywhere else")
+    assert line == "stone colors jacket=black rest=white", line
+
+
+def test_a_plinth_with_no_name_is_unchanged(openscad, tmp_path, monkeypatch):
+    mesh, params = _plinth(openscad, tmp_path, name="")
+    assert not colors.name_faces(mesh, "figure", params).any()
+    res = _painted_regions(monkeypatch, tmp_path, mesh, params)
+    assert not any(d.get("part") == "name" for d in res["regions"])
+    info = jensen_regions()
+    per = np.ones(len(info) + 1, int)
+    per[4] = 2
+    assert cli._name_filament(info, per, ["white", "black"], "") is None
+    # a name color with no name on the plinth colors the plinth, as before
+    line = cli._suggest_line(info, FIL, "Jensen Huang in a black jacket with the name in red, white everywhere else")
+    assert line == "stone colors 1=red jacket=black rest=white", line
+
+
+def _name_painted(openscad, tmp_path):
+    """The figure recipe with ADA on its plinth, the name painted filament 2 on a filament 1 plinth
+    and post: (mesh, region per face (1 plinth, 2 name, 3 post), filament per face)."""
+    mesh, params = _plinth(openscad, tmp_path, name="ADA", height=70)
+    letters = colors.name_faces(mesh, "figure", params)
+    plinth = mesh.triangles_center[:, 2] < colors.base_top("figure", params)
+    region = np.where(letters, 2, np.where(plinth, 1, 3))
+    return mesh, region, np.where(letters, 2, 1)
+
+
+def test_the_name_outline_is_the_shapes_crease_and_skips_the_edge_limits(openscad, tmp_path):
+    """Jensen r3 (2026-11-19): with JENSEN painted black, its letters' sharp corners scored as a
+    jagged color edge (1.084, ADA's small A counter 1.20, max 1.08), so no file was written. The
+    letters and the plinth are fixed faces: the edge is the letter's foot, the mesh's own crease."""
+    mesh, region, fil = _name_painted(openscad, tmp_path)
+    worst, lines = colors.color_edges(mesh.vertices, mesh.faces, fil)
+    assert colors.edge_faults(lines)  # the glyph corners alone fail the limit
+    colors.mark_name_edges(lines, mesh.faces, region, 2, 1)
+    assert lines and all(ln.get("name_edge") for ln in lines)
+    assert colors.edge_faults(lines) == []
+    assert colors.worst_ratio(lines) == 1.0 and colors.worst_wobble(lines) == 0.0
+
+
+def test_a_jagged_figure_edge_beside_the_name_still_fails(openscad, tmp_path):
+    mesh, region, fil = _name_painted(openscad, tmp_path)
+    c = mesh.triangles_center
+    post = region == 3
+    # the post's lower part painted by face center under a tilted plane: the edge runs along the
+    # triangles, a sawtooth
+    fil = fil.copy()
+    fil[post & (c[:, 2] + 0.5 * c[:, 0] < 40)] = 3
+    worst, lines = colors.color_edges(mesh.vertices, mesh.faces, fil)
+    colors.mark_name_edges(lines, mesh.faces, region, 2, 1)
+    bad = colors.edge_faults(lines)
+    assert bad and all(not ln.get("name_edge") and 3 in ln["pair"] for ln in bad)
+    assert any(ln.get("name_edge") for ln in lines)
+    # a name edge with something other than the plinth on its far side is checked like any edge
+    region2 = region.copy()
+    region2[region == 1] = 4  # the plinth is not region 1 now
+    lines2 = colors.color_edges(mesh.vertices, mesh.faces, fil)[1]
+    colors.mark_name_edges(lines2, mesh.faces, region2, 2, 1)
+    assert not any(ln.get("name_edge") for ln in lines2)

@@ -58,7 +58,8 @@ PART_WORDS = {
     "hair": ("hair", "beard"),
     "face": ("face", "skin", "head"),
     "glasses": ("glasses", "spectacles", "eyeglasses", "sunglasses", "frames"),
-    "base": ("base", "plinth", "stand", "name"),
+    "base": ("base", "plinth", "stand"),
+    "name": ("name", "letters", "letter", "lettering", "text", "label"),  # raised on the plinth
 }
 WORD_PART = {w: p for p, ws in PART_WORDS.items() for w in ws}
 # a garment that is more than one part: a black suit is a black jacket and black pants
