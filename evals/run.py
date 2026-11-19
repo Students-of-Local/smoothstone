@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -152,11 +153,8 @@ def main():
     env = {**os.environ, "STONE_JOB": str(job), "STONE_TIER": a.card if a.card != "none" else "S",
            "STONE_FIGURE_SEED": str(a.seed)}
 
-    # the environment, set up before the model starts: the job with the request (and picture)
-    new = ["new", spec["request"]]
-    if spec.get("image"):
-        new += ["--image", str((spec_path.parent / spec["image"]).resolve())]
-    setup = subprocess.run([STONE, *new], capture_output=True, text=True, env=env, cwd=rdir).stdout
+    # the environment, set up before the model starts: the job with the request (and pictures)
+    setup, photos = setup_job(spec, spec_path, a.seed, env, rdir)
 
     system = SYSTEM
     card_sha = None
@@ -164,8 +162,9 @@ def main():
         card = (ROOT / "skill" / "tiers" / f"{a.card}.md").read_text()
         card_sha = sha(card.encode())
         system += "\n\nA skill is loaded for this task. Follow it.\n\n" + card
-    user = spec["request"] + ("\nThe picture is already in the job." if spec.get("image") else "") + \
-        "\nThe job is ready; use the stone tool."
+    given = len(photos["given"]) if photos else int(bool(spec.get("image")))
+    user = spec["request"] + ("\nThe picture is already in the job." if given == 1 else "") + \
+        ("\nThe pictures are already in the job." if given > 1 else "") + "\nThe job is ready; use the stone tool."
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
     log = {"run_id": run_id, "spec": spec["id"], "suite": spec_path.parent.name, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
@@ -173,6 +172,8 @@ def main():
            "model": a.model_name if a.driver == "lfm3" else None, "sampling": SAMPLING if a.driver == "lfm3" else None,
            "harness": HARNESS, "max_steps": MAX_STEPS, "max_new_tokens": MAX_NEW, "setup": setup,
            "system_sha256": sha(system.encode()), "steps": [], "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    if photos:
+        log["photos"] = photos
     t0 = time.time()
     pending = ""
     nxt = "stone status"
@@ -249,11 +250,48 @@ def main():
     if exp.get("judge") and grade["pass"]:
         grade = judge_run(rdir, job, spec["request"], exp["judge"], grade)
     if exp.get("recipe") == "figure" and grade["pass"]:
-        grade = likeness_run(rdir, job, spec["request"], grade, (exp.get("likeness") or {}).get("min"))
+        grade = likeness_for(rdir, job, spec, spec_path, exp, grade)
+    if spec_path.parent.name in MODES:
+        grade["judge"] = craft_run(rdir, job, spec["request"])
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
     print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
+
+
+def held_back(spec: dict, spec_path: Path, seed: int) -> tuple[list[Path], Path | None]:
+    """A photo spec's (given, reference) for a seed (LOG.md, 2026-11-19): the last photo is the
+    likeness reference and never reaches the tool; seed 1 gives photo 1 only (the likely real
+    input), any other seed every photo but the reference. ([], None) for a spec with no photos."""
+    photos = [(spec_path.parent / p).resolve() for p in spec.get("photos") or []]
+    if not photos:
+        return [], None
+    if len(photos) < 2:
+        raise SystemExit(f"{spec['id']}: a photo spec needs 2 or more photos, the last held back")
+    *given, ref = photos
+    return (given[:1] if seed == 1 else given), ref
+
+
+def setup_job(spec: dict, spec_path: Path, seed: int, env: dict, rdir: Path) -> tuple[str, dict | None]:
+    """The job made before the model starts: stone new with the request and its picture, or with
+    the photos this seed gives. Returns (what stone printed, {"given", "reference"} or None)."""
+    given, ref = held_back(spec, spec_path, seed)
+    new = ["new", spec["request"]]
+    if spec.get("image"):
+        new += ["--image", str((spec_path.parent / spec["image"]).resolve())]
+    elif given:
+        new += ["--image", str(given[0])]  # the way a person gives the tool a photo
+    setup = subprocess.run([STONE, *new], capture_output=True, text=True, env=env, cwd=rdir).stdout
+    if not given:
+        return setup, None
+    # stone new takes one photo as image/source.<ext>; job.photos() reads every image/source.*,
+    # sorted, and the figure crops the face from the first. "z" sorts after source.jpg, .png and
+    # .webp, so photo 1 stays first and the others follow in the spec's order.
+    img = Path(env["STONE_JOB"]) / "image"
+    img.mkdir(parents=True, exist_ok=True)
+    for k, p in enumerate(given[1:], 2):
+        shutil.copyfile(p, img / f"source.z{k}{p.suffix.lower()}")
+    return setup, {"given": [p.name for p in given], "reference": ref.name}
 
 
 def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
@@ -321,16 +359,36 @@ def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> d
     return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
 
 
-def likeness_run(rdir: Path, job: Path, request: str, grade: dict, least: int | None = None) -> dict:
+MODES = ("figure-research", "figure-photo", "figure-desc")  # the held-out sets of LOG.md, 2026-11-19
+MODE_LIKENESS = 7  # the likeness bar of the research and photo modes, set with them
+
+
+def likeness_for(rdir: Path, job: Path, spec: dict, spec_path: Path, exp: dict, grade: dict) -> dict:
+    """The likeness bar of the spec's mode (its folder): a description's traits all visible, a
+    held back photo or a Wikipedia photo the tool did not pick at MODE_LIKENESS or more; any other
+    figure as before."""
+    suite = spec_path.parent.name
+    least = (exp.get("likeness") or {}).get("min")
+    if suite == "figure-desc":
+        return traits_run(rdir, job, exp.get("traits") or [], grade)
+    if suite in MODES:
+        least = max(least or 0, MODE_LIKENESS)
+    ref = held_back(spec, spec_path, 1)[1]
+    return likeness_run(rdir, job, spec["request"], grade, least, **({"reference": ref} if ref else {}))
+
+
+def likeness_run(rdir: Path, job: Path, request: str, grade: dict, least: int | None = None,
+                 reference: Path | None = None) -> dict:
     """Every figure: is it the subject asked for? (judge_likeness.py, saved as likeness.json).
     The checks above pass any well made figure, even of the wrong person; a judge that cannot
     answer fails the run with the reason, never passes it. A spec's expect.likeness.min raises
-    the bar above the judge's own."""
+    the bar above the judge's own. A reference photo (one held back from the tool) is the judge's
+    reference instead of Wikipedia's."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_likeness
 
     try:
-        res = judge_likeness.judge(job, request)
+        res = judge_likeness.judge_photo(job, request, reference) if reference else judge_likeness.judge(job, request)
     except Exception as e:  # no render, no reference, no reply: a run is never passed unjudged
         res = {"score": None, "pass": False, "conflicts": [], "error": f"{type(e).__name__}: {e}"}
     if least and res.get("score") is not None and res["score"] < least:
@@ -346,6 +404,46 @@ def likeness_run(rdir: Path, job: Path, request: str, grade: dict, least: int | 
         why.append(f"likeness {res['score']}/10{bar}: " + "; ".join(f"{c['feature']}: {c['what']}"
                                                             for c in res["conflicts"])[:240])
     return {**grade, "pass": False, "why": why, "likeness": res["score"]}
+
+
+def traits_run(rdir: Path, job: Path, traits: list[str], grade: dict) -> dict:
+    """A description's likeness: every trait it names is visible in the views (judge_traits.py,
+    saved as traits.json). A trait not seen, or a judge that cannot answer, fails the run."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import judge_traits
+
+    try:
+        res = judge_traits.judge(job / "build", traits)
+    except Exception as e:  # no views, no traits, no reply: never passed unjudged
+        res = {"pass": False, "traits": [], "error": f"{type(e).__name__}: {e}"}
+    (rdir / "traits.json").write_text(json.dumps(res, indent=1))
+    seen = f"{sum(t['visible'] for t in res['traits'])}/{len(traits)}"
+    if res["pass"]:
+        return {**grade, "traits": seen}
+    why = [w for w in grade["why"] if w != "all checks pass"]
+    if res.get("error"):
+        why.append(f"likeness: the traits judge could not answer ({res['error'][:120]})")
+    else:
+        why.append("likeness: not visible: " + "; ".join(f"{t['trait']} ({t['why']})" for t in res["traits"]
+                                                         if not t["visible"])[:240])
+    return {**grade, "pass": False, "why": why, "traits": seen}
+
+
+def craft_run(rdir: Path, job: Path, request: str) -> int | None:
+    """The blind craft judge (judge_views.py) on a mode run's pictures, saved as judge.json. Its
+    score never fails the run: the bar is the mean per mode (bar.py), and the ratchet's judge."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import judge_views
+
+    build = job / "build"
+    if not (build / "views.png").exists():
+        return None
+    try:
+        res = judge_views.judge(build, request)
+    except (Exception, SystemExit) as e:  # judge_views exits on a missing picture or a failed claude
+        res = {"score": None, "faults": [], "error": f"{type(e).__name__}: {e}"}
+    (rdir / "judge.json").write_text(json.dumps(res, indent=1))
+    return res["score"]
 
 
 SCORES = Path(os.environ.get("STONE_SCORES", str(ROOT / "evals" / "scores.jsonl")))

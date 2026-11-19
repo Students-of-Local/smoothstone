@@ -31,5 +31,15 @@ counts as card "next"), the best pass rate and mean judge score so far and the s
   age, clothes). Below 6 of 10 the run fails with the judge's conflicts; a judge that cannot answer
   fails it too. The tool's own photos are never the reference: for "DHH" it once styled a protein,
   and every other check passed the made up man it sculpted. The verdict is likeness.json.
+- The three figure modes (`figure-research/`, `figure-photo/`, `figure-desc/`, sealed in ../LOG.md on
+  2026-11-19) have their own likeness bar. Research: the Wikipedia judge at 7 or more. Photos: the last
+  photo a spec lists is held back from the tool and is the judge's reference, at 7 or more; seed 1
+  gives the tool photo 1 only, seed 2 every photo but the reference (photo 1 by `stone new --image`,
+  the rest as `image/source.z<k>.jpg`, which `job.photos()` lists after it); log.json records which.
+  Description: `judge_traits.py` shows Opus only views.png and the spec's `expect.traits`, and every
+  trait must be visible (traits.json). Each mode run is also scored by the craft judge
+  (`judge_views.py`, judge.json), which never fails a run on its own. `evals/bar.py <runs dir>` prints
+  per mode the runs that pass out of cases x 2 seeds against 80%, and the craft mean against 8 with the
+  seeded control's score (judge_control.py, then judge_views.py on it), which must be under 8.
 - A spec with `"colors": {"black": ["jacket"], "rest": "white"}` checks the painted 3MF: it reads back
   clean, its color edges pass, and every part prints in the color asked for.

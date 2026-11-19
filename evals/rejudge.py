@@ -37,10 +37,10 @@ def rejudge(rdir: Path) -> dict:
     # a passed run's why is ["all checks pass"] (likeness_run leaves it so), which is no failing check
     other = [w for w in log.get("why", []) if not w.startswith("likeness") and w != "all checks pass"]
     grade = {"pass": not other, "why": other or ["all checks pass"]}
-    grade = run.likeness_run(rdir, rdir / "job", spec["request"], grade, (exp.get("likeness") or {}).get("min"))
+    grade = run.likeness_for(rdir, rdir / "job", spec, spec_path, exp, grade)
     if other:
         grade["pass"] = False
-    log.update({k: grade[k] for k in ("pass", "why", "likeness")})
+    log.update({k: grade[k] for k in ("pass", "why", "likeness", "traits") if k in grade})
     log["rejudged"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     replace_score(log)
@@ -79,7 +79,7 @@ def main() -> int:
     bad = 0
     for d in sys.argv[1:]:
         log = rejudge(Path(d).resolve())
-        print(("PASS  " if log["pass"] else "FAIL  ") + f"{log['run_id']}  likeness {log['likeness']}  "
+        print(("PASS  " if log["pass"] else "FAIL  ") + f"{log['run_id']}  likeness {log.get('likeness', log.get('traits'))}  "
               + "; ".join(log["why"])[:160], flush=True)
         bad += not log["pass"]
     return 1 if bad else 0
