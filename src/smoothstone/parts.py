@@ -259,10 +259,14 @@ HAIR_ORDER = 6  # harmonics in the hairline's series: 2 cannot hold it over the 
 HAIR_SMOOTH = 0.01  # the cost of the hairline leaving a plane's section of the head (_huber_fit)
 HAIR_MISS = 0.25  # a sector whose best split leaves more of its area than this on the wrong side gives no sample
 HAIR_FRONT = 60  # degrees each side of the face where the picture's hair edge sets the hairline
-HAIR_BLEND = 30  # degrees behind the ears over which the hairline goes from over the ears down to the nape
+HAIR_BLEND = 20  # degrees from the ears' back over which the hairline goes from over the ears down to the nape
+HAIR_BACK_FROM = 120  # degrees from the face past which the samples of the drop and the nape count for more
+HAIR_BACK_WEIGHT = 2.0  # their say in the fit: 1 leaves a bare wedge behind each ear, 4 a wavy knee at the nape
 HAIR_EAR_GAP = 0.5  # mm: at the sides the hairline passes this far over the ears' top
 HAIR_BROW = 3.0  # mm: at the middle of the face the hairline stays this far over the ears' top (the brows)
-HAIR_NAPE = 1.0  # mm: at the back the hairline is this far over the head's underside (the nape)
+HAIR_NAPE = 1.0  # mm: the hairline never goes lower than this over the head's underside (the nape)
+HAIR_BACK = 2.0  # mm: across the back the hairline is level, this far over the head's underside: at 1 it
+# runs where the head narrows into the neck, and its turn there is wavy (wobble 0.31 mm on DHH)
 HAIR_ROUGH_R = 1.0  # mm: the spread of the normals within this is how ridged the surface is...
 HAIR_TEX_R = 2.5  # mm: ...averaged over this
 HAIR_ROUGH_MIN = 0.02  # ridged hair is at least this ridged (the level is 0.038 on DHH, 0.059 on Elon)
@@ -1405,8 +1409,9 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
 
     The heights: within HAIR_FRONT degrees of the face the picture's hair edge (hair_samples), as
     the face shows where the hair starts. Round the rest, a person's hair: just over the ears at
-    the sides (HAIR_EAR_GAP over their top, held over their width) and down to the nape at the
-    back (HAIR_NAPE over the head's underside), blended between. The sculpt can only take it lower:
+    the sides (HAIR_EAR_GAP over their top, held over their width) and level across the back
+    (HAIR_BACK over the head's underside), dropping to it within HAIR_BLEND degrees of the ears'
+    back, so no bare wedge is left behind them. The sculpt can only take it lower:
     where the sculpt's ridged hair (head_texture over a level set between the face's skin and the
     picture's hair) runs on down past that, as long hair over the ears does, the height is the
     ridged mass's bottom. Smooth sculpt proves nothing: smooth locks are still hair.
@@ -1466,8 +1471,6 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
     napes = {}
     for b in range(-180, 180, HAIR_SECTOR):
         napes[b] = _nape(mesh, head, (thf >= b) & (thf < b + HAIR_SECTOR), zmid)
-    found = [v for v in napes.values() if v is not None]
-    nape_all = float(np.median(found)) if found else nz
     # nowhere under the nape: the lowest of the head's underside round the back (it never goes
     # lower at the sides or the face)
     tm_b = np.radians(np.array(list(napes)) + HAIR_SECTOR / 2)
@@ -1478,7 +1481,7 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
     for x in (1, -1):
         side = [e for e in ears if e["x"] == x] or ears
         if side:
-            ear_lvl[x] = (max(e["top"] for e in side) + HAIR_EAR_GAP, max(e["span"][1] for e in side) + 5.0)
+            ear_lvl[x] = (max(e["top"] for e in side) + HAIR_EAR_GAP, max(e["span"][1] for e in side))
         else:  # no ears found: the brow's height, a little over halfway up from the neck
             ear_lvl[x] = (nz + 0.55 * (zt - nz), 110.0)
     ear_front = {}
@@ -1535,7 +1538,7 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
         if p < start and edge.get(x) is not None:  # the temple: from the face's edge down to over the ear
             u = float(np.clip((p - HAIR_FRONT) / max(start - HAIR_FRONT, 1.0), 0.0, 1.0))
             side = edge[x] + (side - edge[x]) * u * u * (3 - 2 * u)
-        back = (napes[b] if napes[b] is not None else nape_all) + HAIR_NAPE
+        back = nape_low + HAIR_BACK  # level across the nape: a slope there reads as a V from behind
         w = float(np.clip((p - end) / HAIR_BLEND, 0.0, 1.0))
         w = w * w * (3 - 2 * w)
         target = _rough_bottom(c, a, rough, sel, (1 - w) * side + w * back)
@@ -1548,6 +1551,9 @@ def hairline(mesh, labels: np.ndarray, anat: dict, base: np.ndarray) -> dict | N
         if w == 0.0 and p >= start and target >= side - 1e-9:
             ear_bins.append(len(t2) - 1)
     w2 = np.ones(len(t2))
+    # behind the ears the samples count for more, so the fit drops to the nape there and does not
+    # leave a bare wedge behind each ear
+    w2[len(front):][_from_face(np.c_[np.cos(t2[len(front):]), np.sin(t2[len(front):])], (0.0, 0.0)) > HAIR_BACK_FROM] = HAIR_BACK_WEIGHT
     # the face's samples come from the picture: robust there, but for a lock's crease, which is the sculpt's
     noisy = np.r_[[not f[5] for f in front], np.zeros(len(t2) - len(front), bool)]
     t2, z2, r2 = np.array(t2), np.array(z2), np.array(r2)

@@ -1008,8 +1008,53 @@ def test_the_hair_ends_on_a_smooth_line_fitted_to_the_picture_and_leaves_its_blo
     P = mesh.vertices[np.unique(mesh.face_adjacency_edges[cross])]
     off = np.abs(P[:, 2] - _hair_true(np.arctan2(P[:, 1], P[:, 0])))
     phi = np.degrees(np.abs(np.angle(np.exp(1j * (np.arctan2(P[:, 1], P[:, 0]) + np.pi / 2)))))
-    for lo in range(0, 180, 10):
-        k = (phi >= lo) & (phi < lo + 10)
-        if k.any():
-            print("PHI", lo, round(float(off[k].max()), 2), round(float(np.median(P[k, 2])), 2))
-    assert off.max() < 0.4, f"the hair's edge strays {off.max():.2f} mm from the line"
+    # the picture sets the line only at the face (Donovan: the photo sets forehead and temples);
+    # round the rest it goes over the ears and down to the nape
+    face = phi < parts.HAIR_FRONT
+    assert face.any()
+    assert off[face].max() < 0.4, f"the hair's edge strays {off[face].max():.2f} mm from the picture's line at the face"
+
+
+def test_the_hair_is_level_across_the_back_and_drops_to_it_just_behind_the_ears(monkeypatch, tmp_path):
+    """Eval (Elon, DHH, 8 angles): the hairline held over the ears until 5 degrees past them, then
+    blended down to the nape over 30 more, and the fit smoothed that into a V: on DHH it sat 2.6 mm
+    over the nape at the back's middle and left a bare white wedge behind each ear. Across the back
+    the hair must come down level to just over where the head meets the neck."""
+    from smoothstone import paint
+
+    m = block_figure(ears=True)
+    top_z, H = 65.5, 65.5 - 8.0
+
+    def fake(sub, front, back, atlas):
+        V = np.asarray(sub.vertices, float)
+        t = V[V[:, 2].argmax()]
+        c = (sub.triangles_center - t) * H + np.array([0.0, 0.0, top_z])
+        out = np.where((c[:, 2] < 28.0)[:, None], [[40, 50, 120]], [[25, 25, 28]]).astype(float)
+        out[(c[:, 2] > 50.0) | ((np.abs(c[:, 0]) > 12.0) & (c[:, 2] < 36.0))] = [225, 180, 150]
+        th = np.arctan2(c[:, 1], c[:, 0])  # the picture's hair: over the brows at the front, low behind
+        zl = 58.5 + 2.0 * np.clip(-np.sin(th), 0, None) - 4.5 * np.clip(np.sin(th), 0, None)
+        out[(c[:, 2] > 50.0) & (c[:, 2] > zl)] = [95, 60, 30]
+        return out
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    res = C.find_regions(m, "figure", {"base": "round", "name": ""}, tmp_path / "front.png", None,
+                         tmp_path / "atlas.png")
+    mesh, num, info = res["mesh"], res["num"], res["regions"]
+    hair_n = [d["n"] for d in info if d["part"] == "hair"]
+    assert len(hair_n) == 1, [(d["n"], d["part"]) for d in info]
+    hair = num == hair_n[0]
+    c = mesh.triangles_center
+    head = c[:, 2] > 52.0
+    adj = mesh.face_adjacency
+    cross = (hair[adj[:, 0]] != hair[adj[:, 1]]) & head[adj[:, 0]] & head[adj[:, 1]]
+    P = mesh.vertices[np.unique(mesh.face_adjacency_edges[cross])]
+    phi = np.degrees(np.abs(np.angle(np.exp(1j * (np.arctan2(P[:, 1], P[:, 0]) + np.pi / 2)))))
+    # the ball head (radius 7 at z 58.5) meets the neck (radius 3) at 58.5 - sqrt(40): the nape
+    level = 58.5 - np.sqrt(40.0) + parts.HAIR_BACK
+    back = P[phi >= 170, 2]
+    assert len(back), "no hair edge at the back"
+    assert np.median(back) < level + 0.8, f"the hair's edge at the back is {np.median(back) - level:.2f} mm over the nape's level"
+    # the ears stay out of the hair
+    ears = head & (np.abs(c[:, 0]) > 6.6) & (np.abs(c[:, 2] - 55.0) < 1.6)
+    assert ears.any() and not (hair & ears).any(), f"{int((hair & ears).sum())} ear faces are hair"
