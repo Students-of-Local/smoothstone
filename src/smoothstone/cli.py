@@ -1964,7 +1964,7 @@ def cmd_colors(args, job: Job) -> Out:
         # review first-F2: a wide fairing can shrink a small part the request colors away (black
         # glasses under a 6 mm smoothing); its color is checked on the paint itself, not the mapping
         a = cut.area_faces
-        thin = [g for g in named if g not in boxed and g not in chosen and a[reg_of == g].sum() > 0
+        thin = [g for g in named if g not in boxed and a[reg_of == g].sum() > 0
                 and a[(reg_of == g) & (face_fil == per[g])].sum() < colortool.NAMED_KEPT * a[reg_of == g].sum()]
         if thin:
             (job.root / f"{r.name}.3mf").unlink(missing_ok=True)

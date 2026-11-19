@@ -776,14 +776,76 @@ def test_a_color_the_request_names_is_never_given_up_for_a_rough_edge(jobenv, mo
     assert nxt.startswith("ask the person"), (nxt, text)
     assert not (jobenv / "stone-job" / "figure.3mf").exists()
     # review first-F1: the question offers only what the tools can carry out. The figure file was
-    # given, so no seed makes another; the person's color answer is a command that prints
+    # given, so no seed makes another; another color is a new request
     assert "print it as it is" not in nxt and "another seed" not in nxt, nxt
-    pick = next(ln for ln in text.splitlines() if ln.startswith("If the person picks another color"))
-    cmd = pick.split(": ", 1)[1].replace("<color>", "white")
-    text, code, nxt = stone(*cmd.split()[1:])
+    assert 'stone new --force "<the request, with the color they name>"' in text, text
+    # review second-F1: the model driving stone cannot answer for the person. Giving the jacket's
+    # part the rest color itself, after the question, is refused like any mapping that drops it
+    text, code, nxt = stone("colors", "top=white", "rest=white")
+    assert "the request makes the jacket black" in text and nxt != cli.DONE_NEXT, text
+    assert not (jobenv / "stone-job" / "figure.3mf").exists()
+    # the person's answer, a jacket in white too, is a new request, and that one prints
+    fig = jobenv.parent / "abc123" / "figure.stl"
+    stone("new", "--force", 'A figure 70 mm tall with "ADA" on the base, all white')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    for _ in range(4):
+        if not nxt.startswith("stone colors"):
+            break
+        text, code, nxt = stone(*nxt.split()[1:])
     assert nxt == cli.DONE_NEXT, text
-    assert "the person chose it" in text, text
     assert (jobenv / "stone-job" / "figure.3mf").is_file()
+
+
+def test_a_named_edge_on_a_figure_stone_made_offers_another_seed(jobenv, monkeypatch, openscad, tmp_path):
+    """When the figure step made the figure, another seed makes another figure: the question offers
+    it, and the command it gives builds the figure again with that seed."""
+    import numpy as np
+
+    from smoothstone import colors
+
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", 'A mini figure of Ada, 70 mm tall, with "ADA" on the base, all white but the jacket, which is black')
+    job = cli.Job(jobenv / "stone-job")
+    job.image_dir.mkdir(parents=True, exist_ok=True)
+    _style_picture(job.image_dir / "source.png")
+    made = tmp_path / "made"
+    made.mkdir()
+    figure.repair(standin(tmp_path / "lift.glb"), made / "figure.stl")
+    _style_picture(made / "style.png")
+    seeds = []
+
+    def fake_make(photos, out, style_name="chibi", who="person", seed=7, extra="", say=print):
+        seeds.append(seed)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "latest.txt").write_text(str(made / "figure.stl"))  # as make does
+        return made / "figure.stl"
+
+    monkeypatch.setattr(figure, "make", fake_make)
+    monkeypatch.delenv("STONE_FIGURE_SEED", raising=False)
+    stone("set", "figure", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert nxt.startswith("stone colors"), text
+    real = colors.ledges
+
+    def always_a_ledge(V, F, face_fil, lines):
+        out = real(V, F, face_fil, lines)
+        if len(np.unique(face_fil)) > 1 and out:
+            out[0] = {**out[0], "area": 1.0, "angle": 15.0, "fil": int(face_fil.max()), "faces": 9}
+        return out
+
+    monkeypatch.setattr(colors, "ledges", always_a_ledge)
+    for _ in range(6):
+        if not nxt.startswith("stone colors"):
+            break
+        text, code, nxt = stone(*nxt.split()[1:])
+    assert nxt.startswith("ask the person") and "another seed" in nxt, (nxt, text)
+    line = next(ln for ln in text.splitlines() if ln.startswith("If the person wants the figure made again"))
+    assert "stone set seed=8, then stone build" in line, line
+    text, code, _ = stone("set", "seed=8")
+    assert code == 0, text
+    stone("build")
+    assert seeds[-1] == 8, seeds
 
 
 def test_a_named_part_the_figure_has_no_region_for_asks_for_another_figure(jobenv, monkeypatch, openscad, tmp_path):
