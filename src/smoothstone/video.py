@@ -5,7 +5,8 @@ The clip is built from the job and the run log that made it, nothing else:
   which is cut to …/<its last name>, with lines copied from what stone printed back (a long line
   is wrapped, or cut with a closing "…");
 - the photos, the design and the turning figure come from the job's own files; the figure turns
-  from the painted 3MF itself (Blender, one material per filament), so its colors are the print's;
+  from the painted 3MF itself (Blender, one material per filament), so its colors are the print's,
+  and the design shows each part painted off the rest color in its filament's color;
 - the sound is made here from sine partials (nothing to license), set to -16 LUFS.
 
 Layout follows X's vertical player: no text in the top 200 px or the bottom 300 px. Every text
@@ -35,6 +36,9 @@ TURN = 144  # frames for one full turn of the figure (4.8 s)
 END_S = 2.2
 HOOK_S = 1.1  # the cold open: the finished figure first, then how it was made
 CARD_S = 1.4  # the photos card and the design card
+DESIGN_REACH = 0.02  # of the figure's height: how far past a painted part its drawn color still joins it
+DESIGN_LIGHT = 100.0  # and how far its brightness (0..255) may be from the part's: rim light is in, white is out
+DESIGN_NEAR = 40.0  # how far a pixel's tint (RGB less its mean) may be from a painted part's drawn tint to be recolored
 TYPE_CPF = 4  # characters typed per frame
 DURATION = (13.0, 16.0)
 LUFS, LUFS_TOL, TRUE_PEAK = -16.0, 1.0, -1.5
@@ -433,11 +437,78 @@ def paint_npz(job_root: Path, out: Path) -> dict:
     if not names or fil.max() > len(names):
         raise VideoProblem("the job's colors do not name every filament in its 3MF")
     rgb = np.array([C.filament_rgb(n) or (150, 150, 150) for n in names], np.uint8)
-    np.savez(out, V=V, F=F, fil=fil, rgb=rgb)
+    np.savez(out, V=V, F=F, fil=fil, rgb=rgb, rest=np.int32(main))
     area = np.linalg.norm(np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]), axis=1)
     share = [float(area[fil == k + 1].sum() / area.sum()) for k in range(len(names))]
     return {"3mf": str(f3), "faces": int(len(F)),
             "filaments": [(n, rgb[k].tolist(), round(share[k], 4)) for k, n in enumerate(names)]}
+
+
+def plinth_top(job_root: Path) -> float:
+    """The height of the job's plinth top (0 with none): the figure stands on it."""
+    from . import colors as C
+
+    try:
+        plan = json.loads((job_root / "plan.json").read_text())
+    except (OSError, ValueError):
+        return 0.0
+    return C.base_top(plan.get("recipe") or "", plan.get("params") or {})
+
+
+def painted_design(style: Path, npz: Path, top: float, out: Path) -> Path:
+    """The drawing the figure was made from, with each part painted off the rest color shown in
+    its filament's color, the drawing's own shading kept: the design card never shows black pants
+    on a figure printed with blue ones. The figure's faces facing the camera are drawn far to near
+    into the drawing's frame by the same registration stone colors projects the drawing with, and
+    each pixel takes the filament of the face drawn last on it. The rest color is left as drawn.
+    Returns `style` itself when the paint has nothing off the rest color or no face to show."""
+    from PIL import Image, ImageDraw
+
+    from . import paint as P
+
+    d = np.load(npz)
+    V, F, fil, rgb = d["V"].astype(float), d["F"], d["fil"], d["rgb"].astype(np.float32)
+    rest = int(d["rest"]) if "rest" in d.files else 1
+    tri = V[F]
+    fig = (tri[:, :, 2].min(1) >= top - 0.01) & (tri[:, :, 2].mean(1) > top + 0.01)
+    n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    front = fig & (n[:, 1] < 0)
+    if not (front & (fil != rest)).any():
+        return style
+    img = np.asarray(Image.open(style).convert("RGB")).astype(np.float32)
+    fg = P._fg(style)
+    vf = np.unique(F[fig])
+    px, py = P.register(V[vf, 0], V[vf, 2], fg)(V[:, 0], V[:, 2])
+    lab = Image.new("L", (img.shape[1], img.shape[0]), 0)
+    draw = ImageDraw.Draw(lab)
+    for i in np.nonzero(front)[0][np.argsort(-tri[front, :, 1].mean(1))]:  # far (+y) to near
+        draw.polygon([(float(px[j]), float(py[j])) for j in F[i]], fill=int(fil[i]))
+    lab = np.asarray(lab)
+    from scipy import ndimage
+
+    if (lab > 0).any():  # the drawing's outline runs a little past the mesh's: those pixels take the nearest face's
+        idx = ndimage.distance_transform_edt(lab == 0, return_distances=False, return_indices=True)
+        lab = np.where(fg & (lab == 0), lab[idx[0], idx[1]], lab)
+    show = fg & (lab > 0) & (lab != rest)
+    lum = img.mean(2)
+    res = img.copy()
+    ys = np.nonzero(fg.any(1))[0]
+    reach = DESIGN_REACH * (ys.max() - ys.min() + 1)
+    for k in np.unique(lab[show]):
+        sel = show & (lab == k)
+        tint = img - lum[:, :, None]  # the color without its light: a part's rim light and shadow keep its tint
+        near = ((np.linalg.norm(tint - np.median(tint[sel], 0), axis=2) < DESIGN_NEAR)
+                & (np.abs(lum - np.median(lum[sel])) < DESIGN_LIGHT))  # nor a white zip on a black jacket
+        # the registration is a few pixels off at a part's edge: skin drawn inside it stays skin
+        # rather than turning gray, and the part's own color drawn just outside it joins it
+        edge = fg & (lab == rest) & (ndimage.distance_transform_edt(lab != k) < reach)
+        sel = (sel | edge) & near
+        if not sel.any():
+            continue
+        shade = lum[sel] - float(np.median(lum[sel]))  # the drawing's light and shadow on the new color
+        res[sel] = np.clip(rgb[k - 1][None, :] + shade[:, None], 0, 255)
+    Image.fromarray(res.astype(np.uint8)).save(out)
+    return out
 
 
 def blender() -> str:
@@ -620,7 +691,8 @@ def compose(plan: Plan, turn_frames: list[Path], filaments=()) -> Shots:
     # 3. the design
     if plan.design and plan.style:
         sh.card("design")
-        fr = desktop(3, plan, "it designed the figure", "drawn from the photos by a local model")
+        fr = desktop(3, plan, "it designed the figure", "drawn from the photos by a local model"
+                     if plan.style.name != "design.png" else "drawn by a local model, in the colors asked")
         end = 1240
         picture(fr, Image.open(plan.style).convert("RGB"), [GAP, BODY, W - GAP, end], focused=True,
                 how="fit", fill=(253, 253, 253))
@@ -944,6 +1016,8 @@ def make(job_root: Path, log_path: Path, out: Path, turn: int = TURN) -> dict:
     plan = make_plan(job_root, log)
     out.mkdir(parents=True, exist_ok=True)
     paint = paint_npz(job_root, out / "mesh.npz")
+    if plan.style:
+        plan.style = painted_design(plan.style, out / "mesh.npz", plinth_top(job_root), out / "design.png")
     frames = turntable(out / "mesh.npz", out / "turn", turn, log=out / "blender.log")
     sh = compose(plan, frames, paint["filaments"])
     faults = sh.faults + row_faults(sh.rows, log)
@@ -1165,6 +1239,8 @@ def make_series(items: list[tuple[Path, Path]], out: Path, turn: int = SERIES_TU
         d = out / f"run{k + 1}"
         d.mkdir(exist_ok=True)
         paint = paint_npz(job_root, d / "mesh.npz")
+        if plan.style:
+            plan.style = painted_design(plan.style, d / "mesh.npz", plinth_top(job_root), d / "design.png")
         wide = turntable(d / "mesh.npz", d / "turn", turn, log=d / "blender.log")
         narrow = turntable(d / "mesh.npz", d / "turn3", turn, log=d / "blender3.log", size=narrow_size(len(items)))
         runs.append(Run(plan, log, label_of(job_root), wide, narrow, paint["filaments"]))
