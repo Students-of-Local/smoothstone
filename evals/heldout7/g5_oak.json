@@ -1,0 +1,15 @@
+{
+ "id": "g5_oak",
+ "request": "napolean figure 3 inches tall. blue jacket, black shoes, everything else white",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": [73, 79]
+  },
+  "colors": {
+   "blue": ["jacket"],
+   "black": ["shoes"],
+   "rest": "white"
+  }
+ }
+}

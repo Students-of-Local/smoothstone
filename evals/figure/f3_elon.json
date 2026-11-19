@@ -1,0 +1,11 @@
+{
+ "id": "f3_elon",
+ "request": "A mini figure of Elon Musk, 90 mm tall, with \"ELON\" on the base.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "ELON"
+  }
+ }
+}

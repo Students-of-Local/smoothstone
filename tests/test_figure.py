@@ -45,7 +45,8 @@ def test_repair_orients_and_scales(tmp_path):
 
 
 def test_prompt_names_the_style():
-    assert "chibi" in figure.prompt("chibi") and "this exact person" in figure.prompt("chibi")
+    assert "chibi" in figure.prompt("chibi", "animal") and "this exact person" in figure.prompt("chibi")
+    assert "large head" in figure.prompt("chibi")  # a person's chibi is the likeness figure
     assert "this exact animal" in figure.prompt("statue", "animal")
     with pytest.raises(figure.FigureProblem):
         figure.make([], Path("."), "nope")
@@ -95,6 +96,7 @@ def test_cached_steps_skip_models(tmp_path, monkeypatch):
     monkeypatch.setattr(figure, "describe", fake_describe)
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", fake_lift)
+    monkeypatch.setattr(figure, "traits", lambda *a, **k: None)
     a = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     b = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     assert a == b and a.exists() and calls == ["describe", "style", "lift"]
@@ -396,3 +398,201 @@ def test_an_edited_recipe_source_rebuilds(jobenv, monkeypatch, openscad, tmp_pat
         f.write("\n// edited\n")
     text, code, nxt = stone("build")
     assert "Nothing changed" not in text, text
+
+
+def test_the_style_prompt_takes_the_kind_wikidata_gave_the_found_subject(jobenv, monkeypatch):
+    """An elephant or a golden retriever is an animal and a tower is an object, though neither
+    word is in the animal list; only a photo the owner gives falls back to the request's words."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A figurine of an african elephant, 80 mm tall")
+    job = cli.Job(jobenv / "stone-job")
+    found = job.image_dir / "found"
+    found.mkdir(parents=True)
+    (found / "found.json").write_text(json.dumps({"query": "african elephant", "kind": "animal"}))
+    assert cli.figure_who(job, "chibi") == "animal"
+    (found / "found.json").write_text(json.dumps({"query": "Eiffel Tower", "kind": "object"}))
+    assert cli.figure_who(job, "chibi") == "object"
+    assert cli.figure_who(job, "object") == "object"
+
+
+ELON_LOOK = ("The person has light brown, wavy hair, no glasses, no facial hair, appears to be middle-aged, "
+             "and is of fair complexion. They are wearing a black suit jacket, a white shirt, and a black tie.")
+
+
+def test_a_person_without_glasses_gets_no_glasses_in_the_style_prompt():
+    """The Elon render came back with thick black glasses: the prompt named glasses twice, once in
+    the likeness line and once as 'no glasses' from the description, and naming them draws them."""
+    p = figure.prompt("chibi", "person", ELON_LOOK)
+    assert "glasses" not in p.lower() and "facial hair" not in p.lower()
+
+
+def test_a_person_is_styled_from_the_photo_not_from_the_description():
+    """Owner: "Those things look nothing like elon". The description's "light brown hair" made his
+    hair too light: the blind likeness judge gave 8 with the description in the prompt and 9 on
+    both seeds without it, so for a person the photo alone carries the look."""
+    p = figure.prompt("chibi", "person", ELON_LOOK)
+    assert "light brown" not in p and "middle-aged" not in p
+    assert "the real face from the photo" in p and "the same jaw" in p and "large head" in p
+    assert "expression" in p and "smile" not in p  # a smile he does not have was drawn on
+    assert "friendly smile" in figure.prompt("chibi", "animal")  # animals keep the chibi look
+    assert "light brown" in figure.prompt("chibi", "animal", "light brown fur.")
+
+
+def test_a_person_with_glasses_keeps_them_exactly():
+    p = figure.prompt("chibi", "person", "The person has short grey hair and thin round glasses. They wear a jacket "
+                      "with no tie.")
+    assert "same frame shape" in p and "tie" not in p
+
+
+def test_the_photo_check_decides_the_glasses_over_the_description():
+    """The traits check looked at the photo; the description is one model's sentence about it."""
+    assert "same frame shape" in figure.prompt("chibi", "person", "", glasses=True)
+    assert "glasses" not in figure.prompt("chibi", "person", "He wears glasses.", glasses=False).lower()
+
+
+def test_the_positive_words_of_a_description():
+    assert figure.positive("short hair, no beard, without a hat, a red shirt.") == "short hair, a red shirt."
+    assert figure.positive("He is not wearing glasses. He has a black jacket.") == "He has a black jacket."
+
+
+def _models(tmp_path, monkeypatch, answers):
+    """Fake describe, style and lift; traits answers by file name. Returns the style calls."""
+    calls = []
+
+    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None):
+        calls.append((photos[0].name, seed))
+        out.write_bytes(f"render {seed}".encode())
+        return out
+
+    def fake_traits(images, who, log):
+        return [answers(Path(i).name) for i in images]
+
+    monkeypatch.setattr(figure, "describe", lambda photo, out, who: (out.write_text("hair\n"), "hair")[1])
+    monkeypatch.setattr(figure, "style", fake_style)
+    monkeypatch.setattr(figure, "lift", lambda render, out, seed: standin(out))
+    monkeypatch.setattr(figure, "traits", fake_traits)
+    monkeypatch.setattr(figure, "face_crop", lambda photo, out: None)
+    return calls
+
+
+BARE = {"face": True, "glasses": False, "beard": False, "hat": False}
+
+
+def test_a_photo_with_no_face_never_sets_the_likeness(tmp_path, monkeypatch):
+    """For "DHH" the finder once put a protein first, and the describe model then wrote a man with
+    gold glasses from it. Only a photo that shows the face may lead; a cap goes behind a bare head."""
+    photos = []
+    for name in ("protein.png", "cap.jpg", "talk.jpg"):
+        photos.append(tmp_path / name)
+        photos[-1].write_bytes(name.encode())
+    said = []
+    calls = _models(tmp_path, monkeypatch, lambda n: {"protein.png": {"face": False},
+                                                      "cap.jpg": {**BARE, "hat": True}}.get(n, BARE))
+    figure.make(photos, tmp_path / "fig", say=said.append)
+    assert calls[0][0] == "talk.jpg"
+    assert any("Left out 1 photo with no face" in x for x in said)
+
+
+def test_no_photo_with_a_face_stops_the_figure_with_a_way_on(tmp_path, monkeypatch):
+    photo = tmp_path / "car.jpg"
+    photo.write_bytes(b"car")
+    _models(tmp_path, monkeypatch, lambda n: {"face": False})
+    with pytest.raises(figure.FigureProblem, match="stone image"):
+        figure.make([photo], tmp_path / "fig", say=lambda s: None)
+
+
+def test_a_render_that_adds_glasses_is_styled_again_with_the_next_seed(tmp_path, monkeypatch):
+    """The Elon render came back with thick black glasses he does not wear."""
+    photo = tmp_path / "elon.jpg"
+    photo.write_bytes(b"elon")
+    calls = _models(tmp_path, monkeypatch,
+                    lambda n: {**BARE, "glasses": n == "style-7.png"})
+    said = []
+    fig = figure.make([photo], tmp_path / "fig", seed=7, say=said.append)
+    assert [c[1] for c in calls] == [7, 8]
+    assert (fig.parent / "style.png").read_bytes() == b"render 8"
+    assert json.loads((fig.parent / "check.json").read_text())["differs"] == []
+    assert any("added glasses" in x and "seed 8" in x for x in said)
+
+
+def test_a_render_that_never_matches_keeps_the_closest(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    beard = {"style-7.png": {**BARE, "glasses": True, "beard": True}, "style-8.png": {**BARE, "glasses": True}}
+    calls = _models(tmp_path, monkeypatch, lambda n: beard.get(n, {**BARE, "hat": True, "beard": True}
+                                                               if n.startswith("style") else BARE))
+    fig = figure.make([photo], tmp_path / "fig", seed=7, say=lambda s: None)
+    assert [c[1] for c in calls] == [7, 8, 9]
+    assert (fig.parent / "style.png").read_bytes() == b"render 8"
+
+
+def test_the_face_crop_leads_the_style_references(tmp_path, monkeypatch):
+    """With the whole photo alone the face is a few pixels of a 768 px render and comes out generic;
+    the face crop first and the photo second took the likeness judge from 6 to 9 on Elon."""
+    photo = tmp_path / "elon.jpg"
+    photo.write_bytes(b"elon")
+    refs = []
+    _models(tmp_path, monkeypatch, lambda n: BARE)
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: (refs.append([p.name for p in photos]),
+                                                                      out.write_bytes(b"r"))[1] and out)
+
+    def crop(src, out):
+        out.write_bytes(b"face")
+        return out
+    monkeypatch.setattr(figure, "face_crop", crop)
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert refs[0] == ["face.png", "elon.jpg"]
+
+
+def test_no_face_crop_for_an_animal_or_when_it_fails(tmp_path, monkeypatch):
+    photo = tmp_path / "dog.jpg"
+    photo.write_bytes(b"dog")
+    refs = []
+    _models(tmp_path, monkeypatch, lambda n: BARE)
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: (refs.append([p.name for p in photos]),
+                                                                      out.write_bytes(b"r"))[1] and out)
+    monkeypatch.setattr(figure, "face_crop", lambda src, out: (_ for _ in ()).throw(AssertionError("cropped")))
+    figure.make([photo], tmp_path / "a", who="animal", say=lambda s: None)
+    monkeypatch.setattr(figure, "face_crop", lambda src, out: None)
+    figure.make([photo], tmp_path / "p", say=lambda s: None)
+    assert refs == [["dog.jpg"], ["dog.jpg"]]
+
+
+def test_face_crop_fails_open_without_a_face_or_a_venv(tmp_path, monkeypatch):
+    monkeypatch.setenv("STONE_MFLUX", str(tmp_path / "nowhere"))
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    assert figure.face_crop(photo, tmp_path / "face.png") is None
+
+
+def test_a_fictional_character_is_styled_as_that_character(jobenv, monkeypatch):
+    """Review of PR 23: Mario or a superhero is no human on Wikidata, and was styled as an object."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A chibi figure of Snoopy, 70 mm tall")
+    job = cli.Job(jobenv / "stone-job")
+    found = job.image_dir / "found"
+    found.mkdir(parents=True)
+    (found / "found.json").write_text(json.dumps({"query": "Snoopy", "kind": "character"}))
+    assert cli.figure_who(job, "chibi") == "character"
+    p = figure.prompt("chibi", "character")
+    assert "this exact character" in p and "costume" in p
+
+
+def test_the_owners_own_photo_is_never_stopped_by_the_face_check(tmp_path, monkeypatch):
+    """Review of PR 23: a small or side-on photo the owner gave read as no face, with no way on."""
+    photo = tmp_path / "source.jpg"
+    photo.write_bytes(b"me")
+    calls = _models(tmp_path, monkeypatch, lambda n: {"face": False} if n == "source.jpg" else BARE)
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert calls[0][0] == "source.jpg"
+
+
+def test_a_render_is_checked_only_for_what_the_photo_check_answered(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    asked = []
+    _models(tmp_path, monkeypatch, lambda n: {"face": True})
+    real = figure.traits
+    monkeypatch.setattr(figure, "traits", lambda images, who, log: (asked.append(images), real(images, who, log))[1])
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert len(asked) == 1  # the photo only: no glasses, beard or hat answer to hold a render to

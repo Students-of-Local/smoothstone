@@ -1,0 +1,15 @@
+{
+ "id": "g3_cedar",
+ "request": "Could you make me a Babe Ruth figurine, 4 inches tall, with \"BABE RUTH\" on the base? Paint him all white like his Yankees uniform, except the shoes, which should be black.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": [99, 105],
+   "name": "BABE RUTH"
+  },
+  "colors": {
+   "black": ["shoes"],
+   "rest": "white"
+  }
+ }
+}

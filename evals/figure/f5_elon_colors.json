@@ -1,0 +1,16 @@
+{
+ "id": "f5_elon_colors",
+ "request": "A mini figure of Elon Musk, 90 mm tall, with \"ELON\" on the base, all white but the suit and shoes, which are black, and the hair, which is brown.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "ELON"
+  },
+  "colors": {
+   "black": ["suit", "shoes"],
+   "brown": ["hair"],
+   "rest": "white"
+  }
+ }
+}

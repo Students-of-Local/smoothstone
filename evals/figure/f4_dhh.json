@@ -1,0 +1,11 @@
+{
+ "id": "f4_dhh",
+ "request": "A mini figure of DHH, 90 mm tall, with \"DHH\" on the base.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "DHH"
+  }
+ }
+}

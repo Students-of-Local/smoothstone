@@ -966,12 +966,18 @@ def image_step(job: Job, path: Path, out: Out):
 
 
 ANIMALS = {"dog", "puppy", "cat", "kitten", "pet", "bird", "horse", "rabbit", "bunny", "fox",
-           "bear", "lion", "tiger", "owl", "parrot", "hamster", "corgi", "pug", "frog", "turtle"}
+           "bear", "lion", "tiger", "owl", "parrot", "hamster", "corgi", "pug", "frog", "turtle",
+           "retriever", "terrier", "poodle", "elephant", "monkey", "penguin", "dolphin", "shark",
+           "giraffe", "panda", "koala", "deer", "cow", "pig", "goat", "sheep", "chicken", "duck",
+           "lizard", "snake", "wolf", "dinosaur"}
 
 
 def figure_who(job: Job, style: str) -> str:
     if style == "object":
         return "object"
+    found = read_json(job.image_dir / "found" / "found.json") or {}
+    if found.get("kind") in ("person", "animal", "character", "object") and not list(job.image_dir.glob("source.*")):
+        return found["kind"]  # what Wikidata says the found subject is
     words = set(re.findall(r"[a-z]+", job.request().lower())) if job.exists() else set()
     return "animal" if words & ANIMALS else "person"
 
@@ -1202,9 +1208,20 @@ def cmd_video(args, job: Job) -> Out:
         out.fix(f"no run log at {log}: pass the log.json the model run wrote, stone video <log.json>")
         out.next = nxt
         return out
+    others = [Path(r).expanduser() for r in args.runs or []]
+    for r in others:
+        if not (r / "job").is_dir() or not (r / "log.json").is_file():
+            out.fix(f"no run at {r}: --with takes a run folder holding job/ and log.json")
+            out.next = nxt
+            return out
     from . import video
+    turn = args.turn if args.turn is not None else video.SERIES_TURN if others else video.TURN
     try:
-        rep = video.make(job.root, log, dest, turn=args.turn)
+        if others:
+            items = [(job.root, log)] + [(r / "job", r / "log.json") for r in others]
+            rep = video.make_series(items, dest, turn=turn)
+        else:
+            rep = video.make(job.root, log, dest, turn=turn)
     except video.VideoProblem as e:
         out.fix(str(e))
         out.next = nxt
@@ -1880,7 +1897,10 @@ def make_parser() -> Parser:
     s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")
     s.add_argument("log", nargs="?", help="the run log (default: log.json beside the job)")
     s.add_argument("--out", help="output folder (default: <job>/video)")
-    s.add_argument("--turn", type=_turn_frames, default=144, help="frames in one turn of the figure (8 or more)")
+    s.add_argument("--turn", type=_turn_frames, default=None,
+                   help="frames in one turn of the figure (8 or more; 144 for one run, 120 each in a series)")
+    s.add_argument("--with", dest="runs", action="append", metavar="RUN",
+                   help="another finished run (a folder with job/ and log.json); the clip shows every figure")
     return p
 
 

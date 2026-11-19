@@ -1,0 +1,11 @@
+{
+ "id": "g6_yew",
+ "request": "Michelangelo's David as a mini statue, 120mm tall, and put DAVID on the front of the base",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 120,
+   "name": "DAVID"
+  }
+ }
+}

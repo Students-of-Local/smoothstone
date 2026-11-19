@@ -1,0 +1,10 @@
+{
+ "id": "g2_beech",
+ "request": "can i get a little emperor penguin figure? about 60mm tall, nothing written on it",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 60
+  }
+ }
+}

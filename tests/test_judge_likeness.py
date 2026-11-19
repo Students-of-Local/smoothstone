@@ -1,0 +1,225 @@
+import importlib.util
+import json
+import urllib.parse
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "evals"))
+spec = importlib.util.spec_from_file_location("judge_likeness", ROOT / "evals" / "judge_likeness.py")
+jl = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(jl)
+sys.modules["judge_likeness"] = jl
+spec = importlib.util.spec_from_file_location("run_evals", ROOT / "evals" / "run.py")
+run = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run)
+
+DHH = "A mini figure of DHH, 90 mm tall, with \"DHH\" on the base."
+
+
+def _job(tmp_path, renders=("k",)):
+    job = tmp_path / "job"
+    for k in renders:
+        d = job / "image" / "figure" / k
+        d.mkdir(parents=True)
+        (d / "style.png").write_bytes(b"png " + k.encode())
+    return job
+
+
+def _fake(monkeypatch, title, score, conflicts=()):
+    asked = []
+
+    def claude(prompt, folder=None, model="opus"):
+        asked.append((prompt, folder and sorted(p.name for p in Path(folder).iterdir())))
+        if folder is None:
+            return title
+        return json.dumps({"score": score, "conflicts": list(conflicts)})
+
+    def get(url, timeout=60):
+        if "api.php" in url:
+            assert "David+Heinemeier+Hansson" in url or "Elon+Musk" in url
+            return json.dumps({"query": {"pages": {"1": {"title": title, "description": "Danish programmer",
+                                                         "original": {"source": "https://up/x/ref.jpg"}}}}}).encode()
+        return b"jpeg"
+
+    monkeypatch.setattr(jl, "claude", claude)
+    monkeypatch.setattr(jl, "_get", get)
+    return asked
+
+
+def test_the_reference_comes_from_the_article_the_judge_names_not_the_tools_photos(tmp_path, monkeypatch):
+    """For "DHH" the tool styled a protein and every check passed a made up man (judged 3/10)."""
+    job = _job(tmp_path)
+    asked = _fake(monkeypatch, "David Heinemeier Hansson", 3,
+                  [{"feature": "facial hair", "what": "a full beard on a clean shaven face"}])
+    res = jl.judge(job, DHH)
+    assert not res["pass"] and res["score"] == 3
+    assert res["reference"]["title"] == "David Heinemeier Hansson"
+    assert asked[1][1] == ["reference.jpg", "render.png"]  # the job's own photos are never shown
+
+
+def test_a_figure_that_is_not_the_subject_fails_the_run_with_the_judges_words(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    _fake(monkeypatch, "David Heinemeier Hansson", 3, [{"feature": "glasses", "what": "round gold frames"}])
+    grade = run.likeness_run(tmp_path, job, DHH, {"pass": True, "why": ["all checks pass"]})
+    assert not grade["pass"] and grade["likeness"] == 3
+    assert grade["why"] == ["likeness 3/10: glasses: round gold frames"]
+    assert json.loads((tmp_path / "likeness.json").read_text())["score"] == 3
+
+
+def test_a_likeness_at_the_bar_keeps_the_pass(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    _fake(monkeypatch, "Elon Musk", jl.PASS)
+    grade = run.likeness_run(tmp_path, job, "A mini figure of Elon Musk", {"pass": True, "why": ["all checks pass"]})
+    assert grade["pass"] and grade["likeness"] == jl.PASS
+
+
+def test_a_judge_that_cannot_answer_fails_the_run(tmp_path, monkeypatch):
+    job = tmp_path / "job"
+    job.mkdir()
+    grade = run.likeness_run(tmp_path, job, DHH, {"pass": True, "why": ["all checks pass"]})
+    assert not grade["pass"] and "could not answer" in grade["why"][0]
+
+
+def test_the_render_judged_is_the_one_the_figure_was_made_from(tmp_path):
+    job = _job(tmp_path, renders=("old", "new"))
+    (job / "image" / "figure" / "latest.txt").write_text(str(job / "image" / "figure" / "new" / "figure.stl"))
+    assert jl.render_of(job).parent.name == "new"
+
+
+def test_a_reply_of_the_wrong_shape_is_a_judge_problem():
+    with pytest.raises(jl.JudgeProblem):
+        jl.parse("no json here")
+    with pytest.raises(jl.JudgeProblem):
+        jl.parse('{"score": 11, "conflicts": []}')
+    assert jl.parse('ok {"score": 7, "conflicts": [{"feature": "hair", "what": "lighter"}]}')["score"] == 7
+
+
+def test_a_spec_can_set_a_higher_likeness_bar(tmp_path, monkeypatch):
+    """Owner: "Those things look nothing like elon". The chibi Elon he saw was judged 5 to 7, so
+    the spec for that fault asks 8, above the judge's own bar."""
+    job = _job(tmp_path)
+    _fake(monkeypatch, "Elon Musk", 7, [{"feature": "face", "what": "a generic cartoon face"}])
+    grade = run.likeness_run(tmp_path, job, "A mini figure of Elon Musk", {"pass": True, "why": ["all checks pass"]},
+                             least=8)
+    assert not grade["pass"] and grade["why"] == ["likeness 7/10, the spec asks 8: face: a generic cartoon face"]
+    _fake(monkeypatch, "Elon Musk", 8)
+    assert run.likeness_run(tmp_path, job, "A mini figure of Elon Musk", {"pass": True, "why": []}, least=8)["pass"]
+
+
+def _rejudge_module():
+    s = importlib.util.spec_from_file_location("rejudge", ROOT / "evals" / "rejudge.py")
+    m = importlib.util.module_from_spec(s)
+    s.loader.exec_module(m)
+    return m
+
+
+def _run_dir(tmp_path, why, spec_text):
+    rdir = tmp_path / "run"
+    _job(rdir)
+    sha = __import__("hashlib").sha256(spec_text).hexdigest()
+    (rdir / "log.json").write_text(json.dumps({"run_id": "r", "spec": "f3_elon", "suite": "figure", "card": "S",
+                                               "driver": "lfm3", "spec_sha256": sha, "pass": False, "why": why}))
+    return rdir
+
+
+def test_a_run_the_judge_could_not_answer_is_judged_again_and_scored(tmp_path, monkeypatch):
+    """On the Mac `claude` was not signed in: Elon's run passed every check and failed unjudged."""
+    rj = _rejudge_module()
+    monkeypatch.setattr(rj.run, "SCORES", tmp_path / "scores.jsonl")
+    spec_text = (ROOT / "evals" / "figure" / "f3_elon.json").read_bytes()
+    rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (Not logged in)"], spec_text)
+    _fake(monkeypatch, "Elon Musk", 9)
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
+        "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
+        if "api.php" in url else b"jpeg")
+    log = rj.rejudge(rdir)
+    assert log["pass"] and log["likeness"] == 9 and log["rejudged"]
+    assert json.loads((tmp_path / "scores.jsonl").read_text())["pass"] == 1
+
+
+def test_rejudging_never_passes_a_run_that_failed_another_check(tmp_path, monkeypatch):
+    rj = _rejudge_module()
+    monkeypatch.setattr(rj.run, "SCORES", tmp_path / "scores.jsonl")
+    spec_text = (ROOT / "evals" / "figure" / "f3_elon.json").read_bytes()
+    rdir = _run_dir(tmp_path, ["height 80 mm, asked 90", "likeness: the judge could not answer (x)"], spec_text)
+    _fake(monkeypatch, "Elon Musk", 9)
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
+        "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
+        if "api.php" in url else b"jpeg")
+    log = rj.rejudge(rdir)
+    assert not log["pass"] and log["why"][0] == "height 80 mm, asked 90"
+
+
+def test_a_rejudged_run_replaces_its_own_score_line(tmp_path, monkeypatch):
+    """F3: run.py had scored the unjudged run pass=0, and rejudge added a second line, so it counted twice."""
+    rj = _rejudge_module()
+    scores = tmp_path / "scores.jsonl"
+    other = {"spec": "f4_dhh", "pass": 1, "run": "q"}
+    first = {"spec": "f3_elon", "pass": 0, "run": "r"}
+    scores.write_text(json.dumps(other) + "\n" + json.dumps(first) + "\n" + json.dumps({**other, "run": "s"}) + "\n")
+    monkeypatch.setattr(rj.run, "SCORES", scores)
+    spec_text = (ROOT / "evals" / "figure" / "f3_elon.json").read_bytes()
+    rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (Not logged in)"], spec_text)
+    _fake(monkeypatch, "Elon Musk", 9)
+    monkeypatch.setattr(jl, "_get", lambda url, timeout=60: json.dumps({"query": {"pages": {"1": {
+        "title": "Elon Musk", "original": {"source": "https://up/e.jpg"}}}}}).encode()
+        if "api.php" in url else b"jpeg")
+    rj.rejudge(rdir)
+    lines = [json.loads(x) for x in scores.read_text().splitlines()]
+    assert [x["run"] for x in lines] == ["q", "r", "s"]
+    assert lines[0] == other and lines[2] == {**other, "run": "s"}
+    assert lines[1]["pass"] == 1 and lines[1]["likeness"] == 9 and lines[1]["spec"] == "f3_elon"
+    assert not list(tmp_path.glob("scores.jsonl.*"))
+
+
+def test_a_spec_changed_since_the_run_is_not_rejudged(tmp_path, monkeypatch):
+    rj = _rejudge_module()
+    rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (x)"], b"an older spec")
+    with pytest.raises(SystemExit, match="changed since run"):
+        rj.rejudge(rdir)
+
+
+def _found(job, *titles):
+    d = job / "image" / "found"
+    d.mkdir(parents=True)
+    (d / "found.json").write_text(json.dumps({"photos": [{"title": t} for t in titles]}))
+
+
+def _article(monkeypatch, files):
+    """The fake article's lead image is ref.jpg; files are its other images, each at https://up/x/<n>."""
+    def get(url, timeout=60):
+        if "prop=images" in url:
+            return json.dumps({"query": {"pages": {"1": {"images": [{"title": f} for f in files]}}}}).encode()
+        if "prop=imageinfo" in url:
+            t = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["titles"][0]
+            return json.dumps({"query": {"pages": {"2": {"title": t, "imageinfo": [
+                {"url": "https://up/x/" + urllib.parse.quote(t[5:].replace(" ", "_"))}]}}}}).encode()
+        if "api.php" in url:
+            return json.dumps({"query": {"pages": {"1": {"title": "Elon Musk", "description": "businessman",
+                                                         "original": {"source": "https://up/x/Elon_Musk_ref.jpg"}}}}}).encode()
+        return b"jpeg"
+    monkeypatch.setattr(jl, "_get", get)
+
+
+def test_the_reference_is_never_a_photo_the_tool_styled_from(tmp_path, monkeypatch):
+    """Review of PR 23: the article's lead image is often Wikidata's, which the tool put first, so
+    the judge compared the render with its own source and measured copying, not likeness."""
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg", "File:Elon Musk 2.jpg")
+    _fake(monkeypatch, "Elon Musk", 8)
+    _article(monkeypatch, ["File:Tesla logo.svg", "File:Elon Musk 2.jpg", "File:Elon Musk Royal Society.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert res["reference"]["url"] == "https://up/x/Elon_Musk_Royal_Society.jpg"
+    assert res["reference"]["instead_of"] == "Elon Musk ref.jpg"
+
+
+def test_no_reference_apart_from_the_tools_photos_is_no_verdict(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg")
+    _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, ["File:Tesla logo.svg", "File:SpaceX factory.jpg"])
+    with pytest.raises(jl.JudgeProblem, match="tool"):
+        jl.judge(job, "A mini figure of Elon Musk")

@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -64,13 +65,32 @@ def run_stone(command: str, env: dict, cwd: Path) -> str:
         argv = argv[1:]
     if not argv:
         return "FIX: empty command.\nNEXT: stone status"
+    # its own process group, so a timeout also stops the models it started (mflux, the lift)
+    p = subprocess.Popen([STONE, *argv], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+                         cwd=cwd, start_new_session=True)
     try:
-        p = subprocess.run([STONE, *argv], capture_output=True, text=True, env=env, cwd=cwd,
-                           timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "420")))
-    except subprocess.TimeoutExpired:
-        return "FIX: the command ran too long.\nNEXT: stone status"
-    out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr and not p.stdout else "")
+        stdout, stderr = p.communicate(timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "900")))
+    except subprocess.TimeoutExpired:  # a figure build takes about 430 s; its style and lift are kept
+        stop_group(p)
+        return f"FIX: the command ran too long, and what it finished is kept.\nNEXT: stone {shlex.join(argv)}"
+    out = (stdout or "") + (("\n" + stderr) if stderr and not stdout else "")
     return out.strip()[:3000]
+
+
+def stop_group(p: subprocess.Popen) -> None:
+    """SIGTERM stone's whole process group, give it 5 s, then SIGKILL whatever is left of it."""
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(p.pid, sig)
+        except ProcessLookupError:  # the group is gone
+            break
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+    for f in (p.stdout, p.stderr):
+        if f:
+            f.close()
 
 
 def last_next(text: str) -> str | None:
@@ -226,6 +246,8 @@ def main():
         grade.update({"pass": False, "why": ["before the answer: " + w for w in first["why"]] + grade["why"]})
     if exp.get("judge") and grade["pass"]:
         grade = judge_run(rdir, job, spec["request"], exp["judge"], grade)
+    if exp.get("recipe") == "figure" and grade["pass"]:
+        grade = likeness_run(rdir, job, spec["request"], grade, (exp.get("likeness") or {}).get("min"))
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
@@ -297,11 +319,44 @@ def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> d
     return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
 
 
+def likeness_run(rdir: Path, job: Path, request: str, grade: dict, least: int | None = None) -> dict:
+    """Every figure: is it the subject asked for? (judge_likeness.py, saved as likeness.json).
+    The checks above pass any well made figure, even of the wrong person; a judge that cannot
+    answer fails the run with the reason, never passes it. A spec's expect.likeness.min raises
+    the bar above the judge's own."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import judge_likeness
+
+    try:
+        res = judge_likeness.judge(job, request)
+    except Exception as e:  # no render, no reference, no reply: a run is never passed unjudged
+        res = {"score": None, "pass": False, "conflicts": [], "error": f"{type(e).__name__}: {e}"}
+    if least and res.get("score") is not None and res["score"] < least:
+        res = {**res, "pass": False, "least": least}
+    (rdir / "likeness.json").write_text(json.dumps(res, indent=1))
+    if res["pass"]:
+        return {**grade, "likeness": res["score"]}
+    why = [w for w in grade["why"] if w != "all checks pass"]
+    if res.get("error"):
+        why.append(f"likeness: the judge could not answer ({res['error'][:120]})")
+    else:
+        bar = f", the spec asks {least}" if res.get("least") else ""
+        why.append(f"likeness {res['score']}/10{bar}: " + "; ".join(f"{c['feature']}: {c['what']}"
+                                                            for c in res["conflicts"])[:240])
+    return {**grade, "pass": False, "why": why, "likeness": res["score"]}
+
+
 SCORES = Path(os.environ.get("STONE_SCORES", str(ROOT / "evals" / "scores.jsonl")))
 
 
 def append_score(log: dict) -> None:
-    """One line per run in evals/scores.jsonl. The file is only ever appended to."""
+    """One more line in evals/scores.jsonl; only rejudge.py replaces a run's line."""
+    with SCORES.open("a") as f:
+        f.write(json.dumps(score_line(log)) + "\n")
+
+
+def score_line(log: dict) -> dict:
+    """A run's line in evals/scores.jsonl."""
     try:
         head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
                               text=True).stdout.strip() or None
@@ -309,9 +364,8 @@ def append_score(log: dict) -> None:
         head = None
     line = {"date": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sha": head, "suite": log.get("suite"),
             "spec": log["spec"], "card": log["card"], "driver": log["driver"], "pass": int(bool(log["pass"])),
-            "total": 1, "judge": log.get("judge"), "run": log["run_id"]}
-    with SCORES.open("a") as f:
-        f.write(json.dumps(line) + "\n")
+            "total": 1, "judge": log.get("judge"), "likeness": log.get("likeness"), "run": log["run_id"]}
+    return line
 
 
 def _part_key(name: str) -> str:
@@ -378,7 +432,10 @@ def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:
         t += np.bincount(face_fil[sel], weights=area[sel], minlength=len(fil) + 1)
     for part, t in tally.items():
         got[part] = fil[int(t[1:].argmax())]
-    named = {_part_key(p): str(c).lower() for c, ps in want.items() if c != "rest" for p in ps}
+    from smoothstone import parts as P
+
+    named = {q: str(c).lower() for c, ps in want.items() if c != "rest" for p in ps
+             for q in (P.parts_of(p) or (_part_key(p),))}
     rest = str(want.get("rest", "")).lower()
     for part, c in sorted(got.items()):
         need = named.get(_part_key(part), rest)
