@@ -29,19 +29,22 @@ PURGE_G = 0.65  # grams of purge per filament change, about what Orca's default 
 MANY_LAYERS = 10  # a warning from this many mixed layers
 MAX_FILAMENTS = 16
 EDGE_RADIUS = 1.5  # mm: color boundaries are smoothed over about this distance before the cut
+FAIR_RADII = (EDGE_RADIUS, 3.0, 6.0)  # mm: a boundary that is not smooth is cut again over these, in turn, before a color is given up
 EDGE_WINDOW = 2.0  # mm of arc length: the moving average a boundary is compared with
 JAGGED = 1.08  # a boundary this much longer than its smoothed self zigzags
 EDGE_SPAN = 5.0  # mm: the stretch the wobble check looks at
 WOBBLE = 0.15  # mm: over any EDGE_SPAN stretch a crisp edge stays this close to one plane
 LEDGE_MM = 2.0  # mm from a part's color edge where an up-facing face of the upper color is a ledge
-LEDGE_NZ = 0.5  # a face whose normal points up at least this much faces up (within 60 degrees)
+LEDGE_NZ = 0.6  # a face whose surface (_patch_nz) points up at least this much faces up (within 53 degrees):
+# a collar's top is 1, Elon's shoulder slope 0.71; Jensen's neck leaning back over a groove 0.52 (r3, 2026-11-19)
+LEDGE_PATCH = 0.5  # mm round a face over which its facing up is judged (_patch_nz): 1 blurs a 0.6 mm collar shelf
 LEDGE_AREA = 0.2  # mm2 of such faces seen (parts.visible_faces) in any 30 degree sector fails the check
 EDGE_MIN = 4.0  # mm: shorter boundary pieces (ends at a three-color corner) are too short to judge
 SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under this is a sliver, a band under about 4 mm across
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 NAME_OUT = 0.02  # mm: a plinth face with a corner this far out of the drum is a raised letter of the name
 NAME_CONTRAST = 3.0  # the name's color stands out from the plinth's by at least this contrast ratio (WCAG)
-REGIONS_VERSION = 7  # bump when find_regions changes what it returns, so a cached listing is redone
+REGIONS_VERSION = 8  # bump when find_regions changes what it returns, so a cached listing is redone
 
 # plain color names and a typical filament of each
 NAMES = {
@@ -1142,7 +1145,7 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
     where the color above the line has climbed onto a ledge of the part below it, like the top of
     a standing collar painted the head's color by a plane cut through the collar. For each color
     edge near the line, the color of its upper face is the upper color; the faces of that color
-    within LEDGE_MM of the edge that face up (normal z over LEDGE_NZ) and that a person sees are
+    within LEDGE_MM of the edge that face up (their surface over LEDGE_PATCH, _patch_nz, over LEDGE_NZ) and that a person sees are
     the fault (at a shoe's top, a cuff or on any line along a rim, only those the edge runs onto: _on_edge) (a strip tucked under a cuff's rim is hidden and counts as seen only where it is).
     A neck line's "nostep" bins, where the shoulders' slope runs on into the head with no step for
     the line to sit on (parts.neck_rim), are skipped; the PASS line counts them.
@@ -1157,8 +1160,8 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
     face_fil = np.asarray(face_fil)
     mesh = load_stl_mesh(V, F)
     c = mesh.triangles_center
-    nz = mesh.face_normals[:, 2]
     area = mesh.area_faces
+    nz = mesh.face_normals[:, 2]
     adj = mesh.face_adjacency
     ev = mesh.face_adjacency_edges
     diff = face_fil[adj[:, 0]] != face_fil[adj[:, 1]]
@@ -1182,7 +1185,8 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
         e &= np.isin(face_fil[adj[:, 0]], (U, L)) & np.isin(face_fil[adj[:, 1]], (U, L))
         if U != L and e.any():
             mid = mesh.vertices[ev[e]].mean(1)  # ev indexes the rebuilt mesh's vertices
-            cand = np.where(near & (nz > LEDGE_NZ) & (face_fil == U))[0]
+            cand = np.where(near & (nz > LEDGE_NZ - 0.3) & (face_fil == U))[0]
+            cand = cand[_patch_nz(mesh, cand, LEDGE_PATCH) > LEDGE_NZ]
             if len(cand):
                 dist, _ = cKDTree(mid).query(c[cand], distance_upper_bound=LEDGE_MM)
                 bad = cand[np.isfinite(dist)]
@@ -1202,6 +1206,23 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
                     k = int(per.argmax())
                     res.update(area=float(per[k]), angle=float(k * 30 + 15), fil=U, faces=int(len(bad)))
         out.append(res)
+    return out
+
+
+def _patch_nz(mesh, faces: np.ndarray, radius: float) -> np.ndarray:
+    """For each of `faces`, how much the surface within `radius` mm faces up: the z of the
+    area-weighted mean normal of the faces whose centers lie that close. A sculpt's grain tilts
+    single faces of a wall up past LEDGE_NZ; a shelf faces up as a whole."""
+    from scipy.spatial import cKDTree
+
+    if not len(faces):
+        return np.zeros(0)
+    c = mesh.triangles_center
+    n = mesh.face_normals * mesh.area_faces[:, None]
+    out = np.empty(len(faces))
+    for i, nb in enumerate(cKDTree(c).query_ball_point(c[faces], radius)):
+        v = n[nb].sum(0)
+        out[i] = v[2] / max(float(np.linalg.norm(v)), 1e-12)
     return out
 
 
@@ -1300,6 +1321,38 @@ def corner_normals(v, f, crease: float = CREASE) -> np.ndarray:
     return acc.reshape(nf, 3, 3)
 
 
+RENDER_EDGE = 1.0  # mm: faces longer are split before a panel is drawn (_fine)
+
+
+def _fine(v, f, cn: np.ndarray, max_edge: float = RENDER_EDGE):
+    """(vertices, faces, source face per face, corner normals) with every face split until no edge
+    is longer than max_edge. A panel draws faces far to near by their middles; a long face (a
+    plinth's top) has its middle far from its own parts, and was drawn over a shoe standing in front
+    of it (Jensen r3). The corner normals `cn` of the source faces are carried over by barycentric
+    weights, so the light stays as smooth as before."""
+    import trimesh
+
+    v = np.asarray(v, float)
+    f = np.asarray(f, np.int64)
+    if not len(f) or np.linalg.norm(v[f] - v[np.roll(f, 1, axis=1)], axis=2).max() <= max_edge:
+        return v, f, np.arange(len(f)), cn
+    v2, f2, idx = trimesh.remesh.subdivide_to_size(v, f, max_edge=max_edge, return_index=True)
+    v2, f2, idx = np.asarray(v2, float), np.asarray(f2), np.asarray(idx)
+    tri = v[f[idx]]  # (n, 3 corners, xyz) of each new face's source
+    p = v2[f2]
+    e0, e1 = tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]
+    d00, d01, d11 = (e0 * e0).sum(1), (e0 * e1).sum(1), (e1 * e1).sum(1)
+    den = np.where(np.abs(d00 * d11 - d01 * d01) < 1e-18, 1e-18, d00 * d11 - d01 * d01)[:, None]
+    q = p - tri[:, :1]
+    d20, d21 = (q * e0[:, None]).sum(2), (q * e1[:, None]).sum(2)
+    b1 = (d11[:, None] * d20 - d01[:, None] * d21) / den
+    b2 = (d00[:, None] * d21 - d01[:, None] * d20) / den
+    w = np.stack([1 - b1 - b2, b1, b2], 2)  # (n, corner, source corner)
+    cn2 = np.einsum("nks,nsj->nkj", w, np.asarray(cn)[idx])
+    cn2 /= np.linalg.norm(cn2, axis=2, keepdims=True) + 1e-12
+    return v2, f2, idx, cn2
+
+
 def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, show=None, clip=False, font=None,
            ss: int = SUPERSAMPLE, cn: np.ndarray | None = None):
     """One flat-shaded orthographic view as a PIL image, `half` mm from the center to each edge.
@@ -1395,8 +1448,10 @@ def render(mesh, face_rgb: np.ndarray, out_png: Path, views=(("front", 0.0, 0.0)
     f = np.asarray(mesh.faces)
     center = (v.min(0) + v.max(0)) / 2
     half = float(np.linalg.norm(v - center, axis=1).max()) * 1.04
+    v, f, idx, cn = _fine(v, f, corner_normals(v, f))
+    face_rgb = np.asarray(face_rgb, float)[idx]
+    numbers = None if numbers is None else np.asarray(numbers)[idx]
     font = ImageFont.load_default(size=max(12, px // 26))
-    cn = corner_normals(v, f)
     panels = [_panel(v, f, np.asarray(face_rgb, float), az, el, center, half, px, title=name,
                      numbers=numbers, show=show, font=font, cn=cn) for name, az, el in views]
     _sheet(panels, cols or len(panels), out_png)
@@ -1416,7 +1471,8 @@ def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: in
     from PIL import ImageFont
 
     font = ImageFont.load_default(size=13)
-    cn = corner_normals(V, F)
+    V, F, idx, cn = _fine(V, F, corner_normals(V, F))
+    face_rgb = np.asarray(face_rgb, float)[idx]
     # the jagged ones first, so a failing check shows its edge, then the longest
     pick = sorted([ln for ln in lines if ln["length"] >= EDGE_MIN],
                   key=lambda ln: (-((ln.get("ratio") or 0) > JAGGED), -ln["length"]))[:most]

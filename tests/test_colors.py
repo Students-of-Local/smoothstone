@@ -1002,3 +1002,31 @@ def test_a_name_on_the_plinth_changes_no_other_color_the_suggestion_gives():
         assert "name=" not in cli._suggest_line(jensen_named(), FIL, req)
         pick = cli._suggest(jensen_named(), FIL, req)[0]
         assert 9 not in pick, (req, pick)
+
+
+def test_a_long_plinth_face_is_never_drawn_over_a_part_standing_in_front_of_it(tmp_path):
+    """Jensen r3 (Mac, 2026-11-19): views.png showed a thin light line between the blue trousers and
+    the black shoe at 270 degrees. No face there was painted white: the panels draw faces far to
+    near by their middles, and a long plinth face behind the shoe has its middle nearer the camera
+    than the shoe's, so it was drawn over the shoe's top. Here a cube (blue) stands on a plate of
+    a few long faces (white); from every side the cube's middle must show the cube."""
+    import trimesh
+
+    plate = trimesh.creation.box([60, 60, 1])
+    plate.apply_translation([0, 0, -0.5])
+    cube = trimesh.creation.box([4, 4, 4])
+    cube.apply_translation([0, 18, 2])
+    m = trimesh.util.concatenate([plate, cube])
+    v, f = np.asarray(m.vertices, float), np.asarray(m.faces)
+    rgb = np.where((np.arange(len(f)) < len(plate.faces))[:, None], [235.0, 235, 235], [30.0, 60, 200])
+    for name, az, el in colors.VIEWS[:8]:
+        center = (v.min(0) + v.max(0)) / 2
+        half = float(np.linalg.norm(v - center, axis=1).max()) * 1.04
+        colors.render(m, rgb, tmp_path / "v.png", views=((name, az, el),), px=240)
+        from PIL import Image
+
+        img = np.asarray(Image.open(tmp_path / "v.png").convert("RGB"), float)
+        t = (np.array([0.0, 18, 2]) - center) @ colors._rot(az, el).T
+        x, y = int(t[0] * 240 / (2 * half) + 120), int(120 - t[2] * 240 / (2 * half))
+        px = img[y - 1:y + 2, x - 1:x + 2].reshape(-1, 3).mean(0)
+        assert px[2] > px[0] + 40, (name, px)  # blue: the cube, not the plate drawn over it

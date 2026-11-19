@@ -257,7 +257,9 @@ def test_stone_colors_end_to_end_on_a_figure_with_a_style_picture(jobenv, monkey
 def test_a_failing_color_edge_never_points_back_at_the_same_mapping(jobenv, monkeypatch, openscad, tmp_path):
     """Review first-F1: a ledge fault must give a NEXT that changes the mapping (the region on the
     failing edge takes the rest color, or the part prints in one color), so following NEXT ends in
-    a written 3MF instead of a loop."""
+    a written 3MF instead of a loop. "body" is no part's name, so the request gives no part a
+    color: a color it gives one is never given up
+    (test_a_color_the_request_names_is_never_given_up_for_a_rough_edge)."""
     import numpy as np
 
     from smoothstone import colors
@@ -699,3 +701,112 @@ def test_a_style_check_cut_off_while_copying_leaves_no_picture_under_the_final_n
     with pytest.raises(OSError):
         figure.style_checked([tmp_path / "p.jpg"], out, "chibi", "person", 7, "", {"glasses": False})
     assert not out.exists()
+
+
+def test_the_figure_seed_follows_the_eval_run_seed_unless_one_is_set(jobenv, monkeypatch, tmp_path):
+    """Donovan, 2026-11-19: the held-out bar ran each case on 2 seeds, but the figure always used
+    seed 7, so both seeds painted one figure. The eval harness sets STONE_FIGURE_SEED to the run's
+    seed; a seed set with stone set still wins."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A mini figure of Ada, 70 mm tall")
+    job = cli.Job(jobenv / "stone-job")
+    job.image_dir.mkdir(parents=True, exist_ok=True)
+    _style_picture(job.image_dir / "source.png")
+    seeds = []
+
+    def fake_make(photos, out, style_name="chibi", who="person", seed=7, extra="", say=print):
+        seeds.append(seed)
+        raise figure.FigureProblem("stop here")
+
+    monkeypatch.setattr(figure, "make", fake_make)
+    stone("set", "figure", "height=70")
+    monkeypatch.setenv("STONE_FIGURE_SEED", "3")
+    stone("build")
+    monkeypatch.setenv("STONE_FIGURE_SEED", "4")
+    stone("build")
+    stone("set", "seed=11")
+    stone("build")
+    assert seeds == [3, 4, 11], seeds
+    src = (REPO / "evals" / "run.py").read_text()
+    assert '"STONE_FIGURE_SEED": str(a.seed)' in src
+
+
+def _named_figure_job(jobenv, monkeypatch, tmp_path):
+    """A built figure job whose request names a part's color: the jacket black, the rest white."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    d = tmp_path / "abc123"
+    d.mkdir()
+    fig = d / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    _style_picture(d / "style.png")
+    stone("new", 'A figure 70 mm tall with "ADA" on the base, all white but the jacket, which is black')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert code == 0 and nxt.startswith("stone colors"), text
+    if nxt == "stone colors":
+        text, code, nxt = stone("colors")
+    assert "top=black" in nxt, nxt
+    return nxt
+
+
+def test_a_color_the_request_names_is_never_given_up_for_a_rough_edge(jobenv, monkeypatch, openscad, tmp_path):
+    """Jensen r3 (Mac, 2026-11-19, 2 of 2 seeds): the jacket's edge failed the smoothness check,
+    stone colors gave the jacket the rest color, and NEXT then said the part was ready with a
+    white jacket the person had asked to be black. A color the request names is never given up:
+    when the edge cannot be made clean, the person decides."""
+    import numpy as np
+
+    from smoothstone import colors
+
+    nxt = _named_figure_job(jobenv, monkeypatch, tmp_path)
+    real = colors.ledges
+
+    def always_a_ledge(V, F, face_fil, lines):  # every two-color paint climbs a ledge
+        out = real(V, F, face_fil, lines)
+        if len(np.unique(face_fil)) > 1 and out:
+            out[0] = {**out[0], "area": 1.0, "angle": 15.0, "fil": int(face_fil.max()), "faces": 9}
+        return out
+
+    monkeypatch.setattr(colors, "ledges", always_a_ledge)
+    for _ in range(6):
+        if not nxt.startswith("stone colors"):
+            break
+        text, code, nxt = stone(*nxt.split()[1:])
+        assert nxt != cli.DONE_NEXT, text  # never ready with the body's black given up
+    assert nxt.startswith("ask the person"), (nxt, text)
+    assert not (jobenv / "stone-job" / "figure.3mf").exists()
+
+
+def test_a_mapping_that_drops_a_named_color_is_refused(jobenv, monkeypatch, openscad, tmp_path):
+    """Ready means every part the request colors has its color: a mapping that leaves the black
+    jacket white writes no file and points back at one that keeps it."""
+    _named_figure_job(jobenv, monkeypatch, tmp_path)
+    text, code, nxt = stone("colors", "rest=white")
+    assert "the request makes the jacket black" in text, text
+    assert nxt.startswith("stone colors") and "black" in nxt and nxt != cli.DONE_NEXT, nxt
+    assert not (jobenv / "stone-job" / "figure.3mf").exists()
+    text, code, nxt = stone(*nxt.split()[1:])
+    assert nxt == cli.DONE_NEXT, text
+
+
+def test_a_rough_edge_is_faired_before_any_color_is_given_up(jobenv, monkeypatch, openscad, tmp_path):
+    """A boundary that fails the smoothness check is first cut again along a wider smoothing
+    (colors.FAIR_RADII); only then is anything given up."""
+    from smoothstone import colors
+
+    nxt = _named_figure_job(jobenv, monkeypatch, tmp_path)
+    real = colors.edge_faults
+    calls = []
+
+    def rough_once(lines):  # the first paint has a jagged edge, the faired one does not
+        calls.append(1)
+        out = real(lines)
+        if len(calls) == 1 and lines:
+            ln = max(lines, key=lambda x: x["length"])
+            out = [{**ln, "ratio": colors.JAGGED + 0.05}]
+        return out
+
+    monkeypatch.setattr(colors, "edge_faults", rough_once)
+    text, code, nxt = stone(*nxt.split()[1:])
+    assert "faired" in text and nxt == cli.DONE_NEXT, text
+    assert "black" in status_json_colors(jobenv)["mapping"]

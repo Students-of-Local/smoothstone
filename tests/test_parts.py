@@ -267,6 +267,24 @@ def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it(
     assert C.ledge_faults(C.ledges(V, F, lab, [neck]))
 
 
+def test_a_neck_leaning_back_over_the_collar_is_a_wall_not_a_ledge():
+    """Jensen r3 (Mac, 2026-11-19): over the collar's groove the back of the neck leans in 31
+    degrees off upright (its surface faces up 0.52 over any 1 mm), and the sculpt's grain tilts
+    single faces of it up past 0.5. The ledge check counted 0.74 mm2 of them as the head's color
+    climbing onto a ledge, and stone colors dropped the black top the person named. Here a collar
+    (radius 5) up to z 10 and a neck leaning in from it at that slope, with 0.04 mm of grain."""
+    m = _lathe([(0, 0), (5, 0), (5, 10), (2.6, 14), (0, 14)], sections=240)
+    v = np.asarray(m.vertices, float)
+    r = np.hypot(v[:, 0], v[:, 1])
+    g = np.random.default_rng(7).normal(0.0, 0.04, len(v)) * (r > 0.5) * (v[:, 2] > 10.2) * (v[:, 2] < 13.8)
+    v[:, :2] *= ((r + g) / np.maximum(r, 1e-9))[:, None]
+    m = C.load_stl_mesh(v, np.asarray(m.faces))
+    neck = {**_line("neck", 10.0, 5.0), "curve": None}
+    V, F, lab = _paint(m, neck)
+    found = C.ledges(V, F, lab, [neck])
+    assert not C.ledge_faults(found), found
+
+
 def _zoned(m, z, below, above, parts_by_zone):
     """The mesh cut level at z, a zone per face by its side, regions per zone (nothing merged), the
     region list with a part each (the largest region of a zone takes parts_by_zone[zone], the
@@ -418,7 +436,7 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
 GRAIN = 0.03
 
 
-def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False):
+def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False, arm_z=40.0):
     """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
     a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
     the neck between the torso and the head (48 to 52). shoes=True: each leg stands in a shoe
@@ -427,7 +445,7 @@ def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False):
     down to (24 strands 0.15 mm high); lock, a function of the angle giving the height a smooth
     lock ends at, standing 1 mm proud of the skin with its underside sloping in over 3 mm
     (over the head's top where there is none); ears=True, a flat ear on each side, 105 degrees from the face (a disc 3.6 mm
-    across, top at 56.8)."""
+    across, top at 56.8). arm_z: the arms' middle height (their bottom, where the hands join, 6 under it)."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -444,7 +462,7 @@ def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False):
             pts += [[x + sx * 3.0, sy * 3.0, 12.4] for sx in (-1, 1) for sy in (-1, 1)]
             legs.append(trimesh.convex.convex_hull(np.array(pts)))
     torso = box([22, 12, 20], [0, 0, 38])
-    arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
+    arms = [box([5, 4, 12], [x, 0, arm_z]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
     hands = []
     for x in (-14.5, 14.5):  # 1 mm clear of the torso, so below the arm each hand is loose
         h = trimesh.creation.icosphere(subdivisions=4, radius=2.5)
@@ -492,6 +510,19 @@ def test_anatomy_of_a_block_figure():
     assert abs(a["center"]) < 0.5
     names = {(ln["name"], ln.get("side")) for ln in a["lines"]}
     assert names == {("hem", None), ("neck", None), ("wrist", -1), ("wrist", 1)}
+
+
+def test_a_hand_that_joins_its_arm_just_over_the_scan_grid_still_has_its_wrist_line():
+    """Jensen r3 (Mac, 2026-11-19): the right hand joined its arm 0.02 mm over the 0.1 mm level the
+    wrist scan stopped at, inside the ON_LINE snap the wrist line cuts with, so the line found no
+    loose hand and came out empty; the fist then took the jacket's color down to the hem, the hem's
+    level cut through it was jagged, and stone colors dropped the black top the person named."""
+    m = block_figure(arm_z=40.02)  # the arms' bottom, where the hands join them, at 34.02
+    a = parts.anatomy(m, 8.0)
+    wrists = [ln for ln in a["lines"] if ln["name"] == "wrist"]
+    assert sorted(ln["side"] for ln in wrists) == [-1, 1], wrists
+    for ln in wrists:
+        assert ln["rmax"] > 0, ln  # the hand's own ring, not an empty line
 
 
 def _shorts_figure(belt, flap=False):
