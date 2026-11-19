@@ -536,3 +536,40 @@ def test_stone_video_puts_the_painted_design_on_the_design_card(tmp_path, monkey
     assert seen["style"] == tmp_path / "out" / "design.png"
     a = np.asarray(Image.open(seen["style"]).convert("RGB")).astype(int)
     assert a[350, 100, 2] > a[350, 100, 0] + 100
+
+
+def test_a_figure_clip_never_says_the_work_ran_on_a_cpu(tmp_path, monkeypatch):
+    """Owner, 2026-11-19: no "on a CPU" claim for the figure, since FLUX.2 klein and Hunyuan run on
+    the Mac's GPU and only LFM3-1.7B runs on a CPU. The clip says where each part ran, and a frame
+    that claims a CPU alone for a figure is a fault, which stops the clip."""
+    try:
+        video.mono(30)
+    except video.VideoProblem:
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    runs = []
+    for k, (who, name) in enumerate((("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"))):
+        job, log = _series_run(tmp_path, k, who, name)
+        runs.append(video.Run(video.make_plan(job, log), log, video.label_of(job), _frames(video.SERIES_TURN, (40, 60)),
+                              _frames(video.SERIES_TURN, (40, 60)), [("white", [240, 240, 240], 0.8)]))
+    assert all(r.plan.gpu for r in runs)
+    sh = video.compose_series(runs)
+    assert sh.faults == []
+    monkeypatch.setattr(video, "where", lambda gpu, sep=", ": sep.join(["on a CPU", "no cloud"]))  # the old words
+    sh = video.compose_series(runs)
+    assert any("but the figure step ran on a GPU" in f for f in sh.faults), sh.faults
+
+
+def test_where_the_work_ran_follows_the_figure_step():
+    assert video.where(True) == "the model on a CPU, the figure on a GPU"
+    assert video.where(False) == "on a CPU, no cloud"
+    fr = video.Frame()
+    fr.text((10, 400), "made on a CPU", video.mono(30), video.FG) if _font() else fr.texts.append(((0, 0, 1, 1), None, "made on a CPU", None))
+    assert video.claim_faults(fr, True) and not video.claim_faults(fr, False)
+
+
+def _font():
+    try:
+        video.mono(30)
+        return True
+    except video.VideoProblem:
+        return False
