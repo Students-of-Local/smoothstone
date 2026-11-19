@@ -57,11 +57,17 @@ CLEAR = 3.0  # mm around the frames where the picture's frame color is face pain
 PART_WORDS = {
     "top": ("top", "jacket", "shirt", "dress", "sweater", "coat", "t-shirt", "tshirt", "hoodie",
             "blazer", "suit", "vest", "blouse", "robe", "uniform", "jersey", "cardigan", "tracksuit",
-            "jumpsuit", "overalls", "coveralls", "onesie", "spacesuit", "wetsuit"),
-    "pants": ("pants", "jeans", "trousers", "legs", "skirt", "shorts", "leggings"),
-    "shoes": ("shoes", "shoe", "boots", "boot", "sneakers", "feet", "sandals"),
+            "jumpsuit", "overalls", "coveralls", "onesie", "spacesuit", "wetsuit", "raincoat", "parka",
+            "sweatshirt", "polo", "tunic", "apron", "cloak", "cape", "poncho", "windbreaker", "gown",
+            "kimono", "turtleneck", "scrubs", "jumper", "anorak", "trenchcoat", "overcoat"),
+    "pants": ("pants", "jeans", "trousers", "legs", "skirt", "shorts", "leggings", "slacks", "chinos",
+              "joggers", "sweatpants", "denim", "khakis"),
+    "shoes": ("shoes", "shoe", "boots", "boot", "sneakers", "feet", "sandals", "heels", "loafers",
+              "trainers", "slippers", "clogs", "flats"),
     "hands": ("hands", "hand", "gloves", "glove"),
-    "hair": ("hair", "beard"),
+    "hair": ("hair", "beard", "bob", "braids", "braid", "ponytail", "bun", "curls", "afro", "mohawk",
+             "pigtails", "locks", "dreadlocks", "dreads", "mullet", "bangs", "fringe", "goatee",
+             "moustache", "mustache", "sideburns", "quiff", "pompadour", "buzzcut", "crewcut", "updo"),
     "face": ("face", "skin", "head"),
     "glasses": ("glasses", "spectacles", "eyeglasses", "sunglasses", "frames"),
     "base": ("base", "plinth", "stand"),
@@ -70,7 +76,7 @@ PART_WORDS = {
 WORD_PART = {w: p for p, ws in PART_WORDS.items() for w in ws}
 # a garment that is more than one part: a black suit is a black jacket and black pants
 COVERS = {w: ("top", "pants") for w in ("suit", "tracksuit", "jumpsuit", "overalls", "coveralls",
-                                         "onesie", "spacesuit", "wetsuit")}
+                                         "onesie", "spacesuit", "wetsuit", "scrubs")}
 
 
 def part_of(word: str) -> str | None:

@@ -982,11 +982,14 @@ def test_the_name_takes_whichever_of_black_or_white_stands_out_more_on_a_mid_ton
 
 
 def test_a_plinth_filament_with_no_color_to_read_gives_the_name_no_guess():
-    """Review of PR 28 (first-F2): "Ivory PLA" read as gray, so the name took white on ivory."""
+    """Review of PR 28 (first-F2): "Ivory PLA" read as gray, so the name took white on ivory.
+    Description mode reads ivory as white, so the name takes the dark filament, never the plinth's;
+    a filament with no color to read still gives no guess."""
     info = jensen_named()
     per = np.ones(len(info) + 1, int)
     per[4] = 2
-    assert cli._name_filament(info, per, ["Ivory PLA", "Charcoal"], "") is None
+    assert cli._name_filament(info, per, ["Ivory PLA", "Charcoal"], "") == 2
+    assert cli._name_filament(info, per, ["Galaxy PLA", "Charcoal"], "") is None
     assert cli._name_filament(info, per, ["Ivory PLA", "Charcoal"], "the name in red") == "red"
 
 
@@ -1059,3 +1062,18 @@ def test_a_color_edge_on_the_hairline_is_not_held_to_the_wobble_limit():
     colors.mark_grooves([a, b], [], hair)
     assert a.get("groove") == "hair" and not colors.edge_faults([a])
     assert not b.get("groove") and colors.edge_faults([b])
+
+
+def test_a_description_of_a_person_gives_its_parts_their_colors():
+    """Goal 2026-11-19 (description mode): the colors a description names go to stone colors, in
+    the words people use for hair and clothes: a red bob is red hair, plain jeans are blue."""
+    def asked(r):
+        return {k: v for k, v in colors.part_colors(r).items() if not k.startswith("word:")}
+
+    assert asked("A mini figure of a woman with a red bob, round glasses, a green sweater and jeans") == \
+        {"hair": "red", "top": "green", "pants": "blue"}
+    assert asked("a girl in a yellow raincoat and black boots, blonde braids") == \
+        {"top": "yellow", "shoes": "black", "hair": "tan"}
+    assert asked("a man with ginger hair, a navy suit and brown loafers") == \
+        {"hair": "orange", "top": "blue", "pants": "blue", "shoes": "brown"}
+    assert asked("a man in black jeans")["pants"] == "black"

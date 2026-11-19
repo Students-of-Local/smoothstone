@@ -55,7 +55,13 @@ NAMES = {
     "green": (50, 150, 60), "blue": (40, 80, 200), "purple": (120, 60, 160),
     "pink": (240, 150, 185),
 }
-ALIASES = {"grey": "gray", "beige": "tan", "gold": "yellow", "silver": "gray", "violet": "purple"}
+ALIASES = {"grey": "gray", "beige": "tan", "gold": "yellow", "silver": "gray", "violet": "purple",
+           # the words a description of a person uses for hair and clothes
+           "blonde": "tan", "blond": "tan", "sandy": "tan", "khaki": "tan", "camel": "tan", "cream": "white",
+           "platinum": "white", "ginger": "orange", "auburn": "brown", "brunette": "brown", "chestnut": "brown",
+           "navy": "blue", "denim": "blue", "teal": "blue", "turquoise": "blue", "olive": "green",
+           "burgundy": "red", "maroon": "red", "crimson": "red", "scarlet": "red", "charcoal": "gray",
+           "lavender": "purple", "magenta": "pink", "ivory": "white"}
 # words in a request that ask for color
 WORDS = set(NAMES) | {"grey", "color", "colour", "colors", "colours", "colored", "coloured",
                       "two-color", "two-colour", "multicolor", "multicolour", "multi-color", "multi-colour"}
@@ -296,6 +302,9 @@ def part_colors(request: str, names=()) -> dict[str, str]:
                     if p not in out:
                         out[p] = "picture"
                         used[p] = words[j]
+    for w in words:  # plain jeans are blue jeans
+        if w in ("jeans", "denim", "denims") and "pants" not in out:
+            out["pants"], used["pants"] = "blue", w
     out.update({f"word:{p}": w for p, w in used.items()})
     return out
 
