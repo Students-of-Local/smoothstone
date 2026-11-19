@@ -32,10 +32,12 @@ ANKLE_CREASE_BAND = 1.5  # mm each side of it
 ANKLE_RIM_GAP = 0.2  # mm: an up-facing face starting within this of the shoe's rim so far is still the shoe
 ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the top of the shoe
 ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
+ANKLE_PLINTH_GAP = 0.5  # mm over the plinth's top where a shoe's groove search starts: lower, it takes the sole's corner on the plinth
 NECK_DOWN_NZ = -0.2  # a face whose normal points down at least this much is an overhang
 NECK_HEAD_DOWN = 0.5  # share of the first mm over an overhang facing down for it to be the head's underside
 NECK_WALL = 0.5  # mm: a wall taller than this between the slope's top and the head's underside is a step
 NECK_RIM_REACH = 4.0  # mm over a level neck line searched for the top of the shoulders' slope
+NECK_LIFT_PASSES = 3  # times the neck's groove is lifted over the ledges left above it (neck_lift)
 ANKLE_SETTLED = 0.01  # the leg over a shoe holds its section within this share: the shoe's taper ended
 HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
 HEM_BAND_PAD = 0.25  # mm past the hem fold's groove, each way, that the hem's groove search reaches
@@ -230,10 +232,13 @@ def anatomy(mesh, top: float) -> dict:
     hi = (neck - 1.0) if neck is not None else top + 0.8 * H
     start = low if low is not None else top + 1.0
     x0 = res["center"]
+
+    def hand_at(z, side, tol=1e-6):
+        return any(not p["stands"] and (p["cx"] - x0) * side > 0
+                   for p in _pieces(mesh, _below(mesh, fig, z, tol), top, min_area))
     for side in (-1, 1):
         def hand(z, side=side, tol=1e-6):
-            return any(not p["stands"] and (p["cx"] - x0) * side > 0
-                       for p in _pieces(mesh, _below(mesh, fig, z, tol), top, min_area))
+            return hand_at(z, side, tol)
         w = _scan(start, hi, hand)
         # the wrist line cuts with ON_LINE of snap: a hand that joins its arm within that over the
         # level is not loose at the line, which then finds no hand; step down to where it is
@@ -241,6 +246,20 @@ def anatomy(mesh, top: float) -> dict:
             w = round(w - 0.1, 6) if w - 0.1 >= start else None
         if w is not None:
             res["wrists"].append({"z": w, "side": side})
+    # cut() makes one plane of plane lines within PLANE_MERGE of each other, so a wrist that close
+    # over another line would be painted on that line's cut and step up to its own where faces
+    # straddle it (Elon, seed 1: wrists at 40.4 and 40.6, a 0.2 mm step on the right cuff). It takes
+    # the lower level where its hand is still loose there; else it moves under it, clear of the merge
+    planes = [z for z in (res["hem"], neck) if z is not None]
+    for w in sorted(res["wrists"], key=lambda w: w["z"]):
+        for z in sorted(planes):
+            if abs(w["z"] - z) <= PLANE_MERGE + 1e-9:
+                for cand in ([z] if w["z"] >= z else []) + [round(z - PLANE_MERGE - 0.1, 6)]:
+                    if cand >= start and hand_at(cand, w["side"], ON_LINE):
+                        w["z"] = cand
+                        break
+                break
+        planes.append(w["z"])
     res["lines"] = find_lines(mesh, res)
     return res
 
@@ -259,6 +278,7 @@ GROOVE_ROLL = 10  # degrees each way the envelope looks for the farthest groove 
 HAND_REACH = 8.0  # mm from a hand's axis: the faces below a cuff line that can be the hand
 TOUCH_STEP = 0.1  # mm between the sections that follow a hand up from its wrist level to its cuff
 TOUCH_BELOW = 1.0  # mm under the wrist level where a hand's edge still follows the line where it touches the body
+PLANE_MERGE = 0.2  # mm: plane lines this close are one cut (cut, levels)
 HAIR_SECTOR = 10  # degrees round the head's axis per sample of the picture's hair edge
 HAIR_ORDER = 6  # harmonics in the hairline's series: 2 cannot hold it over the ears and down to the nape behind them
 HAIR_SMOOTH = 0.01  # the cost of the hairline leaving a plane's section of the head (_huber_fit)
@@ -714,8 +734,76 @@ def find_lines(mesh, anat: dict) -> list[dict]:
                     found = {**found, "curve": [round(float(v), 4) for v in rim], "rim": True, "groove": None}
                 if nostep:
                     found = {**found, "nostep": nostep}
+            elif ln["name"] == "neck":
+                found = neck_lift(mesh, found, fig)
             res.append(found)
     return res + ankles
+
+
+def _ledge_area(mesh, line: dict) -> float:
+    """The worst sector's seen mm2 of up-facing faces just over a line, as colors.ledges judges
+    them when everything over the line takes one color and everything under it another."""
+    from . import colors
+
+    fil = np.where(field(line, mesh.triangles_center) > 0, 1, 2)
+    return float(colors.ledges(mesh.vertices, mesh.faces, fil, [line])[0]["area"])
+
+
+def _lift_tops(mesh, line: dict, keep: np.ndarray, reach: float) -> tuple[np.ndarray, np.ndarray]:
+    """The rim walk of _rim_tops from a curve instead of a level: at each 10 degrees, from the
+    curve's highest point in that bin up, the up-facing faces that start within ANKLE_RIM_GAP of
+    the top so far. Returns (36 starts, 36 tops)."""
+    cv = np.asarray(line["curve"], float)
+    cx, cy = line["center"]
+    F = np.asarray(mesh.faces)
+    fz = np.asarray(mesh.vertices, float)[F][:, :, 2]
+    c = mesh.triangles_center
+    r = np.hypot(c[:, 0] - cx, c[:, 1] - cy)
+    th = np.degrees(np.arctan2(c[:, 1] - cy, c[:, 0] - cx))
+    up = keep & (mesh.face_normals[:, 2] > ANKLE_RIM_NZ) & (r < line["rmax"] + 1.0)
+    start = cv.reshape(36, 10).max(1)
+    tops = start.copy()
+    for b in range(36):
+        inb = np.nonzero(up & (th >= b * 10 - 180) & (th < b * 10 - 170) &
+                         (fz.max(1) > start[b]) & (fz.min(1) < start[b] + reach))[0]
+        for i in inb[np.argsort(fz[inb].min(1))]:
+            if fz[i].min() > tops[b] + ANKLE_RIM_GAP:
+                break
+            tops[b] = max(tops[b], float(fz[i].max()))
+    return start, tops
+
+
+def neck_lift(mesh, line: dict, keep: np.ndarray) -> dict:
+    """A neck groove with a ledge over it (a jacket's standing collar or lapel flap the groove runs
+    under) is lifted over the ledge, so the collar keeps the clothing's color: where the rim walk
+    from the curve climbs, the curve goes to the walk's top, widened and smoothed as _rim_curve
+    does. Up to NECK_LIFT_PASSES times, while the ledge (_ledge_area) is over colors.LEDGE_AREA;
+    the lifted curve is kept only when its ledge is smaller. A groove with no such ledge is as found."""
+    from . import colors
+
+    if line.get("curve") is None:
+        return line
+    best, area = line, _ledge_area(mesh, line)
+    cur = line
+    for _ in range(NECK_LIFT_PASSES):
+        if area <= colors.LEDGE_AREA:
+            break
+        start, tops = _lift_tops(mesh, cur, keep, NECK_RIM_REACH)
+        rise = tops - start > 0.1
+        if not rise.any():
+            break
+        cv = np.asarray(cur["curve"], float)
+        # widen each rise by 8 degrees each way and smooth it, never below the walk's top itself
+        # nor the groove: a max with the widened steps would put their cliffs into the edge
+        deg = np.repeat(np.where(rise, tops + 0.05, -np.inf), 10)
+        wide = np.max([np.roll(deg, k) for k in range(-8, 9)], axis=0)
+        smooth = _gauss(np.where(np.isfinite(wide), wide, cv), 3.0)
+        new = np.maximum(np.maximum(smooth, deg), cv)
+        cur = {**cur, "curve": [round(float(v), 4) for v in new], "lifted": True}
+        a = _ledge_area(mesh, cur)
+        if a < area:
+            best, area = cur, a
+    return best
 
 
 def ankle_line(mesh, anat: dict, a: dict) -> dict:
@@ -741,10 +829,12 @@ def ankle_line(mesh, anat: dict, a: dict) -> dict:
         qc = q.mean(0)
         near.update(center=[float(qc[0]), float(qc[1])], rmax=float(np.linalg.norm(q - qc, axis=1).max()) + 1.0,
                     ring=float(np.linalg.norm(np.diff(np.vstack([q, q[:1]]), axis=0), axis=1).sum()))
-    crease = find_groove(leg, near)
+    crease = find_groove(leg, _over_plinth(near, anat["top"]))
     if crease.get("curve") is not None and not _ledge_curve(crease, zc):
-        return crease
-    found = find_groove(leg, line)
+        return {**crease, "z": zc, "band": ANKLE_CREASE_BAND}
+    found = find_groove(leg, _over_plinth(line, anat["top"]))
+    if found.get("curve") is not None:
+        found = {**found, "z": line["z"], "band": line["band"]}
     if found.get("curve") is not None and not _ledge_curve(found, a["z"]):
         return found
     line = {**line, "groove": found.get("groove")}
@@ -753,6 +843,15 @@ def ankle_line(mesh, anat: dict, a: dict) -> dict:
         # the rim is its own course, not the groove the search rejected
         line = {**line, "curve": [round(float(v), 4) for v in rim], "rim": True, "groove": None}
     return line
+
+
+def _over_plinth(line: dict, top: float) -> dict:
+    """The line with its groove search band (z +- band) cut off ANKLE_PLINTH_GAP over the plinth's
+    top, where the sole's corner on the plinth is a groove all the way round the shoe."""
+    lo, hi = max(line["z"] - line["band"], top + ANKLE_PLINTH_GAP), line["z"] + line["band"]
+    if lo >= hi:
+        return {**line, "rmax": 0.0}
+    return {**line, "z": (lo + hi) / 2, "band": (hi - lo) / 2}
 
 
 def _rim_tops(mesh, line: dict, keep: np.ndarray, reach: float):
@@ -848,7 +947,7 @@ def levels(anat: dict) -> list[float]:
     """The z of every plane line (lines on a groove are curves, not planes)."""
     out: list[float] = []
     for z in [anat.get("hem"), anat.get("neck")] + [w["z"] for w in anat.get("wrists", [])]:
-        if z is not None and all(abs(z - o) > 0.2 for o in out):
+        if z is not None and all(abs(z - o) > PLANE_MERGE for o in out):
             out.append(float(z))
     return out
 
@@ -881,7 +980,7 @@ def cut(V, F, anat: dict):
         if (ln["name"] == "wrist" and curved) or ln["name"] == "ankle":
             continue
         if not curved:
-            if any(abs(ln["z"] - z) <= 0.2 for z in done):
+            if any(abs(ln["z"] - z) <= PLANE_MERGE for z in done):
                 continue
             done.append(ln["z"])
         V, F = cut_iso(V, F, field(ln, V), 0.0, snap=0.02)

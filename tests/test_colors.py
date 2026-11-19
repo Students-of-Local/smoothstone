@@ -1030,3 +1030,32 @@ def test_a_long_plinth_face_is_never_drawn_over_a_part_standing_in_front_of_it(t
         x, y = int(t[0] * 240 / (2 * half) + 120), int(120 - t[2] * 240 / (2 * half))
         px = img[y - 1:y + 2, x - 1:x + 2].reshape(-1, 3).mean(0)
         assert px[2] > px[0] + 40, (name, px)  # blue: the cube, not the plate drawn over it
+
+
+def test_a_color_edge_on_the_hairline_is_not_held_to_the_wobble_limit():
+    """Elon, seed 1 (Mac sweep, 2026-11-19): the hair's edge lay within 0.02 mm of the hairline
+    series all round, smooth (length ratio 1.007), but the series climbs over the ears, so over 5 mm
+    it left a plane by 0.21 mm and failed the wobble limit (0.15) at every fairing radius; stone
+    colors asked the person about a clean hairline. An edge on the hairline follows the shape, like
+    one in a groove; one off it is still judged."""
+    from smoothstone import parts
+
+    hair = {"name": "hair", "center": [0.0, 0.0], "R": 7.0, "order": 6, "zmin": 70.0, "zmax": 90.0,
+            "rmax": 8.0, "coef": [80.0, 0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.6, 0.0]}
+    th = np.linspace(-np.pi, np.pi, 720, endpoint=False)
+    r = 7.0 + 0.4 * np.sin(5 * th)  # the hair's relief round the head
+    on = np.c_[r * np.cos(th), r * np.sin(th), np.zeros(len(th))]
+    on[:, 2] = parts.hair_height(hair, on)
+    off = on + [0.0, 0.0, 0.0]
+    off[:, 2] += 0.5 * (np.sin(2 * th) > 0)  # off the hairline on half its way round
+
+    def edge(p):
+        return {"pts": p, "closed": True, "verts": np.arange(len(p)), "pair": (1, 3), "length": 1.0,
+                "ratio": colors.jaggedness(p, True), "wobble": colors.wobble(p, True)}
+
+    a, b = edge(on), edge(off)
+    assert a["wobble"] > colors.WOBBLE and a["ratio"] < colors.JAGGED, a["wobble"]  # the Elon case
+    assert colors.edge_faults([a]), "the fixture must fail without the hairline"
+    colors.mark_grooves([a, b], [], hair)
+    assert a.get("groove") == "hair" and not colors.edge_faults([a])
+    assert not b.get("groove") and colors.edge_faults([b])

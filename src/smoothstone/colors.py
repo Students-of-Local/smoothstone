@@ -45,7 +45,7 @@ SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under thi
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 NAME_OUT = 0.02  # mm: a plinth face with a corner this far out of the drum is a raised letter of the name
 NAME_CONTRAST = 3.0  # the name's color stands out from the plinth's by at least this contrast ratio (WCAG)
-REGIONS_VERSION = 8  # bump when find_regions changes what it returns, so a cached listing is redone
+REGIONS_VERSION = 10  # bump when find_regions changes what it returns, so a cached listing is redone
 
 # plain color names and a typical filament of each
 NAMES = {
@@ -1076,14 +1076,18 @@ def color_edges(V, F, face_fil) -> tuple[float, list[dict]]:
 ON_GROOVE = 0.1  # mm: a color edge this close to a groove line (most of its length) runs in the groove
 
 
-def mark_grooves(lines: list[dict], anatomy: list[dict]) -> None:
+def mark_grooves(lines: list[dict], anatomy: list[dict], hairline: dict | None = None) -> None:
     """Set ln["groove"] to the anatomy line's name on each color edge that runs in a sculpted groove
-    (parts.find_groove) or along a shoe's rim (parts.shoe_rim): 80% of its points within ON_GROOVE mm
-    of that line. Such an edge follows the shape, so it is not flat like a plane and the wobble limit
-    does not apply to it."""
+    (parts.find_groove), along a shoe's rim (parts.shoe_rim) or on the hairline (parts.hairline): 80%
+    of its points within ON_GROOVE mm of that line. Such an edge follows the shape, so it is not flat
+    like a plane and the wobble limit does not apply to it. The hairline is a smooth series that
+    climbs over the ears and down to the nape, so over 5 mm it leaves a plane by up to about 0.2 mm
+    with no wave in it (Elon, seed 1); the jaggedness limit still applies to it."""
     from . import parts
 
     grooves = [g for g in anatomy or [] if (g.get("groove") or {}).get("used") or g.get("rim")]
+    if hairline is not None:
+        grooves.append(hairline)
     for ln in lines:
         p = ln["pts"]
         for g in grooves:

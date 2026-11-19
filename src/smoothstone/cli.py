@@ -1904,7 +1904,7 @@ def cmd_colors(args, job: Job) -> Out:
     def paint(radius: float):
         V, F, face_fil, parent = colortool.smooth_cut(mesh.vertices, mesh.faces, face_fil0, radius=radius, fixed=fixed)
         _, lines = colortool.color_edges(V, F, face_fil)
-        colortool.mark_grooves(lines, anat_lines)
+        colortool.mark_grooves(lines, anat_lines, (res.get("anatomy") or {}).get("hairline"))
         colortool.mark_name_edges(lines, F, num[parent], nm, base)
         faults = colortool.edge_faults(lines)
         one_color = len(np.unique(face_fil)) == 1  # no color edge, so nothing can climb a ledge
@@ -2056,7 +2056,7 @@ def cmd_colors(args, job: Job) -> Out:
     on_name = sum(1 for ln in lines if ln.get("name_edge"))
     out.add(f"PASS color_edges: every color boundary is a smooth curve (worst {worst:.3f}, max {colortool.JAGGED}; "
             f"wobble {wob:.2f} mm, max {colortool.WOBBLE}"
-            + (f"; {in_groove} edges run in a sculpted groove, which the wobble limit does not apply to" if in_groove else "")
+            + (f"; {in_groove} edges follow the shape (a sculpted groove, a shoe's rim or the hairline), which the wobble limit does not apply to" if in_groove else "")
             + (f"; {on_name} edges are the outline of the raised name, the shape's own crease, which neither limit "
                "applies to" if on_name else "") + ")")
     if anat_lines:
