@@ -288,3 +288,38 @@ def test_a_subject_whose_free_photos_the_tool_used_up_is_judged_by_a_photo_picke
     assert res["reference"]["photos"][0]["url"] == "https://dhh.dk/images/new-headshot.jpg"
     prompt, shown = asked[1]
     assert "dhh.dk" in prompt and shown == ["reference_1.jpg", "reference_2.jpg", "render.png"]
+
+
+def test_a_crop_of_the_tools_photo_is_the_tools_photo(tmp_path, monkeypatch):
+    """Review of PR 24: the tool styled from "Elon Musk 2019 (cropped).jpg" and the search found
+    "Elon Musk 2019.jpg", the same picture uncropped, which the judge took as independent."""
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg", "File:Elon Musk 2019 (cropped).jpg")
+    _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Elon Musk 2019.jpg", "File:Elon Musk (crop2) 2015.jpg",
+                                      "File:Elon Musk 2011.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert [p["file"] for p in res["reference"]["photos"]] == ["Elon Musk (crop2) 2015.jpg", "Elon Musk 2011.jpg"]
+
+
+def test_a_relative_with_the_subjects_surname_is_never_a_reference(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg")
+    _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Kimbal Musk 2025.jpg", "File:Maye Musk 2024.jpg", "File:Elon Musk 2018.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert [p["file"] for p in res["reference"]["photos"]] == ["Elon Musk 2018.jpg"]
+
+
+def test_one_searched_photo_still_tells_the_judge_it_may_not_show_the_subject(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg")
+    asked = _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, [], search=["File:Elon Musk Tesla Roadster 2018.jpg"])
+    jl.judge(job, "A mini figure of Elon Musk")
+    assert '"usable": false' in asked[1][0]
+
+
+def test_a_year_still_to_come_or_run_on_from_a_word_is_no_year():
+    assert jl._year("elon musk 2099.jpg") == 0
+    assert jl._year("img_2019.jpg") == 0

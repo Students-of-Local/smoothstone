@@ -30,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
+import time
 import urllib.request
 from pathlib import Path
 
@@ -71,10 +72,12 @@ Reply with one JSON object and nothing else:
 {{"score": <1-10>, "conflicts": [{{"feature": "...", "what": "..."}}]}}"""
 
 SEVERAL = """
-There are several reference photos. Some may not show the subject (a car the subject drives, a
-crowd, a logo): leave those out. Hair, weight and age change over the years, so where the photos
-differ, go by the most recent one that shows the subject (the file names give years). If none of
-them shows the subject, add "usable": false to your reply."""
+The reference photos were found by the subject's name, so some may not show the subject (a car the
+subject drives, a relative, a crowd, a logo): leave those out. A photo marked picked by hand shows
+the subject as they look now; where it differs from the others, go by it. Otherwise hair, weight
+and age change over the years, so where the photos differ, go by the most recent one that shows
+the subject (the file names give years). If none of them shows the subject, add "usable": false to
+your reply."""
 
 
 class JudgeProblem(Exception):
@@ -149,9 +152,26 @@ NOISE = {"cropped", "crop", "jpg", "jpeg", "png", "file", "image", "photo", "the
 
 
 def _year(key: str) -> int:
-    """The latest year in a file name, as 2023, 20231003 or 2023-10-03 (0 with none)."""
-    ys = [int(y) for y in re.findall(r"(?<!\d)((?:19|20)\d\d)(?:[-_ ]?[01]\d[-_ ]?[0-3]\d)?(?!\d)", key)]
-    return max(ys, default=0)
+    """The latest year in a file name, as 2023, 20231003 or 2023-10-03 (0 with none); never one
+    still to come, nor digits run on from a word (IMG_2099)."""
+    now = time.gmtime().tm_year
+    ys = [int(y) for y in re.findall(r"(?<![\dA-Za-z_])((?:19|20)\d\d)(?:[-_ ]?[01]\d[-_ ]?[0-3]\d)?(?!\d)", key)]
+    return max([y for y in ys if y <= now], default=0)
+
+
+def _stem(key: str) -> str:
+    """A file name with its crops taken off: "Elon Musk 2019 (cropped).jpg" and "Elon Musk
+    2019.jpg" are one picture, so a crop of a photo the tool used is the tool's photo too."""
+    k = re.sub(r"\.[a-z0-9]+$", "", key)
+    k = re.sub(r"\([^)]*crop[^)]*\)", " ", k)
+    k = re.sub(r"\bcrop(?:ped)?\d*\b", " ", k)
+    return " ".join(re.findall(r"[a-z0-9]+", k))
+
+
+def _title_words(title: str) -> set[str]:
+    """The words a file must have to be of the subject: the whole title, without a disambiguator
+    in brackets ("Elon Musk", never "Musk" alone, which a relative's photo has too)."""
+    return {w.lower() for w in re.findall(r"[A-Za-z]{3,}", re.sub(r"\([^)]*\)", " ", title))}
 
 
 def _named_for(key: str, words: set[str]) -> float:
@@ -166,7 +186,8 @@ def other_references(ref: dict, avoid: set[str], n: int = REFERENCES) -> list[di
     Commons search for its title. Files named mostly for the subject come first (a portrait, not a
     race car the subject drove among others), newest first by the year in the name.
     [{"file", "url"}], url a 1600 px rendition."""
-    words = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", ref["title"])}
+    words = _title_words(ref["title"])
+    avoid = {_stem(a) for a in avoid}
     q = urllib.parse.urlencode({"action": "query", "titles": ref["title"], "prop": "images", "imlimit": "50",
                                 "redirects": "1", "format": "json"})
     pages = (json.loads(_get(WIKI + "?" + q)).get("query") or {}).get("pages") or {}
@@ -177,9 +198,9 @@ def other_references(ref: dict, avoid: set[str], n: int = REFERENCES) -> list[di
     seen, keep = set(), []
     for f in files:
         key = _file_key(f)
-        if key in avoid or key in seen or not key.endswith((".jpg", ".jpeg")):
+        if _stem(key) in avoid or key in seen or not key.endswith((".jpg", ".jpeg")):
             continue
-        if _named_for(key, words) > 0:
+        if words <= set(re.findall(r"[a-z]{3,}", key)):
             seen.add(key)
             keep.append(f)
     keep = sorted(keep, key=lambda f: (_named_for(_file_key(f), words) < 0.6, -_year(_file_key(f))))[:n]
@@ -235,7 +256,7 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
     ref = reference(title)
     avoid = tool_photos(job)
     lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1]).replace("_", " ")
-    lead_is_tools = _file_key(ref["url"]) in avoid  # Wikidata's photo, which the tool put first
+    lead_is_tools = _stem(_file_key(ref["url"])) in {_stem(a) for a in avoid}  # Wikidata's photo, which the tool put first
     hand = picked_by_hand(ref["title"])
     room = REFERENCES - len(hand) - (0 if lead_is_tools else 1)
     others = other_references(ref, avoid | {_file_key(ref["url"])}, room) if room > 0 else []
@@ -252,10 +273,16 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
             lines = []
             for k, ph in enumerate(ref["photos"], 1):
                 name = t / f"reference_{k}.jpg"
-                name.write_bytes(_get(ph["url"]))
-                where = ph.get("source") or "Wikimedia Commons"
-                lines.append(f"  {name}: a photo of the request's subject from {where}, file \"{ph['file']}\".")
-            refs, several = "\n".join(lines), SEVERAL if len(lines) > 1 else ""
+                try:
+                    name.write_bytes(_get(ph["url"]))
+                except OSError:  # a link that moved: the others still judge
+                    continue
+                where = f"picked by hand, from {ph['source']}" if ph.get("source") else \
+                    "found by searching Wikimedia Commons for the subject's name"
+                lines.append(f"  {name}: a photo {where}, file \"{ph['file']}\".")
+            if not lines:
+                raise JudgeProblem(f"no reference photo of {title!r} could be downloaded")
+            refs, several = "\n".join(lines), SEVERAL
         else:
             ext = Path(urllib.parse.urlparse(ref["url"]).path).suffix.lower() or ".jpg"
             (t / f"reference{ext}").write_bytes(_get(ref["url"]))
