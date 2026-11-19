@@ -749,7 +749,7 @@ def cmd_build(args, job: Job) -> Out:
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
-    for f in ("regions.json", "regions.npy", "regions.npz", "paint.npy", "regions.png", "colors.png", "atlas.png", "views.png", "boundaries.png"):
+    for f in ("regions.json", "regions.npy", "regions.npz", "paint.npy", "slivers.json", "regions.png", "colors.png", "atlas.png", "views.png", "boundaries.png"):
         (bd / f).unlink(missing_ok=True)
     if job.status().get("colors"):
         job.update(colors=None)
@@ -1742,9 +1742,11 @@ def cmd_colors(args, job: Job) -> Out:
     per = np.array([0] + [assign.get(d, rest) for d in range(1, len(info) + 1)])
     # a sliver of a garment's edge that a line of the shape boxed in (a jacket's lip under the
     # hem's level, a collar's top over the neck's) takes the color round it, not the rest color
+    boxed: dict[int, int] = {}
     for s, host in colortool.boxed_slivers(mesh, num, info, per, set(assign), rest,
                                            colortool.filament_rgb(fil[rest - 1])):
         per[s] = per[host]
+        boxed[int(s)] = int(host)
         hd = next(d for d in info if d["n"] == host)
         out.add(f"Region {s}, a sliver boxed in by region {host} ({hd.get('part') or hd['color']}), "
                 f"takes its color, {_fil_value(fil)[per[s] - 1]}.")
@@ -1873,6 +1875,7 @@ def cmd_colors(args, job: Job) -> Out:
         return out
     tmp.replace(final)
     np.save(bd / "paint.npy", num[parent])  # the region of each 3MF triangle, in file order
+    write_json(bd / "slivers.json", {str(k): v for k, v in boxed.items()})  # sliver -> the region it is part of
     for c in added:
         out.add(f"{c} is not in stone.toml [filaments], so it is filament {fil.index(c) + 1} here: load it in that slot.")
     out.add(shares)
