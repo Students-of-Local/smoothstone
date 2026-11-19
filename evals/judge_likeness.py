@@ -370,6 +370,33 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
             "model": model, "request": request}
 
 
+def judge_photo(job: Path, request: str, photo: Path, model: str = "opus") -> dict:
+    """The likeness against one photo of the subject the tool was never given (photo mode: the
+    spec's last photo, held back). Shown as reference.<ext>, so its file name tells the judge
+    nothing; a photo the tool was given is never the reference."""
+    render = render_of(job)
+    if render is None:
+        raise JudgeProblem(f"no style.png under {job / 'image' / 'figure'}")
+    data = Path(photo).read_bytes()
+    ext = _suffix(data)
+    if not ext:
+        raise JudgeProblem(f"the reference {Path(photo).name} is not a picture the judge can read")
+    if _same_picture(data, owner_photos(job)):
+        raise JudgeProblem(f"the reference {Path(photo).name} is a photo the tool was given")
+    with tempfile.TemporaryDirectory(prefix="likeness-") as tmp:
+        t = Path(tmp)
+        (t / f"reference{ext}").write_bytes(data)
+        shutil.copy(render, t / "render.png")
+        refs = f"  {t / f'reference{ext}'}: a photo of the request's subject."
+        reply = claude(RUBRIC.format(request=request, references=refs, several="", render=t / "render.png"),
+                       folder=t, model=model)
+    res = parse(reply)
+    if res.get("usable") is False:
+        raise JudgeProblem(f"the reference {Path(photo).name} does not show the subject")
+    return {**res, "pass": res["score"] >= PASS, "reference": {"photo": Path(photo).name}, "render": str(render),
+            "model": model, "request": request}
+
+
 def main() -> None:
     sys.path.insert(0, str(Path(__file__).parent))
     from judge_views import find_request
