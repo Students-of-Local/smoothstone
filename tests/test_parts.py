@@ -445,7 +445,8 @@ def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False, arm_
     down to (24 strands 0.15 mm high); lock, a function of the angle giving the height a smooth
     lock ends at, standing 1 mm proud of the skin with its underside sloping in over 3 mm
     (over the head's top where there is none); ears=True, a flat ear on each side, 105 degrees from the face (a disc 3.6 mm
-    across, top at 56.8). arm_z: the arms' middle height (their bottom, where the hands join, 6 under it)."""
+    across, top at 56.8). arm_z: the arms' middle height (their bottom, where the hands join, 6 under it), or a
+    (left, right) pair."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -462,7 +463,8 @@ def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False, arm_
             pts += [[x + sx * 3.0, sy * 3.0, 12.4] for sx in (-1, 1) for sy in (-1, 1)]
             legs.append(trimesh.convex.convex_hull(np.array(pts)))
     torso = box([22, 12, 20], [0, 0, 38])
-    arms = [box([5, 4, 12], [x, 0, arm_z]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
+    az = arm_z if isinstance(arm_z, tuple) else (arm_z, arm_z)
+    arms = [box([5, 4, 12], [x, 0, z]) for x, z in zip((-13.5, 13.5), az)]  # into the torso's side by 0.5
     hands = []
     for x in (-14.5, 14.5):  # 1 mm clear of the torso, so below the arm each hand is loose
         h = trimesh.creation.icosphere(subdivisions=4, radius=2.5)
@@ -523,6 +525,25 @@ def test_a_hand_that_joins_its_arm_just_over_the_scan_grid_still_has_its_wrist_l
     assert sorted(ln["side"] for ln in wrists) == [-1, 1], wrists
     for ln in wrists:
         assert ln["rmax"] > 0, ln  # the hand's own ring, not an empty line
+
+
+def test_two_wrists_a_hair_apart_are_cut_on_one_level():
+    """Elon, seed 1 (Mac sweep, 2026-11-19): the wrists came out at 40.4 and 40.6. cut() makes one
+    plane of plane lines 0.2 mm apart, so the right cuff was painted on the left's cut and stepped
+    up to its own level where faces straddle it: a 0.21 mm wobble, and stone colors asked the person
+    about a cuff that was never wavy. Plane lines are one level or clear of the merge."""
+    m = block_figure(arm_z=(40.0, 40.15))
+    a = parts.anatomy(m, 8.0)
+    assert sorted(w["side"] for w in a["wrists"]) == [-1, 1], a["wrists"]
+    # the levels the plane lines cut at (the block's hands meet their arms in a groove, so its wrist
+    # lines are curves; the levels are what a plane wrist line takes)
+    zs = sorted([a[k] for k in ("hem", "neck") if a.get(k) is not None] + [w["z"] for w in a["wrists"]])
+    for i, z in enumerate(zs):
+        for z2 in zs[i + 1:]:
+            assert z2 - z < 1e-6 or z2 - z > parts.PLANE_MERGE, zs
+    for ln in a["lines"]:
+        if ln["name"] == "wrist":
+            assert ln["rmax"] > 0, ln
 
 
 def _shorts_figure(belt, flap=False):

@@ -230,10 +230,13 @@ def anatomy(mesh, top: float) -> dict:
     hi = (neck - 1.0) if neck is not None else top + 0.8 * H
     start = low if low is not None else top + 1.0
     x0 = res["center"]
+
+    def hand_at(z, side, tol=1e-6):
+        return any(not p["stands"] and (p["cx"] - x0) * side > 0
+                   for p in _pieces(mesh, _below(mesh, fig, z, tol), top, min_area))
     for side in (-1, 1):
         def hand(z, side=side, tol=1e-6):
-            return any(not p["stands"] and (p["cx"] - x0) * side > 0
-                       for p in _pieces(mesh, _below(mesh, fig, z, tol), top, min_area))
+            return hand_at(z, side, tol)
         w = _scan(start, hi, hand)
         # the wrist line cuts with ON_LINE of snap: a hand that joins its arm within that over the
         # level is not loose at the line, which then finds no hand; step down to where it is
@@ -241,6 +244,20 @@ def anatomy(mesh, top: float) -> dict:
             w = round(w - 0.1, 6) if w - 0.1 >= start else None
         if w is not None:
             res["wrists"].append({"z": w, "side": side})
+    # cut() makes one plane of plane lines within PLANE_MERGE of each other, so a wrist that close
+    # over another line would be painted on that line's cut and step up to its own where faces
+    # straddle it (Elon, seed 1: wrists at 40.4 and 40.6, a 0.2 mm step on the right cuff). It takes
+    # the lower level where its hand is still loose there; else it moves under it, clear of the merge
+    planes = [z for z in (res["hem"], neck) if z is not None]
+    for w in sorted(res["wrists"], key=lambda w: w["z"]):
+        for z in sorted(planes):
+            if abs(w["z"] - z) <= PLANE_MERGE + 1e-9:
+                for cand in ([z] if w["z"] >= z else []) + [round(z - PLANE_MERGE - 0.1, 6)]:
+                    if cand >= start and hand_at(cand, w["side"], ON_LINE):
+                        w["z"] = cand
+                        break
+                break
+        planes.append(w["z"])
     res["lines"] = find_lines(mesh, res)
     return res
 
@@ -259,6 +276,7 @@ GROOVE_ROLL = 10  # degrees each way the envelope looks for the farthest groove 
 HAND_REACH = 8.0  # mm from a hand's axis: the faces below a cuff line that can be the hand
 TOUCH_STEP = 0.1  # mm between the sections that follow a hand up from its wrist level to its cuff
 TOUCH_BELOW = 1.0  # mm under the wrist level where a hand's edge still follows the line where it touches the body
+PLANE_MERGE = 0.2  # mm: plane lines this close are one cut (cut, levels)
 HAIR_SECTOR = 10  # degrees round the head's axis per sample of the picture's hair edge
 HAIR_ORDER = 6  # harmonics in the hairline's series: 2 cannot hold it over the ears and down to the nape behind them
 HAIR_SMOOTH = 0.01  # the cost of the hairline leaving a plane's section of the head (_huber_fit)
@@ -848,7 +866,7 @@ def levels(anat: dict) -> list[float]:
     """The z of every plane line (lines on a groove are curves, not planes)."""
     out: list[float] = []
     for z in [anat.get("hem"), anat.get("neck")] + [w["z"] for w in anat.get("wrists", [])]:
-        if z is not None and all(abs(z - o) > 0.2 for o in out):
+        if z is not None and all(abs(z - o) > PLANE_MERGE for o in out):
             out.append(float(z))
     return out
 
@@ -881,7 +899,7 @@ def cut(V, F, anat: dict):
         if (ln["name"] == "wrist" and curved) or ln["name"] == "ankle":
             continue
         if not curved:
-            if any(abs(ln["z"] - z) <= 0.2 for z in done):
+            if any(abs(ln["z"] - z) <= PLANE_MERGE for z in done):
                 continue
             done.append(ln["z"])
         V, F = cut_iso(V, F, field(ln, V), 0.0, snap=0.02)
