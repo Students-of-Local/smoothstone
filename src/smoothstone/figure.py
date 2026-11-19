@@ -103,7 +103,27 @@ FRAME = (
 
 
 class FigureProblem(Exception):
-    pass
+    """A figure step that failed. `setup`: the tools are missing a part (a module, a model, its
+    weights), so building again fails the same way until the person runs SETUP."""
+
+    def __init__(self, msg: str, setup: bool = False):
+        super().__init__(msg)
+        self.setup = setup
+
+
+SETUP = "tools/figure/setup.sh"
+# a line of a step's log that says the tools are missing a part, not that the request went wrong
+_MISSING = re.compile(
+    r"(ModuleNotFoundError|No module named|ImportError|LocalEntryNotFoundError|RepositoryNotFoundError|"
+    r"GatedRepoError|EntryNotFoundError|does not appear to have a file named|command not found|"
+    r"No such file or directory: \S*\.(safetensors|ckpt|bin|pt|pth|gguf|npz)\b|Library not loaded)"
+    r"[^\n]*")
+
+
+def missing_part(text: str) -> str | None:
+    """The first line of a step's log that names a part the tools are missing, or None."""
+    m = _MISSING.search(text or "")
+    return m.group(0).strip()[:160] if m else None
 
 
 def prompt(style: str, who: str = "person", extra: str = "", glasses: bool | None = None,
@@ -139,7 +159,7 @@ def _mflux_bin() -> Path:
     base = Path(env).expanduser() if env else Path.home() / ".cache" / "stone-style" / ".venv" / "bin"
     exe = base / "mflux-generate-flux2-edit"
     if not exe.exists():
-        raise FigureProblem("the style model is not set up, run tools/figure/setup.sh once")
+        raise FigureProblem(f"the style model is not set up, run {SETUP} once", setup=True)
     return exe
 
 
@@ -178,6 +198,9 @@ def describe(photo: Path, out: Path, who: str) -> str:
         f.write(r.stderr)
     text = " ".join(r.stdout.split())
     if r.returncode != 0 or not text:
+        part = missing_part(r.stderr)
+        if part:
+            raise FigureProblem(f"the describe model is not set up ({part}), run {SETUP} once", setup=True)
         raise FigureProblem(f"the describe model failed, see {log}")
     out.write_text(text + "\n")
     return text
@@ -297,7 +320,7 @@ def _lift_cmd() -> list[str]:
         return shlex.split(env)
     lift = config.REPO_ROOT / "tools" / "lift"
     if not (lift / "lift.py").exists():
-        raise FigureProblem("the lift model is not set up, run tools/figure/setup.sh once")
+        raise FigureProblem(f"the lift model is not set up, run {SETUP} once", setup=True)
     uv = shutil.which("uv") or "uv"
     return [uv, "run", "--project", str(lift), "python", str(lift / "lift.py")]
 
@@ -319,6 +342,7 @@ def _landed(out: Path, write) -> Path:
 
 def _run(cmd: list[str], log: Path, timeout: int) -> None:
     t = time.time()
+    start = log.stat().st_size if log.exists() else 0
     with log.open("a") as f:
         f.write(f"$ {' '.join(shlex.quote(c) for c in cmd)}\n")
         f.flush()
@@ -326,9 +350,19 @@ def _run(cmd: list[str], log: Path, timeout: int) -> None:
             r = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
         except subprocess.TimeoutExpired as e:
             raise FigureProblem(f"{Path(cmd[0]).name} took over {timeout} s") from e
+        except FileNotFoundError as e:  # the program itself is missing (uv, or STONE_LIFT's)
+            f.write(f"not found: {cmd[0]}\n")
+            raise FigureProblem(f"{Path(cmd[0]).name} is not set up (command not found), run {SETUP} once",
+                                setup=True) from e
         f.write(f"exit {r.returncode} after {time.time() - t:.0f} s\n")
+    name = Path(cmd[-1] if 'lift' in cmd[-1] else cmd[0]).name
     if r.returncode != 0:
-        raise FigureProblem(f"{Path(cmd[-1] if 'lift' in cmd[-1] else cmd[0]).name} failed, see {log}")
+        with log.open("rb") as f:  # this run's part of the log only
+            f.seek(start)
+            part = missing_part(f.read().decode("utf-8", "replace"))
+        if part or r.returncode == 127:
+            raise FigureProblem(f"{name} is not set up ({part or 'command not found'}), run {SETUP} once", setup=True)
+        raise FigureProblem(f"{name} failed, see {log}")
 
 
 def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "",

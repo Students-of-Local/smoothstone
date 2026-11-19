@@ -931,3 +931,102 @@ def test_a_rough_edge_is_faired_before_any_color_is_given_up(jobenv, monkeypatch
     text, code, nxt = stone(*nxt.split()[1:])
     assert "faired" in text and nxt == cli.DONE_NEXT, text
     assert "black" in status_json_colors(jobenv)["mapping"]
+
+
+def test_a_lift_missing_a_module_is_a_setup_problem(tmp_path, monkeypatch):
+    """Mac verify run 2026-11-19: lift.py raised ModuleNotFoundError (hy3dgen) and stone said
+    only "uv failed, see lift.log", so the build looked worth retrying."""
+    monkeypatch.setenv("STONE_LIFT", "lift")
+
+    def run(cmd, stdout=None, **k):
+        stdout.write("Traceback (most recent call last):\n  File \"lift.py\", line 9\n"
+                     "ModuleNotFoundError: No module named 'hy3dgen'\n")
+        return type("R", (), {"returncode": 1})()
+
+    monkeypatch.setattr(figure.subprocess, "run", run)
+    with pytest.raises(figure.FigureProblem) as e:
+        figure.lift(tmp_path / "style.png", tmp_path / "lift.glb", 7)
+    assert e.value.setup and "hy3dgen" in str(e.value) and figure.SETUP in str(e.value)
+
+
+def test_a_lift_that_fails_for_another_reason_is_not_a_setup_problem(tmp_path, monkeypatch):
+    monkeypatch.setenv("STONE_LIFT", "lift")
+    log = tmp_path / "lift.log"
+    log.write_text("ModuleNotFoundError: No module named 'old'\n")  # an earlier run's, fixed since
+
+    def run(cmd, stdout=None, **k):
+        stdout.write("RuntimeError: MPS backend out of memory\n")
+        return type("R", (), {"returncode": 1})()
+
+    monkeypatch.setattr(figure.subprocess, "run", run)
+    with pytest.raises(figure.FigureProblem) as e:
+        figure.lift(tmp_path / "style.png", tmp_path / "lift.glb", 7)
+    assert not e.value.setup
+
+
+def _figure_with_photo():
+    stone("new", "A mini figure of my dog, 80 mm tall")
+    stone("set", "figure", "height=80")
+    photo = REPO / "examples" / "dog.png"
+    if not photo.exists():
+        photo = REPO / "evals" / "heldout" / "dog.png"
+    assert stone("image", str(photo))[2] == "stone build"
+
+
+def test_a_figure_step_that_is_not_set_up_asks_the_person_instead_of_building_again(jobenv, monkeypatch):
+    """Mac verify run 2026-11-19 (log.json of r3_black_shoes s1): the lift was not set up, NEXT
+    said stone build every time, and LFM3 ran the same failing build 4 times and spent all 10 steps."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _figure_with_photo()
+
+    def make(*a, **k):
+        raise figure.FigureProblem("lift.py is not set up (ModuleNotFoundError: No module named 'hy3dgen'), "
+                                   f"run {figure.SETUP} once", setup=True)
+
+    monkeypatch.setattr(figure, "make", make)
+    text, code, nxt = stone("build")
+    assert code == 1 and nxt.startswith("ask the person") and "setup.sh" in nxt, text
+    assert stone("status")[2] == nxt
+    assert nxt.endswith("When they say to go on: stone build"), nxt  # review of #37: a way to resume
+
+
+def test_a_lift_program_that_is_missing_is_a_setup_problem(tmp_path, monkeypatch):
+    """Review of #37: with no uv (or a STONE_LIFT that does not exist) the run raises
+    FileNotFoundError, which must take the setup path, not stone's internal error."""
+    monkeypatch.setenv("STONE_LIFT", str(tmp_path / "no-such-lift"))
+    with pytest.raises(figure.FigureProblem) as e:
+        figure.lift(tmp_path / "style.png", tmp_path / "lift.glb", 7)
+    assert e.value.setup and figure.SETUP in str(e.value)
+
+
+def test_the_same_failure_twice_in_a_row_asks_the_person(jobenv, monkeypatch):
+    """A failure that is not setup: one retry, as NEXT says, then a second identical failure stops
+    the model instead of a third try; a status between does not count as a change."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _figure_with_photo()
+
+    def make(*a, **k):
+        raise figure.FigureProblem("lift.py failed, see lift.log")
+
+    monkeypatch.setattr(figure, "make", make)
+    assert stone("build")[2] == "stone build"
+    stone("status")
+    text, code, nxt = stone("build")
+    assert code == 1 and nxt.startswith("ask the person") and "lift.py failed" in nxt, text
+    assert nxt.endswith("say to try again: stone build"), nxt
+
+
+def test_a_look_between_two_identical_failures_still_counts_them_in_a_row(jobenv, monkeypatch):
+    """Review of #37: build, then show (or a slip), then the same failing build must still stop:
+    a command that only looks does not end the run of failures."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _figure_with_photo()
+
+    def make(*a, **k):
+        raise figure.FigureProblem("lift.py failed, see lift.log")
+
+    monkeypatch.setattr(figure, "make", make)
+    assert stone("build")[2] == "stone build"
+    stone("show", "figure")
+    stone("bogus")
+    assert stone("build")[2].startswith("ask the person")
