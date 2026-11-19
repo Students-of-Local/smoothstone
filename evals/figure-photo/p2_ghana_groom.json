@@ -1,0 +1,16 @@
+{
+ "id": "p2_ghana_groom",
+ "request": "A mini figure of the man in these photos, 90 mm tall",
+ "photos": [
+  "p2_ghana_groom_1.jpg",
+  "p2_ghana_groom_2.jpg",
+  "p2_ghana_groom_3.jpg"
+ ],
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90
+  }
+ },
+ "why": "Anonymous man, dark skin, blue and white striped cap, long white embroidered robe (smock) to the shins, black shoes. Photo 1 full body, photo 2 three-quarter, photo 3 face close-up."
+}

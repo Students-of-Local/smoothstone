@@ -1,0 +1,30 @@
+{
+ "id": "p1_trench_coat_woman",
+ "request": "Make the woman in these photos as a mini figure, 85 mm tall, with black hair, a tan coat, blue jeans and white shoes like she's wearing",
+ "photos": [
+  "p1_trench_coat_woman_1.jpg",
+  "p1_trench_coat_woman_2.jpg"
+ ],
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 85
+  },
+  "colors": {
+   "black": [
+    "hair"
+   ],
+   "tan": [
+    "coat"
+   ],
+   "blue": [
+    "jeans"
+   ],
+   "white": [
+    "shoes"
+   ],
+   "rest": "white"
+  }
+ },
+ "why": "Anonymous East Asian woman, long dark brown hair, beige trench coat over a dark top, cropped blue jeans, white sneakers. Full body in both photos, face clear in both. Colors asked to match her clothes."
+}

@@ -243,3 +243,33 @@ candidate known in the most Wikipedias wins, a person, animal or character weigh
 thing; and a fictional character is its own kind, styled with its costume and colors. On 37 live
 names every one resolved to the subject a figure means, except "Garfield", which is the president
 (defensible) and "Thinker" without "The".
+
+## 2026-11-19 held-out sets for the three figure modes sealed
+
+The goal now is figures of people made three ways: from the model's own research (`stone find`), from 1 to 3 photos the person gives, and from a description (stone draws a FLUX.2 klein portrait, then the same pipeline). Each mode has a held-out set, written by a separate writer this morning before any tuning on it: evals/figure-research (6 people), evals/figure-photo (3 people, 7 free-licensed Wikimedia Commons photos credited in CREDITS.md), evals/figure-desc (4 descriptions). Nothing has run on them. The paint sweep since then tuned on Jensen, Elon and DHH only.
+
+The file names say a trait or two of each person (braids, glasses, a beard), so the sets are not blind on that. The garment and hair words on the desc-mode branch were last changed at 11:09, before the sets were written (11:27 on). Each case runs 2 seeds. The bar, written now, before the run: every check passes and the likeness bar holds (for a description, every trait it names is visible in the views), in at least 80% of runs per mode, and a blind Opus craft judge gives a mean of at least 8 per mode, with a seeded bad control.
+
+```
+d647a6e541edfa9aca2bd027693618f360f3103d05b884b1d820763a485bbc4f  r1_michelle_obama.json
+69abb71e9ee15bcc27c55c1b5eefffac8c8082a273e0acd6373d1e05c080db32  r2_priyanka_chopra.json
+0ab93b59f545c0d3c00b55932a911522382916cf01b9e664e57325fbf7616bda  r3_dolly_parton.json
+db99150a5652b6d85f7fc5edfc68c78a058a968ee3f3801716a163daecd7e1ab  r4_george_rr_martin.json
+ead2b1a841ac30cc6afec331a798606c1e2ee123532a16a43b95bd5ddf811e53  r5_iris_apfel.json
+b6741a6c23a928a9af3911260f29daecde8ae5a1b519347d71ec0a6137cf8ff8  r6_michael_jordan.json
+9fc4065f431c745f15060988e7d7ff8eee420f01c7f93ba5e77f5cdc4d2596d0  CREDITS.md
+c777542c7fc2d29af83aad0400ad816efebaeba3716c10024b3f975fe104add9  p1_trench_coat_woman_1.jpg
+e307ce51c9a26bf32a99616f55bbad969b1c24db5f525b5db6a36257b1ed5ece  p1_trench_coat_woman_2.jpg
+5b2c732b82afe9b1143f1fd90f817adc14e26bdc465fceac94336d00d16f91c4  p1_trench_coat_woman.json
+b517c155fb5303047806a43910acc6421427de7daf8ae72f96e84e14e4ea1aed  p2_ghana_groom_1.jpg
+2620e2547a369c4b28668979d4128d38da033ceafe843334665426392f10cc36  p2_ghana_groom_2.jpg
+071206154eaa5e492059700aa571817a3d06a28b5b5d6ca779fd7d97e24e456a  p2_ghana_groom_3.jpg
+593b00b106ff8bc3773fdebaf98a64fa81fe1682523df6fb8a78ec0abdad48f3  p2_ghana_groom.json
+3344dfa3e31771547aa20b56f6aad79c29e68674ab608abb615d555b7a5187b6  p3_blonde_mustard_pants_1.jpg
+949804327ac7471c87aa265c9d04ba82b38dbf8be6dc6fd4f47b9aa883e5ecdb  p3_blonde_mustard_pants_2.jpg
+01bb91d98cef6e27069155d37497dcb6cd939489b54ed8ce3c4531435d3ab3a2  p3_blonde_mustard_pants.json
+f47d730af3828fd9102745640e4793318db33e82c328f8ba1c193f8f910bf8f4  d1_old_man_beard_cap.json
+b61d8eef7cfc7c891927c122d6d01a06d5a7a38356bb1d65ddf446fc91901ae0  d2_girl_braids_dress.json
+d15e0478f82c292fa8c56f2c6ed737a7a99d1404698866a114d87d8d91c05b0e  d3_woman_pixie_glasses.json
+381c1eb606406955069ffe0aaf52df1b4fdb7eea09aa4a794069ebdde4173c13  d4_man_curly_beard_boots.json
+```

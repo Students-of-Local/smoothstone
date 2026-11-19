@@ -1,0 +1,33 @@
+{
+ "id": "d3_woman_pixie_glasses",
+ "request": "A mini figure of a woman with short black hair in a pixie cut, black glasses, a purple jacket, gray pants and white shoes, 95 mm tall",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 95
+  },
+  "colors": {
+   "black": [
+    "hair",
+    "glasses"
+   ],
+   "purple": [
+    "jacket"
+   ],
+   "gray": [
+    "pants"
+   ],
+   "white": [
+    "shoes"
+   ],
+   "rest": "white"
+  },
+  "traits": [
+   "short black pixie cut",
+   "black glasses",
+   "purple jacket",
+   "gray pants",
+   "white shoes"
+  ]
+ }
+}

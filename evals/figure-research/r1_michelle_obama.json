@@ -1,0 +1,12 @@
+{
+ "id": "r1_michelle_obama",
+ "request": "A mini figure of Michelle Obama, 90 mm tall, with \"MICHELLE\" on the base",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "MICHELLE"
+  }
+ },
+ "why": "Woman; dark skin; shoulder-length dark hair with bangs. Lead image: Michelle_Obama_2013_official_portrait.jpg (seated, navy dress, pearls). Covers: woman, dark skin, name on the base."
+}

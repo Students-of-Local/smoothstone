@@ -1,0 +1,12 @@
+{
+ "id": "r4_george_rr_martin",
+ "request": "A mini figure of George R. R. Martin, 100 mm tall, with \"GRRM\" on the base",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 100,
+   "name": "GRRM"
+  }
+ },
+ "why": "Man; light skin; full white beard; glasses; black Greek fisherman's cap he is almost always photographed in. Lead image: George_R._R._Martin_(54743316729)_(cropped).jpg shows cap, glasses and full white beard. Covers: full beard, hat, glasses, white hair, name on the base."
+}
