@@ -596,3 +596,77 @@ def test_a_render_is_checked_only_for_what_the_photo_check_answered(tmp_path, mo
     monkeypatch.setattr(figure, "traits", lambda images, who, log: (asked.append(images), real(images, who, log))[1])
     figure.make([photo], tmp_path / "fig", say=lambda s: None)
     assert len(asked) == 1  # the photo only: no glasses, beard or hat answer to hold a render to
+
+
+def _dies_mid_write(target_arg):
+    """A stand-in subprocess.run that writes half a file to the path it was given, then fails."""
+    def run(cmd, **kw):
+        Path(target_arg(cmd)).write_bytes(b"half")
+        return type("R", (), {"returncode": -9})()
+    return run
+
+
+def _writes(target_arg, data=b"done"):
+    def run(cmd, **kw):
+        Path(target_arg(cmd)).write_bytes(data)
+        return type("R", (), {"returncode": 0})()
+    return run
+
+
+def test_a_style_cut_off_mid_write_leaves_no_picture_under_the_final_name(tmp_path, monkeypatch):
+    """first-F5: the harness kills a slow build mid-write, and the next run took the half picture as done."""
+    monkeypatch.setattr(figure, "_mflux_bin", lambda: tmp_path / "mflux-generate")
+    monkeypatch.setattr(figure, "_style_model", lambda: [])
+    out_arg = lambda cmd: cmd[cmd.index("--output") + 1]
+    out = tmp_path / "style.png"
+    monkeypatch.setattr(figure.subprocess, "run", _dies_mid_write(out_arg))
+    with pytest.raises(figure.FigureProblem):
+        figure.style([tmp_path / "p.jpg"], out, "chibi", "person", 7)
+    assert not out.exists()
+    monkeypatch.setattr(figure.subprocess, "run", _writes(out_arg))
+    assert figure.style([tmp_path / "p.jpg"], out, "chibi", "person", 7).read_bytes() == b"done"
+    assert [p.name for p in tmp_path.glob("style*.png")] == ["style.png"]
+
+
+def test_a_lift_cut_off_mid_write_leaves_no_mesh_under_the_final_name(tmp_path, monkeypatch):
+    monkeypatch.setenv("STONE_LIFT", "lift")
+    out = tmp_path / "lift.glb"
+    monkeypatch.setattr(figure.subprocess, "run", _dies_mid_write(lambda cmd: cmd[2]))
+    with pytest.raises(figure.FigureProblem):
+        figure.lift(tmp_path / "style.png", out, 7)
+    assert not out.exists()
+    monkeypatch.setattr(figure.subprocess, "run", _writes(lambda cmd: cmd[2]))
+    assert figure.lift(tmp_path / "style.png", out, 7).read_bytes() == b"done"
+    assert [p.name for p in tmp_path.glob("lift*.glb")] == ["lift.glb"]
+
+
+def test_a_repair_that_dies_mid_write_leaves_no_figure_under_the_final_name(tmp_path, monkeypatch):
+    src = standin(tmp_path / "lift.glb")
+    out = tmp_path / "figure.stl"
+
+    def half(self, path, *a, **k):
+        Path(path).write_bytes(b"half")
+        raise OSError("killed")
+    with monkeypatch.context() as m:
+        m.setattr(trimesh.Trimesh, "export", half)
+        with pytest.raises(OSError):
+            figure.repair(src, out)
+    assert not out.exists()
+    figure.repair(src, out)
+    assert trimesh.load(out).is_watertight and out.with_suffix(".json").exists()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["figure.json", "figure.stl", "lift.glb"]
+
+
+def test_a_style_check_cut_off_while_copying_leaves_no_picture_under_the_final_name(tmp_path, monkeypatch):
+    """style_checked copies the kept try onto style.png; a half copy must not stand as the render."""
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: (out.write_bytes(b"render"), out)[1])
+    monkeypatch.setattr(figure, "traits", lambda *a, **k: [{"glasses": False}])
+
+    def half(src, dst, *a, **k):
+        Path(dst).write_bytes(b"half")
+        raise OSError("killed")
+    monkeypatch.setattr(figure.shutil, "copyfile", half)
+    out = tmp_path / "style.png"
+    with pytest.raises(OSError):
+        figure.style_checked([tmp_path / "p.jpg"], out, "chibi", "person", 7, "", {"glasses": False})
+    assert not out.exists()

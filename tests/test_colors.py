@@ -771,3 +771,22 @@ def test_a_suit_is_the_jacket_and_the_pants():
         {"top": "black", "pants": "black", "shoes": "black"}
     assert pc("a grey suit and red shoes") == {"top": "gray", "pants": "gray", "shoes": "red"}
     assert pc("a blue jumpsuit") == {"top": "blue", "pants": "blue"}
+
+
+@pytest.mark.parametrize("req", ["a black jacket, blue pants, and white shoes",
+                                 "a black jacket, blue pants and white shoes",
+                                 "a black jacket and blue pants and white shoes"])
+def test_a_list_ends_at_its_last_item_with_or_without_an_oxford_comma(req):
+    got = colors.part_colors(req)
+    assert {k: v for k, v in got.items() if not k.startswith("word:")} == \
+        {"top": "black", "pants": "blue", "shoes": "white"}
+    assert got["word:shoes"] == "shoes"
+
+
+def test_a_comma_and_ends_a_clause_so_the_part_before_it_keeps_its_color():
+    """second-S4: "show his hands, and the jacket is blue" painted the hands blue."""
+    pc = lambda r: {k: v for k, v in colors.part_colors(r).items() if not k.startswith("word:")}
+    assert pc("show his hands, and the jacket is blue") == {"top": "blue"}
+    assert pc("the jacket, pants, and shoes are black") == {"top": "black", "pants": "black", "shoes": "black"}
+    assert pc("the jacket and pants are black") == {"top": "black", "pants": "black"}
+    assert pc("his hands, and the jacket and pants are blue") == {"top": "blue", "pants": "blue"}
