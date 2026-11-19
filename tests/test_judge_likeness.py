@@ -188,18 +188,22 @@ def _found(job, *titles):
     (d / "found.json").write_text(json.dumps({"photos": [{"title": t} for t in titles]}))
 
 
-def _article(monkeypatch, files):
-    """The fake article's lead image is ref.jpg; files are its other images, each at https://up/x/<n>."""
+def _article(monkeypatch, files, search=(), title="Elon Musk", lead="Elon_Musk_ref.jpg"):
+    """The fake article leads with https://up/x/<lead>; files are its other images and search what
+    a Commons search returns, each at https://up/x/<name> (a 1600 px thumb)."""
     def get(url, timeout=60):
         if "prop=images" in url:
             return json.dumps({"query": {"pages": {"1": {"images": [{"title": f} for f in files]}}}}).encode()
+        if "list=search" in url:
+            return json.dumps({"query": {"search": [{"title": f} for f in search]}}).encode()
         if "prop=imageinfo" in url:
-            t = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["titles"][0]
-            return json.dumps({"query": {"pages": {"2": {"title": t, "imageinfo": [
-                {"url": "https://up/x/" + urllib.parse.quote(t[5:].replace(" ", "_"))}]}}}}).encode()
+            ts = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["titles"][0].split("|")
+            return json.dumps({"query": {"pages": {str(k): {"title": t, "imageinfo": [
+                {"thumburl": "https://up/x/" + urllib.parse.quote(t[5:].replace(" ", "_"))}]}
+                for k, t in enumerate(ts)}}}).encode()
         if "api.php" in url:
-            return json.dumps({"query": {"pages": {"1": {"title": "Elon Musk", "description": "businessman",
-                                                         "original": {"source": "https://up/x/Elon_Musk_ref.jpg"}}}}}).encode()
+            return json.dumps({"query": {"pages": {"1": {"title": title, "description": "someone",
+                                                         "original": {"source": "https://up/x/" + lead}}}}}).encode()
         return b"jpeg"
     monkeypatch.setattr(jl, "_get", get)
 
@@ -223,3 +227,40 @@ def test_no_reference_apart_from_the_tools_photos_is_no_verdict(tmp_path, monkey
     _article(monkeypatch, ["File:Tesla logo.svg", "File:SpaceX factory.jpg"])
     with pytest.raises(jl.JudgeProblem, match="tool"):
         jl.judge(job, "A mini figure of Elon Musk")
+
+
+def test_the_judge_sees_the_lead_and_newer_photos_of_the_subject_newest_first(tmp_path, monkeypatch):
+    """DHH's lead image is him in a racing suit and Jensen's is ten years old, so one photo judged
+    the hair and clothes of the wrong years; more photos named for the subject go with it."""
+    job = _job(tmp_path)
+    _found(job, "File:David Heinemeier Hansson 2019.jpg")
+    asked = _fake(monkeypatch, "David Heinemeier Hansson", 8)
+    _article(monkeypatch, ["File:Ruby on Rails logo.svg", "File:David Heinemeier Hansson 2010.jpg"],
+             search=["File:Porsche 911 RSR.jpg", "File:David Heinemeier Hansson 2019.jpg",
+                     "File:Oreca 07 - David Heinemeier-Hansson, Fabio Scherer & Pietro Fittipaldi at Le Mans 20240616.jpg",
+                     "File:David Heinemeier Hansson 2023.jpg", "File:David Heinemeier Hansson 2015.jpg"],
+             title="David Heinemeier Hansson", lead="DHH_racing.jpg")
+    res = jl.judge(job, DHH)
+    assert [p["url"] for p in res["reference"]["photos"]] == [
+        "https://up/x/DHH_racing.jpg", "https://up/x/David_Heinemeier_Hansson_2023.jpg",
+        "https://up/x/David_Heinemeier_Hansson_2015.jpg"]
+    prompt, shown = asked[1]
+    assert shown == ["reference_1.jpg", "reference_2.jpg", "reference_3.jpg", "render.png"]
+    assert "most recent" in prompt and "2019" not in prompt  # the tool's own photo never goes in
+
+
+def test_no_reference_that_shows_the_subject_is_no_verdict(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    monkeypatch.setattr(jl, "claude", lambda prompt, folder=None, model="opus":
+                        "David Heinemeier Hansson" if folder is None else
+                        json.dumps({"score": 5, "conflicts": [], "usable": False}))
+    _article(monkeypatch, [], search=["File:David Heinemeier Hansson 2023.jpg"],
+             title="David Heinemeier Hansson", lead="DHH_racing.jpg")
+    with pytest.raises(jl.JudgeProblem, match="shows the subject"):
+        jl.judge(job, DHH)
+
+
+def test_a_year_is_read_from_the_dates_commons_file_names_carry():
+    assert jl._year("statue of liberty, new york city, 20231003 1512 1976.jpg") == 2023
+    assert jl._year("jensen huang stanford 2026-04-30 011.jpg") == 2026
+    assert jl._year("david heinemeier hansson (27225732035).jpg") == 0

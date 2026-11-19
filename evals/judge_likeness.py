@@ -9,8 +9,11 @@ lead image, and a second Opus run compares the render with it, feature by featur
 hair, glasses, skin, age, clothes), never naming anyone from a face. When the lead image is a photo
 the tool styled from (image/found/found.json), another photo of the subject from the article is the
 reference, and with none there is no verdict: a render compared with its own source measures
-copying, not likeness. Both run as `claude -p` on
-Donovan's sign-in (ANTHROPIC_API_KEY unset). The verdict is {"score": 1-10, "conflicts": [...],
+copying, not likeness. A lead image can also be old or miss the subject (DHH's is him in a racing
+suit), so up to two more photos named for the subject, from the article and a Commons search,
+newest first by the year in the file name, go with it; the judge leaves out any that do not show
+the subject, goes by the newest where they differ, and with none usable there is no verdict.
+Both run as `claude -p` on Donovan's sign-in (ANTHROPIC_API_KEY unset). The verdict is {"score": 1-10, "conflicts": [...],
 "reference": {...}}, saved as likeness.json next to the run; a score under PASS fails it.
 """
 
@@ -41,9 +44,8 @@ or thing it shows)? Reply with the exact article title and nothing else."""
 RUBRIC = """A tool made a 3D printable collectible figure from this request:
 {request}
 
-Read both pictures with the Read tool:
-  {reference}: a reference photo of the request's subject, the lead image of the Wikipedia
-    article "{title}" ({caption}).
+Read the pictures with the Read tool:
+{references}
   {render}: the colored render the tool sculpted the figure from. It is stylized (for a chibi
     figure a big head and a small body are the style, not a fault).
 
@@ -61,10 +63,16 @@ subject's usual look explains it; a feature the subject does not have is not.
   clean shaven face, the wrong hair color), so people would not know who it is meant to be.
 - 1 to 2: a different subject (another person, an animal or a thing instead of a person).
 If the reference photo does not show the subject (a logo, a building for a person), say so in
-conflicts with feature "reference" and judge from the request's subject as best you can.
+conflicts with feature "reference" and judge from the request's subject as best you can.{several}
 
 Reply with one JSON object and nothing else:
 {{"score": <1-10>, "conflicts": [{{"feature": "...", "what": "..."}}]}}"""
+
+SEVERAL = """
+There are several reference photos. Some may not show the subject (a car the subject drives, a
+crowd, a logo): leave those out. Hair, weight and age change over the years, so where the photos
+differ, go by the most recent one that shows the subject (the file names give years). If none of
+them shows the subject, add "usable": false to your reply."""
 
 
 class JudgeProblem(Exception):
@@ -119,26 +127,61 @@ def tool_photos(job: Path) -> set[str]:
     return {_file_key(p.get("title", "")) for p in found.get("photos") or [] if p.get("title")}
 
 
-def other_reference(ref: dict, avoid: set[str]) -> dict | None:
-    """A photo from the same article that the tool did not use, named for the subject (a file
-    whose name has a word of the title), or None."""
+COMMONS = "https://commons.wikimedia.org/w/api.php"
+REFERENCES = 3
+
+
+NOISE = {"cropped", "crop", "jpg", "jpeg", "png", "file", "image", "photo", "the", "and", "with", "from"}
+
+
+def _year(key: str) -> int:
+    """The latest year in a file name, as 2023, 20231003 or 2023-10-03 (0 with none)."""
+    ys = [int(y) for y in re.findall(r"(?<!\d)((?:19|20)\d\d)(?:[-_ ]?[01]\d[-_ ]?[0-3]\d)?(?!\d)", key)]
+    return max(ys, default=0)
+
+
+def _named_for(key: str, words: set[str]) -> float:
+    """How much of a file name is the subject's name: "Elon Musk 2025 (cropped)" 1.0, a race car
+    "Oreca 07 - David Heinemeier-Hansson, Fabio Scherer & ..." far less."""
+    ws = [w for w in re.findall(r"[a-z]{3,}", key) if w not in NOISE]
+    return sum(w in words for w in ws) / len(ws) if ws else 0.0
+
+
+def other_references(ref: dict, avoid: set[str], n: int = REFERENCES) -> list[dict]:
+    """Up to n photos of the subject the tool did not use, from the article's own photos and a
+    Commons search for its title. Files named mostly for the subject come first (a portrait, not a
+    race car the subject drove among others), newest first by the year in the name.
+    [{"file", "url"}], url a 1600 px rendition."""
+    words = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", ref["title"])}
     q = urllib.parse.urlencode({"action": "query", "titles": ref["title"], "prop": "images", "imlimit": "50",
-                                "format": "json"})
+                                "redirects": "1", "format": "json"})
     pages = (json.loads(_get(WIKI + "?" + q)).get("query") or {}).get("pages") or {}
     files = [i["title"] for pg in pages.values() for i in pg.get("images") or []]
-    words = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", ref["title"])}
+    q = urllib.parse.urlencode({"action": "query", "list": "search", "srnamespace": "6", "srlimit": "20",
+                                "srsearch": f"{ref['title']} filetype:bitmap", "format": "json"})
+    files += [h["title"] for h in (json.loads(_get(COMMONS + "?" + q)).get("query") or {}).get("search") or []]
+    seen, keep = set(), []
     for f in files:
         key = _file_key(f)
-        if key in avoid or not key.endswith((".jpg", ".jpeg")) or not words & set(re.findall(r"[a-z]{3,}", key)):
+        if key in avoid or key in seen or not key.endswith((".jpg", ".jpeg")):
             continue
-        q = urllib.parse.urlencode({"action": "query", "titles": f, "prop": "imageinfo", "iiprop": "url",
-                                    "format": "json"})
-        info = [ii for pg in ((json.loads(_get(WIKI + "?" + q)).get("query") or {}).get("pages") or {}).values()
-                for ii in pg.get("imageinfo") or []]
-        if info and info[0].get("url"):
-            lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1])
-            return {**ref, "url": info[0]["url"], "instead_of": lead.replace("_", " ")}
-    return None
+        if _named_for(key, words) > 0:
+            seen.add(key)
+            keep.append(f)
+    keep = sorted(keep, key=lambda f: (_named_for(_file_key(f), words) < 0.6, -_year(_file_key(f))))[:n]
+    if not keep:
+        return []
+    q = urllib.parse.urlencode({"action": "query", "titles": "|".join(keep), "prop": "imageinfo",
+                                "iiprop": "url", "iiurlwidth": "1600", "format": "json"})
+    info = {pg.get("title"): (pg.get("imageinfo") or [{}])[0]
+            for pg in ((json.loads(_get(COMMONS + "?" + q)).get("query") or {}).get("pages") or {}).values()}
+    out = []
+    for f in keep:
+        ii = info.get(f) or {}
+        url = ii.get("thumburl") or ii.get("url")
+        if url:
+            out.append({"file": f[5:] if f.startswith("File:") else f, "url": url})
+    return out
 
 
 def parse(text: str) -> dict:
@@ -152,8 +195,11 @@ def parse(text: str) -> dict:
     conflicts = out.get("conflicts", [])
     if not isinstance(conflicts, list):
         raise JudgeProblem("conflicts is not a list")
-    return {"score": score, "conflicts": [{"feature": str(c.get("feature", "")), "what": str(c.get("what", ""))}
-                                          for c in conflicts if isinstance(c, dict)]}
+    res = {"score": score, "conflicts": [{"feature": str(c.get("feature", "")), "what": str(c.get("what", ""))}
+                                         for c in conflicts if isinstance(c, dict)]}
+    if out.get("usable") is False:
+        res["usable"] = False
+    return res
 
 
 def render_of(job: Path) -> Path | None:
@@ -174,20 +220,37 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
     title = claude(TITLE.format(request=request), model=model).strip().strip('"').splitlines()[0]
     ref = reference(title)
     avoid = tool_photos(job)
-    if _file_key(ref["url"]) in avoid:  # the article leads with the photo the render was styled from
-        ref = other_reference(ref, avoid)
-        if ref is None:
-            raise JudgeProblem(f"the article {title!r} shows only photos the tool styled from; "
-                               "no reference apart from them")
+    lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1]).replace("_", " ")
+    lead_is_tools = _file_key(ref["url"]) in avoid  # Wikidata's photo, which the tool put first
+    others = other_references(ref, avoid | {_file_key(ref["url"])}, REFERENCES - (0 if lead_is_tools else 1))
+    photos = ([] if lead_is_tools else [{"file": lead, "url": ref["url"]}]) + others
+    if not photos:
+        raise JudgeProblem(f"no photo of {title!r} apart from the ones the tool styled from")
+    if lead_is_tools:
+        ref = {**ref, "instead_of": lead, "url": photos[0]["url"]}
+    if lead_is_tools or len(photos) > 1:
+        ref = {**ref, "photos": photos}
     with tempfile.TemporaryDirectory(prefix="likeness-") as tmp:
         t = Path(tmp)
-        ext = Path(urllib.parse.urlparse(ref["url"]).path).suffix.lower() or ".jpg"
-        (t / f"reference{ext}").write_bytes(_get(ref["url"]))
+        if ref.get("photos"):
+            lines = []
+            for k, ph in enumerate(ref["photos"], 1):
+                name = t / f"reference_{k}.jpg"
+                name.write_bytes(_get(ph["url"]))
+                lines.append(f"  {name}: a photo of the request's subject from Wikimedia Commons, file \"{ph['file']}\".")
+            refs, several = "\n".join(lines), SEVERAL if len(lines) > 1 else ""
+        else:
+            ext = Path(urllib.parse.urlparse(ref["url"]).path).suffix.lower() or ".jpg"
+            (t / f"reference{ext}").write_bytes(_get(ref["url"]))
+            refs = (f"  {t / f'reference{ext}'}: a reference photo of the request's subject, the lead image of "
+                    f"the Wikipedia\n    article \"{ref['title']}\" ({ref['caption'] or 'no caption'}).")
+            several = ""
         shutil.copy(render, t / "render.png")
-        reply = claude(RUBRIC.format(request=request, reference=t / f"reference{ext}", title=ref["title"],
-                                     caption=ref["caption"] or "no caption", render=t / "render.png"),
+        reply = claude(RUBRIC.format(request=request, references=refs, several=several, render=t / "render.png"),
                        folder=t, model=model)
     res = parse(reply)
+    if res.get("usable") is False:
+        raise JudgeProblem(f"none of the reference photos of {title!r} shows the subject")
     return {**res, "pass": res["score"] >= PASS, "reference": ref, "render": str(render),
             "model": model, "request": request}
 
