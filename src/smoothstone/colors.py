@@ -39,6 +39,9 @@ LEDGE_AREA = 0.2  # mm2 of such faces seen (parts.visible_faces) in any 30 degre
 EDGE_MIN = 4.0  # mm: shorter boundary pieces (ends at a three-color corner) are too short to judge
 SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under this is a sliver, a band under about 4 mm across
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
+NAME_OUT = 0.02  # mm: a plinth face with a corner this far out of the drum is a raised letter of the name
+NAME_CONTRAST = 3.0  # the name's color stands out from the plinth's by at least this contrast ratio (WCAG)
+REGIONS_VERSION = 2  # bump when find_regions changes what it returns, so a cached listing is redone
 
 # plain color names and a typical filament of each
 NAMES = {
@@ -91,6 +94,29 @@ def _lab(rgb) -> np.ndarray:
     from .paint import _to_lab
 
     return _to_lab(np.asarray(rgb, dtype=float).reshape(-1, 3))
+
+
+def luminance(rgb) -> float:
+    """Relative luminance (WCAG) of an sRGB color, 0 for black to 1 for white."""
+    c = np.asarray(rgb, float) / 255.0
+    c = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    return float(c @ [0.2126, 0.7152, 0.0722])
+
+
+def contrast_ratio(a, b) -> float:
+    """WCAG contrast ratio of two colors, 1 (the same) to 21 (black on white)."""
+    la, lb = sorted((luminance(a), luminance(b)))
+    return (lb + 0.05) / (la + 0.05)
+
+
+def name_contrast(plinth_rgb, palette) -> int | None:
+    """The palette color (its index) the name on a plinth of `plinth_rgb` takes so it reads: of the
+    colors that stand out from the plinth by NAME_CONTRAST, the one with the most contrast. None
+    when none does (the name then takes black or white, whichever stands out more). Reusing a
+    palette color needs no extra filament."""
+    ok = [(contrast_ratio(c, plinth_rgb), i) for i, c in enumerate(palette)
+          if c is not None and contrast_ratio(c, plinth_rgb) >= NAME_CONTRAST]
+    return max(ok)[1] if ok else None
 
 
 def color_name(rgb) -> str:
@@ -319,6 +345,54 @@ def base_top(recipe: str, params: dict) -> float:
     return bh if bh > 0 else (8.0 if not params.get("name") else 12.0)
 
 
+def plinth(recipe: str, params: dict) -> dict | None:
+    """The plinth as recipes/figure/recipe.scad makes it, or None for a part without one: its height
+    bh, diameter bd, lip and chamfer c, drum radius dr and the name raised on the drum's band
+    (from lip up to bh - c)."""
+    bh = base_top(recipe, params)
+    if bh <= 0:
+        return None
+
+    def num(k, default):
+        try:
+            return float(params.get(k) or default)
+        except (TypeError, ValueError):
+            return float(default)
+
+    name = str(params.get("name") or "")
+    fh = num("height", 90) - bh
+    bd = num("base_d", 0)
+    if bd <= 0:
+        bd = max(30.0, fh * 0.68 + 8, len(name) * fh * 0.075 + 14)
+    lip, c = min(2.4, bh / 4), min(1.2, bh / 8)
+    return {"bh": bh, "bd": bd, "lip": lip, "c": c, "dr": bd / 2 - c, "name": name}
+
+
+def name_faces(mesh, recipe: str, params: dict) -> np.ndarray:
+    """The faces of the name's raised letters on a plinth's drum: faces in the drum's band (between
+    the lip and the top chamfer) with a corner standing out of the drum by more than NAME_OUT mm.
+    The drum's outline is read off the mesh, its corners at radius dr on the band's top edge, so a
+    hex plinth's flat faces count as the drum too. All False for a part with no name on it."""
+    n = len(mesh.faces)
+    p = plinth(recipe, params)
+    if p is None or not p["name"].strip():
+        return np.zeros(n, bool)
+    V = np.asarray(mesh.vertices, float)
+    F = np.asarray(mesh.faces)
+    z0, z1, dr = p["lip"], p["bh"] - p["c"], p["dr"]
+    r = np.hypot(V[:, 0], V[:, 1])
+    ring = V[(np.abs(V[:, 2] - z1) < 1e-3) & (np.abs(r - dr) < 0.05), :2]
+    if len(ring) >= 3:
+        from scipy.spatial import ConvexHull
+
+        eq = ConvexHull(ring).equations  # unit outward normals: a point's distance out of the drum
+        out = (V[:, :2] @ eq[:, :2].T + eq[:, 2]).max(1)
+    else:
+        out = r - dr
+    zc = V[F][:, :, 2].mean(1)
+    return (zc > z0 + 1e-3) & (zc < z1 - 1e-3) & (out[F].max(1) > NAME_OUT)
+
+
 def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None, never: int | None = None) -> np.ndarray:
     """Majority vote over each face's edge neighbors; removes specks a picture leaves. Faces in
     `keep` hold their label, and no other face can take label `never` (the plinth's)."""
@@ -338,21 +412,26 @@ def smooth_labels(mesh, labels: np.ndarray, rounds: int = 3, keep=None, never: i
     return labels
 
 
-def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, lab=None, zone=None) -> np.ndarray:
+def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, lab=None, zone=None,
+            name=None) -> np.ndarray:
     """Connected regions of equal label over face adjacency, numbered from 0. Regions under
     `min_share` of the surface join the neighbor they share the longest edge with, except that with
     `lab` (a Lab color per label) a region of at least SPECK that differs from that neighbor by more
     than CONTRAST stays its own: white hands on a black jacket are small but not noise. Faces in the
-    `base` mask are one region of their own that never merges. With `zone` (a part of the body
-    per face), a region never spans two zones and joins only a neighbor in its own zone."""
+    `base` mask are one region of their own that never merges, and so are the faces in the `name`
+    mask (the name's letters on the plinth, every letter in one region). With `zone` (a part of the
+    body per face), a region never spans two zones and joins only a neighbor in its own zone."""
     import scipy.sparse as sp
     from scipy.sparse.csgraph import connected_components
 
     n = len(mesh.faces)
     labels = np.asarray(labels).copy()
     base = np.zeros(n, bool) if base is None else np.asarray(base, bool)
+    name = np.zeros(n, bool) if name is None else np.asarray(name, bool) & ~base
     if base.any():
         labels[base] = labels.max() + 1  # its own label, so it is its own component
+    if name.any():
+        labels[name] = labels.max() + 1
     zone = np.zeros(n, int) if zone is None else np.asarray(zone, int)
     adj = mesh.face_adjacency
     same = (labels[adj[:, 0]] == labels[adj[:, 1]]) & (zone[adj[:, 0]] == zone[adj[:, 1]])
@@ -363,13 +442,12 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, l
     comp_label[comp] = labels
     comp_zone = np.zeros(nc, int)
     comp_zone[comp] = zone
-    if base.any():  # the plinth and the name letters are one region even where they do not touch
-        bid = comp[base][0]
-        comp[base] = bid
-    area = np.bincount(comp, weights=mesh.area_faces, minlength=nc)
     is_base = np.zeros(nc, bool)
-    if base.any():
-        is_base[comp[base][0]] = True
+    for fixed in (base, name):  # the plinth is one region, the name's letters one more
+        if fixed.any():
+            comp[fixed] = comp[fixed][0]
+            is_base[comp[fixed][0]] = True
+    area = np.bincount(comp, weights=mesh.area_faces, minlength=nc)
     # shared edge length between neighboring components
     ev = mesh.face_adjacency_edges
     elen = np.linalg.norm(mesh.vertices[ev[:, 0]] - mesh.vertices[ev[:, 1]], axis=1)
@@ -468,8 +546,10 @@ def boxed_slivers(mesh, num: np.ndarray, info: list[dict], fil: np.ndarray, name
     return out
 
 
-def describe(mesh, region: np.ndarray, rgb: np.ndarray, base_region: int | None) -> list[dict]:
-    """One entry per region, largest first: share of surface, z span, position word, color."""
+def describe(mesh, region: np.ndarray, rgb: np.ndarray, base_region: int | None,
+             name_region: int | None = None) -> list[dict]:
+    """One entry per region, largest first: share of surface, z span, position word ("name" for
+    the name's letters on the plinth), color."""
     z = mesh.triangles_center[:, 2]
     lo, hi = mesh.bounds[0, 2], mesh.bounds[1, 2]
     H = max(hi - lo, 1e-9)
@@ -485,6 +565,8 @@ def describe(mesh, region: np.ndarray, rgb: np.ndarray, base_region: int | None)
         f = (zc - lo) / H
         if r == base_region:
             pos = "base"
+        elif r == name_region:
+            pos = "name"
         else:
             pos = "base" if f < 0.12 else "bottom" if f < 0.4 else "middle" if f < 0.7 else "top"
         col = rgb[r]
@@ -539,6 +621,7 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
     # the plinth's top face lies at exactly `top`: a face is base when its center is below the top
     # or it lies flat on it
     base = (zc < top) | (ztop <= top + 0.01) if top > 0 else np.zeros(n, bool)
+    letters = name_faces(mesh, recipe, params) & base  # the name raised on the plinth: its own region
     fig = ~base
     # project the pictures on the figure alone, scaled to unit height as paint.py expects
     sub = trimesh.Trimesh(mesh.vertices, mesh.faces[fig], process=False)
@@ -554,22 +637,28 @@ def find_regions(mesh, recipe: str, params: dict, front: Path | None, back: Path
         zone, hand = parts.zones(mesh, anat, base)
         labels, band = parts.snap(mesh, labels, zone, hand, anat)
         fixed |= band
-    reg = regions(mesh, labels, base=base if base.any() else None, lab=_lab(pal), zone=zone)
+    plain = base & ~letters
+    reg = regions(mesh, labels, base=plain if plain.any() else None, lab=_lab(pal), zone=zone,
+                  name=letters if letters.any() else None)
 
     def listing(reg):
         R = int(reg.max()) + 1
         rgb: list = [None] * R
-        base_region = int(reg[base][0]) if base.any() else None
+        base_region = int(reg[plain][0]) if plain.any() else None
+        name_region = int(reg[letters][0]) if letters.any() else None
         area = mesh.area_faces
         for r in range(R):
-            if r == base_region:
+            if r in (base_region, name_region):
                 continue
             sel = reg == r
             votes = np.bincount(labels[sel], weights=area[sel], minlength=len(pal) + 1)[:len(pal)]
             rgb[r] = pal[int(votes.argmax())]
-        info = describe(mesh, reg, rgb, base_region)
+        info = describe(mesh, reg, rgb, base_region, name_region)
         if anat is not None:
             parts.name_parts(mesh, reg, info, zone, anat, look)
+        for d in info:
+            if d["region"] == name_region:
+                d["part"] = "name"
         return info
 
     info = listing(reg)
@@ -986,10 +1075,47 @@ def mark_grooves(lines: list[dict], anatomy: list[dict]) -> None:
                 break
 
 
+def mark_name_edges(lines: list[dict], F, region: np.ndarray, name: int | None, plinth: int | None) -> None:
+    """Set ln["name_edge"] on each color edge that is the outline of the name raised on the plinth:
+    every piece of it lies between a face of the name region and a face of the plinth region
+    (`region` is the region per face of F). Both are fixed faces (smooth_cut leaves them as they
+    are), so the edge is the mesh's own crease at the letter's foot and cannot zigzag; a glyph's
+    sharp corners would still score as jagged. A name edge that touches anything else is not marked."""
+    if name is None or plinth is None or not lines:
+        return
+    F = np.asarray(F, np.int64)
+    region = np.asarray(region)
+    e = np.sort(F[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), 1)
+    n = int(F.max()) + 1
+    key = e[:, 0] * n + e[:, 1]
+    fr = np.repeat(region, 3)
+    on_name = np.isin(key, key[fr == name])
+    sides: dict[int, set] = {}
+    for k, r in zip(key[on_name].tolist(), fr[on_name].tolist()):
+        sides.setdefault(k, set()).add(int(r))
+    want = {int(name), int(plinth)}
+    for ln in lines:
+        v = np.asarray(ln["verts"], np.int64)
+        pk = (np.minimum(v[:-1], v[1:]) * n + np.maximum(v[:-1], v[1:])).tolist()
+        if pk and all(sides.get(k) == want for k in pk):
+            ln["name_edge"] = True
+
+
+def judged(lines: list[dict]) -> list[dict]:
+    """The color edges the jaggedness and wobble limits apply to: all but the name's outline."""
+    return [ln for ln in lines if not ln.get("name_edge")]
+
+
+def worst_ratio(lines: list[dict]) -> float:
+    """The largest jaggedness of the edges the limit applies to (not the name's outline)."""
+    return max([ln["ratio"] for ln in judged(lines) if ln.get("ratio") is not None], default=1.0)
+
+
 def edge_faults(lines: list[dict]) -> list[dict]:
     """The lines that fail: zigzag (ratio over JAGGED) or wavy (wobble over WOBBLE, unless the edge
-    runs in a groove: mark_grooves), worst first."""
-    bad = [ln for ln in lines if (ln.get("ratio") or 0) > JAGGED
+    runs in a groove: mark_grooves), worst first. The name's outline on the plinth
+    (mark_name_edges) is the shape's own crease, so neither limit applies to it."""
+    bad = [ln for ln in judged(lines) if (ln.get("ratio") or 0) > JAGGED
            or ((ln.get("wobble") or 0) > WOBBLE and not ln.get("groove"))]
     return sorted(bad, key=lambda ln: -max((ln.get("ratio") or 1) - 1,
                                            0 if ln.get("groove") else (ln.get("wobble") or 0) / WOBBLE * (JAGGED - 1)))
@@ -1087,8 +1213,8 @@ def ledge_faults(found: list[dict]) -> list[dict]:
 
 
 def worst_wobble(lines: list[dict]) -> float:
-    """The largest wobble of the edges the limit applies to (not those in a groove)."""
-    return max([ln["wobble"] for ln in lines if ln.get("wobble") is not None and not ln.get("groove")], default=0.0)
+    """The largest wobble of the edges the limit applies to (not those in a groove, nor the name's outline)."""
+    return max([ln["wobble"] for ln in judged(lines) if ln.get("wobble") is not None and not ln.get("groove")], default=0.0)
 
 
 # pictures

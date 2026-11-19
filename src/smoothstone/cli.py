@@ -1346,7 +1346,8 @@ def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh) -> dict:
     bd = job.build_dir
     stamp = hashlib.sha1((bd / "part.stl").read_bytes()).hexdigest()
     cached = read_json(bd / "regions.json") or {}
-    if cached.get("stl") == stamp and (bd / "regions.npz").is_file():
+    if (cached.get("stl") == stamp and cached.get("version") == colortool.REGIONS_VERSION
+            and (bd / "regions.npz").is_file()):
         d = np.load(bd / "regions.npz")
         m = colortool.load_stl_mesh(d["V"], d["F"]) if len(d["F"]) != len(mesh.faces) else mesh
         if len(d["num"]) == len(m.faces):
@@ -1360,7 +1361,7 @@ def _color_regions(job: Job, r: rc.Recipe, params: dict, mesh) -> dict:
     fixed = res["fixed"] if res["fixed"] is not None else np.zeros(len(m.faces), bool)
     np.savez(bd / "regions.npz", V=np.asarray(m.vertices, np.float32), F=np.asarray(m.faces, np.int32),
              num=res["num"], fixed=fixed)
-    write_json(bd / "regions.json", {"stl": stamp, "picture": str(front) if front else None, "regions": res["regions"],
+    write_json(bd / "regions.json", {"stl": stamp, "version": colortool.REGIONS_VERSION, "picture": str(front) if front else None, "regions": res["regions"],
                                      "anatomy": res["anatomy"]})
     colortool.render(m, colortool.region_tints(res["num"], res["regions"]), bd / "regions.png", numbers=res["num"],
                      show=set(range(1, colortool.LIST_MAX + 1)))
@@ -1412,16 +1413,22 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
     from . import parts
 
     pc = {k: v for k, v in colortool.part_colors(request).items() if not k.startswith("word:")}
+    if "name" in pc and not any(d.get("part") == "name" for d in info):
+        c = pc.pop("name")  # no name raised on the plinth: "a red name" is the plinth, as it always was
+        pc.setdefault("base", c)
     named = colortool.request_colors(request)
-    if not pc and len(named) == 1 and any(d.get("part") for d in info):
+    figure = any(d.get("part") not in (None, "name") for d in info)  # a name on a plinth is no figure
+    if not pc and len(named) == 1 and figure:
         # one color and no part given a color ("Jensen Huang in white", even with "on the base"
         # or "his face" said along the way): the whole figure is that color
         n = _match_filament(named[0], fil)
         if n is None:
             return {}, len(fil) + 1, [named[0]]
         return {}, n, []
-    if not pc or not any(d.get("part") for d in info):
-        return _suggest_colors(info, fil, request)
+    if not pc or not figure:
+        pick, rest, extra = _suggest_colors(info, fil, request)
+        # the name's color is picked to stand out from the plinth, never from the photo
+        return {k: v for k, v in pick.items() if not any(d["n"] == k and d.get("part") == "name" for d in info)}, rest, extra
 
     extra: list[str] = []
     allf = list(fil)
@@ -1448,6 +1455,8 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
         p = parts.part_of(d.get("part") or "") or d.get("part")
         if d["base"] and p not in pc:
             continue
+        if p == "name" and pc.get(p, "picture") == "picture":
+            continue  # stone colors gives the name a color that stands out from the plinth
         if p in pc:
             pick[d["n"]] = _picture_filament(d["rgb"], allf, rest) if pc[p] == "picture" else num(pc[p])
         else:
@@ -1561,13 +1570,45 @@ def _suggest_line(info: list[dict], fil: list[str], request: str) -> str:
 
 
 def _part_regions(info: list[dict], key: str) -> list[int]:
-    """The region numbers a part name stands for ("jacket", or "top" for the jacket)."""
+    """The region numbers a part name stands for ("jacket", or "top" for the jacket). With no name
+    raised on the plinth, "name" is the plinth, as it was before the name was a region."""
     from . import parts
 
     key = key.strip().lower()
     want = parts.part_of(key)
-    return [d["n"] for d in info if d.get("part") and d["part"] not in ("other",)
-            and (d["part"] == key or (want is not None and parts.part_of(d["part"]) == want))]
+    got = [d["n"] for d in info if d.get("part") and d["part"] not in ("other",)
+           and (d["part"] == key or (want is not None and parts.part_of(d["part"]) == want))]
+    if not got and want == "name":
+        got = [d["n"] for d in info if d["base"] and d.get("part")]
+    return got
+
+
+def _name_filament(info: list[dict], per, fil: list[str], request: str) -> int | str | None:
+    """The filament for the name raised on the plinth when the mapping gives it none, or None when
+    there is no name. The color the request names for it ("red lettering", "the name in red"), else
+    one that stands out from the plinth's (colors.name_contrast): a filament the rest of the print
+    already uses, else black or white, whichever stands out more. A filament number, or the color
+    word when no loaded filament is that color. `per` is the filament per region number. A print in
+    one color stays in one color. None too when the plinth's filament is no color this can read
+    ("Ivory PLA"): a guess would print the name in the plinth's own color."""
+    nm = next((d["n"] for d in info if d.get("part") == "name"), None)
+    base = next((d["n"] for d in info if d["base"]), None)
+    if nm is None or base is None:
+        return None
+    c = colortool.part_colors(request).get("name")
+    if c and c != "picture":
+        return _match_filament(c, fil) or c
+    used = sorted({int(per[d["n"]]) for d in info if d["n"] != nm})
+    if len(used) == 1:
+        return used[0]
+    plinth = colortool.filament_rgb(fil[int(per[base]) - 1])
+    if plinth is None:
+        return None
+    k = colortool.name_contrast(plinth, [colortool.filament_rgb(fil[i - 1]) for i in used])
+    if k is not None:
+        return used[k]
+    c = max(("black", "white"), key=lambda w: colortool.contrast_ratio(colortool.NAMES[w], plinth))
+    return _match_filament(c, fil) or c
 
 
 def _region_line(d: dict, name: str) -> str:
@@ -1616,6 +1657,12 @@ def cmd_colors(args, job: Job) -> Out:
         if d["color"]:
             return d["color"]
         n = pick.get(d["n"], rest_s)
+        if d.get("part") == "name" and d["n"] not in pick:
+            per_s = np.array([0] + [pick.get(i, rest_s) for i in range(1, len(info) + 1)])
+            f = _name_filament(info, per_s, fil + extra_s, request)
+            if isinstance(f, str):
+                return f
+            n = f or n
         return colortool.word_color((fil + extra_s)[n - 1]) or shown[n - 1]
 
     if not args.items:
@@ -1701,6 +1748,21 @@ def cmd_colors(args, job: Job) -> Out:
         hd = next(d for d in info if d["n"] == host)
         out.add(f"Region {s}, a sliver boxed in by region {host} ({hd.get('part') or hd['color']}), "
                 f"takes its color, {_fil_value(fil)[per[s] - 1]}.")
+    # the name raised on the plinth: the color asked for, else one that stands out from the plinth
+    nm = next((d["n"] for d in info if d.get("part") == "name"), None)
+    if nm is not None and nm not in assign:
+        f = _name_filament(info, per, fil, request)
+        if isinstance(f, str) and len(fil) < colortool.MAX_FILAMENTS:
+            fil.append(f)
+            added.append(f)
+            f = len(fil)
+        if f is None:
+            out.add(f"The plinth's filament, {fil[int(per[next(d['n'] for d in info if d['base'])]) - 1]}, is no color "
+                    "I can read, so the name keeps the plinth's color; give it one with name=<color>.")
+        if isinstance(f, int) and f != per[nm]:
+            per[nm] = f
+            out.add(f"The name on the plinth takes {_fil_value(fil)[f - 1]} (filament {f}), so it reads "
+                    f"on the {_fil_value(fil)[per[base] - 1]} plinth.")
     face_fil0 = per[num]
     # cut along smooth boundaries, so a color edge runs as a curve through the triangles
     # the plinth's edge and a figure's hem, neck and wrists are lines of the shape: keep them there
@@ -1715,6 +1777,8 @@ def cmd_colors(args, job: Job) -> Out:
     worst, lines = colortool.color_edges(V, F, face_fil)
     anat_lines = (res.get("anatomy") or {}).get("lines") or []
     colortool.mark_grooves(lines, anat_lines)
+    colortool.mark_name_edges(lines, F, num[parent], nm, base)
+    worst = colortool.worst_ratio(lines)
     faults = colortool.edge_faults(lines)
     wob = colortool.worst_wobble(lines)
     fil_rgb = np.array([colortool.filament_rgb(f) or (150, 150, 150) for f in fil], float)
@@ -1815,9 +1879,12 @@ def cmd_colors(args, job: Job) -> Out:
     out.add(f"Object filament {main_fil}; the other filaments are painted on, triangle by triangle.")
     out.add(f"Checked: the 3MF reads back watertight and clean for a slicer, {len(F)} faces, volume as the STL.")
     in_groove = sum(1 for ln in lines if ln.get("groove"))
+    on_name = sum(1 for ln in lines if ln.get("name_edge"))
     out.add(f"PASS color_edges: every color boundary is a smooth curve (worst {worst:.3f}, max {colortool.JAGGED}; "
             f"wobble {wob:.2f} mm, max {colortool.WOBBLE}"
-            + (f"; {in_groove} edges run in a sculpted groove, which the wobble limit does not apply to)" if in_groove else ")"))
+            + (f"; {in_groove} edges run in a sculpted groove, which the wobble limit does not apply to" if in_groove else "")
+            + (f"; {on_name} edges are the outline of the raised name, the shape's own crease, which neither limit "
+               "applies to" if on_name else "") + ")")
     if anat_lines:
         grooves = [f"{x['name']}{'' if x.get('side') is None else (' left' if x['side'] < 0 else ' right')} "
                    f"{'up' if x['groove']['side'] > 0 else 'down'}" for x in anat_lines if (x.get("groove") or {}).get("used")]
