@@ -226,6 +226,8 @@ def main():
         grade.update({"pass": False, "why": ["before the answer: " + w for w in first["why"]] + grade["why"]})
     if exp.get("judge") and grade["pass"]:
         grade = judge_run(rdir, job, spec["request"], exp["judge"], grade)
+    if exp.get("recipe") == "figure" and grade["pass"]:
+        grade = likeness_run(rdir, job, spec["request"], grade)
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
@@ -297,6 +299,29 @@ def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> d
     return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
 
 
+def likeness_run(rdir: Path, job: Path, request: str, grade: dict) -> dict:
+    """Every figure: is it the subject asked for? (judge_likeness.py, saved as likeness.json).
+    The checks above pass any well made figure, even of the wrong person; a judge that cannot
+    answer fails the run with the reason, never passes it."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import judge_likeness
+
+    try:
+        res = judge_likeness.judge(job, request)
+    except Exception as e:  # no render, no reference, no reply: a run is never passed unjudged
+        res = {"score": None, "pass": False, "conflicts": [], "error": f"{type(e).__name__}: {e}"}
+    (rdir / "likeness.json").write_text(json.dumps(res, indent=1))
+    if res["pass"]:
+        return {**grade, "likeness": res["score"]}
+    why = [w for w in grade["why"] if w != "all checks pass"]
+    if res.get("error"):
+        why.append(f"likeness: the judge could not answer ({res['error'][:120]})")
+    else:
+        why.append(f"likeness {res['score']}/10: " + "; ".join(f"{c['feature']}: {c['what']}"
+                                                            for c in res["conflicts"])[:240])
+    return {**grade, "pass": False, "why": why, "likeness": res["score"]}
+
+
 SCORES = Path(os.environ.get("STONE_SCORES", str(ROOT / "evals" / "scores.jsonl")))
 
 
@@ -309,7 +334,7 @@ def append_score(log: dict) -> None:
         head = None
     line = {"date": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sha": head, "suite": log.get("suite"),
             "spec": log["spec"], "card": log["card"], "driver": log["driver"], "pass": int(bool(log["pass"])),
-            "total": 1, "judge": log.get("judge"), "run": log["run_id"]}
+            "total": 1, "judge": log.get("judge"), "likeness": log.get("likeness"), "run": log["run_id"]}
     with SCORES.open("a") as f:
         f.write(json.dumps(line) + "\n")
 

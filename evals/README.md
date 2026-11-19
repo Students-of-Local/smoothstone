@@ -24,5 +24,11 @@ counts as card "next"), the best pass rate and mean judge score so far and the s
   his words in `why`. A spec with `"judge": {"faults_in": ["boundaries"]}` runs `judge_views.py` (a
   blind Opus judge that sees only the request, views.png and boundaries.png) and fails on any fault it
   names in those pictures; the verdict is saved as judge.json next to the run.
+- Every figure spec also runs `judge_likeness.py`: Opus names the Wikipedia article the request
+  means (text only), the harness fetches that article's lead image, and a blind Opus run compares
+  the render the figure was made from with it, feature by feature (hair, facial hair, glasses, skin,
+  age, clothes). Below 6 of 10 the run fails with the judge's conflicts; a judge that cannot answer
+  fails it too. The tool's own photos are never the reference: for "DHH" it once styled a protein,
+  and every other check passed the made up man it sculpted. The verdict is likeness.json.
 - A spec with `"colors": {"black": ["jacket"], "rest": "white"}` checks the painted 3MF: it reads back
   clean, its color edges pass, and every part prints in the color asked for.
