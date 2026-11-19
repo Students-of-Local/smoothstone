@@ -34,33 +34,99 @@ def _clean(html: str) -> str:
 
 
 WIKIDATA = "https://www.wikidata.org/w/api.php"
+HUMAN = "Q5"
+# taxon, breed, dog breed, cat breed, horse breed, animal known by a common name, individual animal
+ANIMAL = {"Q16521", "Q38829", "Q39367", "Q43577", "Q1160573", "Q55983715", "Q26401003"}
+
+
+def _wd(**params) -> dict:
+    return json.loads(_get(WIKIDATA + "?" + urllib.parse.urlencode({**params, "format": "json"})))
+
+
+def _entities(ids: list[str]) -> dict:
+    if not ids:
+        return {}
+    return _wd(action="wbgetentities", ids="|".join(ids), props="labels|aliases|claims").get("entities") or {}
+
+
+def _kind(ent: dict) -> str:
+    """person, animal or object, from what Wikidata says the entity is an instance of (P31)."""
+    p31 = {((c.get("mainsnak") or {}).get("datavalue") or {}).get("value", {}).get("id")
+           for c in (ent.get("claims") or {}).get("P31", [])}
+    return "person" if HUMAN in p31 else "animal" if p31 & ANIMAL else "object"
+
+
+def _label(ent: dict) -> str:
+    labels = ent.get("labels") or {}
+    return (labels.get("en") or next(iter(labels.values()), {})).get("value", "")
+
+
+def _pack(ent: dict) -> dict:
+    p18 = (ent.get("claims") or {}).get("P18") or []
+    image = ((p18[0].get("mainsnak") or {}).get("datavalue") or {}).get("value") if p18 else None
+    return {"id": ent.get("id"), "label": _label(ent), "kind": _kind(ent), "image": image}
+
+
+def _bare(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _names(ent: dict) -> set[str]:
+    """Every label and alias in every language, and the label's initials (DHH, JFK)."""
+    names = {_bare(v.get("value", "")) for v in (ent.get("labels") or {}).values()}
+    names |= {_bare(a.get("value", "")) for v in (ent.get("aliases") or {}).values() for a in v}
+    names.add("".join(w[0] for w in re.findall(r"[A-Za-z]+", _label(ent))).lower())
+    return names - {""}
+
+
+def resolve(query: str) -> dict | None:
+    """The Wikidata entity a figure of query means: {id, label, kind, image}, or None.
+
+    A figure is of someone or some creature, so the first person or animal among the matches
+    wins over a gene or a song with the same name. When none is, a nickname or initials name a
+    person only when they are that person's alias or initials ("DHH"), never a loose text match.
+    """
+    try:
+        hits = [h["id"] for h in _wd(action="wbsearchentities", search=query, language="en",
+                                     limit="7").get("search") or []]
+        ents = _entities(hits)
+        for i in hits:
+            if i in ents and _kind(ents[i]) != "object":
+                return _pack(ents[i])
+        found = _wd(action="query", list="search", srsearch=f"{query} haswbstatement:P31={HUMAN}",
+                    srlimit="5").get("query", {}).get("search") or []
+        people = _entities([h["title"] for h in found])
+        for h in found:
+            ent = people.get(h["title"])
+            if ent and _bare(query) in _names(ent):
+                return _pack(ent)
+        return _pack(ents[hits[0]]) if hits and hits[0] in ents else None
+    except Exception:  # offline or an odd reply: search Commons by the words alone
+        return None
 
 
 def main_image(query: str) -> str | None:
     """The Commons file Wikidata names as the subject's main image (P18), if any."""
-    try:
-        q = urllib.parse.urlencode({"action": "wbsearchentities", "search": query,
-                                    "language": "en", "format": "json", "limit": "1"})
-        hits = json.loads(_get(WIKIDATA + "?" + q)).get("search") or []
-        if not hits:
-            return None
-        q = urllib.parse.urlencode({"action": "wbgetclaims", "entity": hits[0]["id"],
-                                    "property": "P18", "format": "json"})
-        claims = json.loads(_get(WIKIDATA + "?" + q)).get("claims", {}).get("P18") or []
-        return "File:" + claims[0]["mainsnak"]["datavalue"]["value"] if claims else None
-    except Exception:
-        return None
+    ent = resolve(query)
+    return "File:" + ent["image"] if ent and ent.get("image") else None
 
 
-def search(query: str, limit: int = 20) -> list[dict]:
-    """Candidate photos for query, best first. Wikidata's main image leads when there is one."""
+def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> list[dict]:
+    """Candidate photos for query, best first. Wikidata's main image leads when there is one.
+
+    entity is what resolve(query) gave (True: look it up here). Commons is searched by the
+    entity's own name, so a nickname finds the person's photos.
+    """
+    ent = resolve(query) if entity is True else entity or None
+    if ent and ent.get("label"):
+        query = ent["label"]
     common = {"format": "json", "prop": "imageinfo",
               "iiprop": "url|size|mime|extmetadata", "iiurlwidth": str(THUMB_PX)}
     params = {"action": "query", "generator": "search", "gsrnamespace": "6",
               "gsrsearch": f"{query} filetype:bitmap", "gsrlimit": str(limit), **common}
     try:
         data = json.loads(_get(API + "?" + urllib.parse.urlencode(params)))
-        lead = main_image(query)
+        lead = "File:" + ent["image"] if ent and ent.get("image") else None
         if lead:
             one = json.loads(_get(API + "?" + urllib.parse.urlencode(
                 {"action": "query", "titles": lead, **common})))
@@ -107,7 +173,8 @@ def search(query: str, limit: int = 20) -> list[dict]:
 
 def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     """Download the n best photos into dest (photo_1.jpg ...) and write credits.txt."""
-    found = search(query)
+    ent = resolve(query)
+    found = search(query, entity=ent)
     if not found:
         raise FindProblem(f"no free-licensed photos of {query} on Wikimedia Commons")
     dest.mkdir(parents=True, exist_ok=True)
@@ -130,21 +197,37 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     lines = [f"{Path(g['file']).name}: {g['title'][5:]} by {g['author'] or 'unknown'}, "
              f"{g['license']}, {g['page']}" for g in got]
     (dest / "credits.txt").write_text("\n".join(lines) + "\n")
-    (dest / "found.json").write_text(json.dumps({"query": query, "photos": got}, indent=1))
+    (dest / "found.json").write_text(json.dumps({"query": query, "subject": (ent or {}).get("label") or query,
+                    "kind": (ent or {}).get("kind"), "wikidata": (ent or {}).get("id"),
+                    "photos": got}, indent=1))
     return got
 
 
-SUBJECT = re.compile(
-    r"\b(?:of|like|looks like|resembling|shaped like)\s+((?:[A-Z][\w'.-]*\s?){1,4})")
+SUBJECT = re.compile(r"\b(?:of|like|looks like|resembling|shaped like)\s+(.+)", re.S)
+# where the subject's phrase ends: a comma, a size, "with ...", "in his ...", a quote or a bracket
+PHRASE_END = re.compile(r"[,;:(\"\u201c]|\.(?:\s|$)|\d|\s(?:with|in|on|that|who|which|wearing|holding|"
+                        r"standing|sitting|for|about|around|at|from|and|to)\s", re.I)
+CAPS = re.compile(r"\b[A-Z][\w'.-]*(?:\s+(?:(?:of|the|de|da|di|van|von|der|del|la|le)\s+)?[A-Z][\w'.-]*){0,4}")
+OWN = {"my", "our", "his", "her", "their", "your", "me", "us", "him", "them", "myself"}
+FILLER = {"a", "an", "the", "one", "some", "little", "small", "tiny", "mini", "cute", "big",
+          "favorite", "favourite", "famous"}
 
 
 def subject_from_request(request: str) -> str | None:
-    """'A mini figure of Jensen Huang, 80 mm tall' -> 'Jensen Huang'."""
+    """'A mini figure of Jensen Huang, 80 mm tall' -> 'Jensen Huang'; 'of a golden retriever' ->
+    'golden retriever'. A name in capitals wins ('my favorite astronaut Neil Armstrong'); one's
+    own pet or self ('of my dog') is None, since only the owner's photo can show it."""
     m = SUBJECT.search(request)
-    if m:
-        name = m.group(1).strip(" .,'")
-        stop = {"A", "An", "The", "My", "Me", "It", "This", "That"}
-        parts = [w for w in name.split() if w not in stop]
-        if parts:
-            return " ".join(parts)
-    return None
+    if not m:
+        return None
+    phrase = PHRASE_END.split(m.group(1), maxsplit=1)[0].strip(" .'")
+    stop = {"A", "An", "The", "My", "Me", "It", "This", "That", "Our", "Your"}
+    for run in CAPS.findall(" " + phrase):
+        name = " ".join(w for w in run.split() if w not in stop)
+        if name:
+            return name
+    words = re.findall(r"[a-z][a-z'-]*", phrase.lower())
+    if any(w in OWN for w in words):
+        return None
+    words = [w for w in words if w not in FILLER][:4]
+    return " ".join(words) or None

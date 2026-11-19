@@ -396,3 +396,42 @@ def test_an_edited_recipe_source_rebuilds(jobenv, monkeypatch, openscad, tmp_pat
         f.write("\n// edited\n")
     text, code, nxt = stone("build")
     assert "Nothing changed" not in text, text
+
+
+def test_the_style_prompt_takes_the_kind_wikidata_gave_the_found_subject(jobenv, monkeypatch):
+    """An elephant or a golden retriever is an animal and a tower is an object, though neither
+    word is in the animal list; only a photo the owner gives falls back to the request's words."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A figurine of an african elephant, 80 mm tall")
+    job = cli.Job(jobenv / "stone-job")
+    found = job.image_dir / "found"
+    found.mkdir(parents=True)
+    (found / "found.json").write_text(json.dumps({"query": "african elephant", "kind": "animal"}))
+    assert cli.figure_who(job, "chibi") == "animal"
+    (found / "found.json").write_text(json.dumps({"query": "Eiffel Tower", "kind": "object"}))
+    assert cli.figure_who(job, "chibi") == "object"
+    assert cli.figure_who(job, "object") == "object"
+
+
+ELON_LOOK = ("The person has light brown, wavy hair, no glasses, no facial hair, appears to be middle-aged, "
+             "and is of fair complexion. They are wearing a black suit jacket, a white shirt, and a black tie.")
+
+
+def test_a_person_without_glasses_gets_no_glasses_in_the_style_prompt():
+    """The Elon render came back with thick black glasses: the prompt named glasses twice, once in
+    the likeness line and once as 'no glasses' from the description, and naming them draws them."""
+    p = figure.prompt("chibi", "person", ELON_LOOK)
+    assert "glasses" not in p.lower() and "facial hair" not in p.lower()
+    assert "wavy hair" in p and "black suit jacket" in p and "middle-aged" in p
+
+
+def test_a_person_with_glasses_keeps_them_exactly():
+    p = figure.prompt("chibi", "person", "The person has short grey hair and thin round glasses. They wear a jacket "
+                      "with no tie.")
+    assert "thin round glasses" in p and "same frame shape" in p
+    assert "tie" not in p and "jacket" in p
+
+
+def test_the_positive_words_of_a_description():
+    assert figure.positive("short hair, no beard, without a hat, a red shirt.") == "short hair, a red shirt."
+    assert figure.positive("He is not wearing glasses. He has a black jacket.") == "He has a black jacket."

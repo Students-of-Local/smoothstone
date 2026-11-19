@@ -966,12 +966,18 @@ def image_step(job: Job, path: Path, out: Out):
 
 
 ANIMALS = {"dog", "puppy", "cat", "kitten", "pet", "bird", "horse", "rabbit", "bunny", "fox",
-           "bear", "lion", "tiger", "owl", "parrot", "hamster", "corgi", "pug", "frog", "turtle"}
+           "bear", "lion", "tiger", "owl", "parrot", "hamster", "corgi", "pug", "frog", "turtle",
+           "retriever", "terrier", "poodle", "elephant", "monkey", "penguin", "dolphin", "shark",
+           "giraffe", "panda", "koala", "deer", "cow", "pig", "goat", "sheep", "chicken", "duck",
+           "lizard", "snake", "wolf", "dinosaur"}
 
 
 def figure_who(job: Job, style: str) -> str:
     if style == "object":
         return "object"
+    found = read_json(job.image_dir / "found" / "found.json") or {}
+    if found.get("kind") in ("person", "animal", "object") and not list(job.image_dir.glob("source.*")):
+        return found["kind"]  # what Wikidata says the found subject is
     words = set(re.findall(r"[a-z]+", job.request().lower())) if job.exists() else set()
     return "animal" if words & ANIMALS else "person"
 

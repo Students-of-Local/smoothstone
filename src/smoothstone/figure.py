@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -48,12 +49,34 @@ LOOK = {
 }
 LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
-               "hairstyle, the same glasses exactly if any: the same frame shape, the same thin frame "
-               "thickness and color, never thicker or bolder than in the photo, the same face shape, smile and "
-               "skin tone. "),
+               "hairstyle, the same face shape, smile and skin tone. "),
     "animal": "Keep the likeness from the first photo exactly: the same fur colors, markings, ears and face. ",
     "object": "",
 }
+# only for a person the description says wears glasses: a style model draws whatever a prompt
+# names, so "the same glasses if any" or "no glasses" both put glasses on a face without them
+GLASSES = ("The same glasses exactly: the same frame shape, the same thin frame thickness and color, "
+           "never thicker or bolder than in the photo. ")
+WEARS_GLASSES = re.compile(r"\b(?:glasses|spectacles|eyeglasses|sunglasses)\b", re.I)
+# from a denial to the end of its clause: "no glasses", "not wearing a hat", "without a tie"
+DENIAL = re.compile(r"\b(?:no|not|without|never|neither|nor)\b[^,.;]*|\b\w+n't\b[^,.;]*", re.I)
+
+
+def positive(text: str) -> str:
+    """The description with every denial cut out: what is there, never what is not."""
+    out = []
+    for sentence in re.split(r"(?<=[.!?])\s+", (text or "").strip()):
+        clauses = [DENIAL.sub("", c) for c in re.split(r"(,|;)", sentence)]
+        kept = "".join(clauses)
+        kept = re.sub(r"\b(?:and|with|but|or|has|have|is|are)\s*(?=[,.;!?]|$)", "", kept)
+        kept = re.sub(r"(?:\s*[,;]\s*)+(?=[,;.!?]|$)", "", kept)  # empty clauses
+        kept = re.sub(r"\s*[,;]\s*[,;]", ",", kept)
+        kept = re.sub(r"\s+([,.;!?])", r"\1", re.sub(r"\s{2,}", " ", kept)).strip(" ,;")
+        if len(re.findall(r"[A-Za-z]{2,}", kept)) >= 2:  # "He" alone is what a denial left
+            out.append(kept if kept[-1] in ".!?" else kept + ".")
+    return " ".join(out)
+
+
 FRAME = (
     "{look}. {likeness}Full figure in frame, centered, facing the camera, front view, plain pure white "
     "background, soft studio product lighting, crisp sculpted details, matte finish, no base, "
@@ -66,7 +89,11 @@ class FigureProblem(Exception):
 
 
 def prompt(style: str, who: str = "person", extra: str = "") -> str:
-    p = FRAME.format(look=LOOK[style].format(who=who), likeness=LIKENESS.get(who, ""))
+    extra = positive(extra)
+    likeness = LIKENESS.get(who, "")
+    if who == "person" and WEARS_GLASSES.search(extra):
+        likeness += GLASSES
+    p = FRAME.format(look=LOOK[style].format(who=who), likeness=likeness)
     return f"{p} {extra.strip()}".strip()
 
 
