@@ -165,6 +165,52 @@ def test_anatomy_of_a_block_figure():
     assert names == {("hem", None), ("neck", None), ("wrist", -1), ("wrist", 1)}
 
 
+def _shorts_figure(belt: bool):
+    """The block figure with its torso split at the hips. belt=False: shorts (18 x 10) from the
+    legs up to 31.25 under a jacket (22 x 12) that overhangs them, so the jacket's hem is at 31.
+    belt=True: a long coat (22 x 12) from the legs up, with a belt groove (21 x 11) at 30.5 to
+    31.5: the coat's hem is at the legs."""
+    def box(ext, at):
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        return b
+
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    if belt:
+        body = [box([22, 12, 2.6], [0, 0, 29.2]), box([21, 11, 1.2], [0, 0, 31.0]),
+                box([22, 12, 16.6], [0, 0, 39.7])]
+    else:
+        body = [box([18, 10, 3.5], [0, 0, 29.5]), box([22, 12, 17], [0, 0, 39.5])]
+    arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
+    hands = []
+    for x in (-14.5, 14.5):
+        h = trimesh.creation.icosphere(subdivisions=4, radius=2.5)
+        h.apply_translation([x, 0, 32.5])
+        hands.append(h)
+    neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, *legs, *body, *arms, *hands, neck, head], engine="manifold")
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+def test_a_jacket_over_shorts_has_its_hem_at_its_own_edge():
+    """r1 (judge, then a close look): the Jensen sculpt wears shorts under the jacket. The hem was
+    put where the legs part, so "all white but the jacket" printed black shorts."""
+    a = parts.anatomy(_shorts_figure(belt=False), 8.0)
+    assert 30.5 <= a["hem"] <= 31.5, a["hem"]
+    assert sorted(w["side"] for w in a["wrists"]) == [-1, 1]
+
+
+def test_a_belt_on_a_long_coat_is_not_its_hem():
+    a = parts.anatomy(_shorts_figure(belt=True), 8.0)
+    assert 28.0 <= a["hem"] <= 29.0, a["hem"]
+
+
 def test_part_names_of_a_block_figure():
     m = block_figure()
     a = parts.anatomy(m, 8.0)

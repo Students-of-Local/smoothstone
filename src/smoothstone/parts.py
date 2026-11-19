@@ -3,7 +3,9 @@ to whatever the picture made black.
 
 The figure stands on a plinth whose top is at z = top. From the shape alone:
 - the hem: the highest z where the figure below it is still two or more pieces standing on the
-  plinth (the legs), plus HEM_ABOVE, so the line runs as one ring around the hips;
+  plinth (the legs), plus HEM_ABOVE, so the line runs as one ring around the hips; or, when the
+  top ends higher (a jacket over shorts), the top's own hem: a groove all the way round, within
+  HEM_FOLD of the height above that, where the body steps out going up (hem_fold);
 - the hands: below the arm junction each hand is a piece of its own (connected over shared edges,
   not standing on the plinth, off to one side); the junction is the highest z where it still is;
 - the neck: the narrowest horizontal section between the shoulders and the head.
@@ -22,6 +24,8 @@ BASE, LEGS, TORSO, HANDS, HEAD = range(5)
 ZONES = ("base", "legs", "torso", "hands", "head")
 PIECE_MIN = 0.0005  # share of the figure's surface: a smaller loose piece is noise, not a hand
 HEM_ABOVE = 0.5  # mm above the last level where the legs are apart: one ring, not two
+HEM_FOLD = 0.15  # share of the figure's height above the leg split searched for the top's own hem
+HEM_STEP = 1.08  # the body's section 1 mm above a hem fold is at least this much bigger than 1 mm below
 SNAP = 3.0  # mm: a color boundary this close to a line of the shape moves onto it
 BAND = 2.0  # mm each side of a line that keeps its color through the edge smoothing
 NECK_VALLEY = 1.25  # the neck section is at least this much smaller than the torso and the head
@@ -167,8 +171,12 @@ def anatomy(mesh, top: float) -> dict:
         return sum(p["stands"] for p in _pieces(mesh, _below(mesh, fig, z), top, min_area)) >= 2
 
     split = _scan(top + 1.0, top + 0.6 * H, legs_apart) if legs_apart(top + 1.0) else None
-    hem = split + HEM_ABOVE if split is not None else None
+    low = split + HEM_ABOVE if split is not None else None
+    fold = hem_fold(mesh, low, low + HEM_FOLD * H) if low is not None else None
+    hem = fold if fold is not None else low
     res["hem"] = hem
+    if fold is not None:
+        res["hem_fold"] = True
 
     # the neck: the deepest valley of the section area between the torso and the head
     lo = hem if hem is not None else top + 0.25 * H
@@ -187,7 +195,7 @@ def anatomy(mesh, top: float) -> dict:
 
     # the hands: loose pieces off to each side, below the arm junction
     hi = (neck - 1.0) if neck is not None else top + 0.8 * H
-    start = hem if hem is not None else top + 1.0
+    start = low if low is not None else top + 1.0
     x0 = res["center"]
     for side in (-1, 1):
         def hand(z, side=side):
@@ -439,7 +447,8 @@ def find_groove(mesh, line: dict, only=None) -> dict:
 
     z, (cx, cy), rmax = line["z"], line["center"], line["rmax"]
     out = {**line, "curve": None, "groove": None}
-    loop, cost = crease_loop(mesh, (cx, cy), z - GROOVE_BAND, z + GROOVE_BAND, rmax)
+    band = line.get("band", GROOVE_BAND)
+    loop, cost = crease_loop(mesh, (cx, cy), z - band, z + band, rmax)
     if loop is None:
         return out
     P = np.asarray(mesh.vertices, float)[loop]
@@ -473,6 +482,37 @@ def _line_ring(mesh, z: float, pick) -> tuple[np.ndarray, float, float] | None:
     return c, float(np.linalg.norm(p - c, axis=1).max()), float(np.linalg.norm(np.diff(np.vstack([p, p[:1]]), axis=0), axis=1).sum())
 
 
+def hem_fold(mesh, lo: float, hi: float) -> float | None:
+    """The z of the top's own hem above the legs: the lowest groove in (lo, hi] that runs all the
+    way round the body (crease_loop costs under GROOVE_COST per mm, at least GROOVE_REACH of the
+    ring) where the body's section 1 mm above is at least HEM_STEP times the section 1 mm below: a
+    jacket's edge over shorts. A belt on a long coat is no hem: the coat below it is as wide."""
+
+    def body(z):
+        rings = _rings(mesh, z)
+        return max(rings, key=_ring_area) if rings else None
+
+    for z in np.arange(lo + 0.5, hi, 0.5):
+        p = body(z)
+        if p is None:
+            continue
+        c = p.mean(0)
+        r = float(np.linalg.norm(p - c, axis=1).max())
+        ring = float(np.linalg.norm(np.diff(np.vstack([p, p[:1]]), axis=0), axis=1).sum())
+        loop, cost = crease_loop(mesh, (float(c[0]), float(c[1])), z - 1.0, z + 1.0, r + SNAP)
+        if loop is None:
+            continue
+        P = np.asarray(mesh.vertices, float)[loop]
+        length = float(np.linalg.norm(np.diff(P, axis=0), axis=1).sum())
+        if length <= 0 or cost / length > GROOVE_COST or length < GROOVE_REACH * ring:
+            continue
+        gz = float(np.median(P[:, 2]))
+        a, b = body(gz + 1.0), body(gz - 1.0)
+        if a is not None and b is not None and _ring_area(a) >= HEM_STEP * _ring_area(b):
+            return gz
+    return None
+
+
 def find_lines(mesh, anat: dict) -> list[dict]:
     """The hem, the neck and each wrist as lines: {"name", "z", "center", "rmax", "ring"}, each on
     its groove when one is near (find_groove)."""
@@ -492,7 +532,7 @@ def find_lines(mesh, anat: dict) -> list[dict]:
         rg = _line_ring(mesh, z, widest)
         if rg is not None:
             out.append({"name": "hem", "z": z, "center": [float(rg[0][0]), float(rg[0][1])],
-                        "rmax": rg[1] + SNAP, "ring": rg[2]})
+                        "rmax": rg[1] + SNAP, "ring": rg[2], **({"band": 1.0} if anat.get("hem_fold") else {})})
         else:
             out.append({"name": "hem", "z": z, "center": [x0, 0.0], "rmax": 0.0, "ring": 0.0})
     if anat.get("neck") is not None:

@@ -1017,13 +1017,44 @@ def _rot(az: float, elev: float) -> np.ndarray:
 
 
 SUPERSAMPLE = 3  # panels are drawn 3x and averaged down: antialiased edges
+CREASE = 60.0  # degrees: faces meeting at a sharper angle keep a hard edge in smooth shading
+
+
+def corner_normals(v, f, crease: float = CREASE) -> np.ndarray:
+    """Per face corner normals (faces, 3, 3) for smooth shading, in the faces' own order: each
+    corner averages the area-weighted normals of the faces round its vertex that meet its face at
+    less than `crease` degrees, so a printed surface reads as one surface (no lit facet that looks
+    like a notch) while a real fold stays sharp. Paint stays per face, so a color edge is drawn
+    exactly where it is."""
+    v = np.asarray(v, float)
+    f = np.asarray(f, np.int64)
+    nf = len(f)
+    cr = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
+    area = np.linalg.norm(cr, axis=1)
+    n = cr / (area[:, None] + 1e-30)
+    cf = np.repeat(np.arange(nf), 3)  # corner -> face
+    cv = f.ravel()  # corner -> vertex
+    order = np.argsort(cv, kind="stable")
+    deg = np.bincount(cv, minlength=len(v))
+    start = np.concatenate([[0], np.cumsum(deg)[:-1]])
+    k = np.repeat(np.arange(3 * nf), deg[cv])  # every (corner, corner at the same vertex) pair
+    off = np.arange(len(k)) - np.repeat(np.cumsum(deg[cv]) - deg[cv], deg[cv])
+    j = cf[order[start[cv[k]] + off]]
+    keep = (n[j] * n[cf[k]]).sum(1) > np.cos(np.radians(crease))
+    w = (area[j] * keep)[:, None] * n[j]
+    acc = np.stack([np.bincount(k, weights=w[:, a], minlength=3 * nf) for a in range(3)], 1)
+    norm = np.linalg.norm(acc, axis=1)
+    acc = np.where(norm[:, None] > 1e-30, acc / (norm[:, None] + 1e-30), n[cf])
+    return acc.reshape(nf, 3, 3)
 
 
 def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, show=None, clip=False, font=None,
-           ss: int = SUPERSAMPLE):
+           ss: int = SUPERSAMPLE, cn: np.ndarray | None = None):
     """One flat-shaded orthographic view as a PIL image, `half` mm from the center to each edge.
     Drawn at `ss` times the size and box-filtered down, so a smooth edge does not show as pixel
-    stairs that a reader (or the blind judge) takes for a stepped paint line."""
+    stairs that a reader (or the blind judge) takes for a stepped paint line. With `cn` (from
+    corner_normals) the light is smooth across each surface, as on a print, and only the paint
+    and real folds make edges."""
     from PIL import Image, ImageDraw
     from scipy import ndimage
 
@@ -1045,10 +1076,27 @@ def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, s
     for i in order:
         d.polygon([(sx[i, 0], sy[i, 0]), (sx[i, 1], sy[i, 1]), (sx[i, 2], sy[i, 2])], fill=int(i))
     idbuf = np.asarray(ids, dtype=np.int64)
-    shade = 0.35 + 0.65 * np.clip(-n[:, 1] * 0.7 + n[:, 2] * 0.3, 0, 1)
     img = np.full((P, P, 3), 136, np.float64)
     hit = idbuf >= 0
-    img[hit] = face_rgb[idbuf[hit]] * shade[idbuf[hit], None]
+    fid = idbuf[hit]
+    if cn is None:
+        nn = n[fid]
+    else:  # the corner normals blended at each pixel by its barycentric weights
+        yy, xx = np.nonzero(hit)
+        px_, py_ = xx + 0.5, yy + 0.5
+        x0, y0 = sx[fid, 0], sy[fid, 0]
+        x1, y1, x2, y2 = sx[fid, 1], sy[fid, 1], sx[fid, 2], sy[fid, 2]
+        den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+        den = np.where(np.abs(den) < 1e-12, 1e-12, den)
+        w0 = ((y1 - y2) * (px_ - x2) + (x2 - x1) * (py_ - y2)) / den
+        w1 = ((y2 - y0) * (px_ - x2) + (x0 - x2) * (py_ - y2)) / den
+        w = np.clip(np.stack([w0, w1, 1 - w0 - w1], 1), 0, 1)
+        w /= w.sum(1, keepdims=True) + 1e-12
+        rc = cn[fid] @ _rot(az, elev).T
+        nn = (w[:, :, None] * rc).sum(1)
+        nn /= np.linalg.norm(nn, axis=1)[:, None] + 1e-12
+    shade = 0.35 + 0.65 * np.clip(-nn[:, 1] * 0.7 + nn[:, 2] * 0.3, 0, 1)
+    img[hit] = face_rgb[fid] * shade[:, None]
     if ss > 1:
         img = img.reshape(px, ss, px, ss, 3).mean((1, 3))
         idbuf = idbuf[ss // 2::ss, ss // 2::ss]
@@ -1092,8 +1140,9 @@ def render(mesh, face_rgb: np.ndarray, out_png: Path, views=(("front", 0.0, 0.0)
     center = (v.min(0) + v.max(0)) / 2
     half = float(np.linalg.norm(v - center, axis=1).max()) * 1.04
     font = ImageFont.load_default(size=max(12, px // 26))
+    cn = corner_normals(v, f)
     panels = [_panel(v, f, np.asarray(face_rgb, float), az, el, center, half, px, title=name,
-                     numbers=numbers, show=show, font=font) for name, az, el in views]
+                     numbers=numbers, show=show, font=font, cn=cn) for name, az, el in views]
     _sheet(panels, cols or len(panels), out_png)
     return len(panels)
 
@@ -1111,6 +1160,7 @@ def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: in
     from PIL import ImageFont
 
     font = ImageFont.load_default(size=13)
+    cn = corner_normals(V, F)
     # the jagged ones first, so a failing check shows its edge, then the longest
     pick = sorted([ln for ln in lines if ln["length"] >= EDGE_MIN],
                   key=lambda ln: (-((ln.get("ratio") or 0) > JAGGED), -ln["length"]))[:most]
@@ -1123,7 +1173,7 @@ def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: in
         for a in range(0, 360, 45):
             name = f"{k}: {ln['pair'][0]}/{ln['pair'][1]} z{center[2]:.0f} {a}d r{r}"
             panels.append(_panel(V, F, face_rgb, np.radians(a), np.radians(10), center, half, px,
-                                 title=name, clip=True, font=font))
+                                 title=name, clip=True, font=font, cn=cn))
     rows = len(pick)
     neck = next((ln for ln in anatomy or [] if ln["name"] == "neck" and ln.get("rmax")), None)
     if neck is not None:
@@ -1135,7 +1185,7 @@ def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: in
             at = center - [0, 0, 3.0 if el else 0.0]  # from above, the head fills the top of the panel
             for a in range(0, 360, 45):
                 panels.append(_panel(V, F, face_rgb, np.radians(a), np.radians(el), at, half, px,
-                                     title=f"collar ({how}) {a}d up {el}d", clip=False, font=font))
+                                     title=f"collar ({how}) {a}d up {el}d", clip=False, font=font, cn=cn))
             rows += 1
     if panels:
         _sheet(panels, 8, out_png)
