@@ -45,7 +45,8 @@ def test_repair_orients_and_scales(tmp_path):
 
 
 def test_prompt_names_the_style():
-    assert "chibi" in figure.prompt("chibi") and "this exact person" in figure.prompt("chibi")
+    assert "chibi" in figure.prompt("chibi", "animal") and "this exact person" in figure.prompt("chibi")
+    assert "large head" in figure.prompt("chibi")  # a person's chibi is the likeness figure
     assert "this exact animal" in figure.prompt("statue", "animal")
     with pytest.raises(figure.FigureProblem):
         figure.make([], Path("."), "nope")
@@ -423,14 +424,30 @@ def test_a_person_without_glasses_gets_no_glasses_in_the_style_prompt():
     the likeness line and once as 'no glasses' from the description, and naming them draws them."""
     p = figure.prompt("chibi", "person", ELON_LOOK)
     assert "glasses" not in p.lower() and "facial hair" not in p.lower()
-    assert "wavy hair" in p and "black suit jacket" in p and "middle-aged" in p
+
+
+def test_a_person_is_styled_from_the_photo_not_from_the_description():
+    """Owner: "Those things look nothing like elon". The description's "light brown hair" made his
+    hair too light: the blind likeness judge gave 8 with the description in the prompt and 9 on
+    both seeds without it, so for a person the photo alone carries the look."""
+    p = figure.prompt("chibi", "person", ELON_LOOK)
+    assert "light brown" not in p and "middle-aged" not in p
+    assert "the real face from the photo" in p and "the same jaw" in p and "large head" in p
+    assert "expression" in p and "smile" not in p  # a smile he does not have was drawn on
+    assert "friendly smile" in figure.prompt("chibi", "animal")  # animals keep the chibi look
+    assert "light brown" in figure.prompt("chibi", "animal", "light brown fur.")
 
 
 def test_a_person_with_glasses_keeps_them_exactly():
     p = figure.prompt("chibi", "person", "The person has short grey hair and thin round glasses. They wear a jacket "
                       "with no tie.")
-    assert "thin round glasses" in p and "same frame shape" in p
-    assert "tie" not in p and "jacket" in p
+    assert "same frame shape" in p and "tie" not in p
+
+
+def test_the_photo_check_decides_the_glasses_over_the_description():
+    """The traits check looked at the photo; the description is one model's sentence about it."""
+    assert "same frame shape" in figure.prompt("chibi", "person", "", glasses=True)
+    assert "glasses" not in figure.prompt("chibi", "person", "He wears glasses.", glasses=False).lower()
 
 
 def test_the_positive_words_of_a_description():
@@ -442,7 +459,7 @@ def _models(tmp_path, monkeypatch, answers):
     """Fake describe, style and lift; traits answers by file name. Returns the style calls."""
     calls = []
 
-    def fake_style(photos, out, style_name, who, seed, extra=""):
+    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None):
         calls.append((photos[0].name, seed))
         out.write_bytes(f"render {seed}".encode())
         return out
@@ -454,6 +471,7 @@ def _models(tmp_path, monkeypatch, answers):
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", lambda render, out, seed: standin(out))
     monkeypatch.setattr(figure, "traits", fake_traits)
+    monkeypatch.setattr(figure, "face_crop", lambda photo, out: None)
     return calls
 
 
@@ -506,3 +524,42 @@ def test_a_render_that_never_matches_keeps_the_closest(tmp_path, monkeypatch):
     fig = figure.make([photo], tmp_path / "fig", seed=7, say=lambda s: None)
     assert [c[1] for c in calls] == [7, 8, 9]
     assert (fig.parent / "style.png").read_bytes() == b"render 8"
+
+
+def test_the_face_crop_leads_the_style_references(tmp_path, monkeypatch):
+    """With the whole photo alone the face is a few pixels of a 768 px render and comes out generic;
+    the face crop first and the photo second took the likeness judge from 6 to 9 on Elon."""
+    photo = tmp_path / "elon.jpg"
+    photo.write_bytes(b"elon")
+    refs = []
+    _models(tmp_path, monkeypatch, lambda n: BARE)
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: (refs.append([p.name for p in photos]),
+                                                                      out.write_bytes(b"r"))[1] and out)
+
+    def crop(src, out):
+        out.write_bytes(b"face")
+        return out
+    monkeypatch.setattr(figure, "face_crop", crop)
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert refs[0] == ["face.png", "elon.jpg"]
+
+
+def test_no_face_crop_for_an_animal_or_when_it_fails(tmp_path, monkeypatch):
+    photo = tmp_path / "dog.jpg"
+    photo.write_bytes(b"dog")
+    refs = []
+    _models(tmp_path, monkeypatch, lambda n: BARE)
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: (refs.append([p.name for p in photos]),
+                                                                      out.write_bytes(b"r"))[1] and out)
+    monkeypatch.setattr(figure, "face_crop", lambda src, out: (_ for _ in ()).throw(AssertionError("cropped")))
+    figure.make([photo], tmp_path / "a", who="animal", say=lambda s: None)
+    monkeypatch.setattr(figure, "face_crop", lambda src, out: None)
+    figure.make([photo], tmp_path / "p", say=lambda s: None)
+    assert refs == [["dog.jpg"], ["dog.jpg"]]
+
+
+def test_face_crop_fails_open_without_a_face_or_a_venv(tmp_path, monkeypatch):
+    monkeypatch.setenv("STONE_MFLUX", str(tmp_path / "nowhere"))
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    assert figure.face_crop(photo, tmp_path / "face.png") is None

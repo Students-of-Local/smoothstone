@@ -1,10 +1,12 @@
 """Photos -> styled render -> lifted mesh -> one clean printable body.
 
 Local models do the work, none of them the model that drives stone:
-- describe: LFM3-VL-2B (4 bit, about 3 GB) writes one sentence on how the subject looks. The
-  style model keeps a likeness far better with that sentence in its prompt.
-- style: FLUX.2 klein 4B edit through mflux (Apache 2.0, about 5 GB at 4 bit) turns one or two
-  photos into a clean front view of a collectible figure on white.
+- describe: LFM3-VL-2B (4 bit, about 3 GB) writes one sentence on how an animal or a thing looks,
+  and answers yes or no on a face, glasses, a beard and a hat to check photos and renders.
+- face: tools/figure/face.py (on the lift venv's opencv) crops a person's face out of the lead
+  photo, for the style model to see first.
+- style: FLUX.2 klein 4B edit through mflux (Apache 2.0, about 5 GB at 4 bit) turns the face crop
+  and the photo into a clean front view of a collectible figure on white.
 - lift: tools/lift/lift.py turns that render into a mesh (single-image 3D).
 - repair: trimesh keeps the main body, closes it and scales it to unit height, feet on z = 0.
 
@@ -47,9 +49,19 @@ LOOK = {
         "that stands on its own"
     ),
 }
+# a person's chibi is a likeness figure: a chibi face is a generic cartoon face, and the blind
+# likeness judge gave Elon 5 as a chibi and 9 on both seeds with this look and the face crop
+PERSON_LOOK = {
+    "chibi": (
+        "a premium collectible figure of this exact {who} with a large head, about one third of the "
+        "figure's height, on a slightly small body, the real face from the photo sculpted in fine detail: "
+        "the same jaw, chin, nose, eyes, eyebrows, mouth and expression, the same hairstyle and hairline, "
+        "the same clothes, arms close to the body, feet together, standing upright"
+    ),
+}
 LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
-               "hairstyle, the same face shape, smile and skin tone. "),
+               "hairstyle, the same face shape, expression and skin tone. "),
     "animal": "Keep the likeness from the first photo exactly: the same fur colors, markings, ears and face. ",
     "object": "",
 }
@@ -88,12 +100,18 @@ class FigureProblem(Exception):
     pass
 
 
-def prompt(style: str, who: str = "person", extra: str = "") -> str:
+def prompt(style: str, who: str = "person", extra: str = "", glasses: bool | None = None) -> str:
+    """The style prompt. For a person the photo carries the look and the description stays out:
+    its "light brown hair" drew Elon's hair too light (judge 8 with it, 9 without). Glasses come
+    from the photo check when it ran, else from the description."""
     extra = positive(extra)
     likeness = LIKENESS.get(who, "")
-    if who == "person" and WEARS_GLASSES.search(extra):
-        likeness += GLASSES
-    p = FRAME.format(look=LOOK[style].format(who=who), likeness=likeness)
+    look = (PERSON_LOOK if who == "person" else LOOK).get(style, LOOK[style])
+    if who == "person":
+        if glasses if glasses is not None else WEARS_GLASSES.search(extra):
+            likeness += GLASSES
+        extra = ""
+    p = FRAME.format(look=look.format(who=who), likeness=likeness)
     return f"{p} {extra.strip()}".strip()
 
 
@@ -218,7 +236,7 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
     for i in range(STYLE_TRIES if want else 1):
         s = seed + i
         o = out.with_name(f"style-{s}.png") if want else out
-        style(photos, o, style_name, who, s, extra)
+        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"))
         if not want:
             return o
         got = (traits([o], who, out.with_name("check.log")) or [None])[0]
@@ -239,6 +257,21 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
     out.with_name("check.json").write_text(json.dumps({"want": want, "kept": best[0].name,
                                                        "differs": best[1]}, indent=1))
     return out
+
+
+def face_crop(photo: Path, out: Path) -> Path | None:
+    """The face and hair of the photo's biggest face (tools/figure/face.py), or None when there is
+    no face or the style venv is missing: the figure is then styled from the whole photo."""
+    if out.exists():
+        return out
+    try:  # the lift venv pins opencv 4, whose Haar face finder opencv 5 (in the style venv) dropped
+        lift_py = config.REPO_ROOT / "tools" / "lift" / ".venv" / "bin" / "python"
+        py = lift_py if lift_py.exists() else _mflux_bin().parent / "python"
+        r = subprocess.run([str(py), "-I", str(config.REPO_ROOT / "tools" / "figure" / "face.py"),
+                            str(photo), str(out)], capture_output=True, text=True, timeout=120)
+    except (FigureProblem, OSError, subprocess.TimeoutExpired):
+        return None
+    return out if r.returncode == 0 and out.exists() else None
 
 
 def _lift_cmd() -> list[str]:
@@ -266,12 +299,13 @@ def _run(cmd: list[str], log: Path, timeout: int) -> None:
         raise FigureProblem(f"{Path(cmd[-1] if 'lift' in cmd[-1] else cmd[0]).name} failed, see {log}")
 
 
-def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "") -> Path:
+def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "",
+          glasses: bool | None = None) -> Path:
     if out.exists():
         return out
     cmd = [str(_mflux_bin()), *_style_model(),
-           "--image-paths", *[str(p) for p in photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]],
-           "--prompt", prompt(style_name, who, extra),
+           "--image-paths", *map(str, photos),
+           "--prompt", prompt(style_name, who, extra, glasses),
            "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed),
            "--low-ram",
            "--output", str(out)]
@@ -344,17 +378,24 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
     if not photos:
         raise FigureProblem("no photos, run stone find or stone image first")
     photos, want = screen(list(photos), who, folder, say)
-    key = _digest(*photos, style_name, who, seed, extra, prompt(style_name, who, extra))
+    key = _digest(*photos, style_name, who, seed, extra,
+                  prompt(style_name, who, extra, (want or {}).get("glasses")))
     folder = folder / key
     folder.mkdir(parents=True, exist_ok=True)
     render = folder / "style.png"
     if not render.exists():
-        look = folder / "look.txt"
-        if not look.exists():
-            say("Describing the photo (LFM3-VL-2B, under a minute)...")
-        desc = describe(photos[0], look, who)
+        desc = ""
+        if who != "person" or want is None:  # a person's look comes from the photo, glasses from the check
+            look = folder / "look.txt"
+            if not look.exists():
+                say("Describing the photo (LFM3-VL-2B, under a minute)...")
+            desc = describe(photos[0], look, who)
+        refs = photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]
+        face = face_crop(photos[0], folder / "face.png") if who == "person" else None
+        if face:
+            refs = [face, *refs]
         say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
-        style_checked(photos, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
+        style_checked(refs, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
                       want, say)
     mesh = folder / "lift.glb"
     if not mesh.exists():
