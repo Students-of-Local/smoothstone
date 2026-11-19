@@ -5,7 +5,8 @@ uv run python evals/bar.py <runs dir> [<runs dir> ...] [--card S]
 For each of figure-research, figure-photo and figure-desc: the runs that pass every check and the
 likeness bar, out of cases x 2 seeds, against 80%; and the blind craft judge's mean (judge.json)
 against 8, with the seeded bad control's score. A run is a folder with log.json (evals/run.py);
-the last run of a case and seed counts, and one not made counts as failed. A control is a folder
+the last run of a case and seed counts, across every folder given, and one not made counts as
+failed and as 0 in the craft mean. A control is a folder
 with control.json and judge.json (judge_control.py, then judge_views.py on it), of the mode of the
 run it was seeded from; it must score under 8, or a craft pass means nothing. Exits 1 when a mode
 is below its bar.
@@ -34,12 +35,12 @@ def collect(dirs: list[Path], card: str = "S", evals: Path = ROOT / "evals") -> 
     """({mode: {(spec, seed): log with "dir"}}, {mode: [control scores]})."""
     runs: dict = {m: {} for m in MODES}
     controls: dict = {m: [] for m in MODES}
+    logs = {p.resolve(): json.loads(p.read_text()) for d in dirs
+            for p in ([d / "log.json"] if (d / "log.json").exists() else d.glob("*/log.json"))}
+    for p, log in sorted(logs.items(), key=lambda kv: kv[1].get("run_id", "")):  # every folder at once
+        if log.get("suite") in MODES and log.get("driver") != "next" and str(log.get("card")) == card:
+            runs[log["suite"]][(log["spec"], log["seed"])] = {**log, "dir": p.parent}
     for d in dirs:
-        logs = [d / "log.json"] if (d / "log.json").exists() else sorted(d.glob("*/log.json"))
-        for p in sorted(logs, key=lambda q: json.loads(q.read_text()).get("run_id", "")):
-            log = json.loads(p.read_text())
-            if log.get("suite") in MODES and log.get("driver") != "next" and str(log.get("card")) == card:
-                runs[log["suite"]][(log["spec"], log["seed"])] = {**log, "dir": p.parent}
         for c in sorted(d.rglob("control.json")):
             job = Path(json.loads(c.read_text()).get("job", ""))
             spec = job.parent.name.split("__")[0]
@@ -65,11 +66,12 @@ def bar(dirs: list[Path], card: str = "S", evals: Path = ROOT / "evals") -> tupl
         miss = [f"{c} s{s}: " + ("; ".join(got[(c, s)]["why"])[:120] if (c, s) in got else "not run")
                 for c, s in want if (c, s) not in got or not got[(c, s)]["pass"]]
         out += ["  " + m for m in miss]
+        # a run not made, with no views or with no score counts 0: a mode is never judged on its survivors
         js = [j for k in want if k in got and (j := _score(got[k]["dir"])) is not None]
-        mean = sum(js) / len(js) if js else None
+        mean = sum(js) / len(want) if want else None
         ctl = controls[mode]
         craft = mean is not None and mean >= CRAFT and bool(ctl) and max(ctl) < CRAFT
-        ms = "no score" if mean is None else f"{mean:.2f} over {len(js)} runs"
+        ms = "no score" if mean is None else f"{mean:.2f} over {len(want)} runs ({len(js)} judged, the rest count 0)"
         cs = ", ".join(f"{c:g}" for c in ctl) if ctl else "none judged"
         out.append(f"  craft judge mean {ms} (bar {CRAFT:g}), control {cs} (must be under {CRAFT:g}): "
                    + ("holds" if craft else "below"))

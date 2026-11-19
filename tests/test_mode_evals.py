@@ -393,3 +393,65 @@ def test_check_git_refuses_a_lowered_mode_floor(tmp_path, capsys):
     (root / "evals" / "floor.json").write_text(json.dumps(floor))
     assert ratchet.check_git("HEAD", root) == 1
     assert "floor figure-photo/S judge lowered from 8.2 to 7.9" in capsys.readouterr().out
+
+
+def test_the_later_run_counts_across_folders_in_any_order(tmp_path):
+    """Review of PR 41 (second-F5): folders were read in argument order, so an older pass in the
+    second folder overwrote a newer fail in the first."""
+    ev = _evals(tmp_path)
+    new, old = tmp_path / "new", tmp_path / "old"
+    _run(new, "figure-photo", "p1", 1, False, stamp="20261119-1100")
+    _run(old, "figure-photo", "p1", 1, True, stamp="20261119-1000")
+    for dirs in ([new, old], [old, new]):
+        lines, _ = bar.bar(dirs, evals=ev)
+        assert next(x for x in lines if x.startswith("figure-photo")).startswith("figure-photo: 0 of 2 runs")
+
+
+def test_a_run_with_no_craft_score_counts_0_in_the_mean(tmp_path):
+    """Review of PR 41 (second-F4): the mean was taken over the judged runs only, so a mode whose
+    runs died before views.png was judged on its one survivor."""
+    ev = _evals(tmp_path)
+    runs = _all_pass(tmp_path)
+    (next(runs.glob("d1__*s2__*")) / "judge.json").unlink()
+    lines, ok = bar.bar([runs, tmp_path], evals=ev)
+    desc = lines[lines.index(next(x for x in lines if x.startswith("figure-desc"))) + 1]
+    assert "mean 4.50 over 2 runs (1 judged" in desc and desc.endswith("below") and not ok
+
+
+def _sealed_run(tmp: Path, suite: str, spec: str, why: list[str]) -> Path:
+    import hashlib
+    sp = ROOT / "evals" / suite / f"{spec}.json"
+    rdir = tmp / "run"
+    job = _job(rdir)
+    (rdir / "log.json").write_text(json.dumps({
+        "run_id": "x1", "spec": spec, "suite": suite, "seed": 1, "card": "S", "driver": "lfm3",
+        "pass": False, "why": why, "spec_sha256": hashlib.sha256(sp.read_bytes()).hexdigest()}))
+    return rdir, job, sp
+
+
+def test_rejudge_takes_a_photo_run_to_its_held_back_photo_at_7(tmp_path, monkeypatch, judges):
+    """Review of PR 41 (first-F1): rejudge is the only way to score a held-out run again."""
+    rejudge = _load("rejudge_modes", "rejudge.py")
+    monkeypatch.setattr(rejudge.run, "SCORES", tmp_path / "scores.jsonl")
+    asked, reply = judges
+    rdir, job, sp = _sealed_run(tmp_path, "figure-photo", "p1_trench_coat_woman", ["likeness: the judge could not answer"])
+    spec = json.loads(sp.read_text())
+    (job / "image" / "source.jpg").write_bytes((sp.parent / spec["photos"][0]).read_bytes())
+    reply["text"] = json.dumps({"score": 6, "conflicts": [{"feature": "hair", "what": "short"}]})
+    log = rejudge.rejudge(rdir)
+    assert not log["pass"] and log["likeness"] == 6 and "the spec asks 7" in log["why"][0]
+    assert asked[-1]["files"]["reference.jpg"] == (sp.parent / spec["photos"][-1]).read_bytes()
+    reply["text"] = json.dumps({"score": 8, "conflicts": []})
+    assert rejudge.rejudge(rdir)["pass"]
+
+
+def test_rejudge_takes_a_description_run_to_the_traits_judge(tmp_path, monkeypatch, judges):
+    rejudge = _load("rejudge_modes", "rejudge.py")
+    monkeypatch.setattr(rejudge.run, "SCORES", tmp_path / "scores.jsonl")
+    asked, reply = judges
+    rdir, job, sp = _sealed_run(tmp_path, "figure-desc", "d1_old_man_beard_cap", ["likeness: not visible: flat cap (bare head)"])
+    n = len(json.loads(sp.read_text())["expect"]["traits"])
+    reply["text"] = json.dumps({"traits": [{"n": i + 1, "visible": True, "why": "seen"} for i in range(n)]})
+    log = rejudge.rejudge(rdir)
+    assert log["pass"] and log["traits"] == f"{n}/{n}" and sorted(asked[-1]["files"]) == ["views.png"]
+    assert json.loads((tmp_path / "scores.jsonl").read_text())["pass"] == 1
