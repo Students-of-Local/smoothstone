@@ -931,7 +931,8 @@ def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
 def _shoe_figure(kind):
     """block_figure with other shoes: "seam", a plain shoe (8 x 9, top at 11) with a sole seam 0.75
     deep and 0.5 tall whose middle is 1.5 mm under its top; "low", a plain shoe only 2 mm tall;
-    "sloped", a shoe whose top rises from 10.4 at the heel to 11.6 at the toe."""
+    "sloped", a shoe whose top rises from 10.4 at the heel to 11.6 at the toe; "taper", a shoe 1 mm
+    tall at full size that then tapers into the leg by 10.5, with no crease at its top."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -945,6 +946,10 @@ def _shoe_figure(kind):
             legs += [box([8, 9, 1.25], [x, 1, 8.625]), box([6.5, 7.5, 0.5], [x, 1, 9.5]), box([8, 9, 1.25], [x, 1, 10.375])]
         elif kind == "low":
             legs += [box([8, 9, 2.0], [x, 1, 9.0])]
+        elif kind == "taper":
+            pts = [[x + sx * w, y0 + sy * d, z] for sx in (-1, 1) for sy in (-1, 1)
+                   for w, d, y0, z in ((4, 4.5, 1, 8), (4, 4.5, 1, 9), (3, 3, 0, 10.5))]
+            legs.append(trimesh.convex.convex_hull(np.array(pts)))
         else:
             pts = [[x + sx * 4, y, z] for sx in (-1, 1) for y, z in ((-3.5, 8), (5.5, 8), (-3.5, 10.4), (5.5, 11.6))]
             legs.append(trimesh.convex.convex_hull(np.array(pts)))
@@ -979,6 +984,19 @@ def test_a_sole_seam_or_a_low_shoe_keeps_the_shoe_line_at_the_shoes_top(kind, to
     zone, _ = parts.zones(cm, a, base)
     upper = ~base & (c[:, 2] > top - 1.2) & (c[:, 2] < top - 0.1) & (np.abs(np.abs(c[:, 0]) - 5) < 4.5)
     assert upper.any() and (zone[upper] == parts.SHOES).all()
+
+
+def test_a_shoe_line_never_runs_along_the_soles_corner_on_the_plinth():
+    """Sweep of 2026-11-19, Jensen seed 1: "ready" with the shoes the trousers' blue but a sliver at
+    the sole, though the request named them black. The crease search under the shoe's step reached
+    below the plinth's top, and the sole's corner on the plinth is the cheapest groove round the
+    shoe, so the shoe line ran there."""
+    m = _shoe_figure("taper")
+    a = parts.anatomy(m, 8.0)
+    ankles = [x for x in a["lines"] if x["name"] == "ankle"]
+    assert len(ankles) == 2
+    for ln in ankles:
+        assert ln["curve"] is not None and min(ln["curve"]) > 8.0 + parts.ANKLE_PLINTH_GAP - 0.1, (ln["z"], min(ln["curve"]))
 
 
 def test_a_shoe_rim_line_is_its_own_course_and_its_edge_follows_the_shape(monkeypatch):
@@ -1178,3 +1196,31 @@ def test_the_hair_is_level_across_the_back_and_drops_to_it_just_behind_the_ears(
     # the ears stay out of the hair
     ears = head & (np.abs(c[:, 0]) > 6.6) & (np.abs(c[:, 2] - 55.0) < 1.6)
     assert ears.any() and not (hair & ears).any(), f"{int((hair & ears).sum())} ear faces are hair"
+
+
+def test_a_neck_groove_under_a_standing_collar_is_lifted_over_it():
+    """Sweep of 2026-11-19, Elon seed 2 and Jensen seed 2: the neck's groove ran under a jacket's
+    standing collar, so the collar's sloped top took the skin's color and the ledge check asked the
+    person. The line is lifted over the ledge, so the collar keeps the jacket's color."""
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    torso = trimesh.creation.box([22, 12, 40])
+    torso.apply_translation([0, 0, 28])
+    t = np.radians(np.arange(0, 360, 6))
+    ring = lambda r, z: np.c_[r * np.cos(t), r * np.sin(t), np.full(len(t), z)]
+    collar = trimesh.convex.convex_hull(np.vstack([ring(4.5, 47.5), ring(4.5, 48.5), ring(3.0, 49.5)]))
+    neck = trimesh.creation.cylinder(radius=3, height=6, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, torso, collar, neck, head], engine="manifold")
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=0.5)
+    mesh = C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+    line = {"name": "neck", "z": 48.5, "center": [0.0, 0.0], "rmax": 6.0, "ring": 28.0,
+            "curve": [48.5] * 360, "groove": {"used": True}}
+    assert parts._ledge_area(mesh, line) > C.LEDGE_AREA
+    out = parts.neck_lift(mesh, line, parts._figure_faces(mesh, 8.0))
+    assert out.get("lifted") and min(out["curve"]) >= 49.4, min(out["curve"])
+    assert parts._ledge_area(mesh, out) <= C.LEDGE_AREA
+    flat = {**line, "curve": [47.0] * 360}  # a groove with no ledge over it stays as found
+    assert parts.neck_lift(mesh, flat, parts._figure_faces(mesh, 8.0)) is flat
