@@ -934,7 +934,7 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
     a standing collar painted the head's color by a plane cut through the collar. For each color
     edge near the line, the color of its upper face is the upper color; the faces of that color
     within LEDGE_MM of the edge that face up (normal z over LEDGE_NZ) and that a person sees are
-    the fault (a strip tucked under a cuff's rim is hidden and counts as seen only where it is).
+    the fault (at a shoe's top, only those the edge runs onto: _on_edge) (a strip tucked under a cuff's rim is hidden and counts as seen only where it is).
     Returns one entry per line: {"name", "side", "area" (seen mm2, worst 30 degree sector), "angle" (that sector's
     middle, degrees around the line's center, 0 = +x), "fil" (the upper color), "faces"}."""
     from scipy.spatial import cKDTree
@@ -975,6 +975,8 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
             if len(cand):
                 dist, _ = cKDTree(mid).query(c[cand], distance_upper_bound=LEDGE_MM)
                 bad = cand[np.isfinite(dist)]
+                if ln["name"] == "ankle":
+                    bad = _on_edge(mesh, bad, np.unique(ev[e]))
                 if len(bad):
                     th = np.degrees(np.arctan2(c[bad, 1] - cy, c[bad, 0] - cx)) % 360
                     sec = (th // 30).astype(int)
@@ -987,6 +989,29 @@ def ledges(V, F, face_fil, lines: list[dict]) -> list[dict]:
                     res.update(area=float(per[k]), angle=float(k * 30 + 15), fil=U, faces=int(len(bad)))
         out.append(res)
     return out
+
+
+def _on_edge(mesh, faces: np.ndarray, edge_v: np.ndarray) -> np.ndarray:
+    """The faces that a color edge runs onto: those with a corner on the edge, and those joined to
+    them through the others. Used at a shoe's top only: trousers break over a shoe, so a fold with
+    trouser wall between it and the shoe's rim is the trousers' own shape (parts.shoe_rim already
+    takes the shoe's rim up to its end). On a collar the ledge over the cut is the collar's own top,
+    so there every face near the edge counts."""
+    import scipy.sparse as sp
+    from scipy.sparse.csgraph import connected_components
+
+    if not len(faces):
+        return faces
+    F = np.asarray(mesh.faces)
+    pos = np.full(len(F), -1)
+    pos[faces] = np.arange(len(faces))
+    adj = mesh.face_adjacency
+    both = (pos[adj[:, 0]] >= 0) & (pos[adj[:, 1]] >= 0)
+    a, b = pos[adj[both, 0]], pos[adj[both, 1]]
+    g = sp.coo_matrix((np.ones(len(a)), (a, b)), shape=(len(faces), len(faces)))
+    _, comp = connected_components(g, directed=False)
+    seed = np.isin(F[faces], edge_v).any(1)
+    return faces[np.isin(comp, np.unique(comp[seed]))]
 
 
 def ledge_faults(found: list[dict]) -> list[dict]:

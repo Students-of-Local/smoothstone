@@ -107,6 +107,20 @@ def test_ledge_check_fails_a_plane_cut_through_the_collar_and_passes_the_groove(
     assert worst < C.JAGGED
 
 
+def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it():
+    """r3 (Donovan, 2026-11-18, black shoes under blue pants): a wrinkle of the trousers 1 mm over
+    the shoe faces up and is blue, with blue trouser wall between it and the shoe's edge. The ledge
+    check failed it, so the shoes fell back to white. Only a ledge the edge runs onto is a fault."""
+    m = _lathe([(0, 0), (4.6, 0), (4.6, 11.2), (4.0, 11.2), (4.0, 16), (0, 16)])
+    ankle = {**_line("ankle", 10.0, 4.6), "curve": None}
+    V, F, lab = _paint(m, ankle)
+    found = C.ledges(V, F, lab, [ankle])
+    assert not C.ledge_faults(found), found
+    # the same shape at a collar is the collar's top painted the head's color: still a fault
+    neck = {**ankle, "name": "neck"}
+    assert C.ledge_faults(C.ledges(V, F, lab, [neck]))
+
+
 def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
     m = cuff_figure()
     ln = parts.find_groove(m, _line("wrist", 10.0, 2.5))
