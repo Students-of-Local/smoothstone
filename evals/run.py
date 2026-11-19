@@ -66,9 +66,9 @@ def run_stone(command: str, env: dict, cwd: Path) -> str:
         return "FIX: empty command.\nNEXT: stone status"
     try:
         p = subprocess.run([STONE, *argv], capture_output=True, text=True, env=env, cwd=cwd,
-                           timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "420")))
-    except subprocess.TimeoutExpired:
-        return "FIX: the command ran too long.\nNEXT: stone status"
+                           timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "900")))
+    except subprocess.TimeoutExpired:  # a figure build takes about 430 s; its style and lift are kept
+        return f"FIX: the command ran too long, and what it finished is kept.\nNEXT: stone {shlex.join(argv)}"
     out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr and not p.stdout else "")
     return out.strip()[:3000]
 
