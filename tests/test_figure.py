@@ -459,8 +459,8 @@ def _models(tmp_path, monkeypatch, answers):
     """Fake describe, style and lift; traits answers by file name. Returns the style calls."""
     calls = []
 
-    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None):
-        calls.append((photos[0].name, seed))
+    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False):
+        calls.append((photos[0].name, seed) + (("plain",) if plain else ()))
         out.write_bytes(f"render {seed}".encode())
         return out
 
@@ -513,6 +513,35 @@ def test_a_render_that_adds_glasses_is_styled_again_with_the_next_seed(tmp_path,
     assert (fig.parent / "style.png").read_bytes() == b"render 8"
     assert json.loads((fig.parent / "check.json").read_text())["differs"] == []
     assert any("added glasses" in x and "seed 8" in x for x in said)
+
+
+def test_a_render_with_lettering_on_the_clothes_is_styled_again_in_plain_colors(tmp_path, monkeypatch):
+    """DHH's lead photo is him in a race suit, and the render copied its sponsor logos and an
+    "Abu Dhabi Racing" shirt: lettering a figure cannot print or paint, and other people's marks."""
+    photo = tmp_path / "dhh.jpg"
+    photo.write_bytes(b"dhh")
+    calls = _models(tmp_path, monkeypatch, lambda n: {**BARE, "lettering": n in ("dhh.jpg", "style-7.png")})
+    said = []
+    fig = figure.make([photo], tmp_path / "fig", seed=7, say=said.append)
+    assert calls == [("dhh.jpg", 7), ("dhh.jpg", 8, "plain")]
+    assert (fig.parent / "style.png").read_bytes() == b"render 8"
+    assert any("lettering" in x and "plain" in x and "seed 8" in x for x in said)
+
+
+def test_a_render_with_plain_clothes_keeps_the_clothes_it_has():
+    """The plain look is only for a render that came back with lettering: as the first try it
+    turned Jensen's leather jacket into a sweater."""
+    same, plain = figure.prompt("chibi", "person"), figure.prompt("chibi", "person", plain=True)
+    assert "the same clothes," in same and "plain solid colors" not in same
+    assert "plain solid colors" in plain and "the same clothes," not in plain
+
+
+def test_the_render_check_asks_about_lettering_on_the_clothes():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("describe", Path(__file__).resolve().parents[1] / "tools" / "figure" / "describe.py")
+    d = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(d)
+    assert "logo" in d.TRAITS["person"]["lettering"]
 
 
 def test_a_render_that_never_matches_keeps_the_closest(tmp_path, monkeypatch):

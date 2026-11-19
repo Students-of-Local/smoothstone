@@ -59,6 +59,10 @@ PERSON_LOOK = {
         "the same clothes, arms close to the body, feet together, standing upright"
     ),
 }
+# for a render that came back with lettering or logos on the clothes (DHH's race suit): a figure
+# cannot print or paint them, and they are other people's marks. Only then, as the first try it
+# turned Jensen's leather jacket into a sweater.
+PLAIN = ("the same clothes,", "the same kind of clothes in plain solid colors,")
 LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
                "hairstyle, the same face shape, expression and skin tone. "),
@@ -102,13 +106,16 @@ class FigureProblem(Exception):
     pass
 
 
-def prompt(style: str, who: str = "person", extra: str = "", glasses: bool | None = None) -> str:
+def prompt(style: str, who: str = "person", extra: str = "", glasses: bool | None = None,
+           plain: bool = False) -> str:
     """The style prompt. For a person the photo carries the look and the description stays out:
     its "light brown hair" drew Elon's hair too light (judge 8 with it, 9 without). Glasses come
     from the photo check when it ran, else from the description."""
     extra = positive(extra)
     likeness = LIKENESS.get(who, "")
     look = (PERSON_LOOK if who == "person" else LOOK).get(style, LOOK[style])
+    if plain:
+        look = look.replace(*PLAIN)
     if who == "person":
         if glasses if glasses is not None else WEARS_GLASSES.search(extra):
             likeness += GLASSES
@@ -235,12 +242,12 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
                   want: dict | None, say=print) -> Path:
     """style(), then the render checked against the photo: one that added or left out glasses,
     a beard or a hat is styled again with the next seed, and the closest of STYLE_TRIES is kept."""
-    best = None
+    best, plain = None, False
     check = bool(want) and any(k in want for k in KEEP)  # nothing to hold a render to otherwise
     for i in range(STYLE_TRIES if check else 1):
         s = seed + i
         o = out.with_name(f"style-{s}.png") if check else out
-        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"))
+        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"), plain=plain)
         if not check:
             return o
         got = (traits([o], who, out.with_name("check.log")) or [None])[0]
@@ -248,13 +255,19 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
             best = (o, [])
             break
         miss = [k for k in KEEP if k in want and k in got and bool(got[k]) != bool(want[k])]
+        miss += ["lettering"] if got.get("lettering") else []  # never wanted, whatever the photo has
         if best is None or len(miss) < len(best[1]):
             best = (o, miss)
         if not miss:
             break
-        how = " and ".join(("added " if got[k] else "left out ") + KEEP[k] for k in miss)
+        how = " and ".join(("added " if got[k] else "left out ") + KEEP[k] for k in miss if k in KEEP)
+        if "lettering" in miss:
+            plain = True
+            how = " and ".join(x for x in (how, "put lettering or a logo on the clothes, which a figure cannot "
+                                                "print") if x)
+        again = " in plain colors" if plain else ""
         if i + 1 < STYLE_TRIES:
-            say(f"The render {how}, unlike the photo; styling again with seed {s + 1}.")
+            say(f"The render {how}, unlike the photo; styling again{again} with seed {s + 1}.")
         else:
             say(f"The render {how}, unlike the photo, in all {STYLE_TRIES} tries; keeping the closest.")
     _landed(out, lambda tmp: shutil.copyfile(best[0], tmp))
@@ -319,12 +332,12 @@ def _run(cmd: list[str], log: Path, timeout: int) -> None:
 
 
 def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "",
-          glasses: bool | None = None) -> Path:
+          glasses: bool | None = None, plain: bool = False) -> Path:
     if out.exists():
         return out
     cmd = [str(_mflux_bin()), *_style_model(),
            "--image-paths", *map(str, photos),
-           "--prompt", prompt(style_name, who, extra, glasses),
+           "--prompt", prompt(style_name, who, extra, glasses, plain),
            "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed),
            "--low-ram",
            "--output"]
