@@ -1,0 +1,15 @@
+{
+ "id": "p3_blonde_mustard_pants",
+ "request": "Turn the person in these photos into a mini figure about 95 mm tall",
+ "photos": [
+  "p3_blonde_mustard_pants_1.jpg",
+  "p3_blonde_mustard_pants_2.jpg"
+ ],
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 95
+  }
+ },
+ "why": "Anonymous woman, light skin, platinum blonde shoulder-length hair with bangs, white button-down shirt, long black coat, mustard yellow cropped pants, black heels. Photo 1 full body, photo 2 face and torso."
+}

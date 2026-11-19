@@ -1,0 +1,20 @@
+{
+ "id": "r6_michael_jordan",
+ "request": "Michael Jordan as a mini figure, 80 mm tall, in a brown jacket and black pants",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 80
+  },
+  "colors": {
+   "brown": [
+    "jacket"
+   ],
+   "black": [
+    "pants"
+   ],
+   "rest": "white"
+  }
+ },
+ "why": "Man; dark skin; bald (shaved head). Lead image: Michael_Jordan_in_2014.jpg shows a shaved head, light blue shirt, brown plaid jacket. Covers: dark skin, bald, colors asked."
+}

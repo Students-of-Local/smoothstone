@@ -1,0 +1,32 @@
+{
+ "id": "d1_old_man_beard_cap",
+ "request": "A mini figure of an old man with short gray hair, a full white beard, a flat cap, a green sweater and brown pants, 90 mm tall",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90
+  },
+  "colors": {
+   "gray": [
+    "hair"
+   ],
+   "white": [
+    "beard"
+   ],
+   "green": [
+    "sweater"
+   ],
+   "brown": [
+    "pants"
+   ],
+   "rest": "white"
+  },
+  "traits": [
+   "short gray hair",
+   "full white beard",
+   "flat cap",
+   "green sweater",
+   "brown pants"
+  ]
+ }
+}

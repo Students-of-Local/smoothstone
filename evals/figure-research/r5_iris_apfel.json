@@ -1,0 +1,8 @@
+{
+ "id": "r5_iris_apfel",
+ "request": "A mini figure of Iris Apfel",
+ "expect": {
+  "recipe": "figure"
+ },
+ "why": "Woman; light skin; older; short white hair; oversized round black glasses she is nearly always photographed in. Lead image: Iris_Apfel_at_MIFF_(cropped).jpg shows the round black glasses and white hair. Covers: glasses always, gray/white hair, older woman, no height given."
+}

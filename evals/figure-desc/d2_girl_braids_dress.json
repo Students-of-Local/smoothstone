@@ -1,0 +1,28 @@
+{
+ "id": "d2_girl_braids_dress",
+ "request": "Make a mini figure of a 10 year old girl with long brown hair in two braids, a yellow dress and red shoes, 80 mm tall",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 80
+  },
+  "colors": {
+   "brown": [
+    "hair"
+   ],
+   "yellow": [
+    "dress"
+   ],
+   "red": [
+    "shoes"
+   ],
+   "rest": "white"
+  },
+  "traits": [
+   "child",
+   "long brown hair in two braids",
+   "yellow dress",
+   "red shoes"
+  ]
+ }
+}

@@ -1,0 +1,33 @@
+{
+ "id": "d4_man_curly_beard_boots",
+ "request": "Mini figure of a young man with curly black hair, a short black beard, a blue shirt, tan pants and brown boots, 100 mm tall",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 100
+  },
+  "colors": {
+   "black": [
+    "hair",
+    "beard"
+   ],
+   "blue": [
+    "shirt"
+   ],
+   "tan": [
+    "pants"
+   ],
+   "brown": [
+    "boots"
+   ],
+   "rest": "white"
+  },
+  "traits": [
+   "curly black hair",
+   "short black beard",
+   "blue shirt",
+   "tan pants",
+   "brown boots"
+  ]
+ }
+}
