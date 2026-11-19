@@ -150,8 +150,8 @@ def resolve(query: str) -> dict | None:
         cls = _classes(cands)
         chars, never = cls["character"], NOT_A_SUBJECT | cls["not"]
         cands = [e for e in cands if HUMAN in _p31(e) or not (_p31(e) & never) or _p31(e) & (CHARACTER | chars)]
-        if not cands:
-            return _pack(ents[hits[0]]) if hits and hits[0] in ents else None
+        if not cands:  # a gene or a given name is no subject: search by the words alone
+            return None
 
         def score(rank_ent):
             rank, ent = rank_ent
@@ -263,7 +263,21 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
 NOUN = (r"(?:figure|figurine|statue|statuette|bust|sculpture|model|miniature|mini|replica|toy|doll|print|"
         r"keychain|ornament|chibi|version)s?")
 FIGURE_OF = re.compile(rf"\b{NOUN}\s+of\s+(.+)", re.S)  # lower case: "Statue of Liberty" is a name
-FIGURE_AT = re.compile(rf"\b{NOUN}\b")
+# the figure word a name or an animal stands just before ("a Babe Ruth figurine"); not "mini" or
+# "print", which are as often a size or a verb ("a mini Elon Musk figure", "print a ... figurine")
+FIGURE_AT = re.compile(r"\b(?:figure|figurine|statue|statuette|bust|sculpture|miniature|replica|toy|doll|"
+                       r"keychain|ornament|chibi)s?\b")
+# a pet or a relative after "my": "my dog Max" is the owner's own, only their photo shows it
+KIN = {"dog", "puppy", "cat", "kitten", "pet", "horse", "pony", "bird", "parrot", "hamster", "rabbit", "bunny",
+       "fish", "son", "daughter", "kid", "kids", "child", "baby", "boy", "girl", "wife", "husband", "mom", "mum",
+       "mother", "dad", "father", "brother", "sister", "grandma", "grandpa", "grandmother", "grandfather",
+       "uncle", "aunt", "cousin", "nephew", "niece", "friend", "boyfriend", "girlfriend", "partner", "fiance",
+       "fiancee", "family"}
+# words that end a lower case subject read backwards from the figure word
+NOT_SUBJECT_WORDS = {"make", "print", "build", "create", "get", "give", "want", "need", "like", "love",
+                                 "please", "tall", "high", "wide", "long", "mm", "cm", "inch", "inches", "in",
+                                 "of", "for", "with", "and", "or", "as", "into", "i", "i'd", "i'm", "i'll", "i've",
+                                 "you", "can", "could", "would", "will", "do", "send", "style", "styled"}
 LIKE = re.compile(r"\b(?:looks like|look like|resembling|shaped like|like)\s+(.+?)(?=\blike\b|$)", re.S)
 CAPITAL_OF = re.compile(r"\bof\s+((?:the\s+)?[A-Z].*)", re.S)
 # where the subject's phrase ends: a comma, a size, "with ...", "in his ...", a quote or a bracket
@@ -276,12 +290,14 @@ FILLER = {"a", "an", "the", "one", "some", "little", "small", "tiny", "mini", "c
 
 
 STOP = {"A", "An", "The", "My", "Me", "It", "This", "That", "Our", "Your", "Could", "Can", "Would", "Will",
-        "Please", "Make", "Print", "Build", "Create", "I", "We"}
+        "Please", "Make", "Print", "Build", "Create", "I", "We", "Get", "Give", "Send", "Do", "Hi", "Hey",
+        "Hello", "Want", "Need", "Let's", "Mini", "Little", "Small", "Tiny", "Cute"}
 
 
 def _capitals(text: str, last: bool = False) -> str | None:
     """The first (or last) run of capitalized words in text, without sentence words like "A"."""
-    names = [" ".join(w for w in run.split() if w not in STOP) for run in CAPS.findall(" " + text)]
+    names = [" ".join(w for w in run.split() if w not in STOP and not re.match(r"I'\w+$", w))
+             for run in CAPS.findall(" " + text)]
     names = [n for n in names if n]
     return (names[-1] if last else names[0]) if names else None
 
@@ -289,10 +305,13 @@ def _capitals(text: str, last: bool = False) -> str | None:
 def _phrase(text: str) -> str | None:
     """A subject phrase: the name in capitals in it, or its words; None for one's own (my dog)."""
     phrase = PHRASE_END.split(text, maxsplit=1)[0].strip(" .'")
+    words = re.findall(r"[a-z][a-z'-]*", phrase.lower())
+    own = next((i for i, w in enumerate(words) if w in OWN), None)
+    if own is not None and any(w in KIN for w in words[own + 1:]):
+        return None  # "my dog Max", "my son Jack"; "my favorite astronaut Neil Armstrong" is not one's own
     name = _capitals(phrase)
     if name:
         return name
-    words = re.findall(r"[a-z][a-z'-]*", phrase.lower())
     if any(w in OWN for w in words):
         return None
     words = [w for w in words if w not in FILLER][:4]
@@ -308,15 +327,23 @@ def subject_from_request(request: str) -> str | None:
     m = FIGURE_OF.search(request)
     if m:
         return _phrase(m.group(1))
-    m = FIGURE_AT.search(request)
-    if m:  # a name just before the figure word, in the same clause: "Michelangelo's David as a statue"
-        clause = re.split(r"[.?!;,:\"\u201c]", request[:m.start()])[-1]
+    clauses = [re.split(r"[.?!;,:\"\u201c]", request[:m.start()])[-1] for m in FIGURE_AT.finditer(request)]
+    for clause in clauses:  # a name just before the figure word, in its clause: "Michelangelo's David as a statue"
         name = _capitals(clause, last=True)
         if name:
             return name
-    for m in LIKE.finditer(request):
+    for m in LIKE.finditer(request):  # "looks like Albert Einstein"; a bare "like" is often a verb (I'd like)
         first = re.findall(r"[A-Za-z']+", m.group(1))[:1]
-        if first and first[0].lower() not in OWN:
+        bare = m.group(0).lower().startswith("like")
+        if first and first[0].lower() not in OWN and (not bare or _capitals(PHRASE_END.split(m.group(1), 1)[0])):
             return _phrase(m.group(1))
+    for clause in clauses:  # a creature just before the figure word: "a little koala figure"
+        back = []
+        for w in reversed(re.findall(r"[a-z0-9][a-z0-9'-]*", clause.lower())):
+            if w in FILLER or w in OWN or w in NOT_SUBJECT_WORDS or w[0].isdigit() or len(back) == 3:
+                break
+            back.insert(0, w)
+        if back:
+            return " ".join(back)
     m = CAPITAL_OF.search(request)
     return _phrase(m.group(1)) if m else None

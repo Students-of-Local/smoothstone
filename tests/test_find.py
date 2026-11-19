@@ -204,3 +204,27 @@ def test_a_film_a_disease_or_an_agency_of_the_same_name_is_never_the_subject(mon
     monkeypatch.setattr(find, "_get", _fake([], hits=[dept], people=[dhh],
                                             classes=[_ent("Q2659904", "government agency", [])]))
     assert find.resolve("DHH")["id"] == "Q719413"
+
+
+def test_a_name_or_an_animal_just_before_the_figure_word_is_the_subject():
+    # Review of PR 23, round 2: "mini" and "print" are no figure, and a lower case animal is a subject too.
+    s = find.subject_from_request
+    assert s("Make me a mini Grace Hopper figure, 90 mm tall") == "Grace Hopper"
+    assert s("Please print a Lou Gehrig figurine") == "Lou Gehrig"
+    assert s("I'd like a little koala figure, 70 mm tall") == "koala"
+    assert s("a 90 mm tall golden retriever statue") == "golden retriever"
+    assert s("Get me a cute bulldog figurine") == "bulldog"
+
+
+def test_ones_own_named_pet_or_relative_is_never_looked_up():
+    s = find.subject_from_request
+    assert s("a figure of my dog Max, 80 mm tall") is None
+    assert s("a statue of my son Jack") is None
+    assert s("a mini figure of our cat Luna") is None
+    assert s("make me a little statue of my favorite astronaut Neil Armstrong") == "Neil Armstrong"
+
+
+def test_nothing_that_can_be_a_subject_resolves_to_nothing(monkeypatch):
+    # the DHH protein: a gene alone must not come back as the subject with its picture
+    monkeypatch.setattr(find, "_get", _fake([], hits=[GENE]))
+    assert find.resolve("DHH") is None
