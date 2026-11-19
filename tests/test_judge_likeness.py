@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import urllib.parse
 import sys
 from pathlib import Path
 
@@ -179,3 +180,46 @@ def test_a_spec_changed_since_the_run_is_not_rejudged(tmp_path, monkeypatch):
     rdir = _run_dir(tmp_path, ["likeness: the judge could not answer (x)"], b"an older spec")
     with pytest.raises(SystemExit, match="changed since run"):
         rj.rejudge(rdir)
+
+
+def _found(job, *titles):
+    d = job / "image" / "found"
+    d.mkdir(parents=True)
+    (d / "found.json").write_text(json.dumps({"photos": [{"title": t} for t in titles]}))
+
+
+def _article(monkeypatch, files):
+    """The fake article's lead image is ref.jpg; files are its other images, each at https://up/x/<n>."""
+    def get(url, timeout=60):
+        if "prop=images" in url:
+            return json.dumps({"query": {"pages": {"1": {"images": [{"title": f} for f in files]}}}}).encode()
+        if "prop=imageinfo" in url:
+            t = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["titles"][0]
+            return json.dumps({"query": {"pages": {"2": {"title": t, "imageinfo": [
+                {"url": "https://up/x/" + urllib.parse.quote(t[5:].replace(" ", "_"))}]}}}}).encode()
+        if "api.php" in url:
+            return json.dumps({"query": {"pages": {"1": {"title": "Elon Musk", "description": "businessman",
+                                                         "original": {"source": "https://up/x/Elon_Musk_ref.jpg"}}}}}).encode()
+        return b"jpeg"
+    monkeypatch.setattr(jl, "_get", get)
+
+
+def test_the_reference_is_never_a_photo_the_tool_styled_from(tmp_path, monkeypatch):
+    """Review of PR 23: the article's lead image is often Wikidata's, which the tool put first, so
+    the judge compared the render with its own source and measured copying, not likeness."""
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg", "File:Elon Musk 2.jpg")
+    _fake(monkeypatch, "Elon Musk", 8)
+    _article(monkeypatch, ["File:Tesla logo.svg", "File:Elon Musk 2.jpg", "File:Elon Musk Royal Society.jpg"])
+    res = jl.judge(job, "A mini figure of Elon Musk")
+    assert res["reference"]["url"] == "https://up/x/Elon_Musk_Royal_Society.jpg"
+    assert res["reference"]["instead_of"] == "Elon Musk ref.jpg"
+
+
+def test_no_reference_apart_from_the_tools_photos_is_no_verdict(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    _found(job, "File:Elon Musk ref.jpg")
+    _fake(monkeypatch, "Elon Musk", 9)
+    _article(monkeypatch, ["File:Tesla logo.svg", "File:SpaceX factory.jpg"])
+    with pytest.raises(jl.JudgeProblem, match="tool"):
+        jl.judge(job, "A mini figure of Elon Musk")

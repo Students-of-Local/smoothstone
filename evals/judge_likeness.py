@@ -6,7 +6,10 @@ The tool picks its own photos, so its photos cannot vouch for it: for "DHH" it o
 protein, and every check passed a made up man. The reference here comes another way. Opus names
 the Wikipedia article the request means (text only), the judge harness fetches that article's
 lead image, and a second Opus run compares the render with it, feature by feature (hair, facial
-hair, glasses, skin, age, clothes), never naming anyone from a face. Both run as `claude -p` on
+hair, glasses, skin, age, clothes), never naming anyone from a face. When the lead image is a photo
+the tool styled from (image/found/found.json), another photo of the subject from the article is the
+reference, and with none there is no verdict: a render compared with its own source measures
+copying, not likeness. Both run as `claude -p` on
 Donovan's sign-in (ANTHROPIC_API_KEY unset). The verdict is {"score": 1-10, "conflicts": [...],
 "reference": {...}}, saved as likeness.json next to the run; a score under PASS fails it.
 """
@@ -101,6 +104,43 @@ def reference(title: str) -> dict:
     return {"title": p["title"], "url": p["original"]["source"], "caption": p.get("description", "")}
 
 
+def _file_key(name: str) -> str:
+    """A Commons file name as one compares it: no File: prefix, no query, spaces, lower case."""
+    name = urllib.parse.unquote(urllib.parse.urlparse(name).path.rsplit("/", 1)[-1] if "/" in name else name)
+    return re.sub(r"^file:", "", name.replace("_", " ").strip().lower())
+
+
+def tool_photos(job: Path) -> set[str]:
+    """The Commons files the tool found and styled from (image/found/found.json), as _file_key."""
+    try:
+        found = json.loads((job / "image" / "found" / "found.json").read_text())
+    except (OSError, ValueError):
+        return set()
+    return {_file_key(p.get("title", "")) for p in found.get("photos") or [] if p.get("title")}
+
+
+def other_reference(ref: dict, avoid: set[str]) -> dict | None:
+    """A photo from the same article that the tool did not use, named for the subject (a file
+    whose name has a word of the title), or None."""
+    q = urllib.parse.urlencode({"action": "query", "titles": ref["title"], "prop": "images", "imlimit": "50",
+                                "format": "json"})
+    pages = (json.loads(_get(WIKI + "?" + q)).get("query") or {}).get("pages") or {}
+    files = [i["title"] for pg in pages.values() for i in pg.get("images") or []]
+    words = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", ref["title"])}
+    for f in files:
+        key = _file_key(f)
+        if key in avoid or not key.endswith((".jpg", ".jpeg")) or not words & set(re.findall(r"[a-z]{3,}", key)):
+            continue
+        q = urllib.parse.urlencode({"action": "query", "titles": f, "prop": "imageinfo", "iiprop": "url",
+                                    "format": "json"})
+        info = [ii for pg in ((json.loads(_get(WIKI + "?" + q)).get("query") or {}).get("pages") or {}).values()
+                for ii in pg.get("imageinfo") or []]
+        if info and info[0].get("url"):
+            lead = urllib.parse.unquote(urllib.parse.urlparse(ref["url"]).path.rsplit("/", 1)[-1])
+            return {**ref, "url": info[0]["url"], "instead_of": lead.replace("_", " ")}
+    return None
+
+
 def parse(text: str) -> dict:
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
@@ -133,6 +173,12 @@ def judge(job: Path, request: str, model: str = "opus") -> dict:
         raise JudgeProblem(f"no style.png under {job / 'image' / 'figure'}")
     title = claude(TITLE.format(request=request), model=model).strip().strip('"').splitlines()[0]
     ref = reference(title)
+    avoid = tool_photos(job)
+    if _file_key(ref["url"]) in avoid:  # the article leads with the photo the render was styled from
+        ref = other_reference(ref, avoid)
+        if ref is None:
+            raise JudgeProblem(f"the article {title!r} shows only photos the tool styled from; "
+                               "no reference apart from them")
     with tempfile.TemporaryDirectory(prefix="likeness-") as tmp:
         t = Path(tmp)
         ext = Path(urllib.parse.urlparse(ref["url"]).path).suffix.lower() or ".jpg"
