@@ -137,7 +137,7 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
 # SPEC3 A: the anatomy of a figure from its shape
 
 
-def block_figure(shoes=False):
+def block_figure(shoes=False, flare=False):
     """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
     a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
     the neck between the torso and the head (48 to 52). shoes=True: each leg stands in a shoe
@@ -151,7 +151,12 @@ def block_figure(shoes=False):
     disc.apply_translation([0, 0, 4])
     legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
     if shoes:
-        legs += [box([8, 9, 3.5], [x, 1, 9.25]) for x in (-5, 5)]
+        legs += [box([8, 8.5 if flare else 9, 3.5], [x, 0.25 if flare else 1, 9.25]) for x in (-5, 5)]
+    if flare:  # each trouser hem flares out over its shoe: 7.8 x 8.2 at the shoe's top to the leg at 12.4
+        for x in (-5, 5):
+            pts = [[x + sx * 3.9, 0.25 + sy * 4.1, 10.9] for sx in (-1, 1) for sy in (-1, 1)]
+            pts += [[x + sx * 3.0, sy * 3.0, 12.4] for sx in (-1, 1) for sy in (-1, 1)]
+            legs.append(trimesh.convex.convex_hull(np.array(pts)))
     torso = box([22, 12, 20], [0, 0, 38])
     arms = [box([5, 4, 12], [x, 0, 40]) for x in (-13.5, 13.5)]  # into the torso's side by 0.5
     hands = []
@@ -318,6 +323,25 @@ def test_a_shoe_wider_than_its_leg_gets_its_own_line_and_zone():
     info = C.describe(cm, region, rgb, base_region)
     parts.name_parts(cm, region, info, zone, a, look="a man in a black jacket, blue pants and black shoes")
     assert "shoes" in {d["part"] for d in info}, [d["part"] for d in info]
+
+
+def test_a_trouser_hem_flaring_over_the_shoe_stays_the_trousers_color():
+    """r3, the blind judge on the first black-shoes run: "black band painted on the bottom of the
+    pant legs above the shoes; the blue stops short of the hem". The hem's flare was the steepest
+    step, so the shoe line sat on top of it. The line is the crease where the hem meets the shoe."""
+    m = block_figure(shoes=True, flare=True)
+    a = parts.anatomy(m, 8.0)
+    ankles = [ln for ln in a["lines"] if ln["name"] == "ankle"]
+    assert len(ankles) == 2
+    V, F = parts.cut(m.vertices, m.faces, a)
+    cm = C.load_stl_mesh(V, F)
+    c = cm.triangles_center
+    base = (c[:, 2] < 8.0) | (cm.vertices[cm.faces][:, :, 2].max(1) <= 8.01)
+    zone, _ = parts.zones(cm, a, base)
+    shoe = zone == parts.SHOES
+    assert shoe.any() and c[shoe, 2].max() <= 11.4, c[shoe, 2].max()  # not up the flare (11 to 12.4)
+    flare = ~base & (c[:, 2] > 11.4) & (c[:, 2] < 12.3) & (np.abs(c[:, 0]) < 10)
+    assert (zone[flare] == parts.LEGS).all()
 
 
 def test_straight_legs_have_no_shoe_line():

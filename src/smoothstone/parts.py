@@ -27,6 +27,8 @@ HEM_ABOVE = 0.5  # mm above the last level where the legs are apart: one ring, n
 HEM_FOLD = 0.15  # share of the figure's height above the leg split searched for the top's own hem
 ANKLE_REACH = 0.45  # share of the legs' height (plinth to split) searched for the top of each shoe
 ANKLE_STEP = 1.08  # a leg's section 0.5 mm under a shoe's top is at least this much bigger than 0.5 mm over
+ANKLE_CREASE_BELOW = 1.0  # mm under the steepest step: the middle of the band searched for the hem's crease
+ANKLE_CREASE_BAND = 1.5  # mm each side of it
 ANKLE_RIM_GAP = 0.2  # mm: an up-facing face starting within this of the shoe's rim so far is still the shoe
 ANKLE_RIM_NZ = 0.4  # a face whose normal points up at least this much is the top of the shoe
 ANKLE_RIM_REACH = 3.0  # mm over the ankle line searched for the rest of the shoe's rim
@@ -187,7 +189,7 @@ def anatomy(mesh, top: float) -> dict:
         for side in (-1, 1):
             a = ankle(mesh, top, split, res["center"], side)
             if a is not None:
-                res["ankles"].append({"z": a, "side": side})
+                res["ankles"].append({"z": a[0], "steep": a[1], "side": side})
 
     # the neck: the deepest valley of the section area between the torso and the head
     lo = hem if hem is not None else top + 0.25 * H
@@ -547,11 +549,13 @@ def _leg_ring(mesh, z: float, x0: float, side: int):
     return max(rings, key=_ring_area) if rings else None
 
 
-def ankle(mesh, top: float, split: float, x0: float, side: int) -> float | None:
+def ankle(mesh, top: float, split: float, x0: float, side: int) -> tuple[float, float] | None:
     """The z of the top of a shoe on one leg: in the lowest ANKLE_REACH of the legs, the height
     where the leg's section steps in the most going up (the shoe wider than the leg over it), when
     the section 0.5 mm under it is at least ANKLE_STEP times the one 0.5 mm over it, raised to where
-    that taper ends. A leg that narrows evenly to the plinth has no shoe line."""
+    that taper ends. Returns (that height, the steepest step's) or None: a leg that narrows evenly to
+    the plinth has no shoe line. The step can be a trouser hem flaring over the shoe; ankle_line
+    looks for the crease under it first."""
     def area(z):
         p = _leg_ring(mesh, z, x0, side)
         return _ring_area(p) if p is not None else None
@@ -569,8 +573,8 @@ def ankle(mesh, top: float, split: float, x0: float, side: int) -> float | None:
     for z in np.arange(at, at + 1.0, 0.05):
         a, b = area(z), area(z + 0.3)
         if a and b and abs(a - b) / a < ANKLE_SETTLED:
-            return round(float(z), 3)
-    return at
+            return round(float(z), 3), at
+    return at, at
 
 
 def leg_vertices(V: np.ndarray, anat: dict, side: int) -> np.ndarray:
@@ -658,7 +662,19 @@ def ankle_line(mesh, anat: dict, a: dict) -> dict:
     keep = leg_vertices(mesh.vertices, anat, a["side"])[np.asarray(mesh.faces)].all(1)
     if not keep.any():
         return line
-    found = find_groove(mesh.submesh([np.nonzero(keep)[0]], append=True), line)
+    leg = mesh.submesh([np.nonzero(keep)[0]], append=True)
+    # the crease where a trouser hem meets the shoe, under the hem's flare (the steepest step)
+    zc = a.get("steep", a["z"]) - ANKLE_CREASE_BELOW
+    near = {**line, "z": zc, "band": ANKLE_CREASE_BAND}
+    q = _leg_ring(mesh, zc, anat["center"], a["side"])  # the crease is as wide as the flare's foot
+    if q is not None:
+        qc = q.mean(0)
+        near.update(center=[float(qc[0]), float(qc[1])], rmax=float(np.linalg.norm(q - qc, axis=1).max()) + 1.0,
+                    ring=float(np.linalg.norm(np.diff(np.vstack([q, q[:1]]), axis=0), axis=1).sum()))
+    crease = find_groove(leg, near)
+    if crease.get("curve") is not None and not _ledge_curve(crease, zc):
+        return crease
+    found = find_groove(leg, line)
     if found.get("curve") is not None and not _ledge_curve(found, a["z"]):
         return found
     line = {**line, "groove": found.get("groove")}
