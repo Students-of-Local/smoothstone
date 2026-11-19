@@ -26,8 +26,15 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 
 ## Figures
 For a figure, statue or bust of a person, pet or thing, the recipe is figure. Set height and
-name only. If stone build prints FIX and NEXT: stone find "<name>", run that line, then run
-stone build again. The build takes a few minutes.
+name only, then stone build. The build takes a few minutes. There are three ways in, and stone
+picks the one that fits:
+- A named person ("a mini figure of Ada Lovelace"): build prints NEXT: stone find "<name>".
+  Run it, then stone build again.
+- Photos the person gave: they are already in the job, so stone build uses them. Never run
+  stone find for "the person in these photos".
+- A person described with no name ("a woman with a red bob and a green sweater"): stone build
+  draws them from the words. Never run stone find for a description.
+Then stone colors, as its NEXT line says; it already follows the colors in the request.
 
 ## Example
 Request: A guard for a 92 mm fan with a honeycomb grille.
@@ -54,6 +61,12 @@ stone build -> Part ready, NEXT: stone colors
 stone colors -> a list of parts, like: 2  red     30% of surface  dress
   NEXT: stone colors dress=red rest=white
 stone colors dress=red rest=white -> NEXT: none, the part is ready
+
+Request: A mini figure of a woman with a red bob, round glasses, a green sweater and jeans.
+stone set figure
+stone build -> Portrait: drawn from the description ... Part ready, NEXT: stone colors
+stone colors -> NEXT: stone colors hair=red top=green pants=blue rest=white
+stone colors hair=red top=green pants=blue rest=white -> NEXT: none, the part is ready
 
 Request: A cover for the cable hole in my desk.
 stone set panel -> FIX ... NEXT: ask the person: What are the measurements of the cable hole in your desk, in mm? ...

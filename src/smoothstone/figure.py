@@ -249,8 +249,10 @@ def screen(photos: list[Path], who: str, folder: Path, say=print) -> tuple[list[
             return photos, None
         folder.mkdir(parents=True, exist_ok=True)
         memo.write_text(json.dumps(seen))
-    # a photo the owner gave is theirs to trust: a small or side-on face can read as none
-    keep = [(p, t) for p, t in zip(photos, seen) if t.get("face") or p.name.startswith("source.")]
+    # a photo the owner gave is theirs to trust, and so is a portrait drawn from their words: a
+    # small or side-on face can read as none
+    keep = [(p, t) for p, t in zip(photos, seen)
+            if t.get("face") or p.name.startswith("source.") or p.parent.name == "drawn"]
     if not keep:
         raise FigureProblem(f"none of the {len(photos)} photos shows the {who}'s face; "
                             "give one with stone image <path to photo>")
@@ -378,6 +380,32 @@ def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, e
     _landed(out, lambda tmp: _run(cmd + [str(tmp)], out.with_name("style.log"), timeout=1800))
     if not out.exists():
         raise FigureProblem("the style model wrote no picture")
+    return out
+
+
+PORTRAIT = ("A full-length studio photo of one real person: {who}. Standing upright and facing the camera, "
+            "arms relaxed at the sides, the whole body from the top of the head to the shoes in frame, "
+            "the face clear and in sharp focus, plain light gray background, soft even light, natural "
+            "colors, no text, no logo.")
+
+
+def portrait(description: str, out: Path, seed: int) -> Path:
+    """A reference photo of a person drawn from words alone (FLUX.2 klein 4B text to image), for a
+    request that describes someone with no name to find and no photo: it then stands in for the
+    photo through the same face, style and lift steps."""
+    if out.exists():
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    exe = _mflux_bin().with_name("mflux-generate-flux2")
+    if not exe.exists():
+        raise FigureProblem(f"the portrait model is not set up, run {SETUP} once", setup=True)
+    cmd = [str(exe), *_style_model(), "--prompt", PORTRAIT.format(who=description.strip().rstrip(".")),
+           "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed), "--low-ram",
+           "--output"]
+    _landed(out, lambda tmp: _run(cmd + [str(tmp)], out.with_name("portrait.log"), timeout=1800))
+    if not out.exists():
+        raise FigureProblem("the portrait model wrote no picture")
+    (out.with_name("description.txt")).write_text(description.strip() + "\n")
     return out
 
 

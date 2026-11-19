@@ -289,6 +289,44 @@ FILLER = {"a", "an", "the", "one", "some", "little", "small", "tiny", "mini", "c
           "favorite", "favourite", "famous"}
 
 
+# words for a person who is described, not named: a request of one is drawn from its words
+PEOPLE = {"person", "woman", "man", "girl", "boy", "lady", "guy", "gentleman", "child", "kid", "teen",
+          "teenager", "toddler", "grandma", "grandpa", "grandmother", "grandfather", "people", "women", "men",
+          "nurse", "doctor", "firefighter", "chef", "soldier", "farmer", "student", "teacher", "pilot",
+          "astronaut", "knight", "wizard", "pirate", "cowboy", "cowgirl", "businessman", "businesswoman",
+          "hiker", "skater", "surfer", "runner", "golfer", "gardener", "baker", "scientist", "grad", "graduate"}
+PHOTOS = re.compile(r"\b(?:photos?|pictures?|pics?|images?|selfies?|snapshots?|headshots?)\b", re.I)
+SIZE = re.compile(r",?\s*\b\d+(?:\.\d+)?\s*(?:mm|cm|millimeters?|inch(?:es)?|in\b|\")\s*(?:tall|high)?", re.I)
+NAMED_BASE = re.compile(r",?\s*(?:with|and)\s+(?:the\s+name\s+)?[\"\u201c][^\"\u201d]*[\"\u201d]"
+                        r"(?:\s+on\s+(?:the|its|a)\s+(?:base|plinth|stand))?", re.I)
+
+
+def generic(subject: str | None) -> bool:
+    """A subject that is a kind of person, not a name: "woman", "old man", "firefighter"."""
+    if not subject or _capitals(subject):
+        return False
+    words = re.findall(r"[a-z]+", subject.lower())
+    return bool(words) and words[-1] in PEOPLE
+
+
+def described_person(request: str) -> str | None:
+    """The words to draw a person from, for a figure request that describes one with no name and
+    no photo of their own: 'A mini figure of a woman with a red bob, 80 mm tall' -> 'a woman with
+    a red bob'. None for a name (stone find), one's own or a photo (stone image)."""
+    if PHOTOS.search(request) or re.search(r"\b(?:my|our|me|myself)\b", request, re.I):
+        return None
+    subject = subject_from_request(request)
+    if subject is not None and not generic(subject):
+        return None
+    if not set(re.findall(r"[a-z]+", request.lower())) & PEOPLE:
+        return None
+    m = FIGURE_OF.search(request)
+    text = m.group(1) if m else request
+    text = SIZE.sub("", NAMED_BASE.sub("", text))
+    text = re.sub(r"\s+", " ", text).strip(" ,.;")
+    return text or None
+
+
 STOP = {"A", "An", "The", "My", "Me", "It", "This", "That", "Our", "Your", "Could", "Can", "Would", "Will",
         "Please", "Make", "Print", "Build", "Create", "I", "We", "Get", "Give", "Send", "Do", "Hi", "Hey",
         "Hello", "Want", "Need", "Let's", "Mini", "Little", "Small", "Tiny", "Cute"}

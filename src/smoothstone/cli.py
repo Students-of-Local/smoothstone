@@ -997,7 +997,10 @@ def figure_seed(job: Job, params: dict) -> int:
 def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     """Photos -> styled render -> 3D figure, cached in images/figure. None after a FIX."""
     photos = job.photos()
-    if not photos:
+    drawn = None
+    if not photos and job.exists():
+        drawn = findtool.described_person(job.request())  # no name, no photo: draw them from the words
+    if not photos and drawn is None:
         who = findtool.subject_from_request(job.request()) if job.exists() else None
         out.add(f"Recipe: {r.name}")
         out.fix("the figure needs photos" + (f" of {who}" if who else "") + " first")
@@ -1009,6 +1012,12 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     who = figure_who(job, style)
     t0 = time.time()
     try:
+        if drawn is not None:
+            out.add(f"Drawing a portrait from the description: {drawn}")
+            job.log("Drawing the portrait (FLUX.2 klein 4B, about a minute)...")
+            path = figuretool.portrait(drawn, job.image_dir / "drawn" / "portrait.png", figure_seed(job, params))
+            out.add(f"Portrait: {path} (the figure is made from it as from a photo)")
+            photos = [path]
         made = figuretool.make(photos, job.image_dir / "figure", style_name=style, who=who,
                                seed=figure_seed(job, params), say=lambda s: job.log(s))
     except figuretool.FigureProblem as e:
@@ -1032,7 +1041,8 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
         out.code = 1
         return None
     secs = time.time() - t0
-    out.add(f"Figure: {style} {who} from {len(photos)} photos"
+    src = "the drawn portrait" if photos[0].parent.name == "drawn" else f"{len(photos)} photos"
+    out.add(f"Figure: {style} {who} from {src}"
             + (f" ({secs:.0f} s)" if secs > 2 else " (made before)"))
     return made
 
@@ -1059,6 +1069,14 @@ def cmd_find(args, job: Job) -> Out:
         out.result = "find refused: the job is not a figure"
         return out
     query = " ".join(args.query).strip().strip('"\'') or findtool.subject_from_request(job.request()) or ""
+    if findtool.generic(query) or (not query and findtool.described_person(job.request())):
+        # a kind of person, not a name: there is no one to look up, stone build draws them
+        out.fix(f'stone find looks up a named person; "{query or job.request()}" is described, not named, '
+                "so stone build draws the person from the request's words")
+        out.owns_next = True
+        out.next = "stone build" if plan and plan.get("recipe") == "figure" else "stone show figure"
+        out.result = "find refused: a described person, not a name"
+        return out
     if not query:
         out.fix('say who or what to find, like stone find "Ada Lovelace"')
         out.next = 'stone find "<who or what>"'

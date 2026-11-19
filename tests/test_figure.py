@@ -1030,3 +1030,50 @@ def test_a_look_between_two_identical_failures_still_counts_them_in_a_row(jobenv
     stone("show", "figure")
     stone("bogus")
     assert stone("build")[2].startswith("ask the person")
+
+
+DESCRIBED = "A mini figure of a woman with a red bob, round glasses, a green sweater and jeans, 80 mm tall"
+
+
+def test_described_person_reads_the_words_to_draw_from():
+    from smoothstone import find as findtool
+
+    assert findtool.described_person(DESCRIBED) == "a woman with a red bob, round glasses, a green sweater and jeans"
+    assert findtool.described_person('A 80 mm figure of a girl in a yellow raincoat, with "ZOE" on the base') == \
+        "a girl in a yellow raincoat"
+    for named_or_own in ("A mini figure of Taylor Swift", "A mini figure of the person in these photos",
+                         "A mini figure of my son", "A mini figure of a golden retriever"):
+        assert findtool.described_person(named_or_own) is None, named_or_own
+
+
+def test_a_described_person_is_drawn_from_the_words_and_built_with_no_find(jobenv, monkeypatch, openscad, tmp_path):
+    """Goal 2026-11-19: a figure from a description alone. With no name to find and no photo,
+    stone build draws a portrait from the request's words and makes the figure from it, so the
+    path is new, set, build: no stone find "woman", no stone image."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    fig = tmp_path / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    drew, made = [], []
+
+    def portrait(description, out, seed):
+        drew.append(description)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"png")
+        return out
+
+    def make(photos, folder, **k):
+        made.append([p.name for p in photos])
+        return fig
+
+    monkeypatch.setattr(figure, "portrait", portrait)
+    monkeypatch.setattr(figure, "make", make)
+    stone("new", DESCRIBED)
+    stone("set", "figure", "height=80")
+    text, code, nxt = stone("find", "woman")
+    assert code == 1 and nxt == "stone build" and "described" in text, text
+    text, code, nxt = stone("build")
+    assert code == 0 and "Part ready" in text and "Portrait:" in text, text
+    assert drew == ["a woman with a red bob, round glasses, a green sweater and jeans"]
+    assert made == [["portrait.png"]]
+    stone("build")  # a rebuild reuses the portrait: nothing drawn again
+    assert len(drew) == 1

@@ -179,7 +179,10 @@ class Job:
         return out
 
     def photos(self) -> list[Path]:
-        """Photos for a figure: found ones first, then the picture given with stone image."""
+        """Photos for a figure: the picture given with stone image, then found ones; with neither,
+        the portrait stone build drew from the request's description."""
         found = sorted((self.image_dir / "found").glob("photo_*"))
         given = sorted(self.image_dir.glob("source.*"))
-        return given + found if given else found
+        if given or found:
+            return given + found
+        return sorted((self.image_dir / "drawn").glob("portrait.png"))
