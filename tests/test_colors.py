@@ -968,3 +968,37 @@ def test_a_jagged_figure_edge_beside_the_name_still_fails(openscad, tmp_path):
     lines2 = colors.color_edges(mesh.vertices, mesh.faces, fil)[1]
     colors.mark_name_edges(lines2, mesh.faces, region2, 2, 1)
     assert not any(ln.get("name_edge") for ln in lines2)
+
+
+def test_the_name_takes_whichever_of_black_or_white_stands_out_more_on_a_mid_tone_plinth():
+    """Review of PR 28 (second-F5): on an orange plinth with a white jacket, nothing in the palette
+    stands out 3:1, and the light or dark split gave white at 2.3:1, where black gives 6.6:1."""
+    info = jensen_named()
+    per = np.ones(len(info) + 1, int)  # rest=orange, the plinth too
+    per[4] = 2  # jacket=white
+    assert cli._name_filament(info, per, ["orange", "white"], "") == "black"
+    assert cli._name_filament(info, per, ["orange", "white", "black"], "") == 3
+    assert cli._name_filament(info, per, ["pink", "white"], "") == "black"
+
+
+def test_a_plinth_filament_with_no_color_to_read_gives_the_name_no_guess():
+    """Review of PR 28 (first-F2): "Ivory PLA" read as gray, so the name took white on ivory."""
+    info = jensen_named()
+    per = np.ones(len(info) + 1, int)
+    per[4] = 2
+    assert cli._name_filament(info, per, ["Ivory PLA", "Charcoal"], "") is None
+    assert cli._name_filament(info, per, ["Ivory PLA", "Charcoal"], "the name in red") == "red"
+
+
+def test_a_name_on_the_plinth_changes_no_other_color_the_suggestion_gives():
+    """Review of PR 28 (first-F1, first-F3): with no figure parts found, the name region alone made
+    the suggestion take the figure path and drop "a black jacket"; and a suggestion from the photo
+    colors could give the name the plinth's color, so it printed white on white again."""
+    plain = [dict(d, part=None) for d in jensen_regions()]
+    named = plain + [jensen_named()[-1]]
+    for req in ("a black jacket", "Ada in blue", "Jensen Huang", "Jensen Huang, red and blue"):
+        assert cli._suggest_line(named, FIL, req) == cli._suggest_line(plain, FIL, req), req
+    for req in ("Jensen Huang", "Jensen Huang, red and blue", "white everywhere"):
+        assert "name=" not in cli._suggest_line(jensen_named(), FIL, req)
+        pick = cli._suggest(jensen_named(), FIL, req)[0]
+        assert 9 not in pick, (req, pick)

@@ -109,16 +109,13 @@ def contrast_ratio(a, b) -> float:
 
 
 def name_contrast(plinth_rgb, palette) -> int | None:
-    """The palette color (its index) the name on a plinth of `plinth_rgb` takes so it reads: on a
-    light plinth (luminance over 0.5) the darkest, on a dark one the lightest, of the colors that
-    stand out from the plinth by NAME_CONTRAST. None when none does (the name then takes black on a
-    light plinth, white on a dark one). Reusing a palette color needs no extra filament."""
-    light = luminance(plinth_rgb) > 0.5
-    ok = [(luminance(c), i) for i, c in enumerate(palette)
+    """The palette color (its index) the name on a plinth of `plinth_rgb` takes so it reads: of the
+    colors that stand out from the plinth by NAME_CONTRAST, the one with the most contrast. None
+    when none does (the name then takes black or white, whichever stands out more). Reusing a
+    palette color needs no extra filament."""
+    ok = [(contrast_ratio(c, plinth_rgb), i) for i, c in enumerate(palette)
           if c is not None and contrast_ratio(c, plinth_rgb) >= NAME_CONTRAST]
-    if not ok:
-        return None
-    return (min(ok) if light else max(ok))[1]
+    return max(ok)[1] if ok else None
 
 
 def color_name(rgb) -> str:

@@ -1417,15 +1417,18 @@ def _suggest(info: list[dict], fil: list[str], request: str) -> tuple[dict, int,
         c = pc.pop("name")  # no name raised on the plinth: "a red name" is the plinth, as it always was
         pc.setdefault("base", c)
     named = colortool.request_colors(request)
-    if not pc and len(named) == 1 and any(d.get("part") for d in info):
+    figure = any(d.get("part") not in (None, "name") for d in info)  # a name on a plinth is no figure
+    if not pc and len(named) == 1 and figure:
         # one color and no part given a color ("Jensen Huang in white", even with "on the base"
         # or "his face" said along the way): the whole figure is that color
         n = _match_filament(named[0], fil)
         if n is None:
             return {}, len(fil) + 1, [named[0]]
         return {}, n, []
-    if not pc or not any(d.get("part") for d in info):
-        return _suggest_colors(info, fil, request)
+    if not pc or not figure:
+        pick, rest, extra = _suggest_colors(info, fil, request)
+        # the name's color is picked to stand out from the plinth, never from the photo
+        return {k: v for k, v in pick.items() if not any(d["n"] == k and d.get("part") == "name" for d in info)}, rest, extra
 
     extra: list[str] = []
     allf = list(fil)
@@ -1584,9 +1587,10 @@ def _name_filament(info: list[dict], per, fil: list[str], request: str) -> int |
     """The filament for the name raised on the plinth when the mapping gives it none, or None when
     there is no name. The color the request names for it ("red lettering", "the name in red"), else
     one that stands out from the plinth's (colors.name_contrast): a filament the rest of the print
-    already uses, else black on a light plinth or white on a dark one. A filament number, or the
-    color word when no loaded filament is that color. `per` is the filament per region number. A
-    print in one color stays in one color."""
+    already uses, else black or white, whichever stands out more. A filament number, or the color
+    word when no loaded filament is that color. `per` is the filament per region number. A print in
+    one color stays in one color. None too when the plinth's filament is no color this can read
+    ("Ivory PLA"): a guess would print the name in the plinth's own color."""
     nm = next((d["n"] for d in info if d.get("part") == "name"), None)
     base = next((d["n"] for d in info if d["base"]), None)
     if nm is None or base is None:
@@ -1597,11 +1601,13 @@ def _name_filament(info: list[dict], per, fil: list[str], request: str) -> int |
     used = sorted({int(per[d["n"]]) for d in info if d["n"] != nm})
     if len(used) == 1:
         return used[0]
-    plinth = colortool.filament_rgb(fil[int(per[base]) - 1]) or (150, 150, 150)
+    plinth = colortool.filament_rgb(fil[int(per[base]) - 1])
+    if plinth is None:
+        return None
     k = colortool.name_contrast(plinth, [colortool.filament_rgb(fil[i - 1]) for i in used])
     if k is not None:
         return used[k]
-    c = "black" if colortool.luminance(plinth) > 0.5 else "white"
+    c = max(("black", "white"), key=lambda w: colortool.contrast_ratio(colortool.NAMES[w], plinth))
     return _match_filament(c, fil) or c
 
 
@@ -1749,6 +1755,9 @@ def cmd_colors(args, job: Job) -> Out:
             fil.append(f)
             added.append(f)
             f = len(fil)
+        if f is None:
+            out.add(f"The plinth's filament, {fil[int(per[next(d['n'] for d in info if d['base'])]) - 1]}, is no color "
+                    "I can read, so the name keeps the plinth's color; give it one with name=<color>.")
         if isinstance(f, int) and f != per[nm]:
             per[nm] = f
             out.add(f"The name on the plinth takes {_fil_value(fil)[f - 1]} (filament {f}), so it reads "
