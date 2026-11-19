@@ -1189,6 +1189,38 @@ def cmd_note(args, job: Job) -> Out:
     return out
 
 
+def cmd_video(args, job: Job) -> Out:
+    """A vertical clip of a finished painted job for X, from the run log of the model that made it.
+    The log defaults to log.json beside the job folder, where evals/run.py writes it."""
+    out = Out(owns_next=False)
+    if not need_job(job, out):
+        return out
+    log = Path(args.log).expanduser() if args.log else job.root.parent / "log.json"
+    dest = Path(args.out).expanduser() if args.out else job.root / "video"
+    nxt = job.status().get("next") or "stone status"
+    if not log.exists():
+        out.fix(f"no run log at {log}: pass the log.json the model run wrote, stone video <log.json>")
+        out.next = nxt
+        return out
+    from . import video
+    try:
+        rep = video.make(job.root, log, dest, turn=args.turn)
+    except video.VideoProblem as e:
+        out.fix(str(e))
+        out.next = nxt
+        return out
+    s = rep["spec"]
+    out.add(f"Clip: {rep['clip']} ({rep['seconds']:.1f} s, {s['width']}x{s['height']}, {s['lufs']:.1f} LUFS)")
+    out.add(f"Stills and contact sheet: {dest / 'stills'}")
+    for f in rep["faults"]:
+        out.fix(f)
+    if not rep["faults"]:
+        out.add("PASS video: spec, safe areas, glyphs and terminal lines all check")
+    out.result = "video made" if not rep["faults"] else f"video faults: {rep['faults'][0]}"
+    out.next = nxt
+    return out
+
+
 def cmd_done(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
@@ -1844,7 +1876,23 @@ def make_parser() -> Parser:
 
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
     s.add_argument("items", nargs="*")
+
+    s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")
+    s.add_argument("log", nargs="?", help="the run log (default: log.json beside the job)")
+    s.add_argument("--out", help="output folder (default: <job>/video)")
+    s.add_argument("--turn", type=_turn_frames, default=144, help="frames in one turn of the figure (8 or more)")
     return p
+
+
+def _turn_frames(text: str) -> int:
+    """--turn: a whole number of frames, at least 8, so the figure has something to turn through."""
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of frames") from None
+    if n < 8:
+        raise argparse.ArgumentTypeError(f"{n} is too few frames: one turn takes at least 8")
+    return n
 
 
 COMMANDS = {
@@ -1861,6 +1909,7 @@ COMMANDS = {
     "note": cmd_note,
     "done": cmd_done,
     "colors": cmd_colors,
+    "video": cmd_video,
 }
 
 
