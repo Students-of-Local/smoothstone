@@ -634,6 +634,58 @@ def test_a_cuff_cut_masked_to_the_hand_still_cuts_every_face_it_crosses():
 
 
 
+def thumb_figure():
+    """The block figure with each hand a capsule (radius 1.6, z 26.9 to 35.1) hanging 1.5 mm clear
+    of the torso's side under a sleeve (5 x 5) that overhangs it, its cuff groove at z 34, and a
+    thumb (1 x 1 mm) bridging the gap to the hip at z 31.5 to 32.5: the hand is loose only under
+    the thumb, so its wrist level is 31.4, under the cuff."""
+    def box(ext, at):
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        return b
+
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    torso = box([22, 12, 20], [0, 0, 38])
+    arms = [box([5, 5, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
+    hands = []
+    for s in (-1, 1):
+        h = trimesh.creation.capsule(height=7.0, radius=1.6, count=[48, 48])
+        h.apply_translation([s * 14.1, 0, 31.0])
+        hands += [h, box([2.1, 1.0, 1.0], [s * 11.95, 0, 32.0])]
+    neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+def test_a_hand_whose_thumb_touches_the_hip_under_its_cuff_ends_between_them():
+    """Eval (Elon): a white band ran across the hips at the hem. The thumb's tip touches the hip
+    there, so the hand is loose only under that touch and its wrist level is the touch, under the
+    cuff. Every face from that level up to the cuff within HAND_REACH of the hand's axis counted as
+    the hand, the hip's side and front too, so a strip of hip took the hand's color. The hand must
+    end on the line halfway between it and the hip, and still reach its cuff."""
+    m = thumb_figure()
+    a = parts.anatomy(m, 8.0)
+    wrists = [ln for ln in parts.all_lines(a) if ln["name"] == "wrist"]
+    assert len(wrists) == 2 and all(ln["curve"] is not None for ln in wrists), wrists
+    for w in a["wrists"]:
+        assert 31.0 <= w["z"] <= 31.6, w  # the touch, not the cuff
+    V, F = parts.cut(m.vertices, m.faces, a)
+    m = C.load_stl_mesh(V, F)
+    c = m.triangles_center
+    for w in a["wrists"]:
+        h = parts.hand_faces(m, a, w)
+        hip = float(m.area_faces[h & (np.abs(c[:, 0]) < 11.05)].sum())
+        assert hip < 0.5, f"side {w['side']}: {hip:.1f} mm2 of hip in the hand"
+        assert np.abs(c[h, 0]).min() > 11.5, "the hand runs more than halfway along the thumb"
+        assert c[h, 2].max() > 33.5, "the hand stops short of its cuff"
+
+
 def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
     """CI on x86 failed test_cuff_over_wrist_slips_down while ARM passed: the sleeve rim's flat
     underside lies exactly on the groove's level, so the sign of its distance to the groove fit

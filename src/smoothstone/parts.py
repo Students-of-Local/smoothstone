@@ -249,6 +249,8 @@ ON_FIT = 1e-6  # mm: a face center this close to the groove's smooth fit lies on
 GROOVE_HUG = 0.08  # mm: the curve stays at least this far on the hidden side of the groove
 GROOVE_ROLL = 10  # degrees each way the envelope looks for the farthest groove point
 HAND_REACH = 8.0  # mm from a hand's axis: the faces below a cuff line that can be the hand
+TOUCH_STEP = 0.1  # mm between the sections that follow a hand up from its wrist level to its cuff
+TOUCH_BELOW = 1.0  # mm under the wrist level where a hand's edge still follows the line where it touches the body
 
 
 def _rings(mesh, z: float) -> list[np.ndarray]:
@@ -798,6 +800,31 @@ def cut(V, F, anat: dict):
     # field, every other vertex +1, so no cut runs over the hip or a leg near the hand
     import trimesh
 
+    # where a hand touches the hip under its cuff, it ends on the line halfway between the two
+    # (hand_field), cut through the triangles like the cuff, so its edge there is a smooth curve
+    for w in anat.get("wrists", []):
+        ln = next((x for x in lines if x["name"] == "wrist" and x.get("side") == w["side"]), None)
+        if ln is None or ln.get("curve") is None:
+            continue
+        m = trimesh.Trimesh(V, F, process=False)
+        seed = _hand_seed(m, anat, w)
+        if seed is None:
+            continue
+        ax = _hand_axis(m, seed, w["z"])
+        z1 = _cuff_top(ln, w["z"])
+        inside = (V[:, 2] > w["z"] - TOUCH_BELOW) & (V[:, 2] < z1) & \
+            (np.hypot(V[:, 0] - ax[0], V[:, 1] - ax[1]) < HAND_REACH)
+        f = hand_field(m, seed, w["z"], z1, V)
+        if (inside & (f < 0)).any() and (inside & (f > 0)).any():
+            # a vertex outside the zone takes the side of a neighbor inside it, so the cut runs
+            # only along the line, not round the zone's rim
+            s = np.where(inside, f, 1.0)
+            E = np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+            for a, b in ((0, 1), (1, 0)):
+                rim = inside[E[:, a]] & ~inside[E[:, b]]
+                s[E[rim, b]] = np.sign(f[E[rim, a]]) + (f[E[rim, a]] == 0)
+            V, F = clean_cut(V, F, s, f)
+            V = V.astype(np.float32).astype(float)
     for w in anat.get("wrists", []):
         ln = next((x for x in lines if x["name"] == "wrist" and x.get("side") == w["side"]), None)
         if ln is None or ln.get("curve") is None:
@@ -817,6 +844,12 @@ def cut(V, F, anat: dict):
         V, F = cut_iso(V, F, np.where(inside, d, np.sign(V[:, 2] - ln["z"])), 0.0, snap=0.02, slope=d)
         V = V.astype(np.float32).astype(float)
     return V, F
+
+
+def clean_cut(V, F, s: np.ndarray, slope: np.ndarray):
+    from .clean import cut_iso
+
+    return cut_iso(V, F, s, 0.0, snap=0.02, slope=slope)
 
 
 def cut_masked(V, F, d: np.ndarray, inside: np.ndarray):
@@ -841,17 +874,129 @@ def _hand_seed(mesh, anat: dict, w: dict) -> np.ndarray | None:
     return max(ps, key=lambda p: p["area"])["sel"] if ps else None
 
 
+def _hand_axis(mesh, seed: np.ndarray, wz: float) -> np.ndarray:
+    """The hand's vertical axis: the area-weighted center of its loose piece under the zone the
+    line where it touches the body is cut in (TOUCH_BELOW under the wrist level), so that cut,
+    which splits faces higher up, does not move it."""
+    low = seed & (mesh.vertices[mesh.faces][:, :, 2].max(1) <= wz - TOUCH_BELOW)
+    sel = low if low.any() else seed
+    a = mesh.area_faces[sel]
+    return (mesh.triangles_center[sel, :2] * a[:, None]).sum(0) / max(float(a.sum()), 1e-12)
+
+
+def _cuff_top(ln: dict, wz: float) -> float:
+    """The highest point of a cuff line: where a hand's sections stop."""
+    return float(np.max(ln["curve"])) + TOUCH_STEP if ln.get("curve") is not None else float(ln["z"])
+
+
+def _hand_levels(mesh, ax, wz: float, z1: float) -> tuple[np.ndarray, list]:
+    """(heights, per height (hand points, other points) or None): the horizontal sections round a
+    hand from its wrist level wz up to z1, every TOUCH_STEP mm, as xy points where the section
+    crosses the mesh's edges. The hand's loop is the one nearest its axis; it is its own when it
+    closes within HAND_REACH, and None marks a height where it runs on into the body instead,
+    where the hand touches the hip or a leg. The first height is half a step under wz, where the
+    hand is still loose, and none falls on the 0.1 mm grid the lines and wrist levels lie on, so a
+    section never runs through a cut's own vertices."""
+    import scipy.sparse as sp
+    from scipy.sparse.csgraph import connected_components
+
+    V = np.asarray(mesh.vertices, float)
+    F = np.asarray(mesh.faces)
+    c = mesh.triangles_center
+    r = np.hypot(c[:, 0] - ax[0], c[:, 1] - ax[1])
+    idx = np.where(r < HAND_REACH + 1.0)[0]
+    zs = wz - TOUCH_STEP / 2 + TOUCH_STEP * np.arange(int(np.ceil(max(z1 - wz, 0.0) / TOUCH_STEP)) + 2)
+    if not len(idx):
+        return zs, [None] * len(zs)
+    sub = np.full(len(F), -1)
+    sub[idx] = np.arange(len(idx))
+    adj = mesh.face_adjacency
+    both = (sub[adj[:, 0]] >= 0) & (sub[adj[:, 1]] >= 0)
+    a, b = sub[adj[both, 0]], sub[adj[both, 1]]
+    ez = V[mesh.face_adjacency_edges[both]][:, :, 2]  # the shared edge's ends: the loop goes on only across it
+    P = V[F[idx]]
+    pz = P[:, :, 2]
+    far = r[idx] >= HAND_REACH
+    out = []
+    for z in zs:
+        pts, fid = [], []
+        for i, j in ((0, 1), (1, 2), (2, 0)):
+            za, zb = pz[:, i], pz[:, j]
+            hit = (za - z) * (zb - z) < 0
+            t = (z - za[hit]) / (zb[hit] - za[hit])
+            pts.append(P[hit, i, :2] + t[:, None] * (P[hit, j, :2] - P[hit, i, :2]))
+            fid.append(np.where(hit)[0])
+        pts, fid = np.vstack(pts), np.concatenate(fid)
+        if not len(fid):
+            out.append(None)
+            continue
+        cross = np.zeros(len(idx), bool)
+        cross[fid] = True
+        k = cross[a] & cross[b] & ((ez[:, 0] - z) * (ez[:, 1] - z) < 0)
+        _, comp = connected_components(sp.coo_matrix((np.ones(int(k.sum())), (a[k], b[k])),
+                                                     shape=(len(idx), len(idx))), directed=False)
+        d = np.hypot(pts[:, 0] - ax[0], pts[:, 1] - ax[1])
+        own = comp[fid] == comp[fid[int(np.argmin(d))]]
+        if far[fid[own]].any():
+            out.append(None)  # the loop nearest the axis runs into the body: the hand touches it here
+            continue
+        out.append((pts[own], pts[~own]))
+    return zs, out
+
+
+def hand_field(mesh, seed: np.ndarray, wz: float, z1: float, X: np.ndarray) -> np.ndarray:
+    """Per point of X: positive on a hand's side, negative on the body's, for points from the
+    wrist level wz up to the cuff's top z1. At each section where the hand is its own loop, a
+    point's value is how much nearer that loop it is than any other loop at that height; between
+    two such sections it is the two values blended by height. Where the hand touches the body the
+    sections merge, so the line there morphs from the split just under the touch to the split just
+    over it: a smooth curve through the touch, as the shape gives no crease to follow."""
+    from scipy.spatial import cKDTree
+
+    X = np.asarray(X, float)
+    out = np.full(len(X), 10.0)
+    zs, lv = _hand_levels(mesh, _hand_axis(mesh, seed, wz), wz, z1)
+    ok = np.array([i for i, x in enumerate(lv) if x is not None], int)
+    if not len(ok):
+        return out
+    zo = zs[ok]
+    j = np.clip(np.searchsorted(zo, X[:, 2]), 1, max(len(ok) - 1, 1))  # the separated sections round each point
+    i = j - 1 if len(ok) > 1 else np.zeros_like(j)
+    j = np.minimum(j, len(ok) - 1)
+    t = np.clip((X[:, 2] - zo[i]) / np.maximum(zo[j] - zo[i], 1e-9), 0.0, 1.0)
+    g = np.zeros((len(X), 2))
+    for col, kk in ((0, i), (1, j)):
+        for k in np.unique(kk):
+            sel = np.where(kk == k)[0]
+            h, o = lv[int(ok[k])]
+            dh = cKDTree(h).query(X[sel, :2])[0]
+            do = cKDTree(o).query(X[sel, :2])[0] if len(o) else np.full(len(sel), np.inf)
+            g[sel, col] = np.clip(do - dh, -10.0, 10.0)
+    return (1 - t) * g[:, 0] + t * g[:, 1]
+
+
 def _hand_mask(mesh, seed: np.ndarray, ln: dict, wz: float, fig: np.ndarray) -> np.ndarray:
     """The faces below a cuff line within HAND_REACH mm of the hand's axis, in the pieces
     (connected through such faces) that hold the seed. Below the wrist's level only the seed
-    counts: the hip and legs there are pieces of their own."""
+    counts: the hip and legs there are pieces of their own. Above it, only the faces on the hand's
+    side of hand_field: a hand whose thumb touches the hip joins it at the wrist's level, and
+    without that the hip beside the hand would be the hand up to the cuff."""
     import scipy.sparse as sp
     from scipy.sparse.csgraph import connected_components
 
     c = mesh.triangles_center
-    ax = c[seed, :2].mean(0)
-    above = mesh.vertices[mesh.faces][:, :, 2].max(1) > wz + ON_LINE
-    cand = fig & (side_of(mesh, ln) < 0) & (np.hypot(c[:, 0] - ax[0], c[:, 1] - ax[1]) < HAND_REACH) & (above | seed)
+    ax = _hand_axis(mesh, seed, wz)
+    fz = mesh.vertices[mesh.faces][:, :, 2]
+    above = fz.max(1) > wz + ON_LINE
+    near = fig & (side_of(mesh, ln) < 0) & (np.hypot(c[:, 0] - ax[0], c[:, 1] - ax[1]) < HAND_REACH)
+    zone = near & (fz.min(1) > wz - TOUCH_BELOW)
+    own = np.zeros(len(c), bool)
+    if (above & near & ~seed).any():
+        F = np.asarray(mesh.faces)
+        f = hand_field(mesh, seed, wz, _cuff_top(ln, wz), mesh.vertices)[F]
+        far = np.abs(f).argmax(1)  # as side_of: the corner farthest from the line, since a cut snaps close ones onto it
+        own = zone & (f[np.arange(len(F)), far] > 0)
+    cand = near & (own | seed)
     adj = mesh.face_adjacency
     keep = cand[adj[:, 0]] & cand[adj[:, 1]]
     n = len(mesh.faces)
