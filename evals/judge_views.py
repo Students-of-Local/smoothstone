@@ -41,7 +41,9 @@ A part the request does not name takes the rest color, so the neck, the undersid
 nape and the wrist below a cuff are correct in the rest color even where they show between painted
 parts; a light line there is that part catching the light. A fault is paint on the wrong side of
 where the shape changes: a strip of one color on the other part's surface, a step in the edge, a
-stray patch.
+stray patch. List in faults only what you judge to be wrong. Something you looked at and judge
+correct (such as the neck showing as a light line above the collar) is not a fault: leave it out of
+faults, or put it in an optional "notes" list of strings.
 Judge only what you see in the pictures. Name each fault with the picture and the panel it is in,
 starting with the picture's name (such as "boundaries row 2, column 3" or "views front"), and what
 is wrong in a few words.
