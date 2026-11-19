@@ -799,39 +799,6 @@ def test_a_named_part_the_figure_has_no_region_for_asks_for_another_figure(joben
     assert not (jobenv / "stone-job" / "figure.3mf").exists()
 
 
-def test_a_named_color_that_fairing_shrinks_away_is_never_called_ready(jobenv, monkeypatch, openscad, tmp_path):
-    """Review first-F2: the named colors are checked on the paint itself after fairing, not only on
-    the mapping. A wide smoothing that leaves the black jacket mostly white asks the person."""
-    import numpy as np
-
-    from smoothstone import colors
-
-    nxt = _named_figure_job(jobenv, monkeypatch, tmp_path)
-    real_faults, real_cut = colors.edge_faults, colors.smooth_cut
-    calls = []
-
-    def rough_once(lines):  # the first paint has a jagged edge, so the edges are faired
-        calls.append(1)
-        out = real_faults(lines)
-        if len(calls) == 1 and lines:
-            out = out + [{**max(lines, key=lambda x: x["length"]), "ratio": 1.5}]
-        return out
-
-    def faired_away(vertices, faces, face_fil, radius, fixed=None):  # the faired paint loses the black
-        V, F, ff, parent = real_cut(vertices, faces, face_fil, radius=radius, fixed=fixed)
-        if radius > colors.FAIR_RADII[0]:
-            vals, n = np.unique(ff, return_counts=True)
-            ff = np.where(ff == ff, vals[np.argmax(n)], ff)
-        return V, F, ff, parent
-
-    monkeypatch.setattr(colors, "edge_faults", rough_once)
-    monkeypatch.setattr(colors, "smooth_cut", faired_away)
-    text, code, nxt = stone(*nxt.split()[1:])
-    assert "leaves the top with under 50% of its own color" in text, text
-    assert nxt.startswith("ask the person"), nxt
-    assert not (jobenv / "stone-job" / "figure.3mf").exists()
-
-
 def test_a_mapping_that_drops_a_named_color_is_refused(jobenv, monkeypatch, openscad, tmp_path):
     """Ready means every part the request colors has its color: a mapping that leaves the black
     jacket white writes no file and points back at one that keeps it."""

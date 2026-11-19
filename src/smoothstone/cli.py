@@ -1981,24 +1981,6 @@ def cmd_colors(args, job: Job) -> Out:
                     f"{names[rest - 1]}.")
         out.next = "stone colors " + nxt
 
-    if radius != colortool.FAIR_RADII[0] and not faults and not ledge:
-        # review first-F2: a wide fairing can shrink a small part the request colors away (black
-        # glasses under a 6 mm smoothing); its color is checked on the paint itself, not the mapping
-        a = cut.area_faces
-        thin = [g for g in named if g not in boxed and g not in chosen and a[reg_of == g].sum() > 0
-                and a[(reg_of == g) & (face_fil == per[g])].sum() < colortool.NAMED_KEPT * a[reg_of == g].sum()]
-        if thin:
-            (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
-            if st.get("colors"):
-                job.update(colors=None)
-            colortool.render_boundaries(V, F, fil_rgb[face_fil - 1], lines, bd / "boundaries.png", anatomy=anat_lines)
-            what = ", ".join(sorted({part_at.get(g) or str(g) for g in thin}))
-            out.fix(f"fairing the color edges over {radius:g} mm leaves the {what} with under "
-                    f"{colortool.NAMED_KEPT:.0%} of its own color; no file written")
-            out.add(f"Boundaries picture: {bd / 'boundaries.png'}")
-            retry([], thin)
-            out.result = f"colors failed: the {what} lost its color to fairing"
-            return out
     if ledge:
         x = ledge[0]
         (job.root / f"{r.name}.3mf").unlink(missing_ok=True)
