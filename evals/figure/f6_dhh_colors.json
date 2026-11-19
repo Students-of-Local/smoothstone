@@ -1,0 +1,16 @@
+{
+ "id": "f6_dhh_colors",
+ "request": "A mini figure of DHH, 90 mm tall, with \"DHH\" on the base, all white but the jacket, pants and shoes, which are black, and the hair, which is brown.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "DHH"
+  },
+  "colors": {
+   "black": ["jacket", "pants", "shoes"],
+   "brown": ["hair"],
+   "rest": "white"
+  }
+ }
+}
