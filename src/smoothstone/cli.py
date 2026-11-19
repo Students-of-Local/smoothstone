@@ -2244,13 +2244,13 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-def _fail_key(cmd: str, out: Out) -> str | None:
-    """What makes a failure the same as the last: the command and its first FIX line. None when
-    the command did not fail."""
+def _fail_key(cmdline: str, out: Out) -> str | None:
+    """What makes a failure the same as the last: the whole command line and its first FIX line
+    (stone colors with a new mapping is a new try). None when the command did not fail."""
     first = next((ln for ln in out.lines if ln and ln.startswith("FIX: ")), None)
     if out.code == 0 or first is None:
         return None
-    return f"{cmd}: {first}"
+    return f"{cmdline}: {first}"
 
 
 def run(argv: list[str]) -> tuple[str, int]:
@@ -2281,7 +2281,7 @@ def run(argv: list[str]) -> tuple[str, int]:
         cmd = "error"
     fail = None
     if job.exists() and cmd not in ("status",) and out.raw is None:
-        fail = _fail_key(cmd, out)
+        fail = _fail_key(cmdline, out)
         prev = job.status().get("last_fail")
         if fail and fail == prev and not out.next.startswith("ask the person"):
             # the same failure twice in a row: a third try fails the same way, so stop and ask
