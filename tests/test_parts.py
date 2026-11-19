@@ -108,6 +108,151 @@ def test_ledge_check_fails_a_plane_cut_through_the_collar_and_passes_the_groove(
     assert worst < C.JAGGED
 
 
+def test_a_sleeve_sloping_in_past_its_cuff_rim_is_not_a_ledge_of_the_hand():
+    """Eval (DHH): the cuff's color edge ran in the groove under the sleeve's rim, yet the ledge
+    check failed it (0.34 mm2 at 45 degrees): above the rim the arm bends toward the body, so the
+    sleeve's own outside faces up there, and every up-facing sleeve face within 2 mm counted as
+    the sleeve's color climbing onto a ledge. The rim's underside and lip stand between them and
+    the edge; only faces the edge runs onto are a ledge. Here a hand (radius 2.5) under a sleeve
+    rim that overhangs it by 1.5 mm at z 10, with a 0.5 mm upright lip, and the sleeve's outside
+    sloping in at 45 degrees from z 10.5 to 12."""
+    m = _lathe([(0, 0), (2.5, 0), (2.5, 10), (4, 10), (4, 10.5), (2.5, 12), (2.5, 16), (0, 16)])
+    cuff = {**_line("wrist", 10.0, 2.5), "side": 1, "curve": None}
+    V, F, lab = _paint(m, cuff)
+    found = C.ledges(V, F, lab, [cuff])
+    assert not C.ledge_faults(found), found
+
+
+def test_a_neck_with_no_groove_ends_at_the_top_of_the_shoulders_slope():
+    """Eval (Elon): the neck's line was a level plane (the groove search found none), and at the
+    sides the shoulders slope on up past it to where the neck stands up, so the head's color lay
+    on 1.64 mm2 of that up-facing slope next to the edge. With no groove, the line runs along the
+    top of the slope, as a shoe's rim does. Here shoulders (radius 8, top at z 5) slope in at 45
+    degrees and round off into an upright neck (radius 4) at z 8.4 to 9.8; the neck's level is
+    halfway up the slope, at z 7."""
+    prof = [(0, 0), (8, 0), (8, 5)] + _arc((6.0, 9.828), 2.0, 225, 180) + [(4, 13), (0, 13)]
+    m = _lathe(prof)
+    anat = {"top": 0.0, "height": 13.0, "center": 0.0, "hem": None, "neck": 7.0, "wrists": [], "ankles": []}
+    neck = next(ln for ln in parts.find_lines(m, anat) if ln["name"] == "neck")
+    assert not (neck.get("groove") or {}).get("used"), neck.get("groove")
+    V, F, lab = _paint(m, neck)
+    found = C.ledges(V, F, lab, [neck])
+    assert not C.ledge_faults(found), found
+    assert neck.get("rim") and 8.4 < float(np.median(neck["curve"])) < 9.9, neck
+
+
+_HEAD = [(6.0, 12.0)] + _arc((0.0, 12.0), 6.0, 0.0, 90.0, 12)[1:]
+# a step at the front: the neck's upright wall from z 7.5 to 9.5, then the head's underside
+_FRONT = [(0, 0), (8, 0), (8, 5), (6, 7.5), (6, 9.5), (4, 10.5)] + _HEAD
+# at the back one slope from z 5 on up into the head's underside at z 10.5, over 3 mm (GROOVE_BAND)
+# above the neck's level, so no groove runs all round
+_BACK = [(0, 0), (8, 0), (8, 5), (8 - 2 * 4.5 / 5.5, 7), (5, 8 + 2 / 3), (3.5, 10.5)] + _HEAD
+_STEP = [(0, 0), (8, 0), (8, 5), (5.5, 7.5), (5.5, 8.1), (4, 10.5)] + _HEAD  # the back with a riser in it
+
+
+def _by_angle(front, back, sections=120, step=0.1):
+    """A shape turned round z whose (r, z) profile is `front` at the front (-y) and `back` over
+    the back half (within 50 degrees of +y, eased over the next 12): the two profiles have the
+    same points, blended. Each segment is cut the same number of times all round."""
+    front, back = np.asarray(front, float), np.asarray(back, float)
+    n = [max(1, int(np.ceil(max(np.linalg.norm(f1 - f0), np.linalg.norm(b1 - b0)) / step)))
+         for f0, f1, b0, b1 in zip(front[:-1], front[1:], back[:-1], back[1:])]
+    rings = []
+    phi = np.linspace(0, 2 * np.pi, sections, endpoint=False)
+    for a in phi:
+        off = abs((np.degrees(a) - 90 + 180) % 360 - 180)
+        w = float(np.clip((62 - off) / 12, 0, 1))
+        w = w * w * (3 - 2 * w)
+        prof = front * (1 - w) + back * w
+        pts = [prof[0]]
+        for k in range(len(prof) - 1):
+            pts += [prof[k] + (prof[k + 1] - prof[k]) * j / n[k] for j in range(1, n[k] + 1)]
+        rings.append(np.array(pts))
+    P = np.stack(rings)  # sections x points x (r, z); the first and last points lie on the axis
+    m = P.shape[1]
+    V = [[0.0, 0.0, P[0, 0, 1]]]
+    for i in range(1, m - 1):
+        for j, a in enumerate(phi):
+            V.append([P[j, i, 0] * np.cos(a), P[j, i, 0] * np.sin(a), P[j, i, 1]])
+    V.append([0.0, 0.0, P[0, -1, 1]])
+    top = len(V) - 1
+
+    def vid(i, j):
+        return 1 + (i - 1) * sections + j % sections
+
+    F = []
+    for j in range(sections):
+        F.append([0, vid(1, j + 1), vid(1, j)])
+        F.append([top, vid(m - 2, j), vid(m - 2, j + 1)])
+        for i in range(1, m - 2):
+            F.append([vid(i, j), vid(i, j + 1), vid(i + 1, j + 1)])
+            F.append([vid(i, j), vid(i + 1, j + 1), vid(i + 1, j)])
+    mesh = C.load_stl_mesh(np.array(V), np.array(F))
+    if mesh.volume < 0:
+        mesh = C.load_stl_mesh(np.array(V), np.array(F)[:, ::-1])
+    return mesh
+
+
+_NECK_ANAT = {"top": 0.0, "height": 18.0, "center": 0.0, "hem": None, "neck": 7.0, "wrists": [], "ankles": []}
+
+
+def _back_bins():
+    """The neck's 10 degree bins (first degree from -180) whose middle is within 50 degrees of +y."""
+    return [b for b in range(-180, 180, 10) if abs((b + 5 - 90 + 180) % 360 - 180) < 50]
+
+
+# the neck's upright wall from z 7.5 straight into the chin's long underside at z 9.5, with no taper
+_JAW = [(0, 0), (8, 0), (8, 5), (6, 7.5), (6, 9.5), (9, 9.9)] + _HEAD
+
+
+def test_a_neck_wall_that_rises_straight_into_the_jaw_is_a_step():
+    """Review (PR 33, second-F5): a bin was taken for a slope running on into the head when no
+    up-facing face lay between the slope's top and the first down-facing face over it, so an
+    upright neck wall rising straight into the jaw's underside, with nothing facing up between,
+    was skipped by the ledge check and its line left as a plane through the slope. A wall of any
+    real height between the slope's top and the head's underside is a step."""
+    m = _by_angle(_JAW, _BACK)
+    assert m.is_watertight
+    neck = next(ln for ln in parts.find_lines(m, _NECK_ANAT) if ln["name"] == "neck")
+    skipped = set(neck.get("nostep") or [])
+    front = {b for b in range(-180, 180, 10) if abs((b + 5 + 90 + 180) % 360 - 180) < 50}
+    assert not skipped & front, sorted(skipped & front)
+    assert set(_back_bins()) <= skipped, (sorted(skipped), _back_bins())
+
+
+def test_a_neck_that_slopes_on_into_the_head_with_no_step_is_skipped_only_where_it_does():
+    """Eval (Elon): behind the ears the shoulders' slope runs on up into the skull's underside
+    with no step for the neck's line to sit on. The rim walk took the line up to the skull there
+    and widened that rise, so in the bins beside it, where the neck does step, the edge rode up
+    onto the slope over the step (0.40 mm2 at 135 degrees). Where the walk runs all the way to the
+    head's overhang the line stays level and the ledge check skips that bin, and says so; where
+    there is a step the check holds. Here the front steps (slope to z 7.5, an upright wall to
+    z 9.5) and the back slopes from z 5 straight into the head's underside at z 10.5; the neck's
+    level is z 7."""
+    m = _by_angle(_FRONT, _BACK)
+    assert m.is_watertight
+    neck = next(ln for ln in parts.find_lines(m, _NECK_ANAT) if ln["name"] == "neck")
+    V, F, lab = _paint(m, neck)
+    found = C.ledges(V, F, lab, [neck])
+    assert not C.ledge_faults(found), found
+    back = _back_bins()
+    assert set(back) <= set(neck.get("nostep") or []), (neck.get("nostep"), back)
+    assert not set(neck.get("nostep") or []) & {b for b in range(-180, 180, 10) if (b + 5) % 360 > 200}
+
+    # the same neck with a riser in the back slope: a step, so no bin is skipped there, and a
+    # line kept level across the back (as it is where there is no step) rides onto the slope
+    m = _by_angle(_FRONT, _STEP)
+    neck = next(ln for ln in parts.find_lines(m, _NECK_ANAT) if ln["name"] == "neck")
+    assert not set(neck.get("nostep") or []) & set(back), neck.get("nostep")
+    deg = np.arange(-180, 180)
+    cv = np.asarray(neck["curve"], float)
+    cv[abs((deg + 0.5 - 90 + 180) % 360 - 180) < 50] = 7.0
+    level = {**neck, "curve": [float(v) for v in cv]}
+    V, F, lab = _paint(m, level)
+    bad = C.ledge_faults(C.ledges(V, F, lab, [level]))
+    assert bad and abs((bad[0]["angle"] - 90 + 180) % 360 - 180) < 60, bad
+
+
 def test_a_ledge_above_a_wall_of_its_own_color_is_not_the_edge_climbing_onto_it():
     """r3 (Donovan, 2026-11-18, black shoes under blue pants): a wrinkle of the trousers 1 mm over
     the shoe faces up and is blue, with blue trouser wall between it and the shoe's edge. The ledge
@@ -270,11 +415,19 @@ def test_mark_grooves_exempts_edges_in_a_groove_from_wobble():
 # SPEC3 A: the anatomy of a figure from its shape
 
 
-def block_figure(shoes=False, flare=False):
+GRAIN = 0.03
+
+
+def block_figure(shoes=False, flare=False, cap=None, lock=None, ears=False):
     """A disc plinth (top at z 8), two leg boxes, a box torso, arms ending in two loose hand balls,
     a neck and a ball head: hem at the legs' top (28), wrists where the hands meet the arms (34),
     the neck between the torso and the head (48 to 52). shoes=True: each leg stands in a shoe
-    (8 x 9, up to z 11) wider than the leg, as the Jensen sculpt's are."""
+    (8 x 9, up to z 11) wider than the leg, as the Jensen sculpt's are. On the head (a finer ball
+    then): cap, a function of the angle round the head giving the height the ridged hair comes
+    down to (24 strands 0.15 mm high); lock, a function of the angle giving the height a smooth
+    lock ends at, standing 1 mm proud of the skin with its underside sloping in over 3 mm
+    (over the head's top where there is none); ears=True, a flat ear on each side, 105 degrees from the face (a disc 3.6 mm
+    across, top at 56.8)."""
     def box(ext, at):
         b = trimesh.creation.box(ext)
         b.apply_translation(at)
@@ -299,9 +452,30 @@ def block_figure(shoes=False, flare=False):
         hands.append(h)
     neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
     neck.apply_translation([0, 0, 50])
-    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head = trimesh.creation.icosphere(subdivisions=5 if cap or lock else 4, radius=7)
+    v = np.array(head.vertices)
+    th, z = np.arctan2(v[:, 1], v[:, 0]), v[:, 2] + 58.5
+    out = np.zeros(len(v))
+    if cap is not None:
+        out += 0.15 * np.clip((z - cap(th)) / 0.3, 0.0, 1.0) * np.sin(24 * th)
+    if lock is not None:
+        zb = lock(th)
+        u = np.clip(np.nan_to_num((z - zb) / 3.0, nan=0.0), 0.0, 1.0)
+        t = np.clip((65.0 - z) / 3.0, 0.0, 1.0)  # into the crown again at the top
+        out += 1.0 * u * u * (3 - 2 * u) * t * t * (3 - 2 * t)
+    if cap is not None or lock is not None:  # a sculpt's skin is never smooth: GRAIN mm of grain
+        out += np.random.default_rng(7).normal(0.0, GRAIN, len(v))
+    head = trimesh.Trimesh(v * ((7.0 + out) / 7.0)[:, None], head.faces)
     head.apply_translation([0, 0, 58.5])
-    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    flaps = []
+    if ears:
+        for x in (-6.3, 6.3):
+            e = trimesh.creation.cylinder(radius=1.8, height=1.0, sections=48)
+            e.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0]))
+            e.apply_transform(trimesh.transformations.rotation_matrix(np.radians(15), [0, 0, 1]))
+            e.apply_translation([x * np.cos(np.radians(15)), abs(x) * np.sin(np.radians(15)), 55.0])
+            flaps.append(e)
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head, *flaps], engine="manifold")
     # fine faces, as a sculpted figure has, so lines and pieces are resolved
     v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
     return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
@@ -634,6 +808,58 @@ def test_a_cuff_cut_masked_to_the_hand_still_cuts_every_face_it_crosses():
 
 
 
+def thumb_figure():
+    """The block figure with each hand a capsule (radius 1.6, z 26.9 to 35.1) hanging 1.5 mm clear
+    of the torso's side under a sleeve (5 x 5) that overhangs it, its cuff groove at z 34, and a
+    thumb (1 x 1 mm) bridging the gap to the hip at z 31.5 to 32.5: the hand is loose only under
+    the thumb, so its wrist level is 31.4, under the cuff."""
+    def box(ext, at):
+        b = trimesh.creation.box(ext)
+        b.apply_translation(at)
+        return b
+
+    disc = trimesh.creation.cylinder(radius=20, height=8, sections=96)
+    disc.apply_translation([0, 0, 4])
+    legs = [box([6, 6, 20.5], [x, 0, 18.25]) for x in (-5, 5)]
+    torso = box([22, 12, 20], [0, 0, 38])
+    arms = [box([5, 5, 12], [x, 0, 40]) for x in (-13.5, 13.5)]
+    hands = []
+    for s in (-1, 1):
+        h = trimesh.creation.capsule(height=7.0, radius=1.6, count=[48, 48])
+        h.apply_translation([s * 14.1, 0, 31.0])
+        hands += [h, box([2.1, 1.0, 1.0], [s * 11.95, 0, 32.0])]
+    neck = trimesh.creation.cylinder(radius=3, height=5, sections=64)
+    neck.apply_translation([0, 0, 50])
+    head = trimesh.creation.icosphere(subdivisions=4, radius=7)
+    head.apply_translation([0, 0, 58.5])
+    m = trimesh.boolean.union([disc, *legs, torso, *arms, *hands, neck, head], engine="manifold")
+    v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=1.0)
+    return C.load_stl_mesh(np.asarray(v, float), np.asarray(f))
+
+
+def test_a_hand_whose_thumb_touches_the_hip_under_its_cuff_ends_between_them():
+    """Eval (Elon): a white band ran across the hips at the hem. The thumb's tip touches the hip
+    there, so the hand is loose only under that touch and its wrist level is the touch, under the
+    cuff. Every face from that level up to the cuff within HAND_REACH of the hand's axis counted as
+    the hand, the hip's side and front too, so a strip of hip took the hand's color. The hand must
+    end on the line halfway between it and the hip, and still reach its cuff."""
+    m = thumb_figure()
+    a = parts.anatomy(m, 8.0)
+    wrists = [ln for ln in parts.all_lines(a) if ln["name"] == "wrist"]
+    assert len(wrists) == 2 and all(ln["curve"] is not None for ln in wrists), wrists
+    for w in a["wrists"]:
+        assert 31.0 <= w["z"] <= 31.6, w  # the touch, not the cuff
+    V, F = parts.cut(m.vertices, m.faces, a)
+    m = C.load_stl_mesh(V, F)
+    c = m.triangles_center
+    for w in a["wrists"]:
+        h = parts.hand_faces(m, a, w)
+        hip = float(m.area_faces[h & (np.abs(c[:, 0]) < 11.05)].sum())
+        assert hip < 0.5, f"side {w['side']}: {hip:.1f} mm2 of hip in the hand"
+        assert np.abs(c[h, 0]).min() > 11.5, "the hand runs more than halfway along the thumb"
+        assert c[h, 2].max() > 33.5, "the hand stops short of its cuff"
+
+
 def test_the_side_of_a_flat_rim_groove_does_not_ride_on_rounding():
     """CI on x86 failed test_cuff_over_wrist_slips_down while ARM passed: the sleeve rim's flat
     underside lies exactly on the groove's level, so the sign of its distance to the groove fit
@@ -732,3 +958,171 @@ def test_a_shoe_rim_line_is_its_own_course_and_its_edge_follows_the_shape(monkey
         C.mark_grooves(edge, a["lines"])
         assert edge[0].get("groove") == "ankle"
         assert C.edge_faults(edge) == []
+
+
+def _hair_true(th):
+    """The fixture's hairline round the head's axis: high at the front (-y), low at the back, and
+    lower again over the ears (+-x)."""
+    return 59.5 - 1.5 * np.sin(th) - 0.6 * np.cos(2 * th)
+
+
+def _hair_picture(c):
+    """The fake picture's colors at points c on the block figure: brown hair above _hair_true with
+    the bleed a picture has under it (an ear blotch on each side joined to the hair by a thin
+    streak, and a loose blotch on the forehead), skin on the rest of the head and the hands, a
+    black jacket and blue jeans."""
+    th = np.arctan2(c[:, 1], c[:, 0])
+    z = c[:, 2]
+    zl = _hair_true(th)
+    out = np.where((z < 28.0)[:, None], [[40, 50, 120]], [[25, 25, 28]]).astype(float)
+    skin = (z > 50.0) | ((np.abs(c[:, 0]) > 12.0) & (z < 36.0))
+    out[skin] = [225, 180, 150]
+    head = z > 50.0
+    hair = head & (z > zl)
+    for t in (0.0, np.pi):  # the ear blotches and their streaks
+        d = np.abs(np.angle(np.exp(1j * (th - t))))
+        zc = _hair_true(np.array([t]))[0] - 3.0
+        hair |= head & (np.hypot(d * 7.0, z - zc) < 1.5)
+        hair |= head & (d * 7.0 < 0.5) & (z > zc) & (z <= zl)
+    d = np.abs(np.angle(np.exp(1j * (th + np.pi / 2))))
+    hair |= head & (np.hypot(d * 7.0, z - (_hair_true(np.array([-np.pi / 2]))[0] - 2.5)) < 1.0)
+    out[hair] = [95, 60, 30]
+    return out, hair, head & (z < zl - 0.6) & hair
+
+
+def test_the_hair_ends_on_a_smooth_line_fitted_to_the_picture_and_leaves_its_blotches(monkeypatch, tmp_path):
+    """Eval (Elon, DHH): the hair's edge came straight from the picture, so it was ragged (wobble
+    0.40 and 0.43 mm, over 0.15) and every blotch the picture left on the ears and the face that
+    touched the hair was painted brown. The hair must end on one smooth line round the head,
+    fitted to the picture's edge with the blotches and streaks under it left out, and nothing under
+    that line is hair."""
+    from smoothstone import paint
+
+    m = block_figure()
+    top_z, H = 65.5, 65.5 - 8.0
+
+    def fake(sub, front, back, atlas):
+        # undo the scaling to unit height: the figure's top vertex is the head's top at (0, 0, 65.5)
+        V = np.asarray(sub.vertices, float)
+        t = V[V[:, 2].argmax()]
+        c = (sub.triangles_center - t) * H + np.array([0.0, 0.0, top_z])
+        return _hair_picture(c)[0]
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    res = C.find_regions(m, "figure", {"base": "round", "name": ""}, tmp_path / "front.png", None,
+                         tmp_path / "atlas.png")
+    mesh, num, info = res["mesh"], res["num"], res["regions"]
+    hair_n = [d["n"] for d in info if d["part"] == "hair"]
+    assert len(hair_n) == 1, [(d["n"], d["part"]) for d in info]
+    hair = num == hair_n[0]
+    c = mesh.triangles_center
+    _, _, blotch = _hair_picture(c)
+    assert blotch.any()
+    assert not (hair & blotch).any(), f"{int((hair & blotch).sum())} blotch faces are hair"
+    # the hair's edge: corners shared by hair and other head faces lie on the true line
+    head = c[:, 2] > 50.0
+    adj = mesh.face_adjacency
+    cross = (hair[adj[:, 0]] != hair[adj[:, 1]]) & head[adj[:, 0]] & head[adj[:, 1]]
+    P = mesh.vertices[np.unique(mesh.face_adjacency_edges[cross])]
+    off = np.abs(P[:, 2] - _hair_true(np.arctan2(P[:, 1], P[:, 0])))
+    phi = np.degrees(np.abs(np.angle(np.exp(1j * (np.arctan2(P[:, 1], P[:, 0]) + np.pi / 2)))))
+    # the picture sets the line only at the face (Donovan: the photo sets forehead and temples);
+    # round the rest it goes over the ears and down to the nape
+    face = phi < parts.HAIR_FRONT
+    assert face.any()
+    assert off[face].max() < 0.4, f"the hair's edge strays {off[face].max():.2f} mm from the picture's line at the face"
+
+
+def test_a_beard_the_look_names_keeps_the_hair_color_under_the_hairline(monkeypatch, tmp_path):
+    """Review (PR 33, first-F1): under the hairline every face of the hair's picture color took
+    the head's other color, so a brown goatee under brown hair was painted skin and a request for
+    a beard could not be honored. When the figure step's look gives the figure a beard, the
+    hair's color holds under the line except next to it; with no beard in the look (Elon, DHH)
+    the hair-colored shading on the jaw is still skin."""
+    from smoothstone import paint
+
+    assert parts.has_beard("He has short brown hair and a full brown beard.")
+    assert parts.has_beard("a goatee and a moustache")
+    assert not parts.has_beard("This person has short hair, has no facial hair, and wears glasses.")
+    assert not parts.has_beard("clean-shaven, with light stubble")
+    assert parts.has_beard("a bearded man with brown hair")  # review r2 second-S2
+    assert parts.has_beard("He wears no glasses and has a full brown beard.")  # review r2 first-F1
+    assert not parts.has_beard("a man without a beard")
+    m = block_figure()
+    top_z, H = 65.5, 65.5 - 8.0
+
+    def fake(sub, front, back, atlas):
+        V = np.asarray(sub.vertices, float)
+        t = V[V[:, 2].argmax()]
+        c = (sub.triangles_center - t) * H + np.array([0.0, 0.0, top_z])
+        out = np.where((c[:, 2] < 28.0)[:, None], [[40, 50, 120]], [[25, 25, 28]]).astype(float)
+        out[(c[:, 2] > 50.0) | ((np.abs(c[:, 0]) > 12.0) & (c[:, 2] < 36.0))] = [225, 180, 150]
+        th = np.arctan2(c[:, 1], c[:, 0])
+        out[(c[:, 2] > 50.0) & (c[:, 2] > 59.0)] = [95, 60, 30]
+        chin = (c[:, 2] > 52.5) & (c[:, 2] < 56.0) & (np.abs(np.angle(np.exp(1j * (th + np.pi / 2)))) < 1.3)
+        out[chin] = [95, 60, 30]
+        return out
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    for look, kept in (("He has short brown hair and a short brown beard.", True), ("", False)):
+        res = C.find_regions(m, "figure", {"base": "round", "name": ""}, tmp_path / "front.png", None,
+                             tmp_path / "atlas.png", look=look)
+        mesh, num = res["mesh"], res["num"]
+        c = mesh.triangles_center
+        th = np.arctan2(c[:, 1], c[:, 0])
+        front = np.abs(np.angle(np.exp(1j * (th + np.pi / 2))))
+        chin = (c[:, 2] > 53.3) & (c[:, 2] < 55.5) & (front < 1.0)
+        cheek = (c[:, 2] > 56.6) & (c[:, 2] < 57.6) & (front < 0.6)
+        assert chin.any() and cheek.any()
+        apart = np.isin(num[chin], np.unique(num[cheek]), invert=True).mean()
+        if kept:
+            assert apart > 0.9, f"only {apart:.0%} of the beard keeps its own color"
+        else:
+            assert apart < 0.1, f"{apart:.0%} of the jaw's hair-colored shading is not skin"
+
+
+def test_the_hair_is_level_across_the_back_and_drops_to_it_just_behind_the_ears(monkeypatch, tmp_path):
+    """Eval (Elon, DHH, 8 angles): the hairline held over the ears until 5 degrees past them, then
+    blended down to the nape over 30 more, and the fit smoothed that into a V: on DHH it sat 2.6 mm
+    over the nape at the back's middle and left a bare white wedge behind each ear. Across the back
+    the hair must come down level to just over where the head meets the neck."""
+    from smoothstone import paint
+
+    m = block_figure(ears=True)
+    top_z, H = 65.5, 65.5 - 8.0
+
+    def fake(sub, front, back, atlas):
+        V = np.asarray(sub.vertices, float)
+        t = V[V[:, 2].argmax()]
+        c = (sub.triangles_center - t) * H + np.array([0.0, 0.0, top_z])
+        out = np.where((c[:, 2] < 28.0)[:, None], [[40, 50, 120]], [[25, 25, 28]]).astype(float)
+        out[(c[:, 2] > 50.0) | ((np.abs(c[:, 0]) > 12.0) & (c[:, 2] < 36.0))] = [225, 180, 150]
+        th = np.arctan2(c[:, 1], c[:, 0])  # the picture's hair: over the brows at the front, low behind
+        zl = 58.5 + 2.0 * np.clip(-np.sin(th), 0, None) - 4.5 * np.clip(np.sin(th), 0, None)
+        out[(c[:, 2] > 50.0) & (c[:, 2] > zl)] = [95, 60, 30]
+        return out
+
+    monkeypatch.setattr(paint, "face_colors", fake)
+    (tmp_path / "front.png").write_bytes(b"picture")
+    res = C.find_regions(m, "figure", {"base": "round", "name": ""}, tmp_path / "front.png", None,
+                         tmp_path / "atlas.png")
+    mesh, num, info = res["mesh"], res["num"], res["regions"]
+    hair_n = [d["n"] for d in info if d["part"] == "hair"]
+    assert len(hair_n) == 1, [(d["n"], d["part"]) for d in info]
+    hair = num == hair_n[0]
+    c = mesh.triangles_center
+    head = c[:, 2] > 52.0
+    adj = mesh.face_adjacency
+    cross = (hair[adj[:, 0]] != hair[adj[:, 1]]) & head[adj[:, 0]] & head[adj[:, 1]]
+    P = mesh.vertices[np.unique(mesh.face_adjacency_edges[cross])]
+    phi = np.degrees(np.abs(np.angle(np.exp(1j * (np.arctan2(P[:, 1], P[:, 0]) + np.pi / 2)))))
+    # the ball head (radius 7 at z 58.5) meets the neck (radius 3) at 58.5 - sqrt(40): the nape
+    level = 58.5 - np.sqrt(40.0) + parts.HAIR_BACK
+    back = P[phi >= 170, 2]
+    assert len(back), "no hair edge at the back"
+    assert np.median(back) < level + 0.8, f"the hair's edge at the back is {np.median(back) - level:.2f} mm over the nape's level"
+    # the ears stay out of the hair
+    ears = head & (np.abs(c[:, 0]) > 6.6) & (np.abs(c[:, 2] - 55.0) < 1.6)
+    assert ears.any() and not (hair & ears).any(), f"{int((hair & ears).sum())} ear faces are hair"
