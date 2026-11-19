@@ -1632,8 +1632,11 @@ def cut_hair(V, F, line: dict):
     return np.asarray(V2, np.float32).astype(float), F2, par
 
 
-_BEARD = re.compile(r"\b(beard|goatee|mo?ustache|sideburns)\b")
-_SHAVEN = re.compile(r"\b(no|without|not?)\b[^.,;]*\b(facial hair|beard|goatee|mo?ustache)\b|clean[- ]shaven")
+_BEARD = re.compile(r"\b(beard(ed)?|goatee|mo?ustached?|sideburns|whiskers)\b")
+# a denial right before the facial hair word ("no facial hair", "without a beard"), not one of
+# something else earlier in the clause ("wears no glasses and has a full brown beard")
+_SHAVEN = re.compile(r"\b(no|without|not)\s+(a\s+|any\s+)?([a-z-]+\s+){0,2}?(facial hair|beard|goatee|mo?ustache)\b"
+                     r"|clean[- ]shaven|beardless")
 
 
 def has_beard(look: str) -> bool:
@@ -1891,11 +1894,6 @@ def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, ana
             d["part"] = "hair"
             hair = d
             break
-    if hair is not None and hair["rgb"] is not None and has_beard(look):
-        for d in head:  # the beard: the hair's own color lower on the head
-            if d["part"] == "other" and d["rgb"] is not None and \
-                    np.linalg.norm(_lab(d["rgb"])[0] - _lab(hair["rgb"])[0]) < 10:
-                d["part"] = "hair"
     neck = anat.get("neck")
     for d in head:
         if d["part"] != "other":
@@ -1910,6 +1908,11 @@ def name_parts(mesh, region: np.ndarray, info: list[dict], zone: np.ndarray, ana
         front = float(mesh.triangles_center[sel, 1].mean()) < float(mesh.triangles_center[zone == HEAD, 1].mean())
         if d["share"] < GLASSES_SHARE and front and h0 + 0.25 * (zt - h0) < mid < h0 + 0.65 * (zt - h0):
             d["part"] = "glasses"
+    if hair is not None and hair["rgb"] is not None and has_beard(look):
+        for d in head:  # after the glasses: the beard: the hair's own color lower on the head
+            if d["part"] == "other" and d["rgb"] is not None and \
+                    np.linalg.norm(_lab(d["rgb"])[0] - _lab(hair["rgb"])[0]) < 10:
+                d["part"] = "hair"
     for d in info:
         if d["part"] == "top" and "top" in words:
             d["part"] = words["top"]

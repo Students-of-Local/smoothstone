@@ -1046,6 +1046,9 @@ def test_a_beard_the_look_names_keeps_the_hair_color_under_the_hairline(monkeypa
     assert parts.has_beard("a goatee and a moustache")
     assert not parts.has_beard("This person has short hair, has no facial hair, and wears glasses.")
     assert not parts.has_beard("clean-shaven, with light stubble")
+    assert parts.has_beard("a bearded man with brown hair")  # review r2 second-S2
+    assert parts.has_beard("He wears no glasses and has a full brown beard.")  # review r2 first-F1
+    assert not parts.has_beard("a man without a beard")
     m = block_figure()
     top_z, H = 65.5, 65.5 - 8.0
 
