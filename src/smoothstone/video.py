@@ -1,8 +1,9 @@
 """stone video: a vertical clip of a finished painted job, in the Omarchy look.
 
 The clip is built from the job and the run log that made it, nothing else:
-- the terminal shows the request and every command the model sent, exactly as sent, with lines
-  copied from what stone printed back (a long line is wrapped, or cut with a closing "…");
+- the terminal shows the request and every command the model sent, exactly as sent but for a path,
+  which is cut to …/<its last name>, with lines copied from what stone printed back (a long line
+  is wrapped, or cut with a closing "…");
 - the photos, the design and the turning figure come from the job's own files; the figure turns
   from the painted 3MF itself (Blender, one material per filament), so its colors are the print's;
 - the sound is made here from sine partials (nothing to license), set to -16 LUFS.
@@ -18,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -113,7 +115,18 @@ PRINT_CHECKS = ("watertight", "slicer", "bodies", "min_wall", "overhang")
 
 
 def has_path(line: str) -> bool:
-    return bool(re.search(r"(^|\s)(~|/)[\w.-]+/", line))
+    """A folder path anywhere in the line: after a space, a quote, a bracket or an = sign."""
+    return bool(re.search(r"(?<![\w])(~|/)[\w.-]+/", line))
+
+
+# an absolute or home path in a command: after neither a word, a URL's colon or slash, nor a cut path's …
+PATH = re.compile(r"(?<![\w~.:/…-])(?:~/|/)[^\s'\"()]+")
+
+
+def redact(cmd: str) -> str:
+    """The command as the clip shows it: each absolute or home path cut to …/<its last name>, so no
+    home folder or user name reaches a public post."""
+    return PATH.sub(lambda m: "…/" + m.group(0).rstrip("/").rsplit("/", 1)[-1], cmd)
 
 
 def commands(log: dict) -> list[tuple[str, list[str]]]:
@@ -125,6 +138,22 @@ def commands(log: dict) -> list[tuple[str, list[str]]]:
             if cmd:
                 out.append((cmd, (c.get("result") or "").splitlines()))
     return out
+
+
+def subcommand(cmd: str) -> tuple[str, list[str]]:
+    """(the stone subcommand, its words) as stone itself reads the command: a synonym like paint is
+    colors, a path after build is dropped, and --job may come first."""
+    from .cli import _tidy
+
+    try:
+        argv = shlex.split(cmd)
+    except ValueError:
+        argv = cmd.split()
+    if argv[:1] == ["stone"]:
+        argv = argv[1:]
+    argv = _tidy(argv)
+    i = next((k for k, a in enumerate(argv) if not a.startswith("-") and (k == 0 or argv[k - 1] != "--job")), None)
+    return ("", argv) if i is None else (argv[i], argv[i + 1:])
 
 
 def excerpt(lines: list[str], most: int = 4) -> list[str]:
@@ -163,21 +192,24 @@ def make_plan(job_root: Path, log: dict) -> Plan:
         date = datetime.fromisoformat(log["started"]).strftime("%A %-d %b")
     except (KeyError, ValueError):
         date = ""
-    i_find = next((i for i, (c, _) in enumerate(cmds) if c.startswith("stone find")), None)
-    i_build = max((i for i, (c, r) in enumerate(cmds) if c == "stone build" and any(ln.startswith("Size:") for ln in r)),
+    subs = [subcommand(c) for c, _ in cmds]
+    i_find = max((i for i, (sub, _) in enumerate(subs) if sub == "find"), default=None)
+    i_build = max((i for i, (c, r) in enumerate(cmds) if subs[i][0] == "build" and any(ln.startswith("Size:") for ln in r)),
                   default=None)
-    i_colors = max((i for i, (c, r) in enumerate(cmds) if c.startswith("stone colors")
+    i_colors = max((i for i, (c, r) in enumerate(cmds) if subs[i][0] == "colors"
                     and any(ln.startswith("NEXT: none") for ln in r)), default=None)
     if i_build is None or i_colors is None:
         raise VideoProblem("the run log has no passing build and colors: the clip shows a finished part")
     cut = i_find + 1 if i_find is not None and i_find < i_build else i_build
-    ws1 = [(c, excerpt(r)) for c, r in cmds[:cut]]
+    ws1 = [(redact(c), excerpt(r)) for c, r in cmds[:cut]]
     find = None
     photos = sorted((job_root / "image" / "found").glob("photo_*.jpg"))
     if i_find is not None and photos:
         c, r = cmds[i_find]
-        find = (c, [ln for ln in r if ln.startswith(("photo_", "NEXT:")) and not has_path(ln)])
+        drawn = tuple(f"{p.name}:" for p in photos[:3])  # the credits of the photos on screen, no others
+        find = (redact(c), [ln for ln in r if ln.startswith(drawn + ("NEXT:",)) and not has_path(ln)])
     build_c, build_r = cmds[i_build]
+    build_c = redact(build_c)
     style = None
     latest = job_root / "image" / "figure" / "latest.txt"
     if latest.is_file():
@@ -187,8 +219,9 @@ def make_plan(job_root: Path, log: dict) -> Plan:
     checks_b = [ln for ln in build_r if ln.startswith("Size:")] + [
         ln for ln in build_r if ln.startswith("PASS ") and ln.split()[1].rstrip(":") in PRINT_CHECKS]
     col_c, col_r = cmds[i_colors]
+    col_c = redact(col_c)
     checks_c = [ln for ln in col_r if (ln.startswith(("filament ", "PASS ", "NEXT:"))) and not has_path(ln)]
-    asked = [a.split("=", 1) for a in col_c.split()[2:] if "=" in a]
+    asked = [a.split("=", 1) for a in subs[i_colors][1] if "=" in a and not a.startswith("-")]
     paint = ", ".join(("the rest" if k == "rest" else k) + " " + v for k, v in asked)
     return Plan(request, model, date, ws1, find, design, [(build_c, checks_b), (col_c, checks_c)], paint,
                 photos, style)
@@ -633,10 +666,11 @@ def row_faults(rows: list[dict], log: dict) -> list[str]:
     """Every command shown is one the model sent, and every line shown is a line stone printed back
     to that command, in the run log the clip claims."""
     sent = commands(log)
-    said = {c for c, _ in sent}
+    said = {c for c, _ in sent} | {redact(c) for c, _ in sent}  # the shown form maps back to the logged one
     printed: dict[str, set] = {}
     for c, r in sent:
         printed.setdefault(c, set()).update(r)
+        printed.setdefault(redact(c), set()).update(r)
     m = re.search(r"^Request: (.+)$", log.get("setup") or "", re.M)
     out = []
     for r in rows:
@@ -646,6 +680,8 @@ def row_faults(rows: list[dict], log: dict) -> list[str]:
         elif r["kind"] == "cmd":
             if r["text"] not in said:
                 out.append(f"a command the model never sent: {r['text']!r}")
+            if redact(r["text"]) != r["text"]:
+                out.append(f"a command shown with a path in it: {r['text']!r}")
         elif r["text"] not in printed.get(r["cmd"], set()):
             out.append(f"a line stone never printed for {r['cmd']!r}: {r['text']!r}")
     return out
@@ -763,21 +799,34 @@ def ffmpeg() -> str:
     return f
 
 
+def ffprobe() -> str:
+    f = shutil.which("ffprobe")
+    if not f:
+        raise VideoProblem("ffprobe not found")
+    return f
+
+
 def encode(frames: list, wav: Path, out: Path, total: float):
     """H.264 yuv420p at 30 fps with faststart, AAC 48 kHz at -16 LUFS (two-pass loudnorm)."""
     silent = out.with_suffix(".silent.mp4")
     p = subprocess.Popen([ffmpeg(), "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
                           "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "18",
                           "-preset", "slow", "-pix_fmt", "yuv420p", str(silent)], stdin=subprocess.PIPE)
-    for im in frames:
-        p.stdin.write(im.tobytes())
-    p.stdin.close()
+    try:
+        for im in frames:
+            p.stdin.write(im.tobytes())
+        p.stdin.close()
+    except OSError:  # the encoder died mid-write (a broken pipe)
+        p.kill()
     if p.wait() != 0:
         raise VideoProblem("ffmpeg could not encode the frames")
     probe = subprocess.run([ffmpeg(), "-hide_banner", "-i", str(wav), "-af",
                             f"loudnorm=I={LUFS}:TP={TRUE_PEAK - 0.5}:LRA=11:print_format=json", "-f", "null", "-"],
                            capture_output=True, text=True).stderr
-    m = json.loads(probe[probe.rindex("{"):probe.rindex("}") + 1])
+    try:
+        m = json.loads(probe[probe.rindex("{"):probe.rindex("}") + 1])
+    except ValueError:
+        raise VideoProblem(f"ffmpeg could not measure the sound: {probe[-300:]}") from None
     af = (f"loudnorm=I={LUFS}:TP={TRUE_PEAK - 0.5}:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}"
           f":measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}"
           f":linear=true,aresample=48000,afade=t=in:d=0.05,afade=t=out:st={total - 0.5:.3f}:d=0.5")
@@ -809,7 +858,7 @@ def atoms(path: Path) -> list[str]:
 def check_clip(mp4: Path) -> tuple[dict, list[str]]:
     """(facts, faults) for the delivery spec: 1080 x 1920, 30 fps, 13 to 16 s, H.264 yuv420p,
     faststart, AAC 48 kHz, -16 LUFS within 1, true peak under -1.5 dB, quiet first and last 10 ms."""
-    pr = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json",
+    pr = json.loads(subprocess.run([ffprobe(), "-v", "error", "-show_streams", "-show_format", "-of", "json",
                                     str(mp4)], capture_output=True, text=True).stdout or "{}")
     v = next((s for s in pr.get("streams", []) if s.get("codec_type") == "video"), {})
     a = next((s for s in pr.get("streams", []) if s.get("codec_type") == "audio"), {})
@@ -858,12 +907,15 @@ def check_clip(mp4: Path) -> tuple[dict, list[str]]:
 def stills(mp4: Path, out: Path, at: dict[str, float]):
     """A contact sheet at 1 fps (sheet.png) and a full-size frame at each named time."""
     out.mkdir(parents=True, exist_ok=True)
-    subprocess.run([ffmpeg(), "-loglevel", "error", "-y", "-i", str(mp4), "-vf",
-                    "fps=1,scale=270:-1,tile=8x2:padding=6:color=0x13141c", "-frames:v", "1",
-                    str(out / "sheet.png")], check=True)
-    for name, t in at.items():
-        subprocess.run([ffmpeg(), "-loglevel", "error", "-y", "-i", str(mp4), "-ss", f"{t:.4f}", "-frames:v", "1",
-                        str(out / f"{name}.png")], check=True)
+    try:
+        subprocess.run([ffmpeg(), "-loglevel", "error", "-y", "-i", str(mp4), "-vf",
+                        "fps=1,scale=270:-1,tile=8x2:padding=6:color=0x13141c", "-frames:v", "1",
+                        str(out / "sheet.png")], check=True, capture_output=True, text=True)
+        for name, t in at.items():
+            subprocess.run([ffmpeg(), "-loglevel", "error", "-y", "-i", str(mp4), "-ss", f"{t:.4f}", "-frames:v",
+                            "1", str(out / f"{name}.png")], check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        raise VideoProblem(f"ffmpeg could not take the stills: {(e.stderr or '')[-300:]}") from None
 
 
 # ---- the whole step ----------------------------------------------------------------------------------
@@ -871,7 +923,14 @@ def stills(mp4: Path, out: Path, at: dict[str, float]):
 def make(job_root: Path, log_path: Path, out: Path, turn: int = TURN) -> dict:
     """The clip of a finished painted job: out/clip.mp4, clip.wav, sheet.png, the key frames and
     report.json. Raises VideoProblem when the job or a tool is missing."""
-    log = json.loads(log_path.read_text())
+    if turn < 8:
+        raise VideoProblem(f"--turn {turn} is too few frames: one turn takes at least 8")
+    try:
+        log = json.loads(log_path.read_text())
+    except (ValueError, UnicodeDecodeError):
+        raise VideoProblem("the run log is not JSON") from None
+    if not isinstance(log, dict):
+        raise VideoProblem("the run log is not JSON")
     plan = make_plan(job_root, log)
     out.mkdir(parents=True, exist_ok=True)
     paint = paint_npz(job_root, out / "mesh.npz")

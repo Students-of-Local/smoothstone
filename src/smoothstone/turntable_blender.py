@@ -69,8 +69,10 @@ cam = bpy.data.objects.new("cam", cam_d)
 scene.collection.objects.link(cam)
 scene.camera = cam
 aspect = w / h
-# fit the figure's height (and its width, turned) into the frame with a margin
-fit = max(height, (hi[0] - lo[0]) * 1.15 / aspect, (hi[1] - lo[1]) * 1.15 / aspect) * 1.15
+# fit the figure's height, and its turning diameter (the widest it gets at any angle), into the
+# frame with a margin
+reach = 2 * float(np.max(np.hypot(V[:, 0] / 1000.0 - ctr[0], V[:, 1] / 1000.0 - ctr[1])))
+fit = max(height, reach * 1.15 / aspect) * 1.15
 cam_d.sensor_fit = "VERTICAL"
 cam_d.sensor_height = 24.0
 dist = fit / 2 / math.tan(math.atan(cam_d.sensor_height / 2 / cam_d.lens))

@@ -29,7 +29,7 @@ second, then full-size frames at each card change and at four angles of the turn
 
 The clip claims:
 - the request: {request}
-- the printed figure is painted exactly: {paint}. Every part not named there is the white
+- the printed figure is painted exactly: {paint}. Every part not named there is the {main}
   filament. No other color anywhere on the figure.
 - every terminal line is one of these commands, sent in this order by the model, or a line stone
   printed back to it (a line may be wrapped, or cut with a closing "…"); lines starting with # are
@@ -52,14 +52,27 @@ Reply with only JSON: {{"score": 0-10, "faults": ["picture: what is wrong"], "no
 List in faults only what you judge to be wrong."""
 
 
-def run_judge(pictures: list[Path], report: dict, model: str = "opus") -> dict:
+def build_prompt(pictures: list[Path], report: dict) -> str:
+    """The judge's prompt for this clip. Parts the paint does not name are the job's main filament,
+    the one covering the most surface."""
     cmds = [r["text"] for r in report["rows"] if r["kind"] == "cmd"]
     seen = list(dict.fromkeys(cmds))
     req = next((r["text"] for r in report["rows"] if r["kind"] == "req"), "")
-    paint = ", ".join(f"{n} {int(round(s * 100))}% of the surface" for n, _, s in report["paint"]["filaments"])
-    prompt = PROMPT.format(request=req, paint=f"{report.get('paint_words') or ''} ({paint})",
-                           commands="\n".join(f"  {c}" for c in seen),
-                           pictures="\n".join(str(p) for p in pictures))
+    fils = report["paint"]["filaments"]
+    paint = ", ".join(f"{n} {int(round(s * 100))}% of the surface" for n, _, s in fils)
+    main = max(fils, key=lambda f: f[2])[0] if fils else "main"
+    return PROMPT.format(request=req, paint=f"{report.get('paint_words') or ''} ({paint})", main=main,
+                         commands="\n".join(f"  {c}" for c in seen),
+                         pictures="\n".join(str(p) for p in pictures))
+
+
+def control_caught(faults: list[str]) -> bool:
+    """The control is caught only by a fault that calls the figure red in a turntable still."""
+    return any(re.search(r"\bred\b", f, re.I) and "turn_" in f for f in faults)
+
+
+def run_judge(pictures: list[Path], report: dict, model: str = "opus") -> dict:
+    prompt = build_prompt(pictures, report)
     p = subprocess.run(["claude", "-p", "--model", model, "--tools", "Read", "--allowedTools", "Read",
                         "--add-dir", str(pictures[0].parent)], input=prompt, capture_output=True, text=True,
                        timeout=900)
@@ -112,7 +125,7 @@ def main():
     (d / ("judge-control.json" if a.control else "judge.json")).write_text(json.dumps(res, indent=1))
     print(json.dumps(res, indent=1))
     if a.control:
-        caught = any(re.search(r"red|wrong colou?r|color", f, re.I) for f in res.get("faults", []))
+        caught = control_caught(res.get("faults", []))
         print("control caught" if caught else "CONTROL MISSED: the judge did not name the red jacket")
         sys.exit(0 if caught else 1)
     sys.exit(0 if not res.get("faults") else 1)

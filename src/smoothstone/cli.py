@@ -1880,8 +1880,19 @@ def make_parser() -> Parser:
     s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")
     s.add_argument("log", nargs="?", help="the run log (default: log.json beside the job)")
     s.add_argument("--out", help="output folder (default: <job>/video)")
-    s.add_argument("--turn", type=int, default=144, help="frames in one turn of the figure")
+    s.add_argument("--turn", type=_turn_frames, default=144, help="frames in one turn of the figure (8 or more)")
     return p
+
+
+def _turn_frames(text: str) -> int:
+    """--turn: a whole number of frames, at least 8, so the figure has something to turn through."""
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of frames") from None
+    if n < 8:
+        raise argparse.ArgumentTypeError(f"{n} is too few frames: one turn takes at least 8")
+    return n
 
 
 COMMANDS = {
