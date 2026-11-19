@@ -1693,6 +1693,13 @@ def cmd_colors(args, job: Job) -> Out:
         if len(assign) < len(info):
             out.add(f"No rest= given: the other regions take filament 1 {fil[0]}.")
     per = np.array([0] + [assign.get(d, rest) for d in range(1, len(info) + 1)])
+    # a sliver of a garment's edge that a line of the shape boxed in (a jacket's lip under the
+    # hem's level, a collar's top over the neck's) takes the color round it, not the rest color
+    for s, host in colortool.boxed_slivers(mesh, num, info, per, set(assign), rest):
+        per[s] = per[host]
+        hd = next(d for d in info if d["n"] == host)
+        out.add(f"Region {s}, a sliver boxed in by region {host} ({hd.get('part') or hd['color']}), "
+                f"takes its color, {_fil_value(fil)[per[s] - 1]}.")
     face_fil0 = per[num]
     # cut along smooth boundaries, so a color edge runs as a curve through the triangles
     # the plinth's edge and a figure's hem, neck and wrists are lines of the shape: keep them there

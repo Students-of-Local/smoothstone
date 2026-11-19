@@ -36,6 +36,7 @@ LEDGE_MM = 2.0  # mm from a part's color edge where an up-facing face of the upp
 LEDGE_NZ = 0.5  # a face whose normal points up at least this much faces up (within 60 degrees)
 LEDGE_AREA = 0.2  # mm2 of such faces seen (parts.visible_faces) in any 30 degree sector fails the check
 EDGE_MIN = 4.0  # mm: shorter boundary pieces (ends at a three-color corner) are too short to judge
+SLIVER_MM = 2.0  # mm: a region whose area over its boundary length is under this is a sliver, a band under about 4 mm across
 VOLUME_TOL = 0.0005  # the painted mesh keeps the STL's volume within 0.05%
 
 # plain color names and a typical filament of each
@@ -410,6 +411,43 @@ def regions(mesh, labels: np.ndarray, base=None, min_share: float = MIN_SHARE, l
     out = root[comp]
     _, out = np.unique(out, return_inverse=True)
     return out.reshape(-1)
+
+
+def boxed_slivers(mesh, num: np.ndarray, info: list[dict], fil: np.ndarray, named, rest: int) -> list[tuple[int, int]]:
+    """[(sliver, host)]: the regions that would take the rest color but lie boxed in between
+    painted parts, each with the region it shares the longest boundary with, whose color it takes.
+    A sliver is a region of no named part ("other"), under MIN_SHARE of the surface and SLIVER_MM
+    across (area over boundary length), that the request gave no color (not in `named`), and whose
+    every neighbor is painted (fil[n] is not rest). Such a piece is a part's own edge that a line of
+    the shape put on the other side: a jacket's lip below the hem's level, a collar's top above the
+    neck's. Painted rest, it shows as a stripe of the wrong color along the garment's edge. A hand,
+    a belt or a shirt hem is wider, a part with a name, or touches the rest color; any region
+    the request names keeps its own color. `num` is the region number (1..R) per face, `fil` the
+    filament per region number (fil[0] unused)."""
+    adj = mesh.face_adjacency
+    ev = mesh.face_adjacency_edges
+    elen = np.linalg.norm(mesh.vertices[ev[:, 0]] - mesh.vertices[ev[:, 1]], axis=1)
+    a, b = num[adj[:, 0]], num[adj[:, 1]]
+    diff = a != b
+    R = int(num.max()) + 1
+    shared = np.zeros((R, R))
+    np.add.at(shared, (a[diff], b[diff]), elen[diff])
+    np.add.at(shared, (b[diff], a[diff]), elen[diff])
+    area = np.bincount(num, weights=mesh.area_faces, minlength=R)
+    total = float(area.sum())
+    out = []
+    for d in info:
+        n = d["n"]
+        if d.get("part") != "other" or d.get("base") or n in named or fil[n] != rest:
+            continue
+        nb = np.nonzero(shared[n])[0]
+        edge = float(shared[n].sum())
+        if not len(nb) or area[n] >= MIN_SHARE * total or area[n] / edge >= SLIVER_MM:
+            continue
+        if any(fil[m] == rest for m in nb):
+            continue
+        out.append((n, int(nb[np.argmax(shared[n, nb])])))
+    return out
 
 
 def describe(mesh, region: np.ndarray, rgb: np.ndarray, base_region: int | None) -> list[dict]:
