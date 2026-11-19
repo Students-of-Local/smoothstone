@@ -95,6 +95,7 @@ def test_cached_steps_skip_models(tmp_path, monkeypatch):
     monkeypatch.setattr(figure, "describe", fake_describe)
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", fake_lift)
+    monkeypatch.setattr(figure, "traits", lambda *a, **k: None)
     a = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     b = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     assert a == b and a.exists() and calls == ["describe", "style", "lift"]
@@ -435,3 +436,73 @@ def test_a_person_with_glasses_keeps_them_exactly():
 def test_the_positive_words_of_a_description():
     assert figure.positive("short hair, no beard, without a hat, a red shirt.") == "short hair, a red shirt."
     assert figure.positive("He is not wearing glasses. He has a black jacket.") == "He has a black jacket."
+
+
+def _models(tmp_path, monkeypatch, answers):
+    """Fake describe, style and lift; traits answers by file name. Returns the style calls."""
+    calls = []
+
+    def fake_style(photos, out, style_name, who, seed, extra=""):
+        calls.append((photos[0].name, seed))
+        out.write_bytes(f"render {seed}".encode())
+        return out
+
+    def fake_traits(images, who, log):
+        return [answers(Path(i).name) for i in images]
+
+    monkeypatch.setattr(figure, "describe", lambda photo, out, who: (out.write_text("hair\n"), "hair")[1])
+    monkeypatch.setattr(figure, "style", fake_style)
+    monkeypatch.setattr(figure, "lift", lambda render, out, seed: standin(out))
+    monkeypatch.setattr(figure, "traits", fake_traits)
+    return calls
+
+
+BARE = {"face": True, "glasses": False, "beard": False, "hat": False}
+
+
+def test_a_photo_with_no_face_never_sets_the_likeness(tmp_path, monkeypatch):
+    """For "DHH" the finder once put a protein first, and the describe model then wrote a man with
+    gold glasses from it. Only a photo that shows the face may lead; a cap goes behind a bare head."""
+    photos = []
+    for name in ("protein.png", "cap.jpg", "talk.jpg"):
+        photos.append(tmp_path / name)
+        photos[-1].write_bytes(name.encode())
+    said = []
+    calls = _models(tmp_path, monkeypatch, lambda n: {"protein.png": {"face": False},
+                                                      "cap.jpg": {**BARE, "hat": True}}.get(n, BARE))
+    figure.make(photos, tmp_path / "fig", say=said.append)
+    assert calls[0][0] == "talk.jpg"
+    assert any("Left out 1 photo with no face" in x for x in said)
+
+
+def test_no_photo_with_a_face_stops_the_figure_with_a_way_on(tmp_path, monkeypatch):
+    photo = tmp_path / "car.jpg"
+    photo.write_bytes(b"car")
+    _models(tmp_path, monkeypatch, lambda n: {"face": False})
+    with pytest.raises(figure.FigureProblem, match="stone image"):
+        figure.make([photo], tmp_path / "fig", say=lambda s: None)
+
+
+def test_a_render_that_adds_glasses_is_styled_again_with_the_next_seed(tmp_path, monkeypatch):
+    """The Elon render came back with thick black glasses he does not wear."""
+    photo = tmp_path / "elon.jpg"
+    photo.write_bytes(b"elon")
+    calls = _models(tmp_path, monkeypatch,
+                    lambda n: {**BARE, "glasses": n == "style-7.png"})
+    said = []
+    fig = figure.make([photo], tmp_path / "fig", seed=7, say=said.append)
+    assert [c[1] for c in calls] == [7, 8]
+    assert (fig.parent / "style.png").read_bytes() == b"render 8"
+    assert json.loads((fig.parent / "check.json").read_text())["differs"] == []
+    assert any("added glasses" in x and "seed 8" in x for x in said)
+
+
+def test_a_render_that_never_matches_keeps_the_closest(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    beard = {"style-7.png": {**BARE, "glasses": True, "beard": True}, "style-8.png": {**BARE, "glasses": True}}
+    calls = _models(tmp_path, monkeypatch, lambda n: beard.get(n, {**BARE, "hat": True, "beard": True}
+                                                               if n.startswith("style") else BARE))
+    fig = figure.make([photo], tmp_path / "fig", seed=7, say=lambda s: None)
+    assert [c[1] for c in calls] == [7, 8, 9]
+    assert (fig.parent / "style.png").read_bytes() == b"render 8"

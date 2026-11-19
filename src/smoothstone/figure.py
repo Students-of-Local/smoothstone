@@ -156,6 +156,91 @@ def describe(photo: Path, out: Path, who: str) -> str:
     return text
 
 
+# what the render must keep from the photo; a style model adds glasses or a beard on its own
+KEEP = {"glasses": "glasses", "beard": "a beard", "hat": "a hat"}
+STYLE_TRIES = 3
+
+
+def traits(images: list[Path], who: str, log: Path) -> list[dict] | None:
+    """Yes or no for each image: a face, glasses, a beard, a hat (tools/figure/describe.py --traits).
+
+    None when the describe model is not set up or the check fails: the figure is then made
+    unchecked, as before, never stopped by its own check."""
+    model = _describe_model()
+    if model is None or os.environ.get("STONE_DESCRIBE") == "0" or who not in ("person", "animal"):
+        return None
+    script = config.REPO_ROOT / "tools" / "figure" / "describe.py"
+    try:
+        py = _mflux_bin().parent / "python"
+        r = subprocess.run([str(py), "-I", str(script), "--traits", who, str(model), *map(str, images)],
+                           capture_output=True, text=True, timeout=600)
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a") as f:
+            f.write(r.stderr[-4000:])
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+    except (FigureProblem, OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        return None
+    return got if isinstance(got, list) and len(got) == len(images) else None
+
+
+def screen(photos: list[Path], who: str, folder: Path, say=print) -> tuple[list[Path], dict | None]:
+    """The photos that show the subject's face, a bare head first, and what the first one shows.
+
+    Only the first photo sets the likeness, so a photo of a car or a protein that came back for a
+    name must not lead. The answers are kept in folder, so a rebuild asks nothing."""
+    if who not in ("person", "animal"):
+        return photos, None
+    memo = folder / f"screen-{_digest(*photos, who)}.json"
+    if memo.exists():
+        seen = json.loads(memo.read_text())
+    else:
+        seen = traits(photos, who, folder / "screen.log")
+        if seen is None:
+            return photos, None
+        folder.mkdir(parents=True, exist_ok=True)
+        memo.write_text(json.dumps(seen))
+    keep = [(p, t) for p, t in zip(photos, seen) if t.get("face")]
+    if not keep:
+        raise FigureProblem(f"none of the {len(photos)} photos shows the {who}'s face; "
+                            "give one with stone image <path to photo>")
+    if len(keep) < len(photos):
+        n = len(photos) - len(keep)
+        say(f"Left out {n} photo{'s' if n > 1 else ''} with no face in {'them' if n > 1 else 'it'}.")
+    keep.sort(key=lambda pt: bool(pt[1].get("hat")))  # hair shows best on a bare head
+    return [p for p, _ in keep], keep[0][1]
+
+
+def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str,
+                  want: dict | None, say=print) -> Path:
+    """style(), then the render checked against the photo: one that added or left out glasses,
+    a beard or a hat is styled again with the next seed, and the closest of STYLE_TRIES is kept."""
+    best = None
+    for i in range(STYLE_TRIES if want else 1):
+        s = seed + i
+        o = out.with_name(f"style-{s}.png") if want else out
+        style(photos, o, style_name, who, s, extra)
+        if not want:
+            return o
+        got = (traits([o], who, out.with_name("check.log")) or [None])[0]
+        if got is None:  # the check could not run: keep this one
+            best = (o, [])
+            break
+        miss = [k for k in KEEP if k in want and k in got and bool(got[k]) != bool(want[k])]
+        if best is None or len(miss) < len(best[1]):
+            best = (o, miss)
+        if not miss:
+            break
+        how = " and ".join(("added " if got[k] else "left out ") + KEEP[k] for k in miss)
+        if i + 1 < STYLE_TRIES:
+            say(f"The render {how}, unlike the photo; styling again with seed {s + 1}.")
+        else:
+            say(f"The render {how}, unlike the photo, in all {STYLE_TRIES} tries; keeping the closest.")
+    shutil.copyfile(best[0], out)
+    out.with_name("check.json").write_text(json.dumps({"want": want, "kept": best[0].name,
+                                                       "differs": best[1]}, indent=1))
+    return out
+
+
 def _lift_cmd() -> list[str]:
     env = os.environ.get("STONE_LIFT")
     if env:
@@ -258,6 +343,7 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
         raise FigureProblem(f"style must be one of {', '.join(STYLES)}")
     if not photos:
         raise FigureProblem("no photos, run stone find or stone image first")
+    photos, want = screen(list(photos), who, folder, say)
     key = _digest(*photos, style_name, who, seed, extra, prompt(style_name, who, extra))
     folder = folder / key
     folder.mkdir(parents=True, exist_ok=True)
@@ -268,7 +354,8 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
             say("Describing the photo (LFM3-VL-2B, under a minute)...")
         desc = describe(photos[0], look, who)
         say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
-        style(photos, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x))
+        style_checked(photos, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
+                      want, say)
     mesh = folder / "lift.glb"
     if not mesh.exists():
         say("Lifting the render to 3D (Hunyuan3D-2mini, about 4 minutes)...")
