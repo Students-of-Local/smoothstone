@@ -262,22 +262,43 @@ def _seq(text: str) -> list[str]:
     return [stem(w) for w in re.split(r"[^A-Za-z0-9]+", text or "") if w]
 
 
+# words after which a request says where the part goes or what it holds, not what it is
+CONTEXT = re.compile(r"\b(?:for|inside|in|into|on|onto|with|that|which|who|to|under|over|near|from|at|of|"
+                     r"so|and|by|holding|wearing)\b", re.I)
+SIZE_WORDS = {"mm", "cm", "in", "inch", "tall", "wide", "long", "high", "deep", "thick", "big", "small"}
+
+
+def head(query: str) -> list[str]:
+    """The words that name the part: the request up to its first comma or context word
+    ("A guard for a 120 mm PC fan inside a box" is "a guard"), size words off the end."""
+    first = re.split(r"[,.;:!?(]", query or "", maxsplit=1)[0]
+    words = _seq(CONTEXT.split(first, maxsplit=1)[0])
+    while words and (words[-1].isdigit() or words[-1] in SIZE_WORDS or re.fullmatch(r"\d+\w*", words[-1])):
+        words.pop()
+    return words
+
+
 def fit(r: Recipe, query: str) -> int:
-    """How well the request names what the recipe makes: 2 when one of its makes phrases is in the
-    request word for word ("phone stand"), 1 when all of a phrase's words are there in any order
-    ("clips that hold the cables"), 0 when none is. A box is not a birdhouse: a recipe that fits 0
-    must not be handed over as the request. A recipe with no makes list fits any request (1)."""
+    """How well the request names what the recipe makes. 3 when a makes phrase ends in the noun the
+    request starts with ("a guard for a PC fan" is a fan guard), 2 when a phrase is in the request
+    word for word somewhere else ("a box" in "a guard ... inside a box"), 1 when all of a phrase's
+    words are there in any order ("clips that hold the cables"), 0 when none is. A box is not a
+    birdhouse: a recipe that fits 0 must not be handed over as the request. A recipe with no makes
+    list fits any request (1)."""
     if not r.makes:
         return 1
     q = _seq(query)
     text = " " + " ".join(q) + " "
+    h = head(query)
+    noun = h[-1] if h else None
     best = 0
     for phrase in r.makes:
         ph = _seq(phrase)
-        if ph and " " + " ".join(ph) + " " in text:
-            return 2
-        if ph and all(any(_same(w, x) for x in q) for w in ph):
-            best = 1
+        if not ph or not all(any(_same(w, x) for x in q) for w in ph):
+            continue
+        if noun and _same(ph[-1], noun):
+            return 3
+        best = max(best, 2 if " " + " ".join(ph) + " " in text else 1)
     return best
 
 

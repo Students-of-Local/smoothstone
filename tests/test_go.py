@@ -1,5 +1,6 @@
 """stone go: a person's one command follows the NEXT lines to a ready part, or stops on a question."""
 import json
+import shutil
 from pathlib import Path
 
 from smoothstone import cli, recipes
@@ -71,12 +72,24 @@ def test_fit_reads_what_the_request_asks_for():
     assert rc.fit(r["box"], "Can you make a birdhouse for my backyard?") == 0
     assert rc.fit(r["spur_gear"], "I need a new stove knob that fits a 6 mm D-shaped shaft.") == 0
     assert rc.fit(r["cable_comb"], "I need a clip to keep my bag of chips closed.") == 0
-    assert rc.fit(r["cable_comb"], "little clips that stick under my desk and hold the cables up") == 1
+    assert rc.fit(r["cable_comb"], "little clips that stick under my desk and hold the cables up") >= 1
     stand = "Make a phone stand for my iPhone 15 Pro that works with the case on."
-    assert rc.fit(r["phone_stand"], stand) == 2 > rc.fit(r["phone_case"], stand)
-    assert rc.fit(r["fan_guard"], "fan gaurd for an 80mm fan") == 1  # a typo in a long word still fits
+    assert rc.fit(r["phone_stand"], stand) == 3 > rc.fit(r["phone_case"], stand)
+    assert rc.fit(r["fan_guard"], "fan gaurd for an 80mm fan") >= 1  # a typo in a long word still fits
     assert rc.fit(r["planter"], "plant labels for my tomatoes") == 0  # plant is not planter
     assert rc.fit(r["hook"], "a stand for my hex keys that holds sizes from 1.5 to 10 mm") == 0
+
+
+def test_the_part_the_request_starts_with_beats_one_it_mentions_later(jobenv, monkeypatch):
+    """Review of #45 round 2: "A guard for a 120 mm PC fan inside a box" handed over the box."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    for req, want in (("A guard for a 120 mm PC fan inside a box", "fan_guard"),
+                      ("A box to keep my 120 mm fan guard in", "box"),
+                      ("A phone stand for my desk, next to a box of pens", "phone_stand")):
+        shutil.rmtree(jobenv / "stone-job", ignore_errors=True)
+        cli.run(["new", req])
+        text, _ = cli.run(["recipes"])
+        assert text.splitlines()[-1] == f"NEXT: stone show {want}", (req, text)
 
 
 def test_narrowing_words_never_stop_the_job(jobenv, monkeypatch):
