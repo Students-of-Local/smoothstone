@@ -349,10 +349,11 @@ def base_top(recipe: str, params: dict) -> float:
     return bh if bh > 0 else (8.0 if not params.get("name") else 12.0)
 
 
-def plinth(recipe: str, params: dict) -> dict | None:
+def plinth(recipe: str, params: dict, mesh=None) -> dict | None:
     """The plinth as recipes/figure/recipe.scad makes it, or None for a part without one: its height
     bh, diameter bd, lip and chamfer c, drum radius dr and the name raised on the drum's band
-    (from lip up to bh - c)."""
+    (from lip up to bh - c). With the mesh, an automatic diameter is read off the lip, the widest
+    part of the plinth: the recipe sizes a hex to its name with OpenSCAD's own text metrics."""
     bh = base_top(recipe, params)
     if bh <= 0:
         return None
@@ -366,9 +367,14 @@ def plinth(recipe: str, params: dict) -> dict | None:
     name = str(params.get("name") or "")
     fh = num("height", 90) - bh
     bd = num("base_d", 0)
+    lip, c = min(2.4, bh / 4), min(1.2, bh / 8)
+    if bd <= 0 and mesh is not None:
+        V = np.asarray(mesh.vertices, float)
+        low = V[V[:, 2] < lip - 1e-3]
+        if len(low):
+            bd = 2 * float(np.hypot(low[:, 0], low[:, 1]).max())
     if bd <= 0:
         bd = max(30.0, fh * 0.68 + 8, len(name) * fh * 0.075 + 14)
-    lip, c = min(2.4, bh / 4), min(1.2, bh / 8)
     return {"bh": bh, "bd": bd, "lip": lip, "c": c, "dr": bd / 2 - c, "name": name}
 
 
@@ -378,7 +384,7 @@ def name_faces(mesh, recipe: str, params: dict) -> np.ndarray:
     The drum's outline is read off the mesh, its corners at radius dr on the band's top edge, so a
     hex plinth's flat faces count as the drum too. All False for a part with no name on it."""
     n = len(mesh.faces)
-    p = plinth(recipe, params)
+    p = plinth(recipe, params, mesh)
     if p is None or not p["name"].strip():
         return np.zeros(n, bool)
     V = np.asarray(mesh.vertices, float)
