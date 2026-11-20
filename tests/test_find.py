@@ -11,19 +11,19 @@ def _page(title, lic, idx, w=1200, h=1600, mime="image/jpeg"):
             "LicenseShortName": {"value": lic}, "Artist": {"value": "<a>Someone</a>"}}}]}
 
 
-def _ent(qid, label, p31, image=None, aliases=(), sites=0):
+def _ent(qid, label, p31, image=None, aliases=(), sites=0, desc="", lang="en"):
     claims = {"P31": [{"mainsnak": {"datavalue": {"value": {"id": c}}}} for c in p31]}
     if image:
         claims["P18"] = [{"mainsnak": {"datavalue": {"value": image}}}]
-    return {"id": qid, "labels": {"en": {"value": label}},
+    return {"id": qid, "labels": {lang: {"value": label}}, "descriptions": {"en": {"value": desc}} if desc else {},
             "aliases": {"en": [{"value": a} for a in aliases]}, "claims": claims,
             "sitelinks": {f"w{i}wiki": {} for i in range(sites)}}
 
 
-def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=()):
+def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=()):
     """A fake Wikidata and Commons. hits: entities the name search returns, best first;
     people: humans the full text search returns; classes: P31 classes with their labels;
-    seen collects every Commons search."""
+    seen collects every Commons search; depicted: the files Commons says depict the subject (P180)."""
     if hits is None:
         hits = [_ent("Q1", "Subject", ["Q5"], lead)] if lead else []
     every = {e["id"]: e for e in [*hits, *people, *classes]}
@@ -43,6 +43,8 @@ def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=()):
             return b"\xff\xd8jpeg"
         if seen is not None:
             seen.append(q.get("gsrsearch", [""])[0])
+        if q.get("gsrsearch", [""])[0].startswith("haswbstatement:P180"):
+            return json.dumps({"query": {"pages": {str(i): p for i, p in enumerate(depicted)}}}).encode()
         return json.dumps({"query": {"pages": {str(i): p for i, p in enumerate(pages)}}}).encode()
     return get
 
@@ -104,7 +106,7 @@ def test_a_nickname_finds_the_person_not_the_gene_with_that_name(monkeypatch):
     assert (got["label"], got["kind"]) == ("David Heinemeier Hansson", "person")
     titles = [c["title"] for c in find.search("DHH")]
     assert titles[0] == "File:David Heinemeier Hansson.jpg"
-    assert seen and all(q.startswith("David Heinemeier Hansson") for q in seen)
+    assert seen and all(q.startswith(("David Heinemeier Hansson", "haswbstatement:P180=Q20")) for q in seen)
 
 
 def test_a_loose_text_match_on_a_person_is_not_the_subject(monkeypatch):
@@ -228,3 +230,98 @@ def test_nothing_that_can_be_a_subject_resolves_to_nothing(monkeypatch):
     # the DHH protein: a gene alone must not come back as the subject with its picture
     monkeypatch.setattr(find, "_get", _fake([], hits=[GENE]))
     assert find.resolve("DHH") is None
+
+
+# two people called Michael Jordan: the famous one, and the one a hint can name
+ATHLETE = _ent("Q41", "Michael Jordan", ["Q5"], "Jordan.jpg", sites=150, desc="American basketball player")
+SCIENTIST = _ent("Q33", "Michael Jordan", ["Q5"], "Jordan Berkeley.jpg", sites=60,
+                 desc="American computer scientist, University of California, Berkeley")
+ACTOR = _ent("Q34", "Michael Jordan", ["Q5"], sites=8, desc="American actor")
+
+
+def test_a_name_kept_only_under_mul_still_reads_in_english(monkeypatch):
+    """Wikidata now keeps many names under "mul", and the first label was another script."""
+    ent = _ent("Q9", "Sam Altman", ["Q5"], sites=40, desc="American entrepreneur", lang="mul")
+    ent["labels"] = {"zh": {"value": "山姆"}, **ent["labels"]}
+    monkeypatch.setattr(find, "_get", _fake([], hits=[ent]))
+    got = find.resolve("Sam Altman")
+    assert got["label"] == "Sam Altman" and got["description"] == "American entrepreneur"
+
+
+def test_a_hint_picks_the_person_it_names_over_the_famous_one(monkeypatch):
+    monkeypatch.setattr(find, "_get", _fake([], hits=[ATHLETE, SCIENTIST, ACTOR]))
+    got = find.resolve("Michael Jordan, the Berkeley computer scientist")
+    assert got["id"] == "Q33" and not got["ambiguous"]
+    assert find.resolve("Michael Jordan (computer scientist)")["id"] == "Q33"
+
+
+def test_two_well_known_people_with_one_name_ask_which_before_any_download(monkeypatch, tmp_path):
+    """The wrong person's figure is the worst result: no photo is taken until the person says which."""
+    pages = [_page("File:Michael Jordan.jpg", "CC BY 4.0", 1)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ATHLETE, SCIENTIST, ACTOR]))
+    got = find.resolve("Michael Jordan")
+    assert got["id"] == "Q41" and got["ambiguous"]
+    assert [n["id"] for n in got["namesakes"]] == ["Q33", "Q34"]
+    try:
+        find.fetch("Michael Jordan", tmp_path)
+        raise AssertionError("fetch downloaded photos of an ambiguous name")
+    except find.WhichOne as e:
+        assert e.name == "Michael Jordan" and [p["id"] for p in e.people][:2] == ["Q41", "Q33"]
+    assert not list(tmp_path.glob("photo_*"))
+    # words in the request that match no one's description do not count as an answer
+    assert find.resolve("Michael Jordan, a mini figure 80 mm tall")["ambiguous"]
+
+
+def test_a_famous_name_with_only_little_known_namesakes_does_not_ask(monkeypatch):
+    monkeypatch.setattr(find, "_get", _fake([], hits=[ATHLETE, ACTOR]))
+    assert not find.resolve("Michael Jordan")["ambiguous"]
+
+
+def test_photos_commons_says_show_this_person_alone_come_first(monkeypatch):
+    """A text match can be a namesake, a group photo or a thing named after them."""
+    solo = {**_page("File:MJ portrait 1997.jpg", "CC BY 4.0", 4), "pageid": 7}
+    pages = [_page("File:Michael Jordan Freeway.jpg", "CC BY 4.0", 1),
+             _page("File:Michael Jordan and friends.jpg", "CC BY 4.0", 2),
+             _page("File:Michael Jordan 2.jpg", "CC BY 4.0", 3)]
+    ent = _ent("Q41", "Michael Jordan", ["Q5"], sites=150)
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent], depicted=[solo]))
+    titles = [c["title"] for c in find.search("Michael Jordan")]
+    assert titles[0] == "File:MJ portrait 1997.jpg"
+    assert titles.index("File:Michael Jordan 2.jpg") < titles.index("File:Michael Jordan Freeway.jpg")
+
+
+def test_the_words_after_a_name_say_which_person(monkeypatch):
+    """subject_from_request gives "Michael Jordan the Berkeley": the name search finds no one by that."""
+    def get(url, timeout=30):
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        if "Berkeley" in q.get("search", [""])[0] or "Berkeley" in q.get("srsearch", [""])[0]:
+            return json.dumps({"search": [], "query": {"search": []}}).encode()
+        return _fake([], hits=[ATHLETE, SCIENTIST, ACTOR])(url, timeout)
+    monkeypatch.setattr(find, "_get", get)
+    got = find.resolve("Michael Jordan the Berkeley, a mini figure of Michael Jordan the Berkeley computer scientist")
+    assert got["id"] == "Q33" and not got["ambiguous"]
+
+
+def test_a_namesakes_photos_never_stand_in_for_the_person(monkeypatch):
+    """Live, 2026-11-20: Michael I. Jordan, the computer scientist, got photos of Michael B. Jordan."""
+    pages = [_page("File:Michael B Jordan - Sinners.jpg", "CC BY 4.0", 1),
+             _page("File:Steve Lipofsky -- Michael Jordan (1997).jpg", "CC BY 4.0", 2),
+             _page("File:Michael I. Jordan at Berkeley.jpg", "CC BY 4.0", 3)]
+    scientist = _ent("Q33", "Michael I. Jordan", ["Q5"], sites=60, desc="American computer scientist",
+                     aliases=["Michael Jordan"])
+    actor = _ent("Q34", "Michael B. Jordan", ["Q5"], sites=90, desc="American actor", aliases=["Michael Jordan"])
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[actor, scientist]))
+    ent = find.resolve("Michael Jordan, computer scientist")
+    assert ent["id"] == "Q33" and ent["namesakes"]
+    assert [c["title"] for c in find.search("Michael Jordan", entity=ent)] == ["File:Michael I. Jordan at Berkeley.jpg"]
+
+
+def test_a_failed_find_leaves_no_earlier_persons_photos(monkeypatch, tmp_path):
+    (tmp_path / "photo_1.jpg").write_bytes(b"someone else")
+    (tmp_path / "credits.txt").write_text("photo_1.jpg: someone else")
+    monkeypatch.setattr(find, "_get", _fake([]))
+    try:
+        find.fetch("Nobody Atall", tmp_path)
+    except find.FindProblem:
+        pass
+    assert not list(tmp_path.iterdir())

@@ -1049,3 +1049,25 @@ def test_a_figure_build_says_each_long_step_on_the_terminal_as_it_starts(jobenv,
     text, code, nxt = stone("build")
     assert nxt == "stone build" and "Lifting" not in text, text
     assert "Lifting the render to 3D" in (jobenv / "stone-job" / "log.txt").read_text()
+
+
+def test_find_asks_which_person_when_two_well_known_people_share_the_name(jobenv, monkeypatch):
+    """Donovan, 2026-11-20: "For figures it needs to ensure the figure referenced is the correct one they want"."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    from smoothstone import find as findtool
+    asked = []
+
+    def which(q, d, n=4):
+        asked.append(q)
+        raise findtool.WhichOne("Michael Jordan", [
+            {"id": "Q41421", "label": "Michael Jordan", "description": "American basketball player"},
+            {"id": "Q3308285", "label": "Michael I. Jordan", "description": "American computer scientist"}])
+
+    monkeypatch.setattr(findtool, "fetch", which)
+    stone("new", "A mini figure of Michael Jordan, 80 mm tall")
+    text, code, nxt = stone("find")
+    assert asked and asked[0].startswith("Michael Jordan, ")  # the rest of the request is the hint
+    assert nxt.startswith("ask the person: which Michael Jordan do you mean")
+    assert "computer scientist" in nxt and "basketball player" in nxt
+    assert 'stone find "Michael Jordan, ' in nxt
+    assert stone("status")[2] == nxt  # a compacted model finds the question again

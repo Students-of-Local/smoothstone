@@ -1076,19 +1076,43 @@ def cmd_find(args, job: Job) -> Out:
             out.next = f"stone show {other}"
         out.result = "find refused: the job is not a figure"
         return out
-    query = " ".join(args.query).strip().strip('"\'') or findtool.subject_from_request(job.request()) or ""
+    query = " ".join(args.query).strip().strip('"\'')
+    if not query and (subject := findtool.subject_from_request(job.request())):
+        # the rest of the request may say which one ("the Berkeley computer scientist")
+        query = f"{subject}, {job.request()}"
     if not query:
         out.fix('say who or what to find, like stone find "Ada Lovelace"')
         out.next = 'stone find "<who or what>"'
         return out
     try:
         got = findtool.fetch(query, job.image_dir / "found", n=args.n)
+    except findtool.WhichOne as e:
+        # the wrong person's figure is the worst result: ask which one before any photo is taken
+        out.add(f"Several well known people are called {e.name}:")
+        for p in e.people[:4]:
+            out.add(f"- {p['label']}, {p['description'] or 'no description'} (wikidata {p['id']})")
+        out.fix(f"say which {e.name}; stone takes photos of one person only")
+        choices = " or ".join(f"{p['label']}, {p['description']}" for p in e.people[:3])
+        out.next = (f"ask the person: which {e.name} do you mean: {choices}? "
+                    f'When they answer: stone find "{e.name}, <what that one is known for>"')
+        out.owns_next = True
+        out.stage = "needs_image"
+        out.result = f"find asks which {e.name}"
+        return out
     except findtool.FindProblem as e:
         out.fix(f"{e}; give your own photo with stone image <path to photo>")
         out.next = "stone image <path to photo>"
         out.result = f"find failed: {e}"
         return out
-    out.add(f"Found {len(got)} free-licensed photos of {query} on Wikimedia Commons:")
+    try:
+        who = json.loads((job.image_dir / "found" / "found.json").read_text())
+    except (OSError, ValueError):
+        who = {}
+    name = who.get("subject") or query
+    if who.get("wikidata"):
+        desc = f", {who['description']}" if who.get("description") else ""
+        out.add(f"Who: {name}{desc} (wikidata {who['wikidata']}). Not them? stone find \"{name}, <what they are known for>\"")
+    out.add(f"Found {len(got)} free-licensed photos of {name} on Wikimedia Commons:")
     for g in got:
         out.add(f"{Path(g['file']).name}: {g['license']}, by {g['author'] or 'unknown'}")
     out.add(f"Credits: {job.image_dir / 'found' / 'credits.txt'} (name them when you share the part)")
@@ -1099,7 +1123,7 @@ def cmd_find(args, job: Job) -> Out:
     else:
         out.next = "stone show figure"
         out.stage = "image"
-    out.result = f"found {len(got)} photos of {query}"
+    out.result = f"found {len(got)} photos of {name}"
     return out
 
 
