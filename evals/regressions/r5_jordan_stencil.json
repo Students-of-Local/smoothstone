@@ -1,0 +1,13 @@
+{
+ "id": "r5_jordan_stencil",
+ "request": "A figure of Michael Jordan, the basketball player",
+ "why": "The owner said: \"For figures it needs to ensure the figure referenced is the correct one they want.\" Live on 2026-11-20, stone find for Michael Jordan took C215's street art stencil of him as photo 3. A figure made from an artwork of a person is a wrong figure, so every photo must be of Michael Jordan (Q41421) himself, one clear face, and the stencil never one of them.",
+ "expect": {
+  "recipe": "figure",
+  "found": {
+   "wikidata": "Q41421",
+   "never": ["C215 - Michael Jordan (1).jpg", "C215 - Michael Jordan (2).jpg"],
+   "one_face": true
+  }
+ }
+}

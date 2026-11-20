@@ -13,6 +13,8 @@ REPO = Path(__file__).resolve().parent.parent
 def no_user_config(tmp_path_factory, monkeypatch):
     """Keep the machine's own ~/.config/smoothstone/stone.toml out of every test."""
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("xdg")))
+    # the face models download on first use: no test reaches the network for them
+    monkeypatch.setenv("STONE_FACES", "0")
 
 
 @pytest.fixture

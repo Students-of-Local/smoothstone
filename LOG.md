@@ -273,3 +273,33 @@ b61d8eef7cfc7c891927c122d6d01a06d5a7a38356bb1d65ddf446fc91901ae0  d2_girl_braids
 d15e0478f82c292fa8c56f2c6ed737a7a99d1404698866a114d87d8d91c05b0e  d3_woman_pixie_glasses.json
 381c1eb606406955069ffe0aaf52df1b4fdb7eea09aa4a794069ebdde4173c13  d4_man_curly_beard_boots.json
 ```
+
+## 2026-11-20 stone find keeps only photos of the one person meant
+
+The owner said: "For figures it needs to ensure the figure referenced is the correct one they want."
+Live that day, `stone find` for Michael Jordan took C215's street art stencil of him as photo 3, and
+on main Sam Altman's photo 3 was "Ilya Sutskever and Sam Altman in TAU.jpg", a stage panel. This is
+a change to `stone find` after the 2026-11-19 seal, so the sealed runs' report must list it.
+
+- An artwork of a person or an animal is left out: its title, Commons categories or object name
+  names a painting, drawing, stencil, mural, graffiti, street art, statue, sculpture, wax figure and
+  the like, or its structured data (P31) is an artwork class. C215's file is in "Graffiti of
+  Michael Jordan".
+- A person's photo must show one face that has at least twice the area of the next face and is
+  80 px or more on its shorter side (OpenCV YuNet). The TAU panel has two faces of 31 and 29 px.
+- That face must be the person's: SFace cosine 0.363 or more (opencv_zoo's own bar) against the face
+  in Wikidata's main photo. With no face there (Chris Evans the presenter's main photo shows two
+  people) the largest group of faces that agree wins. Michael Jordan's main photo is a close-up
+  bigger than YuNet looks for; a grey border around it finds the face.
+- Checked on Commons photos of seven people (Michael Jordan, Michael B. Jordan, both Chris Evanses,
+  Sam Altman, Elon Musk, Bill Gates; 18 photos each): 235 pairs of one person's main photo against
+  another's photos scored 0.26 at most (Michael B. Jordan against Michael Jordan 0.12). The C215
+  stencil scored 0.32 against Michael Jordan. Most of a person's own photos scored 0.39 to 0.95; six
+  true photos fell under the bar and are lost: a 1984 Michael Jordan profile 22 years younger than
+  the main photo (0.25), Chris Evans in sunglasses (0.25) and in a cap and full beard (0.18), Elon
+  Musk's face on a stage screen behind him and Javier Milei (0.34, 0.35), and one of Bill Gates
+  (0.34). So the line says "a face that may not be his", not "is not".
+- Without the models (offline, STONE_FACES=0) find works as before and says the faces went unchecked.
+- regressions/r5_jordan_stencil and r6_altman_group_shot check found.json (expect.found): the
+  person's Wikidata id, never those two files, one clear face in every photo. Both fail on the
+  photos the faulty finds took.

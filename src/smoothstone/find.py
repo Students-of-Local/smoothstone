@@ -11,12 +11,32 @@ import json
 import re
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from . import faces
 
 API = "https://commons.wikimedia.org/w/api.php"
 AGENT = "smoothstone/0.3 (https://github.com/baney75/smoothstone; stone find)"
 OK_LICENSE = re.compile(r"^(public domain|pd|cc0|cc by(-sa)? [1-4]\.0|cc by(-sa)?$|godl)", re.I)
 THUMB_PX = 1280
+# a painting, a drawing, a statue or street art of a person is someone's art, not the person: its
+# title, Commons categories or object name says so ("C215 - Michael Jordan", "Graffiti of ...")
+POSTER = re.compile(r"\b(?:posters?|plakat\w*|affiches?|carteles?|manifesto)\b", re.I)
+# a Commons category names art as "<kind> of ...": "Portrait paintings of men", "Busts of Mozart".
+# A loose word there is often something else: a voice actor's "Cartoon Network", "Drawings by children"
+ART_CATS = re.compile(r"\b(?:paintings|drawings|sketches|stencils|murals|graffiti|street art|statues|sculptures|busts|"
+                      r"wax figures|caricatures|cartoons|illustrations|mosaics|artworks|figurines|action figures)"
+                      r" (?:of|depicting|by)\b"
+                      r"|\bPD-Art\b|\bArtworks (?:with Wikidata item|digital representation)", re.I)  # Commons' own art tags
+ART_WORDS = re.compile(
+    r"\b(?:paintings?|painted portrait|drawings?|sketch(?:es)?|stencils?|murals?|graffiti|"
+    r"street art|statues?|sculptures?|busts? of|wax (?:figures?|museum|statues?)|madame tussauds|"
+    r"caricatures?|cartoons?|illustrations?|mosaics?|artworks?|fan art|figurines?|action figures?)\b", re.I)
+# what a Commons file's structured data calls an artwork (P31): painting, sculpture, statue, drawing,
+# mural, graffiti, street art, work of art, visual artwork
+ART_CLASSES = {"Q3305213", "Q860861", "Q179700", "Q93184", "Q219423", "Q17514", "Q17516", "Q838948",
+               "Q4502142"}
 
 
 class FindProblem(Exception):
@@ -305,11 +325,14 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
             score -= 25  # another person, a sign or a thing named after them
         if any(k in t for k in ("logo", "signature", "map", "diagram", "chart")):
             score -= 50
+        about = " ".join([title, _clean((meta.get("ObjectName") or {}).get("value", ""))])
+        cats = _clean((meta.get("Categories") or {}).get("value", ""))
         out.append({
             "title": title, "url": info.get("thumburl") or info.get("url"),
             "page": info.get("descriptionurl", ""), "width": w, "height": h,
             "license": lic, "author": _clean((meta.get("Artist") or {}).get("value", ""))[:120],
-            "score": score,
+            "score": score, "lead": bool(p.get("lead")),
+            "artwork": bool(ART_WORDS.search(about) or ART_CATS.search(cats) or depicted.get(title, {}).get("artwork")),
         })
     out.sort(key=lambda c: -c["score"])
     seen, uniq = set(), []
@@ -322,7 +345,8 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
 
 def _depicting(qid: str, common: dict, limit: int = 30) -> dict[str, dict]:
     """Commons files whose structured data says they depict qid (P180), with how many things each
-    depicts: 1 is a photo of them alone, more is a group or a scene."""
+    depicts (1 is a photo of them alone, more is a group or a scene) and whether the file says it
+    is an artwork (P31)."""
     try:
         data = json.loads(_get(API + "?" + urllib.parse.urlencode(
             {"action": "query", "generator": "search", "gsrnamespace": "6",
@@ -333,16 +357,87 @@ def _depicting(qid: str, common: dict, limit: int = 30) -> dict[str, dict]:
             ents = json.loads(_get(API + "?" + urllib.parse.urlencode(
                 {"action": "wbgetentities", "ids": "|".join(list(mids)[:50]), "format": "json"}))).get("entities") or {}
             for mid, e in ents.items():
-                st = (e.get("statements") or e.get("claims") or {}).get("P180") or []
+                said = e.get("statements") or e.get("claims") or {}
                 if mid in mids:
-                    pages[mids[mid]]["depicts"] = len(st)
+                    pages[mids[mid]]["depicts"] = len(said.get("P180") or [])
+                    kinds = {((c.get("mainsnak") or {}).get("datavalue") or {}).get("value", {}).get("id")
+                             for c in said.get("P31") or []}
+                    pages[mids[mid]]["artwork"] = bool(kinds & ART_CLASSES)
         return pages
     except Exception:  # structured data is a bonus; the name search still runs
         return {}
 
 
+TRY = 12  # a person's best ranked photos that are downloaded and looked at for one face
+# why a photo was left out, said once (one) or for several ({n} ...); {name} is the person
+WHY = {
+    "art": ("an artwork", "{n} artworks"),
+    "group": ("a group shot", "{n} group shots"),
+    "small": ("a face too small to style from", "{n} faces too small to style from"),
+    "none": ("a photo with no clear face", "{n} photos with no clear face"),
+    "other": ("a face that may not be {name}'s", "{n} faces that may not be {name}'s"),
+    "unlike": ("a face unlike the other photos of {name}", "{n} faces unlike the other photos of {name}"),
+}
+
+
+def left_out_line(left: list[dict], name: str) -> str | None:
+    """"Left out 2 photos: a group shot, a face that is not Sam Altman's." or None."""
+    if not left:
+        return None
+    counts: dict[str, int] = {}
+    for x in left:
+        counts[x["why"]] = counts.get(x["why"], 0) + 1
+    said = [(WHY[k][0] if c == 1 else WHY[k][1]).format(n=c, name=name) for k, c in counts.items() if k in WHY]
+    n = len(left)
+    return f"Left out {n} photo{'s' if n > 1 else ''}: {', '.join(said)}."
+
+
+def _download(cands: list[dict]) -> list[bytes | None]:
+    def one(c):
+        try:
+            return _get(c["url"], timeout=60)
+        except Exception:
+            return None
+    with ThreadPoolExecutor(6) as ex:
+        return list(ex.map(one, cands))
+
+
+def _by_face(tried: list[tuple[int, dict]], chk, n: int) -> tuple[list[tuple[int, dict, bytes]], dict[int, str]]:
+    """The first n of tried ((rank, candidate), best first) that show one face, and that face the
+    person's: the face in Wikidata's main photo (the lead) when it shows one, else the largest group
+    of faces that agree with each other. Returns ([(rank, candidate, bytes)], {rank: why left out})."""
+    raws = _download([c for _, c in tried])
+    left: dict[int, str] = {}
+    ok: list[int] = []  # positions in tried
+    emb: dict[int, list[float]] = {}
+    for k, raw in enumerate(raws):
+        if raw is None:
+            continue
+        try:
+            look = chk.look(raw)
+        except Exception:  # a photo opencv cannot read is no face; the find goes on
+            look = faces.Look(why="none")
+        if not look.one:
+            left[tried[k][0]] = look.why if look.why in ("group", "small") else "none"
+            continue
+        ok.append(k)
+        emb[k] = look.embedding
+    anchor = next((k for k in ok if tried[k][1].get("lead")), None)
+    if anchor is not None:
+        same, why = [k for k in ok if faces.cosine(emb[anchor], emb[k]) >= faces.SAME], "other"
+    else:
+        same, why = [ok[j] for j in faces.agree([emb[k] for k in ok])], "unlike"
+    left.update({tried[k][0]: why for k in ok if k not in same})
+    return [(tried[k][0], tried[k][1], raws[k]) for k in same[:n]], left
+
+
 def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
-    """Download the n best photos into dest (photo_1.jpg ...) and write credits.txt."""
+    """Download the n best photos into dest (photo_1.jpg ...) and write credits.txt.
+
+    For a person or an animal, an artwork of them is left out, unless they are known only through art
+    (their Wikidata image is a painting, or Commons has no photo of them); for a person, every photo must show
+    one clear face and that face theirs (faces.py). found.json says what was left out and why, and
+    whether the faces could be checked at all."""
     # an earlier find's photos may be someone else: none outlive a new find, found or not
     for old in [*dest.glob("photo_*"), dest / "credits.txt", dest / "found.json"]:
         old.unlink(missing_ok=True)
@@ -353,27 +448,56 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     found = search(query, entity=ent)
     if not found:
         raise FindProblem(f"no free-licensed photos of {query} on Wikimedia Commons")
+    kind = (ent or {}).get("kind")
+    # someone known only through art (Napoleon, Mozart): the lead is a painting, or no photo exists;
+    # then the paintings and statues are their likeness and stay in
+    by_art = any(c.get("lead") and c.get("artwork") for c in found) or all(c.get("artwork") for c in found)
+    no_art = kind in ("person", "animal") and not by_art
+    # a poster is lettering over a likeness (a 1941 Mozart poster bore a swastika): never a reference
+    out = {i for i, c in enumerate(found) if (no_art and c.get("artwork")) or POSTER.search(c.get("title", ""))}
+    pool = [(i, c) for i, c in enumerate(found) if i not in out]
+    left = {i: "art" for i in out}
+    check, chk = None, None
+    if kind == "person":
+        try:
+            chk = faces.checker()
+            check = "checked"
+        except faces.Unavailable as e:
+            check = f"not checked: {e}"
+    picked: list[tuple[int, dict, bytes]] = []
+    if chk is not None:
+        picked, why = _by_face(pool[:max(TRY, 4 * n)], chk, n)
+        left.update(why)
+        if not picked and why:
+            raise FindProblem(f"none of the photos of {query} on Wikimedia Commons shows one clear face "
+                              f"that is {query}'s")
+    else:
+        for i, c in pool:
+            if len(picked) >= n:
+                break
+            try:
+                picked.append((i, c, _get(c["url"], timeout=60)))
+            except Exception:
+                continue
+    if not picked:
+        raise FindProblem(f"could not download photos of {query}")
     dest.mkdir(parents=True, exist_ok=True)
     got = []
-    for c in found:
-        if len(got) >= n:
-            break
-        try:
-            raw = _get(c["url"], timeout=60)
-        except Exception:
-            continue
+    for _, c, raw in picked:
         ext = ".png" if c["url"].lower().split("?")[0].endswith(".png") else ".jpg"
         f = dest / f"photo_{len(got) + 1}{ext}"
         f.write_bytes(raw)
         got.append({**c, "file": str(f)})
-    if not got:
-        raise FindProblem(f"could not download photos of {query}")
+    # what would have been a photo but for a rule: ranked above the last one kept, or any when short
+    last = picked[-1][0] if len(picked) >= n else len(found)
+    dropped = [{"title": found[i]["title"], "why": w} for i, w in sorted(left.items()) if i < last]
     lines = [f"{Path(g['file']).name}: {g['title'][5:]} by {g['author'] or 'unknown'}, "
              f"{g['license']}, {g['page']}" for g in got]
     (dest / "credits.txt").write_text("\n".join(lines) + "\n")
     (dest / "found.json").write_text(json.dumps({"query": query, "subject": (ent or {}).get("label") or query,
-                    "kind": (ent or {}).get("kind"), "wikidata": (ent or {}).get("id"),
+                    "kind": kind, "wikidata": (ent or {}).get("id"),
                     "description": (ent or {}).get("description") or "",
+                    "faces": check, "left_out": dropped,
                     "photos": got}, indent=1))
     return got
 

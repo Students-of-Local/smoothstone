@@ -1,14 +1,18 @@
 import json
 import urllib.parse
 
-from smoothstone import find
+import pytest
+
+from smoothstone import cli, faces, find
 
 
-def _page(title, lic, idx, w=1200, h=1600, mime="image/jpeg"):
+def _page(title, lic, idx, w=1200, h=1600, mime="image/jpeg", cats=""):
+    meta = {"LicenseShortName": {"value": lic}, "Artist": {"value": "<a>Someone</a>"}}
+    if cats:
+        meta["Categories"] = {"value": cats}
     return {"title": title, "index": idx, "imageinfo": [{
         "width": w, "height": h, "mime": mime, "thumburl": f"https://x/{idx}.jpg",
-        "descriptionurl": f"https://c/{idx}", "extmetadata": {
-            "LicenseShortName": {"value": lic}, "Artist": {"value": "<a>Someone</a>"}}}]}
+        "descriptionurl": f"https://c/{idx}", "extmetadata": meta}]}
 
 
 def _ent(qid, label, p31, image=None, aliases=(), sites=0, desc="", lang="en"):
@@ -20,7 +24,7 @@ def _ent(qid, label, p31, image=None, aliases=(), sites=0, desc="", lang="en"):
             "sitelinks": {f"w{i}wiki": {} for i in range(sites)}}
 
 
-def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=()):
+def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=(), lead_cats=""):
     """A fake Wikidata and Commons. hits: entities the name search returns, best first;
     people: humans the full text search returns; classes: P31 classes with their labels;
     seen collects every Commons search; depicted: the files Commons says depict the subject (P180)."""
@@ -38,9 +42,9 @@ def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicte
         if "wikidata" in url and "list=search" in url:
             return json.dumps({"query": {"search": [{"title": e["id"]} for e in people]}}).encode()
         if "titles=" in url:
-            return json.dumps({"query": {"pages": {"9": _page(q["titles"][0], "Public domain", 5)}}}).encode()
+            return json.dumps({"query": {"pages": {"9": _page(q["titles"][0], "Public domain", 5, cats=lead_cats)}}}).encode()
         if url.startswith("https://x/"):
-            return b"\xff\xd8jpeg"
+            return b"\xff\xd8" + url.encode()  # each photo its own bytes, for a stub face checker
         if seen is not None:
             seen.append(q.get("gsrsearch", [""])[0])
         if q.get("gsrsearch", [""])[0].startswith("haswbstatement:P180"):
@@ -374,3 +378,220 @@ def test_a_description_with_a_long_dash_reads_with_a_hyphen(monkeypatch):
     ent = _ent("Q297816", "Sammy Davis Jr.", ["Q5"], sites=60, desc="American entertainer (1925\u20131990)")
     monkeypatch.setattr(find, "_get", _fake([], hits=[ent]))
     assert find.resolve("Sammy Davis, Jr.")["description"] == "American entertainer (1925-1990)"
+
+
+# the face check: a stub checker stands in for YuNet and SFace, keyed by the photo's url
+
+
+class _Faces:
+    """looks: {page index: faces.Look}; a photo not named shows one face of the person (e0)."""
+
+    def __init__(self, looks):
+        self.looks = looks
+
+    def look(self, raw):
+        idx = int(raw.decode(errors="ignore").rsplit("/", 1)[-1].split(".")[0])
+        return self.looks.get(idx, _one(E0))
+
+
+E0, E1, E2 = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]
+NEAR0 = [0.9, 0.3, 0.0]  # the same person as E0 in another photo (cosine 0.95)
+
+
+def _one(e):
+    return faces.Look(faces=1, one=True, embedding=e)
+
+
+SAM = _ent("Q7407093", "Sam Altman", ["Q5"], "Sam Altman TED.jpg", sites=80, desc="American entrepreneur")
+
+
+def _sam_pages():
+    # the lead (Sam Altman TED.jpg) comes back from _fake with index 5
+    return [_page("File:Sam Altman 2019.jpg", "CC BY 2.0", 1),
+            _page("File:Sam Altman in TAU 2023.jpg", "CC BY 2.0", 2),
+            _page("File:Sam Altman 2017.jpg", "CC BY 2.0", 3),
+            _page("File:Sam Altman 2022.jpg", "CC BY 2.0", 4)]
+
+
+def _with_faces(monkeypatch, looks):
+    monkeypatch.setattr(faces, "checker", lambda: _Faces(looks))
+
+
+def test_a_group_shot_is_never_a_persons_photo(monkeypatch, tmp_path):
+    """Live, 2026-11-20: Sam Altman's photo 3 was a stage panel of several people."""
+    monkeypatch.setattr(find, "_get", _fake(_sam_pages(), hits=[SAM]))
+    _with_faces(monkeypatch, {2: faces.Look(faces=3, why="group")})
+    got = find.fetch("Sam Altman", tmp_path)
+    titles = [g["title"] for g in got]
+    assert "File:Sam Altman in TAU 2023.jpg" not in titles and len(titles) == 3
+    found = json.loads((tmp_path / "found.json").read_text())
+    assert found["faces"] == "checked"
+    assert {"title": "File:Sam Altman in TAU 2023.jpg", "why": "group"} in found["left_out"]
+
+
+def test_one_face_must_lead_the_others_by_twice_the_area_and_be_big_enough():
+    assert faces.judge([(300, 380)]) == (True, "")
+    assert faces.judge([(300, 380), (60, 70)]) == (True, "")  # diners behind him
+    assert faces.judge([(31, 39), (29, 38)])[1] == "group"  # two people on a stage
+    assert faces.judge([(200, 250), (160, 200)])[1] == "group"
+    assert faces.judge([(40, 50)])[1] == "small"
+    assert faces.judge([])[1] == "no face"
+
+
+def test_a_face_that_is_not_the_persons_is_left_out(monkeypatch, tmp_path):
+    """A namesake or a stranger in a photo with the person's name is not them."""
+    monkeypatch.setattr(find, "_get", _fake(_sam_pages(), hits=[SAM]))
+    _with_faces(monkeypatch, {5: _one(E0), 1: _one(E1), 3: _one(NEAR0), 4: _one(E0)})
+    got = find.fetch("Sam Altman", tmp_path)
+    assert [g["title"] for g in got][0] == "File:Sam Altman TED.jpg"
+    assert "File:Sam Altman 2019.jpg" not in [g["title"] for g in got]
+    left = json.loads((tmp_path / "found.json").read_text())["left_out"]
+    assert {"title": "File:Sam Altman 2019.jpg", "why": "other"} in left
+
+
+def test_with_no_lead_face_the_faces_that_agree_win(monkeypatch, tmp_path):
+    """Chris Evans the presenter's Wikidata photo shows two people: no anchor, so the faces that
+    agree with each other are the person and a lone other face is left out."""
+    ent = _ent("Q2964710", "Chris Evans", ["Q5"], "Chris and joss.jpg", sites=40)
+    pages = [_page("File:Chris Evans 1.jpg", "CC BY 4.0", 1), _page("File:Chris Evans 2.jpg", "CC BY 4.0", 2),
+             _page("File:Chris Evans 3.jpg", "CC BY 4.0", 3), _page("File:Chris Evans 4.jpg", "CC BY 4.0", 4)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    _with_faces(monkeypatch, {5: faces.Look(faces=2, why="group"), 1: _one(E1),
+                              2: _one(E2), 3: _one([0.1, 0.0, 1.0]), 4: _one([0.0, 0.2, 1.0])})
+    got = find.fetch("Chris Evans", tmp_path)
+    assert [g["title"] for g in got] == ["File:Chris Evans 2.jpg", "File:Chris Evans 3.jpg", "File:Chris Evans 4.jpg"]
+    whys = {x["title"]: x["why"] for x in json.loads((tmp_path / "found.json").read_text())["left_out"]}
+    assert whys == {"File:Chris and joss.jpg": "group", "File:Chris Evans 1.jpg": "unlike"}
+
+
+def test_faces_agree_keeps_the_largest_group_and_breaks_ties_by_rank():
+    assert faces.agree([E1, E2, [0.1, 0, 1], [0, 0.2, 1]]) == [1, 2, 3]
+    assert faces.agree([E0, E1, E2]) == [0]  # nobody agrees: the best ranked alone
+    assert faces.agree([]) == []
+
+
+def test_an_artwork_of_the_person_is_left_out(monkeypatch, tmp_path):
+    """Live, 2026-11-20: Michael Jordan's photo 3 was C215's street art stencil of him."""
+    ent = _ent("Q41421", "Michael Jordan", ["Q5"], "Michael Jordan.jpg", sites=150)
+    pages = [_page("File:Michael Jordan 1984.jpg", "Public domain", 1),
+             _page("File:C215 - Michael Jordan (1).jpg", "CC BY-SA 4.0", 2, cats="C215|Graffiti of Michael Jordan"),
+             _page("File:Michael Jordan in 2014.jpg", "CC BY 2.0", 3, cats="Portrait paintings of men"),
+             _page("File:Michael Jordan 2006.jpg", "CC BY 2.0", 4)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    found = {c["title"]: c["artwork"] for c in find.search("Michael Jordan", entity=find._pack(ent))}
+    assert found["File:C215 - Michael Jordan (1).jpg"] and found["File:Michael Jordan in 2014.jpg"]
+    assert not found["File:Michael Jordan 1984.jpg"] and not found["File:Michael Jordan.jpg"]
+    got = [g["title"] for g in find.fetch("Michael Jordan", tmp_path)]  # faces off: still no artwork
+    assert got == ["File:Michael Jordan.jpg", "File:Michael Jordan 1984.jpg", "File:Michael Jordan 2006.jpg"]
+    left = json.loads((tmp_path / "found.json").read_text())["left_out"]
+    assert {"title": "File:C215 - Michael Jordan (1).jpg", "why": "art"} in left
+
+
+def test_a_file_commons_calls_an_artwork_is_one(monkeypatch):
+    """No word in the title says it, but the file's structured data says it is a sculpture."""
+    ent = _ent("Q41421", "Michael Jordan", ["Q5"], sites=150)
+    bronze = {**_page("File:MJ 1994.jpg", "CC BY 4.0", 6), "pageid": 9}
+
+    def get(url, timeout=30):
+        if "wbgetentities" in url and "M9" in url:
+            return json.dumps({"entities": {"M9": {"statements": {
+                "P180": [{}], "P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q860861"}}}}]}}}}).encode()
+        return _fake([], hits=[ent], depicted=[bronze])(url, timeout)
+    monkeypatch.setattr(find, "_get", get)
+    got = find.search("Michael Jordan", entity=find._pack(ent))
+    assert [(c["title"], c["artwork"]) for c in got] == [("File:MJ 1994.jpg", True)]
+
+
+def test_without_the_face_models_find_works_as_before_and_says_so(monkeypatch, tmp_path):
+    monkeypatch.setattr(find, "_get", _fake(_sam_pages(), hits=[SAM]))
+
+    def gone():
+        raise faces.Unavailable("the face model face_detection_yunet_2023mar.onnx: cannot download it (URLError)")
+    monkeypatch.setattr(faces, "checker", gone)
+    got = find.fetch("Sam Altman", tmp_path)
+    assert len(got) == 3  # today's ranking, unchecked, never a failed find
+    assert json.loads((tmp_path / "found.json").read_text())["faces"].startswith("not checked: the face model")
+
+
+def test_the_face_models_are_checked_against_their_sha256(monkeypatch, tmp_path):
+    monkeypatch.setenv("STONE_FACE_MODELS", str(tmp_path))
+    name = faces.MODELS["detect"][0]
+
+    class Bad:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n=-1, _left=[b"not the model"]):
+            return _left.pop() if _left else b""
+    monkeypatch.setattr(faces.urllib.request, "urlopen", lambda *a, **k: Bad())
+    with pytest.raises(faces.Unavailable, match="SHA-256"):
+        faces.model("detect")
+    assert not (tmp_path / name).exists()
+
+
+def test_left_out_line_names_each_reason_once():
+    left = [{"title": "a", "why": "group"}, {"title": "b", "why": "other"}, {"title": "c", "why": "group"}]
+    assert find.left_out_line(left, "Sam Altman") == \
+        "Left out 3 photos: 2 group shots, a face that may not be Sam Altman's."
+    assert find.left_out_line([{"title": "a", "why": "art"}], "X") == "Left out 1 photo: an artwork."
+    assert find.left_out_line([], "X") is None
+
+
+def test_stone_find_says_what_it_left_out(monkeypatch, jobenv):
+    from test_cli import stone
+    monkeypatch.setattr(find, "_get", _fake(_sam_pages(), hits=[SAM]))
+    _with_faces(monkeypatch, {2: faces.Look(faces=3, why="group"), 1: _one(E1)})
+    stone("new", "A mini figure of Sam Altman")
+    text, code, nxt = stone("find", "Sam Altman")
+    assert "Left out 2 photos: a face that may not be Sam Altman's, a group shot." in text
+    assert "Found 3 free-licensed photos" in text
+
+
+def test_stone_find_says_when_faces_went_unchecked(monkeypatch, jobenv):
+    from test_cli import stone
+    monkeypatch.setattr(find, "_get", _fake(_sam_pages(), hits=[SAM]))
+    stone("new", "A mini figure of Sam Altman")
+    text, code, nxt = stone("find", "Sam Altman")
+    assert "Faces not checked: STONE_FACES=0 turned it off; look that every photo shows Sam Altman alone." in text
+
+
+def test_someone_known_only_through_art_keeps_the_paintings(monkeypatch, tmp_path):
+    """Review of #48: Mozart's and Napoleon's Wikidata image is a painting; leaving out every artwork
+    left nothing, or a monument, where find had returned their portrait. A poster is never one:
+    live, 2026-11-20, a 1941 Mozart poster with a swastika was photo 2."""
+    ent = _ent("Q254", "Wolfgang Amadeus Mozart", ["Q5"], "Wolfgang-amadeus-mozart 1.jpg", sites=150)
+    pages = [_page("File:Mozart Verona 1770.jpg", "Public domain", 1, cats="Portrait paintings of Mozart"),
+             _page("File:Mozart-Plakat 1941 Arpke.jpg", "Public domain", 2),
+             _page("File:Mozart bust Salzburg.jpg", "CC BY-SA 4.0", 3, cats="Busts of Mozart")]
+    # live, 2026-11-20: only Commons' own tags say Krafft's portrait is a painting
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent], lead_cats="PD-Art (PD-old-100-expired)|Artworks with Wikidata item"))
+    got = [g["title"] for g in find.fetch("Wolfgang Amadeus Mozart", tmp_path)]
+    assert got == ["File:Wolfgang-amadeus-mozart 1.jpg", "File:Mozart Verona 1770.jpg", "File:Mozart bust Salzburg.jpg"]
+    left = json.loads((tmp_path / "found.json").read_text())["left_out"]
+    assert {"title": "File:Mozart-Plakat 1941 Arpke.jpg", "why": "art"} in left
+
+
+def test_with_only_artworks_of_them_the_artworks_are_their_likeness(monkeypatch, tmp_path):
+    ent = _ent("Q9", "Old Painter", ["Q5"], sites=40)
+    pages = [_page("File:Old Painter self portrait painting.jpg", "Public domain", 1),
+             _page("File:Statue of Old Painter.jpg", "CC BY 4.0", 2)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    assert len(find.fetch("Old Painter", tmp_path)) == 2
+
+
+def test_a_photographers_credit_or_a_loose_category_is_no_artwork(monkeypatch):
+    """Review of #48: "portrait by Steve Jurvetson" credits a photographer; "Cartoon Network" is a voice job."""
+    ent = _ent("Q317521", "Elon Musk", ["Q5"], sites=150)
+    pages = [_page("File:Elon Musk, portrait by Steve Jurvetson.jpg", "CC BY 2.0", 1),
+             _page("File:Elon Musk 2015.jpg", "CC BY 2.0", 2, cats="Cartoon Network|People in 2015"),
+             _page("File:Elon Musk (1).jpg", "CC BY 2.0", 3, cats="Portrait paintings of men")]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    art = {c["title"]: c["artwork"] for c in find.search("Elon Musk", entity=find._pack(ent))}
+    assert art == {"File:Elon Musk, portrait by Steve Jurvetson.jpg": False, "File:Elon Musk 2015.jpg": False,
+                   "File:Elon Musk (1).jpg": True}

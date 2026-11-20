@@ -38,7 +38,9 @@ keychains, cookie cutters and signs, and makes a height map for lithophanes and 
 The figure recipe makes a mini figure on a round plinth with a name on it. Ask for it plainly:
 `stone new 'A mini figure of Jensen Huang, 90 mm tall, with "JENSEN" on the base'`. With no
 photo, stone build says to run `stone find "<name>"`, which downloads free-licensed photos from
-Wikimedia Commons and writes credits.txt. With your own photo, run `stone image <photo>` instead.
+Wikimedia Commons and writes credits.txt. For a person it keeps only photos of one clear face
+that matches the person's Wikidata photo, leaves out artworks and group shots, and says what it
+left out. With your own photo, run `stone image <photo>` instead.
 Then stone build runs three local models (describe, style, lift) and the print checks. Run
 tools/figure/setup.sh once first.
 

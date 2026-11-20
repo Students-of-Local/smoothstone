@@ -1165,6 +1165,12 @@ def cmd_find(args, job: Job) -> Out:
     out.add(f"Found {len(got)} free-licensed photos of {name} on Wikimedia Commons:")
     for g in got:
         out.add(f"{Path(g['file']).name}: {g['license']}, by {g['author'] or 'unknown'}")
+    left = findtool.left_out_line(who.get("left_out") or [], name)
+    if left:
+        out.add(left)
+    if str(who.get("faces") or "").startswith("not checked"):
+        # the find still works without the face models; the person should know it went unchecked
+        out.add(f"Faces {who['faces']}; look that every photo shows {name} alone.")
     out.add(f"Credits: {job.image_dir / 'found' / 'credits.txt'} (name them when you share the part)")
     show([g["file"] for g in got], f"Photos found of {query}")
     out.owns_next = True  # the photos are what the plan was waiting for

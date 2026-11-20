@@ -73,3 +73,34 @@ def test_a_command_that_runs_too_long_takes_its_children_with_it(monkeypatch, tm
     else:
         os.kill(pid, 9)
         raise AssertionError(f"the child {pid} outlived the timeout")
+
+
+def _found(tmp_path, titles):
+    d = tmp_path / "image" / "found"
+    d.mkdir(parents=True)
+    photos = []
+    for i, title in enumerate(titles, 1):
+        (d / f"photo_{i}.jpg").write_bytes(title.encode())
+        photos.append({"title": "File:" + title, "file": str(d / f"photo_{i}.jpg")})
+    (d / "found.json").write_text(__import__("json").dumps({"wikidata": "Q41421", "photos": photos}))
+
+
+def test_a_spec_fails_a_find_that_took_the_stencil_or_a_group_shot(tmp_path):
+    """r5 and r6: the owner said a figure must be of the person meant, never an artwork or a group."""
+    from smoothstone import faces
+
+    class Stub:
+        def look(self, raw):
+            return faces.Look(faces=3, why="group") if b"TAU" in raw else faces.Look(faces=1, one=True)
+    _found(tmp_path, ["Michael Jordan.jpg", "C215 - Michael Jordan (1).jpg", "Sam in TAU.jpg"])
+    why = run.grade_found(tmp_path, {"wikidata": "Q41421", "never": ["C215 - Michael Jordan (1).jpg"],
+                                     "one_face": True}, checker=Stub())
+    assert why == ["photo C215 - Michael Jordan (1).jpg is one it must never take",
+                   "photo Sam in TAU.jpg is not one clear face (group)"]
+    assert run.grade_found(tmp_path, {"wikidata": "Q3308007"}) == ["photos of wikidata Q41421 (want Q3308007)"]
+
+
+def test_a_spec_whose_faces_cannot_be_checked_fails(tmp_path, monkeypatch):
+    _found(tmp_path, ["Michael Jordan.jpg"])
+    monkeypatch.setenv("STONE_FACES", "0")
+    assert run.grade_found(tmp_path, {"one_face": True}) == ["the faces could not be checked: STONE_FACES=0 turned it off"]
