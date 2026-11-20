@@ -780,6 +780,17 @@ def cmd_build(args, job: Job) -> Out:
             lower = int(lower) if quality.type == "int" else round(lower, 1)
             out.fix(f"lower {quality.name} to {lower} so it builds faster")
             out.next = f"stone set {quality.name}={lower}"
+        elif run.error.startswith(scad.SETUP_ERROR):
+            # a reset or another build fails the same way: stop and ask, as figure_step does
+            fix = f"uv tool install --reinstall --editable {config.REPO_ROOT}"
+            out.fix(f"{run.error}. This is the computer's setup, not the part: no setting fixes it")
+            out.next = (f"ask the person: {run.error}. Please run {fix}, then tell me to go on. "
+                        "When they say to go on: stone build")
+            out.add(f"Log: {bd / 'openscad.log'}")
+            out.stage = "needs_setup"
+            out.result = run.error[:120]
+            job.update(builds=builds, passed=False)
+            return out
         elif run.error.startswith(scad.SLICER_ERROR):
             seed = r.param("seed")
             if seed is not None:
@@ -994,6 +1005,13 @@ def figure_seed(job: Job, params: dict) -> int:
     return int(env) if env.isdigit() else int(params.get("seed") or 7)
 
 
+def progress(job: Job, text: str) -> None:
+    """A step that takes minutes says so as it starts: on stderr, so the person at the terminal
+    sees the build working and stdout still ends with the NEXT line, and in log.txt."""
+    job.log(text)
+    print(text, file=sys.stderr, flush=True)
+
+
 def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     """Photos -> styled render -> 3D figure, cached in images/figure. None after a FIX."""
     photos = job.photos()
@@ -1010,7 +1028,7 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     t0 = time.time()
     try:
         made = figuretool.make(photos, job.image_dir / "figure", style_name=style, who=who,
-                               seed=figure_seed(job, params), say=lambda s: job.log(s))
+                               seed=figure_seed(job, params), say=lambda s: progress(job, s))
     except figuretool.FigureProblem as e:
         job.log("figure failed:\n" + traceback.format_exc())
         out.add(f"Recipe: {r.name}")

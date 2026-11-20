@@ -632,3 +632,23 @@ def test_a_phone_the_case_does_not_know_is_still_asked_about(jobenv, recipes_roo
     stone("new", "A case for my iPhone 15.")
     _, code, nxt = stone("set", "phone_case")
     assert code == 1 and nxt.startswith("ask the person") and "iphone 17 pro max" in nxt.lower()
+
+
+def test_a_package_missing_from_stones_install_asks_the_person_instead_of_a_reset(jobenv, openscad, monkeypatch):
+    """Donovan's Sam Altman figure on the Mac, 2026-11-20: the OFF to STL step raised
+    ModuleNotFoundError (fast_simplification) and the FIX said to return to defaults, which
+    fails the same way. A missing package is the computer's setup: ask the person to reinstall."""
+    from smoothstone import clean
+
+    def missing(*a, **k):
+        raise ModuleNotFoundError("No module named 'fast_simplification'")
+
+    monkeypatch.setattr(clean, "for_slicer", missing)
+    stone("new", "a plate")
+    stone("set", "_demo")
+    text, code, nxt = stone("build")
+    assert code == 1 and "--reset" not in text, text
+    assert nxt.startswith("ask the person") and "fast_simplification" in nxt, nxt
+    assert "uv tool install --reinstall" in nxt and nxt.endswith("When they say to go on: stone build")
+    assert status_json(jobenv)["stage"] == "needs_setup"
+    assert stone("status")[2] == nxt

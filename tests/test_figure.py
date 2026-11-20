@@ -1030,3 +1030,22 @@ def test_a_look_between_two_identical_failures_still_counts_them_in_a_row(jobenv
     stone("show", "figure")
     stone("bogus")
     assert stone("build")[2].startswith("ask the person")
+
+
+def test_a_figure_build_says_each_long_step_on_the_terminal_as_it_starts(jobenv, monkeypatch, capsys):
+    """Donovan, 2026-11-20, a Sam Altman figure on the Mac: stone build printed nothing for minutes
+    while it described, styled and lifted, so it looked hung. Each step's line reaches the terminal
+    as it starts, on stderr, and stdout still ends with NEXT."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _figure_with_photo()
+    capsys.readouterr()
+
+    def make(*a, say=print, **k):
+        say("Lifting the render to 3D (Hunyuan3D-2mini, about 4 minutes)...")
+        assert "Lifting the render" in capsys.readouterr().err  # shown before the step ends
+        raise figure.FigureProblem("lift.py failed, see lift.log")
+
+    monkeypatch.setattr(figure, "make", make)
+    text, code, nxt = stone("build")
+    assert nxt == "stone build" and "Lifting" not in text, text
+    assert "Lifting the render to 3D" in (jobenv / "stone-job" / "log.txt").read_text()
