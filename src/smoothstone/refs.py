@@ -92,7 +92,7 @@ USES = [
     # "heat-set inserts" is how a part is built, not where it lives
     Use("hot", r"\bhot\b|\bheat(ed)?\b(?![- ]?set)|radiator|\bengine\b|\bstove\b", "ASA", ("PLA", "PLA+")),
     # "outside diameter" is a size, "card deck" a game
-    Use("outdoor", r"outdoors?|outside(?!\s*(?:diameters?|dimensions?|walls?|edges?|of|width|size|corners?)\b)|"
+    Use("outdoor", r"outdoors?|outside(?!\s*(?:diameters?|dimensions?|walls?|edges?|width|size|corners?)\b)|"
                    r"\bsun\b|sunny|sunlight|patio|garden|\byard\b|porch|balcony|(?<!card\s)\bdeck\b|mailbox",
         "PETG", ("PLA", "PLA+")),
     Use("flexible", r"flexible|\bflex\b|bumper|squishy|rubbery|\bsoft\b|gasket", "TPU"),
@@ -101,6 +101,13 @@ USES = [
     Use("food", r"\bfood\b|cookie|\bkitchen\b|\bcups?\b|\bmugs?\b|\bbowls?\b|\bdrink|\beat\b|snack|candy|fondant|dough", "PLA"),
 ]
 RECIPE_USE = {"cookie_cutter": "food"}
+# a cup holder holds a cup: a food word naming what a holder is for is not food contact
+HOLDS = re.compile(r"\b(?:food|cookie|kitchen|cups?|mugs?|bowls?|drinks?|snacks?|candy)\s+(?:holders?|stands?|racks?|"
+                   r"hooks?|trees?|hangers?|caddy|caddies|organizers?|coasters?|mounts?|sleeves?|shel(?:f|ves)|labels?|signs?)\b")
+
+
+def _matches(use: Use, text: str) -> bool:
+    return bool(re.search(use.words, HOLDS.sub(" ", text) if use.name == "food" else text))
 HEAT = ("dishwasher", "car", "hot", "outdoor")  # uses PLA is too soft for
 WHERE = {"dishwasher": "a dishwasher", "car": "a hot car", "hot": "heat", "outdoor": "sun outdoors"}
 
@@ -213,7 +220,7 @@ def material_for(request: str, recipe=None, params: dict | None = None) -> Pick:
     name = getattr(recipe, "name", recipe) or ""
     params = params or {}
     text = _words(request)
-    use = next((u for u in USES if re.search(u.words, text)), None)
+    use = next((u for u in USES if _matches(u, text)), None)
     if use is None and name in RECIPE_USE:
         use = next(u for u in USES if u.name == RECIPE_USE[name])
     named = named_material(request)
@@ -236,7 +243,7 @@ def material_for(request: str, recipe=None, params: dict | None = None) -> Pick:
         mat, kind = use.material, use.name
     else:
         mat, kind = "PLA", "default"
-    food = kind == "food" or bool(re.search(USES[-1].words, text)) or RECIPE_USE.get(name) == "food"
+    food = kind == "food" or _matches(USES[-1], text) or RECIPE_USE.get(name) == "food"
     swapped = None
     if food and _not_for_food(mat):
         # a cup for the dishwasher: the heat pick (ASA) is one its maker says not to use with food

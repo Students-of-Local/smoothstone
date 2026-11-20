@@ -194,3 +194,17 @@ def test_decorative_is_not_a_wall_plate_and_a_figure_gets_no_text_contrast():
         return " | ".join(r.line() for r in refs.standards_for(recipe, params, request))
     assert "6-32" not in texts("panel", {}, "a decorative panel")
     assert "Contrast" not in texts("figure", {}, "A mini figure of a man in a blue jacket and black pants")
+
+
+@pytest.mark.parametrize("req", ["a cup holder for my car", "a drink holder for my truck"])
+def test_a_cup_holder_holds_a_cup_and_is_no_food_part(req):
+    """Review of PR 47 round 2: "cup" in a car cup holder swapped the heat pick ASA for PETG."""
+    pick = refs.material_for(req, "box")
+    assert pick.material == "ASA", (req, pick.material)
+    assert not any("Food contact" in ln or ln.startswith("Not ASA") for ln in pick.lines())
+    assert refs.material_for("a mug rack for my wall", "hook").use != "food"
+    assert refs.material_for("a cup for my coffee", "box").use == "food"
+
+
+def test_outside_of_a_door_is_outdoors():
+    assert refs.material_for("a planter for outside of my front door", "planter").material != "PLA"
