@@ -12,6 +12,7 @@ from .recipes import Recipe, scad_literal
 
 BUILD_TIMEOUT = 300
 SLICER_ERROR = "the mesh is not clean for a slicer"
+SETUP_ERROR = "stone's own install is missing a Python package"
 PREVIEW_TIMEOUT = 120
 
 
@@ -96,6 +97,10 @@ def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadR
             from .clean import for_slicer
 
             for_slicer(load_off(out_off)).export(str(out_stl))
+        except ImportError as e:  # the computer's setup, not the part: no setting fixes it
+            log += f"\nOFF to STL failed: {type(e).__name__}: {e}"
+            out_stl.unlink(missing_ok=True)
+            err = f"{SETUP_ERROR} ({e})"
         except ValueError as e:  # the mesh cannot be made clean for a slicer
             log += f"\nOFF to STL failed: {e}"
             out_stl.unlink(missing_ok=True)
