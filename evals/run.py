@@ -332,6 +332,8 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         bad = [x["name"] for x in res if not x["ok"]]
         if bad:
             why.append("print checks fail: " + ", ".join(bad))
+    if exp.get("found"):
+        why += grade_found(job, exp["found"])
     col = None
     if exp.get("colors"):
         col = grade_colors(job, recipe, exp["colors"])
@@ -480,6 +482,32 @@ def _part_key(name: str) -> str:
 
 
 PART_OFF_MAX = 0.02  # share of a part's area that may take another color (0.0 measured on real f2 builds)
+
+
+def grade_found(job: Path, want: dict, checker=None) -> list[str]:
+    """What is wrong with the photos stone find took, by a spec's expect.found:
+    {"wikidata": the person's id, "never": file titles that must not be a photo, "one_face": every
+    photo shows one clear face (faces.py; a checker that cannot load fails the run, never passes it)}."""
+    try:
+        found = json.loads((job / "image" / "found" / "found.json").read_text())
+    except (OSError, ValueError):
+        return ["stone find took no photos"]
+    why = []
+    if want.get("wikidata") and found.get("wikidata") != want["wikidata"]:
+        why.append(f"photos of wikidata {found.get('wikidata')} (want {want['wikidata']})")
+    titles = [p.get("title", "").removeprefix("File:") for p in found.get("photos", [])]
+    why += [f"photo {t} is one it must never take" for t in titles if t in set(want.get("never", []))]
+    if want.get("one_face"):
+        from smoothstone import faces
+        try:
+            chk = checker or faces.checker()
+        except faces.Unavailable as e:
+            return why + [f"the faces could not be checked: {e}"]
+        for p in found.get("photos", []):
+            look = chk.look(Path(p["file"]).read_bytes())
+            if not look.one:
+                why.append(f"photo {p.get('title', '')[5:]} is not one clear face ({look.why})")
+    return why
 
 
 def grade_colors(job: Path, recipe: str | None, want: dict) -> dict:

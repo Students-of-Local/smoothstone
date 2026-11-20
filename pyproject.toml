@@ -17,6 +17,7 @@ dependencies = [
     "rtree>=1.2; platform_machine != 'x86_64' and platform_machine != 'AMD64' and sys_platform != 'darwin'",
     "manifold3d>=3.0",
     "fast-simplification>=0.1",
+    "opencv-python-headless>=4.10",
 ]
 
 [project.scripts]

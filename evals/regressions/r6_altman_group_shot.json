@@ -1,0 +1,13 @@
+{
+ "id": "r6_altman_group_shot",
+ "request": "A mini figure of Sam Altman",
+ "why": "The owner said: \"For figures it needs to ensure the figure referenced is the correct one they want.\" Live on 2026-11-20, stone find for Sam Altman took a stage panel of people as photo 3. A figure made from a group shot can take the wrong face, so every photo must show Sam Altman (Q7407093) alone, one clear face, and never that panel.",
+ "expect": {
+  "recipe": "figure",
+  "found": {
+   "wikidata": "Q7407093",
+   "never": ["Ilya Sutskever and Sam Altman in TAU.jpg"],
+   "one_face": true
+  }
+ }
+}
