@@ -122,6 +122,16 @@ In the slicer: filament 2 must be white, filament 4 must be black.
 NEXT: none, the part is ready
 ```
 
+## References
+
+A small model cannot research the web well, so stone carries a reference library in `recipes/lib/refs` and applies it on its own. Every fact there has its value, the page it came from and the date it was checked: filament temperatures, heat deflection, UV, drying and food contact from Prusament and Polymaker data sheets, ISO 273 clearance holes, US screw clearances, fan screw spacing from Noctua, Gridfinity, keystone and wall plate sizes, the IP2X test finger, ADA 703.5 sign letters, WCAG contrast and FDM design guides. `stone show` prints the references that apply to the part, and a passing build picks the filament from the request and says why:
+
+```
+Material: PETG, nozzle 240 to 260 C, bed 70 to 90 C (outdoors in sun: PLA softens near 55 C, PETG holds to 68 C; Prusament PETG datasheet, Prusament PLA datasheet)
+```
+
+`stone refs PETG` or `stone refs fan` lists the facts on a topic with their sources. No FDM print is certified food safe, and stone says so rather than call one safe.
+
 ## Recipes
 
 fan_guard, panel, cable_comb, vase, planter, gridfinity_bin, phone_stand, hook, spur_gear, box, keychain, cookie_cutter, sign, lithophane, relief and figure. Every recipe prints without supports and every default and example is built and checked in CI.

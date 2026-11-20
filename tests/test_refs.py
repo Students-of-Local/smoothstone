@@ -34,7 +34,7 @@ def test_every_entry_has_a_source_url_and_date():
 def test_library_has_no_em_or_en_dashes():
     for f in refs.FILES:
         text = (REFS / f"{f}.json").read_text()
-        assert "—" not in text and "–" not in text, f
+        assert "\u2014" not in text and "\u2013" not in text, f
 
 
 def test_every_material_has_its_print_temperatures():
