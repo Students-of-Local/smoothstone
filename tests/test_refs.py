@@ -161,3 +161,36 @@ def test_stone_refs_lists_topics_and_facts(jobenv):
     assert "fan.120: hole spacing 105 mm" in text
     text, code, nxt = stone("refs", "nonsense-topic")
     assert code == 1 and "No reference matches" in text
+
+
+@pytest.mark.parametrize("req", ["a PLA cup, 80 mm outside diameter", "a PLA box with holes for heat-set inserts",
+                                 "a PLA box for a card deck", "a PLA ring, outside edges rounded"])
+def test_a_size_or_a_build_step_is_not_a_place_and_keeps_pla(req):
+    """Review of PR 47: "outside diameter", "heat-set inserts" and "card deck" read as sun or heat and refused PLA."""
+    pick = refs.material_for(req, "box")
+    assert pick.material == "PLA" and pick.refused is None, req
+
+
+@pytest.mark.parametrize("req", ["a dishwasher-safe cup", "a mug for my hot coffee in the car"])
+def test_a_hot_food_part_never_gets_a_filament_its_maker_rules_out_for_food(req):
+    """Review of PR 47: a dishwasher cup got ASA, whose own entry says not for food, and the warning was cut."""
+    pick = refs.material_for(req, "box")
+    fe = refs.load().get(f"{pick.info.key}.food")
+    assert not (fe and "should not" in str(fe["value"]).lower()), (req, pick.material)
+    lines = refs.build_lines("box", {}, req)
+    assert any("no FDM print is certified food safe" in ln for ln in lines), lines
+    assert any(ln.startswith("Not ASA") for ln in lines), lines
+
+
+def test_a_named_material_too_soft_for_the_heat_is_refused_by_its_number():
+    pick = refs.material_for("a nylon phone mount for my car dashboard", "phone_stand")
+    soft = refs._hdt_value("PA") < refs._hdt_value("ASA")
+    assert (pick.material == "ASA" and pick.refused.startswith("Not PA")) if soft else pick.material == "PA"
+    assert refs.material_for("a polycarbonate mount for my car dashboard", "phone_stand").material == "PC"
+
+
+def test_decorative_is_not_a_wall_plate_and_a_figure_gets_no_text_contrast():
+    def texts(recipe, params, request=""):
+        return " | ".join(r.line() for r in refs.standards_for(recipe, params, request))
+    assert "6-32" not in texts("panel", {}, "a decorative panel")
+    assert "Contrast" not in texts("figure", {}, "A mini figure of a man in a blue jacket and black pants")

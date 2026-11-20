@@ -89,8 +89,12 @@ class Use:
 USES = [
     Use("dishwasher", r"dish\s?washer", "ASA", ("PLA", "PLA+")),
     Use("car", r"(?<!toy\s)\bcars?\b|dashboard|\bdash\b|windshield|vehicle|\btruck\b", "ASA", ("PLA", "PLA+")),
-    Use("hot", r"\bhot\b|\bheat(ed)?\b|radiator|\bengine\b|\bstove\b", "ASA", ("PLA", "PLA+")),
-    Use("outdoor", r"outdoors?|outside|\bsun\b|sunny|sunlight|patio|garden|\byard\b|porch|balcony|\bdeck\b|mailbox", "PETG", ("PLA", "PLA+")),
+    # "heat-set inserts" is how a part is built, not where it lives
+    Use("hot", r"\bhot\b|\bheat(ed)?\b(?![- ]?set)|radiator|\bengine\b|\bstove\b", "ASA", ("PLA", "PLA+")),
+    # "outside diameter" is a size, "card deck" a game
+    Use("outdoor", r"outdoors?|outside(?!\s*(?:diameters?|dimensions?|walls?|edges?|of|width|size|corners?)\b)|"
+                   r"\bsun\b|sunny|sunlight|patio|garden|\byard\b|porch|balcony|(?<!card\s)\bdeck\b|mailbox",
+        "PETG", ("PLA", "PLA+")),
     Use("flexible", r"flexible|\bflex\b|bumper|squishy|rubbery|\bsoft\b|gasket", "TPU"),
     Use("heavy", r"\bheavy\b|load.bearing|\bloads?\b|mechanically stressed", "PC"),
     Use("toy", r"\btoys?\b|\bkids?\b|\bkid's\b|\bchild(ren)?\b", "PLA+"),
@@ -147,6 +151,25 @@ def named_material(request: str) -> str | None:
     return None
 
 
+def _hdt_value(mat: str) -> float | None:
+    e = load().get(f"{MATERIALS[mat].key}.hdt")
+    try:
+        return float(e["value"]) if e else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _softer(named: str, wanted: str) -> bool:
+    """named softens at a lower temperature than the material this use calls for."""
+    a, b = _hdt_value(named), _hdt_value(wanted)
+    return a is not None and b is not None and a < b
+
+
+def _not_for_food(mat: str) -> bool:
+    e = load().get(f"{MATERIALS[mat].key}.food")
+    return bool(e) and "should not" in str(e["value"]).lower()
+
+
 def _hdt(mat: str) -> str:
     return num(get(f"{MATERIALS[mat].key}.hdt")["value"])
 
@@ -201,7 +224,10 @@ def material_for(request: str, recipe=None, params: dict | None = None) -> Pick:
             named = None if named == "TPU" else named
             use = None if use is not None and use.material == "TPU" else use
     refused = None
-    if named and use and named in use.refuse:
+    if named and use and use.name in HEAT and _softer(named, use.material):
+        # by the numbers: a named material that softens below what this use calls for is ruled out
+        refused, mat, kind = named, use.material, use.name
+    elif named and use and named in use.refuse:
         refused, mat, kind = named, use.material, use.name
     elif named:
         mat = named
@@ -210,13 +236,22 @@ def material_for(request: str, recipe=None, params: dict | None = None) -> Pick:
         mat, kind = use.material, use.name
     else:
         mat, kind = "PLA", "default"
+    food = kind == "food" or bool(re.search(USES[-1].words, text)) or RECIPE_USE.get(name) == "food"
+    swapped = None
+    if food and _not_for_food(mat):
+        # a cup for the dishwasher: the heat pick (ASA) is one its maker says not to use with food
+        swapped, mat = mat, "PETG"
     reason, cites = _reason(kind, mat)
     pick = Pick(mat, kind, reason, cites)
+    if swapped:
+        pick.extra.append(f"Not {swapped}: its maker says not to use it for food ({_cite(MATERIALS[swapped].key + '.food')}); "
+                          f"no filament here is both heat-rated and food-suitable, PETG softens near {_hdt('PETG')} C, "
+                          f"so wash it by hand ({_cite('petg.hdt')})")
     if refused:
         pick.refused = (f"Not {refused}: it softens near {_hdt(refused)} C, too soft for {WHERE[use.name]} "
                         f"({_cite(MATERIALS[refused].key + '.hdt')})")
     lib = load()
-    if kind == "food" or re.search(USES[-1].words, text) or RECIPE_USE.get(name) == "food":
+    if food:
         if kind != "food":
             pick.extra.append(f"Food contact: no FDM print is certified food safe; layer grooves hold bacteria "
                               f"({_cite('any.food.layers')})")
@@ -313,7 +348,7 @@ def standards_for(recipe, params: dict | None = None, request: str = "") -> list
     if re.search(r"keystone", text) or (name == "panel" and re.search(r"keystone|network|ethernet|rj45", text)):
         e = lib["keystone.cutout"]
         out.append(Ref(f"Keystone jack cutout {num(e['value']['width'])} x {num(e['value']['height'])} mm", e["cite"]))
-    if re.search(r"wall\s?plate|switch\s?plate|light switch|outlet|receptacle|decora", text):
+    if re.search(r"wall\s?plate|switch\s?plate|light switch|\boutlet (?:cover|plate)|receptacle|\bdecora\b", text):
         t, dcr, s = lib["wallplate.toggle"], lib["wallplate.decorator"], lib["wallplate.screw"]
         out.append(Ref(f"US wall plate screws {s['value']}, {num(t['value'])} in apart for a toggle switch", t["cite"]))
         out.append(Ref(f"Decorator (rocker) plate screws {num(dcr['value'])} in apart", dcr["cite"]))
@@ -335,7 +370,8 @@ def standards_for(recipe, params: dict | None = None, request: str = "") -> list
         st = lib["text.stroke_vs_nozzle"]
         out.append(Ref(f"Letter strokes at least {num(st['value'])} mm wide on a 0.4 mm nozzle", st["cite"]))
     cols = request_colors(request)
-    if len(cols) >= 2 and name in ("sign", "keychain", "box", "phone_case", "figure"):
+    # a figure's colors are clothes, not letters on a ground: no text contrast there
+    if len(cols) >= 2 and name in ("sign", "keychain", "box", "phone_case"):
         a, b = cols[0], cols[1]
         r = contrast_ratio(lib[f"color.{a}"]["value"], lib[f"color.{b}"]["value"])
         floor = float(lib["wcag.contrast_text"]["value"])
@@ -363,7 +399,7 @@ def show_lines(recipe, params: dict, request: str, limit: int = 3) -> list[str]:
 def build_lines(recipe, params: dict, request: str) -> list[str]:
     """What a passing build prints: the material line, and any standard this part falls short of."""
     pick = material_for(request, recipe, params)
-    return pick.lines()[:2] + [r.line() for r in standards_for(recipe, params, request) if r.flag]
+    return pick.lines() + [r.line() for r in standards_for(recipe, params, request) if r.flag]
 
 
 # stone refs
