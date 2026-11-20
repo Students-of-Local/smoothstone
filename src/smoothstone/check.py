@@ -34,6 +34,13 @@ TEXT_STROKE = {"sans": 0.15, "serif": 0.07, "mono": 0.14}
 # A recipe tells the check what text it made with
 #   echo(stone_text = [letter height, font, setting that grows it, that setting's value now]);
 # the setting is then raised in proportion. "font" as the setting means no size can pass.
+# finger_gap: a guard's largest opening must stop the IEC 61032 test finger (12 mm, IP2X).
+MAX_FINGER_GAP = 12.0  # mm
+GAP_PX = 0.1  # mm, raster step for the gap
+# A guard tells the check where its opening is and what closes it up:
+#   echo(stone_grille = [center x, center y, radius, z of the middle, setting, its value, "up" | "down"]);
+GRILLE_ECHO = re.compile(
+    r'ECHO: stone_grille = \[([-\d.e+]+), ([-\d.e+]+), ([-\d.e+]+), ([-\d.e+]+), "(\w+)", ([-\d.e+]+), "(up|down)"\]')
 TEXT_ECHO = re.compile(r'ECHO: stone_text = \[([-\d.e+]+), "(\w+)", "(\w+)", ([-\d.e+]+)\]')
 
 
@@ -153,6 +160,56 @@ def bed_edge_inset(mesh, contact: float) -> float | None:
     return (area - contact) / per
 
 
+def slice_mask(mesh, z: float, x0: float, y0: float, n: int, px: float) -> np.ndarray:
+    """n x n raster (rows along y) of the cross section at height z, cells of px from (x0, y0):
+    True where the cell center is inside the part, by the crossings of each row (even-odd)."""
+    import trimesh
+
+    seg = trimesh.intersections.mesh_plane(mesh, [0, 0, 1], [0, 0, z])
+    xs = x0 + (np.arange(n) + 0.5) * px
+    ys = y0 + (np.arange(n) + 0.5) * px
+    out = np.zeros((n, n), bool)
+    if len(seg) == 0:
+        return out
+    ax, ay, bx, by = seg[:, 0, 0], seg[:, 0, 1], seg[:, 1, 0], seg[:, 1, 1]
+    lo, hi = np.minimum(ay, by), np.maximum(ay, by)
+    for i, y in enumerate(ys):
+        m = (lo <= y) & (hi > y)
+        if not m.any():
+            continue
+        x = np.sort(ax[m] + (y - ay[m]) / (by[m] - ay[m]) * (bx[m] - ax[m]))
+        out[i] = np.searchsorted(x, xs) % 2 == 1
+    return out
+
+
+def largest_gap(mesh, cx: float, cy: float, r: float, z: float, px: float = GAP_PX) -> float:
+    """Diameter of the biggest ball that passes the grille: twice the largest distance from an
+    empty point of the slice at z, inside the opening circle, to the part or the circle."""
+    from scipy import ndimage
+
+    n = int(math.ceil(2 * r / px)) + 2
+    x0, y0 = cx - n * px / 2, cy - n * px / 2
+    solid = slice_mask(mesh, z, x0, y0, n, px)
+    c = (np.arange(n) + 0.5) * px - n * px / 2
+    inside = c[None, :] ** 2 + c[:, None] ** 2 < r * r
+    empty = inside & ~solid
+    if not empty.any():
+        return 0.0
+    return 2 * float(ndimage.distance_transform_edt(empty).max()) * px
+
+
+def grille_results(mesh, log: str | None) -> list[Result]:
+    out = []
+    for m in GRILLE_ECHO.finditer(log or ""):
+        cx, cy, r, z = (float(m[i]) for i in range(1, 5))
+        gap = largest_gap(mesh, cx, cy, r, float(mesh.bounds[0][2]) + z)
+        out.append(Result("finger_gap", gap <= MAX_FINGER_GAP, round(gap, 1),
+                          f"largest opening {gap:.1f} mm (max {MAX_FINGER_GAP:.0f} mm, the test finger)",
+                          advice="a finger fits through the grille; make the openings smaller",
+                          direction=m[7], need=MAX_FINGER_GAP, measured=gap, param=m[5], at=float(m[6])))
+    return out
+
+
 def text_echoes(log: str | None) -> list[tuple[float, str, str, float]]:
     """(letter height, font, setting, its value) for each stone_text echo in an OpenSCAD log."""
     return [(float(m[1]), m[2], m[3], float(m[4])) for m in TEXT_ECHO.finditer(log or "")]
@@ -262,6 +319,7 @@ def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Resul
                                  "the bottom edge 0.4 mm, as soft_extrude and bed_chamfer do",
                           direction="up", need=MIN_BED_EDGE, measured=inset))
 
+    out.extend(grille_results(mesh, log))
     # before min_wall: thin letters are thin walls too, and the text fix sizes both at once
     out.extend(text_results(log))
 

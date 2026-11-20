@@ -648,6 +648,15 @@ def suggest_value(r: rc.Recipe, params: dict, res: checks.Result, spec: dict):
         return best if best != cur else None
     if p.type not in ("number", "int") or direction not in ("up", "down"):
         return None
+    if res.name == "finger_gap" and res.at and res.measured and res.need:
+        # the openings shrink in proportion: more rings or blades, or smaller cells
+        if direction == "up":
+            v = math.ceil(res.at * res.measured / res.need - 1e-6)
+        else:
+            v = math.floor(res.at * res.need / res.measured + 1e-6)
+        if (p.max is not None and v > p.max) or (p.min is not None and v < p.min) or v == res.at:
+            return None
+        return v
     if res.name == "text" and res.at and res.measured and res.need:
         # letter height grows in proportion to the setting; whole mm, so the next build passes
         v = math.ceil(res.at * res.need / res.measured - 1e-6)

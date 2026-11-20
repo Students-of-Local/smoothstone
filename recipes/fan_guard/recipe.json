@@ -89,7 +89,7 @@
   {
    "name": "rings",
    "type": "int",
-   "default": 3,
+   "default": 4,
    "min": 1,
    "max": 10,
    "help": "rings style: number of rings"
@@ -150,7 +150,7 @@
   {
    "name": "blades",
    "type": "int",
-   "default": 11,
+   "default": 16,
    "min": 3,
    "max": 30,
    "help": "spiral style: number of blades"

@@ -8,14 +8,14 @@ opening = 0;         // round opening diameter, mm; 0 = auto
 hole_spacing = 0;    // screw hole spacing, mm; 0 = the standard for this fan size
 hole_d = 0;          // screw hole diameter, mm; 0 = auto
 corner_r = 5;        // outer corner radius, mm
-rings = 3;           // rings style: number of rings
+rings = 4;           // rings style: number of rings (4 keeps a 120 mm guard finger safe)
 ring_w = 2;          // rings style: ring width, mm
 ring_pitch = 0;      // rings style: distance between rings, mm; 0 = auto
 spokes = 4;          // rings style: number of spokes
 spoke_w = 3;         // rings style: spoke width, mm
 cell = 9;            // honeycomb and grid: cell size, mm
 bar_w = 1.6;         // honeycomb and grid: bar width, mm
-blades = 11;         // spiral style: number of blades
+blades = 16;         // spiral style: number of blades (16 keeps a 120 mm guard finger safe)
 blade_w = 2.4;       // spiral style: blade width, mm
 blade_sweep = 70;    // spiral style: how far each blade curves, degrees
 hub_d = -1;          // center disc diameter, mm; -1 = auto, 0 = none
@@ -82,6 +82,13 @@ module grille2d(r_out) {
         }
     }
 }
+
+// the opening, for the finger check: [x, y, radius, middle z, setting that closes it up, its value,
+// whether it goes "up" or "down"]
+echo(stone_grille = [0, 0, op_r, thickness / 2,
+    style == "rings" ? "rings" : style == "spiral" ? "blades" : "cell",
+    style == "rings" ? rings : style == "spiral" ? blades : cell,
+    style == "rings" || style == "spiral" ? "up" : "down"]);
 
 // one chamfer for the outline, the opening, the screw holes and every grille bar
 bed_chamfer() union() {
