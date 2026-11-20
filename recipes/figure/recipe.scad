@@ -40,6 +40,10 @@ module arc_name() {
     zc = lip + band / 2;
     rr = base == "hex" ? dr * cos(30) : dr;  // the flat face of a hex, or the drum
     step = min(160 / max(n, 1), ts * 0.86 / rr * 180 / PI);
+    // for the stroke check: [height, font, the setting that grows the letters, its value]. At
+    // the 10 mm cap only the font is left to change.
+    echo(stone_text = [ts, font, ts >= 10 ? "font" : ts >= bd * 0.11 ? "base_d" : "base_h",
+                       ts >= 10 ? 0 : ts >= bd * 0.11 ? bd : bh]);
     for (i = [0 : n - 1]) {
         a = -90 - ((n - 1) / 2 - i) * step;
         rotate([0, 0, a + 90]) translate([0, -(rr - 0.3), zc]) rotate([90, 0, 0])

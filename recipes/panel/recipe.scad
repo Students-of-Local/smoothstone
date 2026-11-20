@@ -16,7 +16,7 @@ hole_d = 3.4;        // screw hole diameter, mm (3.4 fits M3)
 hole_inset = 5;      // hole center distance from the edge, mm
 countersink = false; // countersink the screw holes for flat head screws
 label = "";          // text on the plate ("" = none)
-label_size = 5;      // text height, mm
+label_size = 6;      // text height, mm
 label_y = -99;       // text center along Y, mm; -99 = auto, under the cutouts
 label_style = "raised"; // raised | engraved
 edge = 0.8;          // top edge rounding, mm
@@ -40,6 +40,9 @@ hole_pos = holes == "ends" ? [[-(w / 2 - hole_inset), 0], [w / 2 - hole_inset, 0
          : holes == "top_bottom" ? [[0, -(d / 2 - hole_inset)], [0, d / 2 - hole_inset]]
          : holes == "corners" ? [for (sx = [-1, 1], sy = [-1, 1]) [sx * (w / 2 - hole_inset), sy * (d / 2 - hole_inset)]]
          : [];
+
+// the letters, for the stroke check: [height, font, the setting that grows them, its value]
+if (label != "") echo(stone_text = [label_size, "sans", "label_size", label_size]);
 
 // one chamfer for the outline, the cutouts and the holes alike
 bed_chamfer() difference() {

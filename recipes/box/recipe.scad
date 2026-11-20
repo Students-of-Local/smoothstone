@@ -40,7 +40,13 @@ module lid() union() {
     // engraved, mirrored to read right when the lid is turned over
 }
 
-module lid_with_label() difference() {
+module lid_with_label() {
+    // the letters, for the stroke check: [height, font, the setting that grows them, its value]
+    if (label != "") echo(stone_text = [label_size, "sans", "label_size", label_size]);
+    lid_engraved();
+}
+
+module lid_engraved() difference() {
     lid();
     if (label != "") translate([0, 0, -0.01]) linear_extrude(0.6) mirror([1, 0]) label2d(label, label_size);
 }

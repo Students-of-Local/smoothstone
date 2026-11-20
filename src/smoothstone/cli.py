@@ -642,8 +642,18 @@ def suggest_value(r: rc.Recipe, params: dict, res: checks.Result, spec: dict):
             v = direction == "on"
             return v if v != cur else None
         return None
+    if res.name == "text" and p.type == "choice":
+        # no letter size passes in this font: the font with the thickest strokes does
+        best = max(p.choices, key=lambda c: checks.TEXT_STROKE.get(str(c), 0))
+        return best if best != cur else None
     if p.type not in ("number", "int") or direction not in ("up", "down"):
         return None
+    if res.name == "text" and res.at and res.measured and res.need:
+        # letter height grows in proportion to the setting; whole mm, so the next build passes
+        v = math.ceil(res.at * res.need / res.measured - 1e-6)
+        if p.max is not None and v > p.max:
+            return None
+        return v
     try:
         cur = float(cur)
     except (TypeError, ValueError):
@@ -681,7 +691,7 @@ def plan_fix(r: rc.Recipe, params: dict, results: list[checks.Result]):
     for res in results:
         if res.ok:
             continue
-        spec = _fix_spec(r, res.name)
+        spec = {"param": res.param} if res.param and r.param(res.param) else _fix_spec(r, res.name)
         if spec is None:
             if res.name == "dims" and "dims" not in texts:
                 texts[res.name] = f"go back to the defaults with stone set {r.name} --reset"
@@ -874,7 +884,7 @@ def cmd_build(args, job: Job) -> Out:
         return out
 
     bed = config.bed(job.root)
-    results = checks.check_stl(stl, recipe=r, params=params, bed=bed)  # the file that ships
+    results = checks.check_stl(stl, recipe=r, params=params, bed=bed, log=run.log)  # the file that ships
     ok = checks.passed(results)
     size = checks.measured_size(results)
     texts, nxt = plan_fix(r, params, results) if not ok else ({}, None)
@@ -955,7 +965,10 @@ def cmd_check(args, job: Job) -> Out:
         out.fix(f"no file at {f}")
         out.next = "stone check <file.stl>"
         return out
-    results = checks.check_stl(f, recipe=r, params=params, bed=config.bed(job.root))
+    log = None
+    if not args.file and (job.build_dir / "openscad.log").is_file():
+        log = (job.build_dir / "openscad.log").read_text()
+    results = checks.check_stl(f, recipe=r, params=params, bed=config.bed(job.root), log=log)
     ok = checks.passed(results)
     size = checks.measured_size(results)
     texts, nxt = plan_fix(r, params or {}, results) if (r and not ok) else ({}, None)

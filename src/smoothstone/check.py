@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -25,6 +26,15 @@ CHAMFER_ZONE = 0.45  # mm
 # compensation is 0.2 mm, so a part needs at least that much inset at the bed edge.
 BED_EDGE_Z = 0.8  # mm, the slice the bed contact is compared with
 MIN_BED_EDGE = 0.2  # mm
+# text: a 0.4 mm nozzle lays a letter stroke as at least two lines, so it needs 0.8 mm.
+MIN_STROKE = 0.8  # mm
+# Thin strokes of each bold font as a share of the letter height (text size): the 10th percentile
+# of the stroke widths along the letters' center lines, measured from OpenSCAD's own text().
+TEXT_STROKE = {"sans": 0.15, "serif": 0.07, "mono": 0.14}
+# A recipe tells the check what text it made with
+#   echo(stone_text = [letter height, font, setting that grows it, that setting's value now]);
+# the setting is then raised in proportion. "font" as the setting means no size can pass.
+TEXT_ECHO = re.compile(r'ECHO: stone_text = \[([-\d.e+]+), "(\w+)", "(\w+)", ([-\d.e+]+)\]')
 
 
 @dataclass
@@ -39,6 +49,9 @@ class Result:
     direction: str = ""
     need: float | None = None
     measured: float | None = None
+    # the setting the part itself names as the fix, and its value now (see TEXT_ECHO)
+    param: str = ""
+    at: float | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -140,6 +153,28 @@ def bed_edge_inset(mesh, contact: float) -> float | None:
     return (area - contact) / per
 
 
+def text_echoes(log: str | None) -> list[tuple[float, str, str, float]]:
+    """(letter height, font, setting, its value) for each stone_text echo in an OpenSCAD log."""
+    return [(float(m[1]), m[2], m[3], float(m[4])) for m in TEXT_ECHO.finditer(log or "")]
+
+
+def text_results(log: str | None) -> list[Result]:
+    """One text check for the thinnest lettering the part has, or none when it has no text."""
+    worst = None
+    for size, font, param, at in text_echoes(log):
+        k = TEXT_STROKE.get(font, TEXT_STROKE["sans"])
+        if worst is None or size * k < worst[0]:
+            worst = (size * k, size, font, param, at, MIN_STROKE / k)
+    if worst is None:
+        return []
+    stroke, size, font, param, at, need = worst
+    return [Result("text", stroke >= MIN_STROKE - 1e-6, round(stroke, 2),
+                   f"letter strokes {stroke:.2f} mm at {size:.1f} mm {font} (need {MIN_STROKE} mm, "
+                   f"{need:.1f} mm letters)",
+                   advice="the letters are too thin for a 0.4 mm nozzle; make them bigger",
+                   direction="up", need=need, measured=size, param=param, at=at)]
+
+
 def _hull_area(xy: np.ndarray) -> float:
     from scipy.spatial import ConvexHull, QhullError
 
@@ -151,7 +186,8 @@ def _hull_area(xy: np.ndarray) -> float:
         return 0.0
 
 
-def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
+def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Result]:
+    """log: the OpenSCAD output of the build, which carries the stone_text echoes."""
     out: list[Result] = []
     bed = bed or config.DEFAULT_BED
     max_bodies = recipe.max_bodies if recipe else 1
@@ -226,6 +262,9 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
                                  "the bottom edge 0.4 mm, as soft_extrude and bed_chamfer do",
                           direction="up", need=MIN_BED_EDGE, measured=inset))
 
+    # before min_wall: thin letters are thin walls too, and the text fix sizes both at once
+    out.extend(text_results(log))
+
     wall = thinnest_wall(mesh)
     need_wall = recipe.min_wall if recipe else MIN_WALL
     if wall is None:
@@ -265,14 +304,14 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
     return out
 
 
-def check_stl(path, recipe=None, params=None, bed=None) -> list[Result]:
+def check_stl(path, recipe=None, params=None, bed=None, log=None) -> list[Result]:
     path = Path(path)
     try:
         mesh = _load(path)
     except Exception as e:  # trimesh raises many types on bad files
         return [Result("loads", False, None, f"cannot read {path.name}: {type(e).__name__}",
                        advice="the STL is missing or broken; rebuild the part")]
-    return check_mesh(mesh, recipe=recipe, params=params, bed=bed)
+    return check_mesh(mesh, recipe=recipe, params=params, bed=bed, log=log)
 
 
 def passed(results: list[Result]) -> bool:

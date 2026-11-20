@@ -26,6 +26,12 @@ fit = min(tw_avail / t10[0], ih / t10[1]) * 10;
 ts = text_size > 0 ? text_size : fit * 0.95;
 hy = holes == "top" ? 4 : 0;       // nudge the art down when there are holes
 
+// the letters, for the stroke check: [height, font, the setting that grows them, its value].
+// Fitted letters grow with the side that limits them.
+wide = tw_avail / t10[0] <= ih / t10[1];
+if (text != "") echo(stone_text = [ts, font, text_size > 0 ? "text_size" : wide ? "w" : "h",
+                                   text_size > 0 ? text_size : wide ? w : h]);
+
 assert(h > 2 * m + 6, "the sign is too short for the rim: make h bigger");
 
 module words() translate([slot / 2, -hy / 2]) text(text, size = ts, font = F, halign = "center", valign = "center");
