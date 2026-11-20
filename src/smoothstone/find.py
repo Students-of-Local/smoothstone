@@ -115,10 +115,9 @@ def _classes(ents: list[dict]) -> dict[str, set[str]]:
 def _in_english(field: dict) -> str:
     """English first, then "mul", the label Wikidata now keeps for a name in every language
     (Michael Jordan's en label moved there and the first label left was Chinese), then any."""
-    for lang in ("en", "mul", "en-us", "en-gb"):
-        if (field or {}).get(lang):
-            return field[lang].get("value", "")
-    return next(iter((field or {}).values()), {}).get("value", "")
+    text = next((field[lang].get("value", "") for lang in ("en", "mul", "en-us", "en-gb") if (field or {}).get(lang)),
+                next(iter((field or {}).values()), {}).get("value", ""))
+    return text.replace("\u2013", "-").replace("\u2014", "-")  # stone's lines carry no long dashes
 
 
 def _label(ent: dict) -> str:
@@ -153,10 +152,20 @@ HINT_NOISE = {"a", "an", "the", "of", "and", "or", "for", "with", "to", "in", "o
               "american", "english", "british", "famous", "known", "one"}  # a namesake within this factor of the best known's sitelinks: ask which one
 
 
+# a generational or academic suffix after a comma belongs to the name
+SUFFIX = re.compile(r"(?:jr|sr|ii|iii|iv|v|phd|md|esq)\.?(?=\s*(?:,|$|\s))", re.I)
+
+
 def split_hint(query: str) -> tuple[str, str]:
     """"Michael Jordan, computer scientist" or "Michael Jordan (computer scientist)": the name to
     search and the words that say which one."""
     m = re.match(r"\s*(.+?)\s*(?:\((.+)\)|,\s*(.+))\s*$", query)
+    if m and m.group(3) and SUFFIX.match(m.group(3)):  # "Hank Williams, Jr." is one name
+        rest = query[m.end(1):]
+        sfx = SUFFIX.match(rest.lstrip(" ,"))
+        name = query[:m.end(1)] + ", " + sfx.group(0).strip()
+        more = rest.lstrip(" ,")[sfx.end():].lstrip(" ,")
+        return name.strip(), more.strip()
     if not m:
         return query.strip(), ""
     return m.group(1).strip(), (m.group(2) or m.group(3) or "").strip()

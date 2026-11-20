@@ -359,3 +359,18 @@ def test_only_the_words_right_after_the_name_say_which_one():
     assert h("A mini figure of Michael Jordan the Berkeley computer scientist", "Michael Jordan the Berkeley") \
         == "computer scientist"
     assert h("a chibi Chris Evans figure", "Chris Evans") == "figure"
+
+
+def test_a_generational_suffix_stays_part_of_the_name():
+    """Review of #46: "Hank Williams, Jr." is a name, not Hank Williams with the hint "Jr."."""
+    assert find.split_hint("Hank Williams, Jr.") == ("Hank Williams, Jr.", "")
+    assert find.split_hint("Sammy Davis, Jr., the singer") == ("Sammy Davis, Jr.", "the singer")
+    assert find.split_hint("Tim Hardaway Jr.") == ("Tim Hardaway Jr.", "")
+    assert find.split_hint("Michael Jordan, computer scientist") == ("Michael Jordan", "computer scientist")
+    assert find.split_hint("Michael Jordan (computer scientist)") == ("Michael Jordan", "computer scientist")
+
+
+def test_a_description_with_a_long_dash_reads_with_a_hyphen(monkeypatch):
+    ent = _ent("Q297816", "Sammy Davis Jr.", ["Q5"], sites=60, desc="American entertainer (1925\u20131990)")
+    monkeypatch.setattr(find, "_get", _fake([], hits=[ent]))
+    assert find.resolve("Sammy Davis, Jr.")["description"] == "American entertainer (1925-1990)"
