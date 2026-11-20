@@ -24,7 +24,7 @@ def _ent(qid, label, p31, image=None, aliases=(), sites=0, desc="", lang="en"):
             "sitelinks": {f"w{i}wiki": {} for i in range(sites)}}
 
 
-def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=()):
+def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=(), lead_cats=""):
     """A fake Wikidata and Commons. hits: entities the name search returns, best first;
     people: humans the full text search returns; classes: P31 classes with their labels;
     seen collects every Commons search; depicted: the files Commons says depict the subject (P180)."""
@@ -42,7 +42,7 @@ def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicte
         if "wikidata" in url and "list=search" in url:
             return json.dumps({"query": {"search": [{"title": e["id"]} for e in people]}}).encode()
         if "titles=" in url:
-            return json.dumps({"query": {"pages": {"9": _page(q["titles"][0], "Public domain", 5)}}}).encode()
+            return json.dumps({"query": {"pages": {"9": _page(q["titles"][0], "Public domain", 5, cats=lead_cats)}}}).encode()
         if url.startswith("https://x/"):
             return b"\xff\xd8" + url.encode()  # each photo its own bytes, for a stub face checker
         if seen is not None:
@@ -565,13 +565,14 @@ def test_someone_known_only_through_art_keeps_the_paintings(monkeypatch, tmp_pat
     """Review of #48: Mozart's and Napoleon's Wikidata image is a painting; leaving out every artwork
     left nothing, or a monument, where find had returned their portrait. A poster is never one:
     live, 2026-11-20, a 1941 Mozart poster with a swastika was photo 2."""
-    ent = _ent("Q254", "Wolfgang Amadeus Mozart", ["Q5"], "Mozart painting by Krafft.jpg", sites=150)
+    ent = _ent("Q254", "Wolfgang Amadeus Mozart", ["Q5"], "Wolfgang-amadeus-mozart 1.jpg", sites=150)
     pages = [_page("File:Mozart Verona 1770.jpg", "Public domain", 1, cats="Portrait paintings of Mozart"),
              _page("File:Mozart-Plakat 1941 Arpke.jpg", "Public domain", 2),
              _page("File:Mozart bust Salzburg.jpg", "CC BY-SA 4.0", 3, cats="Busts of Mozart")]
-    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    # live, 2026-11-20: only Commons' own tags say Krafft's portrait is a painting
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent], lead_cats="PD-Art (PD-old-100-expired)|Artworks with Wikidata item"))
     got = [g["title"] for g in find.fetch("Wolfgang Amadeus Mozart", tmp_path)]
-    assert got == ["File:Mozart painting by Krafft.jpg", "File:Mozart Verona 1770.jpg", "File:Mozart bust Salzburg.jpg"]
+    assert got == ["File:Wolfgang-amadeus-mozart 1.jpg", "File:Mozart Verona 1770.jpg", "File:Mozart bust Salzburg.jpg"]
     left = json.loads((tmp_path / "found.json").read_text())["left_out"]
     assert {"title": "File:Mozart-Plakat 1941 Arpke.jpg", "why": "art"} in left
 
@@ -582,3 +583,15 @@ def test_with_only_artworks_of_them_the_artworks_are_their_likeness(monkeypatch,
              _page("File:Statue of Old Painter.jpg", "CC BY 4.0", 2)]
     monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
     assert len(find.fetch("Old Painter", tmp_path)) == 2
+
+
+def test_a_photographers_credit_or_a_loose_category_is_no_artwork(monkeypatch):
+    """Review of #48: "portrait by Steve Jurvetson" credits a photographer; "Cartoon Network" is a voice job."""
+    ent = _ent("Q317521", "Elon Musk", ["Q5"], sites=150)
+    pages = [_page("File:Elon Musk, portrait by Steve Jurvetson.jpg", "CC BY 2.0", 1),
+             _page("File:Elon Musk 2015.jpg", "CC BY 2.0", 2, cats="Cartoon Network|People in 2015"),
+             _page("File:Elon Musk (1).jpg", "CC BY 2.0", 3, cats="Portrait paintings of men")]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    art = {c["title"]: c["artwork"] for c in find.search("Elon Musk", entity=find._pack(ent))}
+    assert art == {"File:Elon Musk, portrait by Steve Jurvetson.jpg": False, "File:Elon Musk 2015.jpg": False,
+                   "File:Elon Musk (1).jpg": True}

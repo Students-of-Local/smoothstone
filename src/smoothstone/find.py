@@ -23,8 +23,14 @@ THUMB_PX = 1280
 # a painting, a drawing, a statue or street art of a person is someone's art, not the person: its
 # title, Commons categories or object name says so ("C215 - Michael Jordan", "Graffiti of ...")
 POSTER = re.compile(r"\b(?:posters?|plakat\w*|affiches?|carteles?|manifesto)\b", re.I)
+# a Commons category names art as "<kind> of ...": "Portrait paintings of men", "Busts of Mozart".
+# A loose word there is often something else: a voice actor's "Cartoon Network", "Drawings by children"
+ART_CATS = re.compile(r"\b(?:paintings|drawings|sketches|stencils|murals|graffiti|street art|statues|sculptures|busts|"
+                      r"wax figures|caricatures|cartoons|illustrations|mosaics|artworks|figurines|action figures)"
+                      r" (?:of|depicting|by)\b"
+                      r"|\bPD-Art\b|\bArtworks (?:with Wikidata item|digital representation)", re.I)  # Commons' own art tags
 ART_WORDS = re.compile(
-    r"\b(?:paintings?|painted portrait|portrait by|drawings?|sketch(?:es)?|stencils?|murals?|graffiti|"
+    r"\b(?:paintings?|painted portrait|drawings?|sketch(?:es)?|stencils?|murals?|graffiti|"
     r"street art|statues?|sculptures?|busts? of|wax (?:figures?|museum|statues?)|madame tussauds|"
     r"caricatures?|cartoons?|illustrations?|mosaics?|artworks?|fan art|figurines?|action figures?)\b", re.I)
 # what a Commons file's structured data calls an artwork (P31): painting, sculpture, statue, drawing,
@@ -319,14 +325,14 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
             score -= 25  # another person, a sign or a thing named after them
         if any(k in t for k in ("logo", "signature", "map", "diagram", "chart")):
             score -= 50
-        about = " ".join([title, _clean((meta.get("Categories") or {}).get("value", "")).replace("|", " | "),
-                          _clean((meta.get("ObjectName") or {}).get("value", ""))])
+        about = " ".join([title, _clean((meta.get("ObjectName") or {}).get("value", ""))])
+        cats = _clean((meta.get("Categories") or {}).get("value", ""))
         out.append({
             "title": title, "url": info.get("thumburl") or info.get("url"),
             "page": info.get("descriptionurl", ""), "width": w, "height": h,
             "license": lic, "author": _clean((meta.get("Artist") or {}).get("value", ""))[:120],
             "score": score, "lead": bool(p.get("lead")),
-            "artwork": bool(ART_WORDS.search(about) or depicted.get(title, {}).get("artwork")),
+            "artwork": bool(ART_WORDS.search(about) or ART_CATS.search(cats) or depicted.get(title, {}).get("artwork")),
         })
     out.sort(key=lambda c: -c["score"])
     seen, uniq = set(), []
