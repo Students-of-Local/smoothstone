@@ -1066,7 +1066,7 @@ def test_find_asks_which_person_when_two_well_known_people_share_the_name(jobenv
     monkeypatch.setattr(findtool, "fetch", which)
     stone("new", "A mini figure of Michael Jordan, 80 mm tall")
     text, code, nxt = stone("find")
-    assert asked and asked[0].startswith("Michael Jordan, ")  # the rest of the request is the hint
+    assert asked == ["Michael Jordan"]  # a size says nothing about which one
     assert nxt.startswith("ask the person: which Michael Jordan do you mean")
     assert "computer scientist" in nxt and "basketball player" in nxt
     assert 'stone find "Michael Jordan, ' in nxt

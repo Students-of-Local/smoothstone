@@ -148,7 +148,9 @@ AMBIGUOUS = 3.0
 # words of a request that say nothing about which person it is
 HINT_NOISE = {"a", "an", "the", "of", "and", "or", "for", "with", "to", "in", "on", "my", "me", "i", "make",
               "print", "figure", "figurine", "mini", "minifig", "statue", "chibi", "tall", "mm", "cm", "inch",
-              "inches", "base", "name", "his", "her", "their", "born", "please", "little", "small", "tiny"}  # a namesake within this factor of the best known's sitelinks: ask which one
+              "inches", "base", "name", "his", "her", "their", "born", "please", "little", "small", "tiny",
+              "bust", "sculpture", "statuette", "model", "replica", "toy", "doll", "painting", "portrait",
+              "american", "english", "british", "famous", "known", "one"}  # a namesake within this factor of the best known's sitelinks: ask which one
 
 
 def split_hint(query: str) -> tuple[str, str]:
@@ -171,9 +173,9 @@ def resolve(query: str) -> dict | None:
     """
     query, hint = split_hint(query)
     got = _resolve(query, hint)
-    if got is None and " the " in query:  # "Michael Jordan the Berkeley ...": the name, then which one
-        name, more = query.split(" the ", 1)
-        got = _resolve(name, f"{more} {hint}")
+    name, _, more = query.partition(" the ")
+    if got is None and more and all(w[:1].isupper() for w in name.split()):
+        got = _resolve(name, f"{more} {hint}")  # "Michael Jordan the Berkeley ...": the name, then which one
     return got
 
 
@@ -200,12 +202,15 @@ def _resolve(query: str, hint: str) -> dict | None:
 
         said = set(re.findall(r"[a-z0-9]+", hint.lower())) - HINT_NOISE - set(re.findall(r"[a-z0-9]+", query.lower()))
 
+        def told_of(ent):  # how many hint words this person's description has; 0 for a thing
+            if _kind(ent, chars) != "person" or _bare(query) not in _names(ent):
+                return 0
+            return len(said & set(re.findall(r"[a-z0-9]+", _in_english(ent.get("descriptions") or {}).lower())))
+
         def score(rank_ent):
             rank, ent = rank_ent
-            told = len(said & set(re.findall(r"[a-z0-9]+", _in_english(ent.get("descriptions") or {}).lower())))
-            return (told, fame(ent), -rank)
+            return (told_of(ent), fame(ent), -rank)
         best = max(enumerate(cands), key=score)[1]
-        told = score((0, best))[0]  # the hint named what this one is known for
         out = _pack(best, chars)
         # people who share the name: the person may mean one the search ranks lower
         same = [e for e in cands if e is not best and _kind(e, chars) == out["kind"] == "person"
@@ -213,6 +218,8 @@ def _resolve(query: str, hint: str) -> dict | None:
         out["namesakes"] = [{"id": e.get("id"), "label": _label(e),
                              "description": _in_english(e.get("descriptions") or {})}
                             for e in sorted(same, key=fame, reverse=True)[:3]]
+        # the hint answers only when it fits this one better than every namesake
+        told = told_of(best) > max((told_of(e) for e in same), default=0)
         out["ambiguous"] = bool(same) and not told and fame(same and max(same, key=fame)) * AMBIGUOUS > fame(best)
         return out
     except Exception:  # offline or an odd reply: search Commons by the words alone
@@ -256,7 +263,9 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
     words = [w.lower() for w in re.findall(r"[A-Za-z0-9]+", query)]
     # when others share the name, a photo whose only tie is its title must name this person in full
     own = _bare(ent["label"]) if ent and ent.get("namesakes") else ""
-    others = {_bare(n["label"]) for n in (ent or {}).get("namesakes", [])} - {own}
+    labels = {_bare(n["label"]) for n in (ent or {}).get("namesakes", [])}
+    others = labels - {own}
+    alike = own in labels  # "Michael Jordan" and "Michael Jordan": no title tells them apart
     out = []
     for p in (data.get("query") or {}).get("pages", {}).values():
         info = (p.get("imageinfo") or [{}])[0]
@@ -270,7 +279,7 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
         title = p.get("title", "")
         t = title.lower()
         if own and not p.get("lead") and title not in depicted and (
-                own not in _bare(title) or any(o in _bare(title) for o in others)):
+                alike or own not in _bare(title) or any(o in _bare(title) for o in others)):
             continue  # maybe the namesake: "Michael B Jordan - Sinners" is not Michael I. Jordan
         score = 10 * sum(w_ in t for w_ in words) - int(p.get("index", 0))
         if all(w_ in t for w_ in words):
@@ -358,6 +367,18 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
                     "description": (ent or {}).get("description") or "",
                     "photos": got}, indent=1))
     return got
+
+
+def hint_after(request: str, subject: str) -> str:
+    """The words that say which one, right after the name in the request: "Michael Jordan, the
+    basketball player" gives "the basketball player"; a size, a sentence end or a clause like
+    "for my son who ..." ends them."""
+    i = request.lower().find(subject.lower())
+    if i < 0:
+        return ""
+    rest = request[i + len(subject):]
+    rest = re.split(r"[.;!?()]|\d|\b(?:for|with|who|that|which|in|on|holding|wearing|and)\b", rest, 1)[0]
+    return rest.strip(" ,:-\"'")
 
 
 NOUN = (r"(?:figure|figurine|statue|statuette|bust|sculpture|model|miniature|mini|replica|toy|doll|print|"

@@ -1079,7 +1079,8 @@ def cmd_find(args, job: Job) -> Out:
     query = " ".join(args.query).strip().strip('"\'')
     if not query and (subject := findtool.subject_from_request(job.request())):
         # the rest of the request may say which one ("the Berkeley computer scientist")
-        query = f"{subject}, {job.request()}"
+        hint = findtool.hint_after(job.request(), subject)
+        query = f"{subject}, {hint}" if hint else subject
     if not query:
         out.fix('say who or what to find, like stone find "Ada Lovelace"')
         out.next = 'stone find "<who or what>"'

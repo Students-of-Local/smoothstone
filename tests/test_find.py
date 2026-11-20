@@ -325,3 +325,37 @@ def test_a_failed_find_leaves_no_earlier_persons_photos(monkeypatch, tmp_path):
     except find.FindProblem:
         pass
     assert not list(tmp_path.iterdir())
+
+
+def test_a_namesake_with_the_very_same_label_never_lends_a_photo(monkeypatch):
+    """Review of #46: both are labeled "Michael Jordan", so a title cannot tell them apart."""
+    pages = [_page("File:Michael Jordan.jpg", "CC BY 4.0", 1), _page("File:Michael Jordan 1997.jpg", "CC BY 4.0", 2)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ATHLETE, SCIENTIST, ACTOR]))
+    ent = find.resolve("Michael Jordan, computer scientist")
+    assert ent["id"] == "Q33"
+    assert [c["title"] for c in find.search("Michael Jordan", entity=ent)] == ["File:Jordan Berkeley.jpg"]
+
+
+def test_a_hint_that_fits_several_namesakes_still_asks(monkeypatch):
+    a = _ent("Q51", "Chris Evans", ["Q5"], sites=150, desc="actor and film producer")
+    b = _ent("Q52", "Chris Evans", ["Q5"], sites=90, desc="television presenter and radio producer")
+    monkeypatch.setattr(find, "_get", _fake([], hits=[a, b]))
+    assert find.resolve("Chris Evans, the producer")["ambiguous"]
+    assert find.resolve("Chris Evans, the radio presenter")["id"] == "Q52"
+
+
+def test_a_hint_never_lifts_a_thing_over_the_person(monkeypatch):
+    lincoln = _ent("Q91", "Abraham Lincoln", ["Q5"], sites=200, desc="president of the United States")
+    bust = _ent("Q92", "Abraham Lincoln", ["Q860861"], sites=0, desc="bronze bust by Gutzon Borglum")
+    monkeypatch.setattr(find, "_get", _fake([], hits=[bust, lincoln]))
+    assert find.resolve("Abraham Lincoln, bronze bust")["id"] == "Q91"
+
+
+def test_only_the_words_right_after_the_name_say_which_one():
+    h = find.hint_after
+    assert h("A mini figure of Michael Jordan, 80 mm tall", "Michael Jordan") == ""
+    assert h("A figure of Michael Jordan for my son who loves computer games", "Michael Jordan") == ""
+    assert h("A figure of Michael Jordan, the basketball player, 90 mm", "Michael Jordan") == "the basketball player"
+    assert h("A mini figure of Michael Jordan the Berkeley computer scientist", "Michael Jordan the Berkeley") \
+        == "computer scientist"
+    assert h("a chibi Chris Evans figure", "Chris Evans") == "figure"
