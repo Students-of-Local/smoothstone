@@ -871,6 +871,7 @@ def cmd_build(args, job: Job) -> Out:
         views = views_step(job, stl)
         if views:
             out.add(f"Views: {views} (look at every panel before you call it done)")
+            show([views], "The finished part")
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
         if colortool.asks_for_color(_color_text(job)):
@@ -1031,11 +1032,28 @@ def figure_seed(job: Job, params: dict) -> int:
     return int(env) if env.isdigit() else int(params.get("seed") or 7)
 
 
+# stone go sets these for a person at a terminal: "progress" takes a step's progress line,
+# "show" takes pictures and a caption; a model's run leaves them unset
+HOOKS: dict = {}
+
+
 def progress(job: Job, text: str) -> None:
     """A step that takes minutes says so as it starts: on stderr, so the person at the terminal
     sees the build working and stdout still ends with the NEXT line, and in log.txt."""
     job.log(text)
-    print(text, file=sys.stderr, flush=True)
+    if HOOKS.get("progress"):
+        HOOKS["progress"](text)
+    else:
+        print(text, file=sys.stderr, flush=True)
+
+
+def show(paths: list, caption: str) -> None:
+    """Pictures a person at a terminal sees as soon as they exist (stone go draws them inline)."""
+    if HOOKS.get("show"):
+        try:
+            HOOKS["show"]([Path(p) for p in paths], caption)
+        except Exception:  # a picture is a bonus: never a failed step
+            pass
 
 
 def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
@@ -1054,7 +1072,8 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     t0 = time.time()
     try:
         made = figuretool.make(photos, job.image_dir / "figure", style_name=style, who=who,
-                               seed=figure_seed(job, params), say=lambda s: progress(job, s))
+                               seed=figure_seed(job, params), say=lambda s: progress(job, s),
+                               shown=lambda p: show([p], "Styled picture, lifted to 3D next"))
     except figuretool.FigureProblem as e:
         job.log("figure failed:\n" + traceback.format_exc())
         out.add(f"Recipe: {r.name}")
@@ -1118,6 +1137,7 @@ def cmd_find(args, job: Job) -> Out:
     for g in got:
         out.add(f"{Path(g['file']).name}: {g['license']}, by {g['author'] or 'unknown'}")
     out.add(f"Credits: {job.image_dir / 'found' / 'credits.txt'} (name them when you share the part)")
+    show([g["file"] for g in got], f"Photos found of {query}")
     out.owns_next = True  # the photos are what the plan was waiting for
     if plan and plan.get("recipe") == "figure":
         out.next = "stone build"
@@ -2135,6 +2155,7 @@ def cmd_colors(args, job: Job) -> Out:
         out.add(f"Boundaries: {bd / 'boundaries.png'} (each color edge close up from 8 sides)")
     out.add(f"3MF: {final} (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)")
     out.add(f"Views: {bd / 'views.png'} (look at every panel before you call it done)")
+    show([bd / "views.png"], "The painted part")
     out.add("In the slicer: " + ", ".join(f"filament {i} must be {fil[i - 1]}" for i in used)
             + ". The 3MF names slots, not colors; set them in stone.toml [filaments] to match the printer.")
     mapping = mapping_line(assign)

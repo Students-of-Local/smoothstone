@@ -13,6 +13,8 @@ import sys
 import time
 from typing import Callable
 
+from . import term
+
 MAX_STEPS = 30
 SAME_STEP_MAX = 3  # the same command this many times without the job moving on: stop
 # lines worth showing a person from each step; the rest stay in log.txt
@@ -46,9 +48,43 @@ def _value(lines: list[str], head: str) -> str | None:
     return None
 
 
+def _live_wanted() -> bool:
+    want = os.environ.get("STONE_LIVE", "")
+    return want == "1" or (want != "0" and sys.stderr.isatty())
+
+
 def go(words: list[str], run: Callable[[list[str]], tuple[str, int]],
-       say: Callable[[str], None] = lambda s: print(s, flush=True)) -> int:
-    """words: the request and any new options (--image p), or nothing to go on. --job applies to every step."""
+       say: Callable[[str], None] = lambda s: print(s, flush=True), hooks: dict | None = None) -> int:
+    """words: the request and any new options (--image p), or nothing to go on. --job applies to every step.
+    hooks: the dict stone's steps call for progress lines and pictures (cli.HOOKS)."""
+    if hooks is None:
+        from .cli import HOOKS as hooks
+    live = term.Live() if _live_wanted() else None
+    how = term.protocol()
+    drawn: set[str] = set()
+
+    def on_show(paths, caption):
+        def draw():
+            if term.picture(paths, caption, how=how):
+                drawn.update(str(p) for p in paths)
+        if how:
+            live.above(draw) if live else draw()
+
+    def on_progress(text):
+        live.note(text) if live else say(f"    {text}")
+
+    saved = dict(hooks)
+    hooks.update(progress=on_progress, show=on_show)
+    try:
+        return _go(words, run, say, live, drawn)
+    finally:
+        hooks.clear()
+        hooks.update(saved)
+        if live:
+            live.stop()
+
+
+def _go(words, run, say, live, drawn) -> int:
     words = list(words)
     job: list[str] = []
     if "--job" in words:
@@ -78,7 +114,13 @@ def go(words: list[str], run: Callable[[list[str]], tuple[str, int]],
             argv = shlex.split(nxt)[1:]
         except ValueError:
             break
-        text, _ = run(argv + job)
+        if live:
+            live.start(f"Running {nxt}")
+        try:
+            text, _ = run(argv + job)
+        finally:
+            if live:
+                live.pause()
         lines, after = _split(text)
         for ln in lines:
             if ln.startswith(SHOW):
@@ -98,7 +140,7 @@ def go(words: list[str], run: Callable[[list[str]], tuple[str, int]],
     if nxt.startswith("none"):
         say(f"Ready in {mins:.1f} min: {stl}" if stl else f"Ready in {mins:.1f} min.")
         if views:
-            say(f"Views: {views}" + (" (opened)" if _open(views) else ""))
+            say(f"Views: {views}" + ("" if views in drawn else " (opened)" if _open(views) else ""))
         if credits:
             say(f"Photo credits: {credits} (name them when you share it)")
         say(f"NEXT: {nxt}")
