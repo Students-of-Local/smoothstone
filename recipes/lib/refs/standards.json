@@ -1,0 +1,581 @@
+{
+ "about": "Engineering standards and published dimensions. Where a standard is paywalled, the source is a public page that reproduces its table and names it.",
+ "entries": [
+  {
+   "id": "iso273.m2",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 2.2,
+    "medium": 2.4,
+    "coarse": 2.6
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M2 2.0 2.2 0.087 2.4 0.094 2.6 0.102",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "iso273.m2.5",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 2.7,
+    "medium": 2.9,
+    "coarse": 3.1
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M2.5 2.5 2.7 0.106 2.9 0.114 3.1 0.122",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "iso273.m3",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 3.2,
+    "medium": 3.4,
+    "coarse": 3.6
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M3 3.0 3.2 0.126 3.4 0.134 3.6 0.142",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "iso273.m4",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 4.3,
+    "medium": 4.5,
+    "coarse": 4.8
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M4 4.0 4.3 0.169 4.5 0.177 4.8 0.189",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "iso273.m5",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 5.3,
+    "medium": 5.5,
+    "coarse": 5.8
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M5 5.0 5.3 0.209 5.5 0.217 5.8 0.228",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "iso273.m6",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 6.4,
+    "medium": 6.6,
+    "coarse": 7.0
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M6 6.0 6.4 0.252 6.6 0.260 7.0 0.276",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "iso273.m8",
+   "topic": "clearance",
+   "standard": "ISO 273",
+   "value": {
+    "fine": 8.4,
+    "medium": 9.0,
+    "coarse": 10.0
+   },
+   "unit": "mm",
+   "note": "Chart columns are Close Fit (H12) = fine, Normal Fit (H13) = medium, Loose Fit (H14) = coarse. Columns: Bolt Size, Major Dia. (mm), Close Hole (mm), Close Hole (in), Normal Hole (mm), Normal Hole (in), Loose Hole (mm), Loose Hole (in).",
+   "quote": "Metric Series Clearance Holes (ISO 273) ... M8 8.0 8.4 0.331 9.0 0.354 10.0 0.394",
+   "source": "Albany County Fasteners, Clearance Hole Chart (Metric Series Clearance Holes (ISO 273))",
+   "cite": "ISO 273 table, Albany County Fasteners",
+   "url": "https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "us_clearance.no4",
+   "topic": "clearance",
+   "standard": "none named on page (unified inch screw clearance drill table)",
+   "value": {
+    "close_fit": 0.116,
+    "free_fit": 0.1285,
+    "close_drill": "#32",
+    "free_drill": "#30",
+    "value_mm": {
+     "close_fit": 2.946,
+     "free_fit": 3.264
+    }
+   },
+   "unit": "in",
+   "note": "value_mm = inch value x 25.4, rounded to 0.001 mm (my conversion). Cross-checks: TR Fastenings (https://www.trfastenings.com/Knowledge-Base/Engineering-Data/tapping-sizes-and-clearance-holes) lists the same close and free fit drills (#4: 32, 30; #6: 27, 25; #8: 18, 16; #10: 9, 7). The Albany County Fasteners chart (https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf) has the same Close Fit drill, but its Normal Fit is #15 (0.1800) for #8 and #5 (0.2055) for #10, looser than this free fit.",
+   "quote": "#4 | 32 | 0.116 | 30 | 0.1285 (columns: Size of Screw; Close Fit Drill Size, Decimal Equivalent; Free Fit Drill Size, Decimal Equivalent)",
+   "source": "Imperial Clearance Hole Sizes | Bolts & Screws | Fractory",
+   "cite": "Fractory imperial clearance holes",
+   "url": "https://fractory.com/?p=21622",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "us_clearance.no6",
+   "topic": "clearance",
+   "standard": "none named on page (unified inch screw clearance drill table)",
+   "value": {
+    "close_fit": 0.144,
+    "free_fit": 0.1495,
+    "close_drill": "#27",
+    "free_drill": "#25",
+    "value_mm": {
+     "close_fit": 3.658,
+     "free_fit": 3.797
+    }
+   },
+   "unit": "in",
+   "note": "value_mm = inch value x 25.4, rounded to 0.001 mm (my conversion). Cross-checks: TR Fastenings (https://www.trfastenings.com/Knowledge-Base/Engineering-Data/tapping-sizes-and-clearance-holes) lists the same close and free fit drills (#4: 32, 30; #6: 27, 25; #8: 18, 16; #10: 9, 7). The Albany County Fasteners chart (https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf) has the same Close Fit drill, but its Normal Fit is #15 (0.1800) for #8 and #5 (0.2055) for #10, looser than this free fit.",
+   "quote": "#6 | 27 | 0.144 | 25 | 0.1495 (columns: Size of Screw; Close Fit Drill Size, Decimal Equivalent; Free Fit Drill Size, Decimal Equivalent)",
+   "source": "Imperial Clearance Hole Sizes | Bolts & Screws | Fractory",
+   "cite": "Fractory imperial clearance holes",
+   "url": "https://fractory.com/?p=21622",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "us_clearance.no8",
+   "topic": "clearance",
+   "standard": "none named on page (unified inch screw clearance drill table)",
+   "value": {
+    "close_fit": 0.1695,
+    "free_fit": 0.177,
+    "close_drill": "#18",
+    "free_drill": "#16",
+    "value_mm": {
+     "close_fit": 4.305,
+     "free_fit": 4.496
+    }
+   },
+   "unit": "in",
+   "note": "value_mm = inch value x 25.4, rounded to 0.001 mm (my conversion). Cross-checks: TR Fastenings (https://www.trfastenings.com/Knowledge-Base/Engineering-Data/tapping-sizes-and-clearance-holes) lists the same close and free fit drills (#4: 32, 30; #6: 27, 25; #8: 18, 16; #10: 9, 7). The Albany County Fasteners chart (https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf) has the same Close Fit drill, but its Normal Fit is #15 (0.1800) for #8 and #5 (0.2055) for #10, looser than this free fit.",
+   "quote": "#8 | 18 | 0.1695 | 16 | 0.177 (columns: Size of Screw; Close Fit Drill Size, Decimal Equivalent; Free Fit Drill Size, Decimal Equivalent)",
+   "source": "Imperial Clearance Hole Sizes | Bolts & Screws | Fractory",
+   "cite": "Fractory imperial clearance holes",
+   "url": "https://fractory.com/?p=21622",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "us_clearance.no10",
+   "topic": "clearance",
+   "standard": "none named on page (unified inch screw clearance drill table)",
+   "value": {
+    "close_fit": 0.196,
+    "free_fit": 0.201,
+    "close_drill": "#9",
+    "free_drill": "#7",
+    "value_mm": {
+     "close_fit": 4.978,
+     "free_fit": 5.105
+    }
+   },
+   "unit": "in",
+   "note": "value_mm = inch value x 25.4, rounded to 0.001 mm (my conversion). Cross-checks: TR Fastenings (https://www.trfastenings.com/Knowledge-Base/Engineering-Data/tapping-sizes-and-clearance-holes) lists the same close and free fit drills (#4: 32, 30; #6: 27, 25; #8: 18, 16; #10: 9, 7). The Albany County Fasteners chart (https://www.albanycountyfasteners.com/media/6b/b8/g0/1764944339/clearance-hole-chart.pdf) has the same Close Fit drill, but its Normal Fit is #15 (0.1800) for #8 and #5 (0.2055) for #10, looser than this free fit.",
+   "quote": "#10 | 9 | 0.196 | 7 | 0.201 (columns: Size of Screw; Close Fit Drill Size, Decimal Equivalent; Free Fit Drill Size, Decimal Equivalent)",
+   "source": "Imperial Clearance Hole Sizes | Bolts & Screws | Fractory",
+   "cite": "Fractory imperial clearance holes",
+   "url": "https://fractory.com/?p=21622",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.hole_allowance",
+   "topic": "fdm",
+   "standard": "design guide (Protolabs Network)",
+   "value": {
+    "direction": "undersize",
+    "numeric_allowance": null,
+    "advice": "print critical holes undersized, then drill to size"
+   },
+   "unit": "",
+   "note": "No numeric hole allowance found in a design guide read this session. The page says the amount depends on printer, slicer, hole size and material.",
+   "quote": "FDM often prints undersized vertical-axis holes. ... The amount of undersize depends on the printer, slicing software, hole size and material. ... If the diameter of the vertical axis hole is critical, the recommendation is to print it undersized and then drill the hole to the correct diameter.",
+   "source": "How to design parts for FDM 3D printing | Protolabs Network",
+   "cite": "Protolabs Network (Hubs) FDM design guide",
+   "url": "https://www.hubs.com/knowledge-base/how-design-parts-fdm-3d-printing/",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.min_wall",
+   "topic": "fdm",
+   "standard": "design guide",
+   "value": {
+    "supported": 1.0,
+    "unsupported": 1.0
+   },
+   "unit": "mm",
+   "note": "The guide does not state a nozzle size.",
+   "quote": "Supported Walls Walls that are connected to the surrounding of the part on at least two sides. 1.0[mm] ... Unsupported Walls ... 1.0[mm]",
+   "source": "Design Guideline FDM (amf.uzh.ch, University of Zurich)",
+   "cite": "University of Zurich FDM design guideline",
+   "url": "https://www.amf.uzh.ch/dam/jcr:fd1ee024-1a98-488b-89ec-ffd85befa786/Design-Guideline-FDM.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.min_wall.single_perimeter",
+   "topic": "fdm",
+   "standard": "design guide (Prusa knowledge base)",
+   "value": 0.45,
+   "unit": "mm",
+   "note": "Absolute floor for a 0.4 mm nozzle: one extrusion width in PrusaSlicer.",
+   "quote": "The most common size and stock nozzle size on MK3S is 0.4 mm, which in PrusaSlicer has an extrusion width of 0.45 mm. ... Walls thinner than one nozzle perimeter are not printable.",
+   "source": "Modeling with 3D printing in mind | Prusa Knowledge Base",
+   "cite": "Prusa Knowledge Base",
+   "url": "https://help.prusa3d.com/article/modeling-with-3d-printing-in-mind_164135",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.text",
+   "topic": "fdm",
+   "standard": "design guide",
+   "value": {
+    "embossed_min": 1.0,
+    "font_min_pt": 14
+   },
+   "unit": "mm",
+   "note": "The guide does not state a nozzle size. Engraved depth or stroke width is not given separately.",
+   "quote": "Embossed & Engraved Details ... Min. 1.0[mm] embossed Min. Font 14pt Clearly legible font depends strongly on the font type",
+   "source": "Design Guideline FDM (amf.uzh.ch, University of Zurich)",
+   "cite": "University of Zurich FDM design guideline",
+   "url": "https://www.amf.uzh.ch/dam/jcr:fd1ee024-1a98-488b-89ec-ffd85befa786/Design-Guideline-FDM.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.hole",
+   "topic": "fdm",
+   "standard": "design guide",
+   "value": 2.0,
+   "unit": "mm",
+   "note": "The guide does not state a nozzle size.",
+   "quote": "Holes The minimum diameter to successfully manufacture a hole. 2.0[mm] highly depends on the hole length and sorrounding wall thickness",
+   "source": "Design Guideline FDM (amf.uzh.ch, University of Zurich)",
+   "cite": "University of Zurich FDM design guideline",
+   "url": "https://www.amf.uzh.ch/dam/jcr:fd1ee024-1a98-488b-89ec-ffd85befa786/Design-Guideline-FDM.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.gap",
+   "topic": "fdm",
+   "standard": "design guide",
+   "value": 0.5,
+   "unit": "mm",
+   "note": "The guide does not state a nozzle size.",
+   "quote": "Connecting / Moving Parts The recommended clearance between two moving or connecting parts. 0.5[mm]",
+   "source": "Design Guideline FDM (amf.uzh.ch, University of Zurich)",
+   "cite": "University of Zurich FDM design guideline",
+   "url": "https://www.amf.uzh.ch/dam/jcr:fd1ee024-1a98-488b-89ec-ffd85befa786/Design-Guideline-FDM.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.gap.moving_prusa",
+   "topic": "fdm",
+   "standard": "design guide (Prusa knowledge base)",
+   "value": 0.3,
+   "unit": "mm",
+   "note": "Prusa's starting point for movable parts; the UZH guide recommends 0.5 mm.",
+   "quote": "An initial good measurement for movable parts is at least 0.3 mm.",
+   "source": "Modeling with 3D printing in mind | Prusa Knowledge Base",
+   "cite": "Prusa Knowledge Base",
+   "url": "https://help.prusa3d.com/article/modeling-with-3d-printing-in-mind_164135",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fdm.min_feature",
+   "topic": "fdm",
+   "standard": "design guide",
+   "value": {
+    "min_feature": 2.0,
+    "min_pin_diameter": 3.0
+   },
+   "unit": "mm",
+   "note": "The guide does not state a nozzle size.",
+   "quote": "Pin Diameter / Minimum Features ... Min. pin diameter: 3.0[mm] ... Min. features: 2.0[mm]",
+   "source": "Design Guideline FDM (amf.uzh.ch, University of Zurich)",
+   "cite": "University of Zurich FDM design guideline",
+   "url": "https://www.amf.uzh.ch/dam/jcr:fd1ee024-1a98-488b-89ec-ffd85befa786/Design-Guideline-FDM.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "ip2x.finger",
+   "topic": "safety",
+   "standard": "IEC 61032 test probe B (Figure 2); IEC 60529 IP2X",
+   "value": {
+    "diameter": 12,
+    "length": 80,
+    "diameter_tol": 0.1,
+    "length_tol": 0.2
+   },
+   "unit": "mm",
+   "note": "Test equipment maker page, not the standard. Its page lists 'Applied Thrust: 10N ± 0.5N'. IP2X use confirmed on https://moddyren.github.io/IP-Code/IP2X-Access-ProbeB-Jointed-Test-Finger.html: 'This test probe B conforms to the standard requirements of IEC61032 fig.2, IEC60529 IP2X and IEC60065.' (12mm diameter, 80mm finger length).",
+   "quote": "Knurled Finger Diameter: 12mm ± 0.1mm; Knurled Finger Length: 80mm ± 0.2mm; Standards: IEC 61032 Figure 2; IEC 60529 Figure 1",
+   "source": "Test Probe B of IEC 61032 - Jointed Test Finger - LISUN",
+   "cite": "IEC 61032 probe B, LISUN",
+   "url": "https://www.lisungroup.com/products/test-finger-test-probe-test-pin/test-probe-b-of-iec-61032-jointed-test-finger.html",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "wallplate.device_strap",
+   "topic": "wallplate",
+   "standard": "NEMA WD 6",
+   "value": 2.375,
+   "unit": "in",
+   "note": "60.325 mm. This is the two-screw device or strap mounting used by toggle plates. The page does not label it 'toggle'; see wallplate.toggle.",
+   "quote": "These are the most common nominal spacings for mounting holes for wallplates and covers. Holes are normally countersunk for oval head 6-32 screws. 2.375\" (60.325mm) Device or Strap",
+   "source": "Cooper Wiring Devices, Wallplates catalog Section O, page O-Intro-3, Mounting Holes for Wallplates and Covers",
+   "cite": "Cooper wallplate catalog",
+   "url": "https://images.orgill.com/weblarge/10022/Cooper Wiring_PJ8W-CP-L_Catalog.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "wallplate.toggle",
+   "topic": "wallplate",
+   "standard": "NEMA WD 6",
+   "value": 2.375,
+   "unit": "in",
+   "note": "Maker product page (Mulberry Metal). 2.375 in = 60.325 mm.",
+   "quote": "(Toggle) device mounting (2.375 in. between mounting holes) ... Comes with 1/2 inch standard slotted 6-32 oval head screws in matching finishes.",
+   "source": "Mulberry Metal product page, 2-gang with toggle opening and (3) Interchangeable openings, Princess size",
+   "cite": "Mulberry Metal wall plate",
+   "url": "https://mulberrymetal.com/?p=147804",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "wallplate.decorator",
+   "topic": "wallplate",
+   "standard": "NEMA WD 6",
+   "value": 3.81,
+   "unit": "in",
+   "note": "96.77 mm. Labeled Decorator/GFCI on the page. The 3.281 in (83.34 mm) spacing on the same page is labeled Box, not decorator.",
+   "quote": "3.81\" (96.77mm) Decorator/GFCI",
+   "source": "Cooper Wiring Devices, Wallplates catalog Section O, page O-Intro-3, Mounting Holes for Wallplates and Covers",
+   "cite": "Cooper wallplate catalog",
+   "url": "https://images.orgill.com/weblarge/10022/Cooper Wiring_PJ8W-CP-L_Catalog.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "wallplate.screw",
+   "topic": "wallplate",
+   "standard": "NEMA WD 6",
+   "value": "6-32",
+   "unit": "thread",
+   "note": "Cooper's page also says holes are normally countersunk for oval head 6-32 screws.",
+   "quote": "Oval head milled slot 1/2-inch long, 6x32 thread. Standard size for duplex receptacles and toggle switch wall plates.",
+   "source": "Legrand (Pass & Seymour) 510, Wall Plate Screws, Oval Head Milled Slot, 6x32 Thread",
+   "cite": "Legrand wall plate screw 510",
+   "url": "https://www.legrand.us/wiring-devices/electrical-accessories/wall-plate-screws-oval-head-milled-slot-6x32-thread-brown/p/510",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fan.80",
+   "topic": "fan",
+   "standard": "maker spec (Noctua)",
+   "value": {
+    "hole_spacing": 71.5,
+    "hole_diameter": null
+   },
+   "unit": "mm",
+   "note": "Square frame. Noctua's spec page gives no mounting hole diameter.",
+   "quote": "Frame shape | Square | Mounting hole spacing(s) | 71.5 x 71.5 mm",
+   "source": "NF-A8 PWM: Specifications | Noctua",
+   "cite": "NF-A8 PWM specifications, Noctua",
+   "url": "https://www.noctua.at/en/products/nf-a8-pwm/specifications",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fan.92",
+   "topic": "fan",
+   "standard": "maker spec (Noctua)",
+   "value": {
+    "hole_spacing": 82.5,
+    "hole_diameter": null
+   },
+   "unit": "mm",
+   "note": "Square frame. Noctua's spec page gives no mounting hole diameter.",
+   "quote": "Frame shape | Square | Mounting hole spacing(s) | 82.5 x 82.5 mm",
+   "source": "NF-A9 PWM: Specifications | Noctua",
+   "cite": "NF-A9 PWM specifications, Noctua",
+   "url": "https://www.noctua.at/en/products/nf-a9-pwm/specifications",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fan.120",
+   "topic": "fan",
+   "standard": "maker spec (Noctua)",
+   "value": {
+    "hole_spacing": 105,
+    "hole_diameter": null
+   },
+   "unit": "mm",
+   "note": "Square frame. Noctua's spec page gives no mounting hole diameter.",
+   "quote": "Frame shape | Square | Mounting hole spacing(s) | 105 x 105 mm",
+   "source": "NF-A12x25 PWM: Specifications | Noctua",
+   "cite": "NF-A12x25 PWM specifications, Noctua",
+   "url": "https://www.noctua.at/en/products/nf-a12x25-pwm/specifications",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "fan.140",
+   "topic": "fan",
+   "standard": "maker spec (Noctua)",
+   "value": {
+    "hole_spacing": 124.5,
+    "hole_diameter": null
+   },
+   "unit": "mm",
+   "note": "Square frame. Noctua's spec page gives no mounting hole diameter.",
+   "quote": "Frame shape | Square | Mounting hole spacing(s) | 124.5 x 124.5 mm",
+   "source": "NF-A14 PWM: Specifications | Noctua",
+   "cite": "NF-A14 PWM specifications, Noctua",
+   "url": "https://www.noctua.at/en/products/nf-a14-pwm/specifications",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "gridfinity.grid",
+   "topic": "gridfinity",
+   "standard": "Gridfinity (Zack Freedman), unofficial specification",
+   "value": 42,
+   "unit": "mm",
+   "note": "The gridfinity.xyz drawing (https://gridfinity.xyz/assets/img/spec_draft_willtree8.jpg) also shows the baseplate at 42x42mm and the bin at 41.5x41.5mm (0.5mm tolerance).",
+   "quote": "The core of the gridfinity design is the 42x42x7mm grid format.",
+   "source": "Unofficial Gridfinity Specification (README)",
+   "cite": "Gridfinity specification",
+   "url": "https://github.com/gridfinity-unofficial/specification",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "gridfinity.unit",
+   "topic": "gridfinity",
+   "standard": "Gridfinity (Zack Freedman), unofficial specification",
+   "value": 7,
+   "unit": "mm",
+   "note": "Read from the drawing image shown on https://gridfinity.xyz/specification/. Same drawing: stacking lip adds about 4.4 mm; base profile 4.75mm.",
+   "quote": "Height Units: 7mm 1u; +1u = +7mm (Gridfinity Design Reference v5, graphic by @willtree8)",
+   "source": "Gridfinity Design Reference v5 (gridfinity.xyz specification drawing)",
+   "cite": "Gridfinity design reference v5",
+   "url": "https://gridfinity.xyz/assets/img/spec_draft_willtree8.jpg",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "keystone.cutout",
+   "topic": "keystone",
+   "standard": "maker drawing (Signamax KJ458MT-C6AC)",
+   "value": {
+    "width": 14.7,
+    "height": 19.3
+   },
+   "unit": "mm",
+   "note": "Drawing hosted by a reseller (akshoptifibre.com). Inch values .579 x .760. Another Signamax drawing on the same site (KJS458TL-C6AC) shows the same 14.70 x 19.30 panel cutout.",
+   "quote": "PANEL CUTOUT 14.70 (.579) 19.30 (.760); TITLE KJ458MT-C6AC (CAT6A UTP MT-SERIES KEYSTONE JACK)",
+   "source": "Signamax KJ458MT-C6AC (CAT6A UTP MT-SERIES KEYSTONE JACK) drawing",
+   "cite": "Signamax keystone jack drawing",
+   "url": "https://akshoptifibre.com/upload/Product/Description/File/drawing.pdf",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "ada.visual.min_height",
+   "topic": "ada",
+   "standard": "2010 ADA Standards for Accessible Design 703.5.5",
+   "value": {
+    "min_height": 0.625,
+    "at": "baseline 40 to 70 in above floor, viewing distance under 72 in"
+   },
+   "unit": "in",
+   "note": "16 mm. Table 703.5.5 rows: 40 to 70 in height: under 72 in viewing 5/8 in; 72 in and more 5/8 in plus 1/8 in per foot beyond 72 in. Over 70 to 120 in: under 180 in viewing 2 in; 180 in and more 2 in plus 1/8 in per foot beyond 180 in. Over 120 in: under 21 ft viewing 3 in; 21 ft and more 3 in plus 1/8 in per foot beyond 21 ft. Height is based on the uppercase I.",
+   "quote": "Table 703.5.5 Visual Character Height ... 40 inches (1015 mm) to less than or equal to 70 inches (1780 mm) | less than 72 inches (1830 mm) | 5/8 inch (16 mm)",
+   "source": "U.S. Access Board, ADA Accessibility Standards",
+   "cite": "ADA Standards, U.S. Access Board",
+   "url": "https://www.access-board.gov/ada/",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "ada.visual.stroke",
+   "topic": "ada",
+   "standard": "2010 ADA Standards for Accessible Design 703.5.7",
+   "value": {
+    "min_pct": 10,
+    "max_pct": 30
+   },
+   "unit": "percent of character height",
+   "note": "",
+   "quote": "Stroke thickness of the uppercase letter \"I\" shall be 10 percent minimum and 30 percent maximum of the height of the character.",
+   "source": "U.S. Access Board, ADA Accessibility Standards",
+   "cite": "ADA Standards, U.S. Access Board",
+   "url": "https://www.access-board.gov/ada/",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "ada.raised.height",
+   "topic": "ada",
+   "standard": "2010 ADA Standards for Accessible Design 703.2.5",
+   "value": {
+    "min": 0.625,
+    "max": 2
+   },
+   "unit": "in",
+   "note": "16 mm to 51 mm. Exception: 1/2 in (13 mm) minimum where separate raised and visual characters carry the same information.",
+   "quote": "Character height measured vertically from the baseline of the character shall be 5/8 inch (16 mm) minimum and 2 inches (51 mm) maximum based on the height of the uppercase letter \"I\".",
+   "source": "U.S. Access Board, ADA Accessibility Standards",
+   "cite": "ADA Standards, U.S. Access Board",
+   "url": "https://www.access-board.gov/ada/",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "ada.raised.depth",
+   "topic": "ada",
+   "standard": "2010 ADA Standards for Accessible Design 703.2.1",
+   "value": 0.03125,
+   "unit": "in",
+   "note": "1/32 in = 0.8 mm minimum. The section is 703.2.1 (703.2.2 is Case).",
+   "quote": "703.2.1 Depth Raised characters shall be 1/32 inch (0.8 mm) minimum above their background.",
+   "source": "U.S. Access Board, ADA Accessibility Standards",
+   "cite": "ADA Standards, U.S. Access Board",
+   "url": "https://www.access-board.gov/ada/",
+   "checked": "2026-11-20"
+  },
+  {
+   "id": "ada.raised.stroke",
+   "topic": "ada",
+   "standard": "2010 ADA Standards for Accessible Design 703.2.6",
+   "value": {
+    "max_pct": 15
+   },
+   "unit": "percent of character height",
+   "note": "",
+   "quote": "Stroke thickness of the uppercase letter \"I\" shall be 15 percent maximum of the height of the character.",
+   "source": "U.S. Access Board, ADA Accessibility Standards",
+   "cite": "ADA Standards, U.S. Access Board",
+   "url": "https://www.access-board.gov/ada/",
+   "checked": "2026-11-20"
+  }
+ ]
+}

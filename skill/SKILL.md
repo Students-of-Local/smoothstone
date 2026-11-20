@@ -28,6 +28,13 @@ makes a person recognizable, a real museum scan before a generated one. Keep eac
 source with `stone note "<fact>, <source>"`; stone status shows the notes again after a
 compaction. Never make up a size a part has to fit.
 
+stone already carries the facts most parts need, each with its source: filament temperatures and
+which filament suits the use (sun, car, dishwasher, flexible, food, heavy load), screw clearance holes
+(ISO 273), fan screw spacing, Gridfinity, keystone and wall plate sizes, and ADA sign letter heights.
+stone show prints the ones that apply under References, and a passing build prints the filament to
+load and why. `stone refs <topic>` lists them (stone refs PETG, stone refs fan). Use these before
+searching the web.
+
 ## Pictures
 
 `stone new "<request>" --image photo.png` (or `stone image photo.png`) traces outlines for
