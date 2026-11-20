@@ -22,6 +22,7 @@ OK_LICENSE = re.compile(r"^(public domain|pd|cc0|cc by(-sa)? [1-4]\.0|cc by(-sa)
 THUMB_PX = 1280
 # a painting, a drawing, a statue or street art of a person is someone's art, not the person: its
 # title, Commons categories or object name says so ("C215 - Michael Jordan", "Graffiti of ...")
+POSTER = re.compile(r"\b(?:posters?|plakat\w*|affiches?|carteles?|manifesto)\b", re.I)
 ART_WORDS = re.compile(
     r"\b(?:paintings?|painted portrait|portrait by|drawings?|sketch(?:es)?|stencils?|murals?|graffiti|"
     r"street art|statues?|sculptures?|busts? of|wax (?:figures?|museum|statues?)|madame tussauds|"
@@ -427,7 +428,8 @@ def _by_face(tried: list[tuple[int, dict]], chk, n: int) -> tuple[list[tuple[int
 def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     """Download the n best photos into dest (photo_1.jpg ...) and write credits.txt.
 
-    For a person or an animal, an artwork of them is left out; for a person, every photo must show
+    For a person or an animal, an artwork of them is left out, unless they are known only through art
+    (their Wikidata image is a painting, or Commons has no photo of them); for a person, every photo must show
     one clear face and that face theirs (faces.py). found.json says what was left out and why, and
     whether the faces could be checked at all."""
     # an earlier find's photos may be someone else: none outlive a new find, found or not
@@ -441,9 +443,14 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     if not found:
         raise FindProblem(f"no free-licensed photos of {query} on Wikimedia Commons")
     kind = (ent or {}).get("kind")
-    no_art = kind in ("person", "animal")
-    pool = [(i, c) for i, c in enumerate(found) if not (no_art and c.get("artwork"))]
-    left = {i: "art" for i, c in enumerate(found) if no_art and c.get("artwork")}
+    # someone known only through art (Napoleon, Mozart): the lead is a painting, or no photo exists;
+    # then the paintings and statues are their likeness and stay in
+    by_art = any(c.get("lead") and c.get("artwork") for c in found) or all(c.get("artwork") for c in found)
+    no_art = kind in ("person", "animal") and not by_art
+    # a poster is lettering over a likeness (a 1941 Mozart poster bore a swastika): never a reference
+    out = {i for i, c in enumerate(found) if (no_art and c.get("artwork")) or POSTER.search(c.get("title", ""))}
+    pool = [(i, c) for i, c in enumerate(found) if i not in out]
+    left = {i: "art" for i in out}
     check, chk = None, None
     if kind == "person":
         try:

@@ -559,3 +559,26 @@ def test_stone_find_says_when_faces_went_unchecked(monkeypatch, jobenv):
     stone("new", "A mini figure of Sam Altman")
     text, code, nxt = stone("find", "Sam Altman")
     assert "Faces not checked: STONE_FACES=0 turned it off; look that every photo shows Sam Altman alone." in text
+
+
+def test_someone_known_only_through_art_keeps_the_paintings(monkeypatch, tmp_path):
+    """Review of #48: Mozart's and Napoleon's Wikidata image is a painting; leaving out every artwork
+    left nothing, or a monument, where find had returned their portrait. A poster is never one:
+    live, 2026-11-20, a 1941 Mozart poster with a swastika was photo 2."""
+    ent = _ent("Q254", "Wolfgang Amadeus Mozart", ["Q5"], "Mozart painting by Krafft.jpg", sites=150)
+    pages = [_page("File:Mozart Verona 1770.jpg", "Public domain", 1, cats="Portrait paintings of Mozart"),
+             _page("File:Mozart-Plakat 1941 Arpke.jpg", "Public domain", 2),
+             _page("File:Mozart bust Salzburg.jpg", "CC BY-SA 4.0", 3, cats="Busts of Mozart")]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    got = [g["title"] for g in find.fetch("Wolfgang Amadeus Mozart", tmp_path)]
+    assert got == ["File:Mozart painting by Krafft.jpg", "File:Mozart Verona 1770.jpg", "File:Mozart bust Salzburg.jpg"]
+    left = json.loads((tmp_path / "found.json").read_text())["left_out"]
+    assert {"title": "File:Mozart-Plakat 1941 Arpke.jpg", "why": "art"} in left
+
+
+def test_with_only_artworks_of_them_the_artworks_are_their_likeness(monkeypatch, tmp_path):
+    ent = _ent("Q9", "Old Painter", ["Q5"], sites=40)
+    pages = [_page("File:Old Painter self portrait painting.jpg", "Public domain", 1),
+             _page("File:Statue of Old Painter.jpg", "CC BY 4.0", 2)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent]))
+    assert len(find.fetch("Old Painter", tmp_path)) == 2
