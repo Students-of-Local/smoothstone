@@ -1,7 +1,9 @@
 """stone go: a person's one command follows the NEXT lines to a ready part, or stops on a question."""
+import json
 from pathlib import Path
 
-from smoothstone import cli
+from smoothstone import cli, recipes
+from smoothstone.go import go
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -75,3 +77,83 @@ def test_fit_reads_what_the_request_asks_for():
     assert rc.fit(r["fan_guard"], "fan gaurd for an 80mm fan") == 1  # a typo in a long word still fits
     assert rc.fit(r["planter"], "plant labels for my tomatoes") == 0  # plant is not planter
     assert rc.fit(r["hook"], "a stand for my hex keys that holds sizes from 1.5 to 10 mm") == 0
+
+
+def test_narrowing_words_never_stop_the_job(jobenv, monkeypatch):
+    """Review of #45: stone recipes fan is the narrowing stone itself suggests; it must not ask the person."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    cli.run(["new", "A guard for a 120 mm PC fan"])
+    text, _ = cli.run(["recipes", "fan"])
+    assert "fan_guard" in text and text.splitlines()[-1] == "NEXT: stone show fan_guard", text
+
+
+def test_a_bare_set_keeps_two_words_without_quote_marks(jobenv, monkeypatch):
+    """Review of #45: "WELCOME HOME" was saved with its quote marks and would print them."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    cli.run(["new", 'A door sign that says "WELCOME HOME"'])
+    text, code = cli.run(["set", "sign"])
+    plan = json.loads((jobenv / "stone-job" / "plan.json").read_text())
+    assert "WELCOME HOME" in plan["params"].values(), (text, plan)
+    assert not any(isinstance(v, str) and '"' in v for v in plan["params"].values()), plan
+
+
+def test_every_eval_request_still_fits_its_recipe(monkeypatch):
+    """Review of #45: a makes list narrower than its tags would refuse requests that work today."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    allr = recipes.load_all()
+    misses = []
+    for f in sorted(REPO.glob("evals/*/*.json")):
+        try:
+            spec = json.loads(f.read_text())
+        except ValueError:
+            continue
+        want = (spec.get("expect") or {}).get("recipe") if isinstance(spec, dict) else None
+        if want in allr and spec.get("request") and recipes.fit(allr[want], spec["request"]) == 0:
+            misses.append((f.name, want))
+    assert not misses
+    assert recipes.fit(allr["hook"], "a headphone holder for my desk") >= 1
+    assert recipes.fit(allr["panel"], "a plate with two holes for a wall") >= 1
+
+
+def test_after_no_recipe_one_command_makes_the_nearest(jobenv, openscad, monkeypatch, capsys):
+    """Review of #45: after the no-recipe stop, stone go alone asked the same question again."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    code, lines = _go(capsys, "go", "A birdhouse for my backyard")
+    make = next((ln for ln in lines if ln.startswith("To make the nearest anyway: ")), None)
+    assert code == 1 and make and any(ln.startswith("To ask another way: ") for ln in lines), lines
+    show = make[len("To make the nearest anyway: "):].split(", then")[0]
+    cli.run(show.split()[1:])
+    capsys.readouterr()
+    code, lines = _go(capsys, "go")
+    assert code == 0 and lines[-1] == f"NEXT: {cli.DONE_NEXT}", lines
+
+
+def test_a_step_that_answers_differently_each_time_is_progress():
+    """Review of #45: build, fix, build, fix, build, reset, build is a job moving on, not a loop."""
+    said, n = [], {"build": 0}
+
+    def run(argv):
+        if argv[0] == "new":
+            return "Job.\nNEXT: stone build", 0
+        if argv[0] == "build":
+            n["build"] += 1
+            if n["build"] < 5:
+                return f"FAIL check {n['build']}\nNEXT: stone set x a={n['build']}", 1
+            return "Part ready: /p.stl\nNEXT: none, the part is ready", 0
+        return "Plan: x\nNEXT: stone build", 0
+
+    assert go(["a part"], run, say=said.append, hooks={}) == 0, said
+    said.clear()
+    assert go(["a part"], lambda argv: ("FAIL same\nNEXT: stone build", 1), say=said.append, hooks={}) == 1
+    assert any(s.startswith("Stopped: stone build keeps coming back") for s in said), said
+
+
+def test_job_given_as_one_word_reaches_every_step():
+    seen = []
+
+    def run(argv):
+        seen.append(argv)
+        return ("Job.\nNEXT: none, the part is ready", 0)
+
+    go(["--job=elsewhere", "a part"], run, say=lambda s: None, hooks={})
+    assert seen == [["new", "a part", "--job=elsewhere"]]

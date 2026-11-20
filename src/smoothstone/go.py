@@ -7,6 +7,7 @@ step needs the person. `stone go` with no request goes on with the job in this f
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -19,7 +20,8 @@ MAX_STEPS = 30
 SAME_STEP_MAX = 3  # the same command this many times without the job moving on: stop
 # lines worth showing a person from each step; the rest stay in log.txt
 SHOW = ("FIX:", "FAIL", "Plan:", "From the request:", "From the picture:", "Found ", "Credits:", "Figure:",
-        "Size:", "Build failed", "ERROR", "Part ready:", "Painted:", "Colors:", "Not placed yet:")
+        "Size:", "Build failed", "ERROR", "Part ready:", "Painted:", "Colors:", "Not placed yet:", "3MF:",
+        "In the slicer:", "Warning:")
 
 
 def _open(path: str) -> bool:
@@ -87,23 +89,26 @@ def go(words: list[str], run: Callable[[list[str]], tuple[str, int]],
 def _go(words, run, say, live, drawn) -> int:
     words = list(words)
     job: list[str] = []
-    if "--job" in words:
-        i = words.index("--job")
-        job = words[i:i + 2]
-        del words[i:i + 2]
+    for i, w in enumerate(words):
+        if w == "--job" or w.startswith("--job="):
+            job = words[i:i + (1 if "=" in w else 2)]
+            del words[i:i + len(job)]
+            break
     if words:
         nxt = "stone new " + " ".join(shlex.quote(w) for w in words)
     else:
         nxt = _split(run(["status", *job])[0])[1]
-    seen: dict[str, int] = {}
-    stl = views = credits = None
+    seen: dict[tuple, int] = {}
+    stl = views = credits = model3mf = None
+    last = None
     t0 = time.time()
     step = 0
     while True:
         if not nxt or not nxt.startswith("stone ") or "<" in nxt:
             break
-        seen[nxt] = seen.get(nxt, 0) + 1
-        if seen[nxt] > SAME_STEP_MAX or step >= MAX_STEPS:
+        if last is not None:  # the command and what it answered: the same pair again is no progress
+            seen[last] = seen.get(last, 0) + 1
+        if (last is not None and seen[last] >= SAME_STEP_MAX) or step >= MAX_STEPS:
             say(f"Stopped: {nxt} keeps coming back. stone status shows where the job stands.")
             say(f"NEXT: {nxt}")
             return 1
@@ -132,6 +137,8 @@ def _go(words, run, say, live, drawn) -> int:
         stl = _value(lines, "Part ready:") or stl
         views = _value(lines, "Views:") or views
         credits = _value(lines, "Credits:") or credits
+        model3mf = _value(lines, "3MF:") or model3mf
+        last = (nxt, "\n".join(lines), after)
         took = time.time() - t
         if took >= 10:
             say(f"    ({took:.0f} s)")
@@ -139,6 +146,8 @@ def _go(words, run, say, live, drawn) -> int:
     mins = (time.time() - t0) / 60
     if nxt.startswith("none"):
         say(f"Ready in {mins:.1f} min: {stl}" if stl else f"Ready in {mins:.1f} min.")
+        if model3mf:
+            say(f"3MF with the colors: {model3mf} (open it in the slicer)")
         if views:
             say(f"Views: {views}" + ("" if views in drawn else " (opened)" if _open(views) else ""))
         if credits:
@@ -147,8 +156,14 @@ def _go(words, run, say, live, drawn) -> int:
         return 0
     if nxt.startswith("ask the person"):
         ask = nxt[len("ask the person"):].lstrip(": ")
-        say(f"Needs you: {ask}")
-        say("When that is done, run: stone go")
+        make = re.search(r"If they say make it: (stone show \S+)", ask)
+        if make:  # no recipe makes it: two ways on, both one command
+            say(f"Needs you: {ask.split(' If they say', 1)[0]}")
+            say(f"To make the nearest anyway: {make.group(1)}, then stone go")
+            say('To ask another way: stone go "<the request in other words>"')
+        else:
+            say(f"Needs you: {ask}")
+            say("When that is done, run: stone go")
     elif "<" in nxt:
         say(f"Needs you: stone needs something only you have. Run {nxt} with it filled in, then stone go.")
     elif nxt:

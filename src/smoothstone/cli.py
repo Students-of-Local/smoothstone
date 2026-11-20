@@ -31,7 +31,7 @@ FAILS_BEFORE_RESET = 4
 DONE_NEXT = "none, the part is ready"
 NEW_NEXT = 'stone new "<what to make>"'
 # stages before a plan exists; read-only commands may move NEXT only here
-EARLY_STAGES = {"new", "image", "recipes", "show"}
+EARLY_STAGES = {"new", "image", "recipes", "show", "no_recipe"}  # no plan yet: the last step says what is next
 
 
 @dataclass
@@ -286,20 +286,21 @@ def cmd_recipes(args, job: Job) -> Out:
     words = " ".join(args.words).strip()
     query = words or (job.request() if job.exists() else "")
     ranked = rc.rank(vis, query)
-    if query:
-        # a recipe that makes what the request names comes first, word for word before any order
+    if query and not words:
+        # a recipe that makes what the request names comes first, word for word before any order;
+        # words the caller adds only narrow the list (stone recipes fan): they never stop the job
         fits = {r.name: rc.fit(r, query) for _, r in ranked}
         ranked.sort(key=lambda sr: -fits[sr[1].name])  # stable: keeps the word score within a fit
         top = ranked[0][1]
         if fits[top.name] == 0:
             # no recipe makes this: handing over the nearest one ready would be a wrong part
             what = top.title.lower()
-            out.add("No recipe makes this yet. Recipes that share words with it:" if not words
-                    else f'No recipe makes "{words}" yet. Recipes that share words with it:')
+            out.add("No recipe makes this yet. Recipes that share words with it:")
             for _, r in ranked[:5]:
                 out.add(f"{r.name}  {r.title}")
             out.next = (f"ask the person: stone has no recipe for this yet; the nearest is {what} ({top.name}). "
-                        f"Should I make {what}, or can you ask for it another way?")
+                        f"Should I make {what}, or can you ask for it another way? "
+                        f"If they say make it: stone show {top.name}. If they ask another way: stone new \"<their words>\"")
             out.owns_next = True
             out.stage = "no_recipe"
             out.result = "no recipe fits"
@@ -488,8 +489,11 @@ def cmd_set(args, job: Job) -> Out:
     if not items and not args.reset and not (plan and plan["recipe"] == r.name) and job.request():
         # a bare "stone set <recipe>" means the request's values, the ones stone show offers
         sug = match.suggest_full(r, job.request())[0]
-        items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items() if r.param(k) is not None]
-        from_request = " ".join(items) or None
+        shown = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items() if r.param(k) is not None]
+        from_request = " ".join(shown) or None
+        # fmt_value quotes text with a space for a command line; here no shell takes the quotes off
+        items = [k + "=" + (json.loads(v) if v.startswith('"') else v)
+                 for k, v in (it.split("=", 1) for it in shown)]
     given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
     # the set line answers the question when it names the product (phone=iphone_17_pro) or gives a length
     # (hole_d=60); so does a size measured from a photo
