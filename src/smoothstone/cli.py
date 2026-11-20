@@ -286,6 +286,24 @@ def cmd_recipes(args, job: Job) -> Out:
     words = " ".join(args.words).strip()
     query = words or (job.request() if job.exists() else "")
     ranked = rc.rank(vis, query)
+    if query:
+        # a recipe that makes what the request names comes first, word for word before any order
+        fits = {r.name: rc.fit(r, query) for _, r in ranked}
+        ranked.sort(key=lambda sr: -fits[sr[1].name])  # stable: keeps the word score within a fit
+        top = ranked[0][1]
+        if fits[top.name] == 0:
+            # no recipe makes this: handing over the nearest one ready would be a wrong part
+            what = top.title.lower()
+            out.add("No recipe makes this yet. Recipes that share words with it:" if not words
+                    else f'No recipe makes "{words}" yet. Recipes that share words with it:')
+            for _, r in ranked[:5]:
+                out.add(f"{r.name}  {r.title}")
+            out.next = (f"ask the person: stone has no recipe for this yet; the nearest is {what} ({top.name}). "
+                        f"Should I make {what}, or can you ask for it another way?")
+            out.owns_next = True
+            out.stage = "no_recipe"
+            out.result = "no recipe fits"
+            return out
     if words and ranked[0][0] == 0:
         out.add(f'No recipe matches "{words}". All recipes:')
     else:

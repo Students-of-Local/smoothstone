@@ -79,6 +79,7 @@ class Recipe:
     counts: dict = field(default_factory=dict)
     size_order: list = field(default_factory=list)
     grow: dict = field(default_factory=dict)  # assert text -> {"param", "value"}: "the cutouts do not fit" widens the plate
+    makes: list = field(default_factory=list)  # the objects it really makes: "phone stand"; none listed fits any request
     phrases: dict = field(default_factory=dict)  # "with a saucer" -> {"part": "both"}, read before single words  # params for "A by B by C"; default: from dims x, y, z  # word -> [param, offset]: "3 compartments" sets div_x = 2
 
     @property
@@ -181,6 +182,7 @@ def _load_one(d: Path) -> Recipe:
         max_overhang=float(data.get("max_overhang", 0.05)),
         min_wall=float(data.get("min_wall", 0.8)),
         fix=dict(data.get("fix") or {}),
+        makes=list(data.get("makes") or []),
         examples=list(data.get("examples") or []),
         aliases=dict(data.get("aliases") or {}),
         counts=dict(data.get("counts") or {}),
@@ -254,6 +256,39 @@ def tokens(text: str) -> set[str]:
         if s and s not in STOPWORDS:
             out.add(s)
     return out
+
+
+def _seq(text: str) -> list[str]:
+    return [stem(w) for w in re.split(r"[^A-Za-z0-9]+", text or "") if w]
+
+
+def fit(r: Recipe, query: str) -> int:
+    """How well the request names what the recipe makes: 2 when one of its makes phrases is in the
+    request word for word ("phone stand"), 1 when all of a phrase's words are there in any order
+    ("clips that hold the cables"), 0 when none is. A box is not a birdhouse: a recipe that fits 0
+    must not be handed over as the request. A recipe with no makes list fits any request (1)."""
+    if not r.makes:
+        return 1
+    q = _seq(query)
+    text = " " + " ".join(q) + " "
+    best = 0
+    for phrase in r.makes:
+        ph = _seq(phrase)
+        if ph and " " + " ".join(ph) + " " in text:
+            return 2
+        if ph and all(any(_same(w, x) for x in q) for w in ph):
+            best = 1
+    return best
+
+
+def _same(word: str, said: str) -> bool:
+    """A word of a makes phrase in the request, through a typo in a longer word: "gaurd" is guard."""
+    if word == said:
+        return True
+    # a typo keeps the length; a longer or shorter word is another word: plant is not planter
+    if len(word) < 5 or abs(len(word) - len(said)) > 1 or word.startswith(said) or said.startswith(word):
+        return False
+    return difflib.SequenceMatcher(None, word, said).ratio() >= 0.8
 
 
 def rank(recipes: list[Recipe], query: str) -> list[tuple[int, Recipe]]:

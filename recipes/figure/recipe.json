@@ -24,6 +24,7 @@
     "copy",
     "sculpture"
   ],
+  "makes": ["figure", "figurine", "minifig", "minifigure", "miniature", "statue", "statuette", "bust", "likeness", "chibi", "collectible"],
   "params": [
     {
       "name": "figure",

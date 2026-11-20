@@ -15,6 +15,7 @@
   "screw",
   "mount"
  ],
+ "makes": ["hook", "hanger", "key holder", "coat rack"],
  "params": [
   {
    "name": "width",

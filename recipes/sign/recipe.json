@@ -17,6 +17,7 @@
   "office",
   "room"
  ],
+ "makes": ["sign", "plaque", "nameplate", "name plate", "house number", "door number", "address number", "door sign", "desk sign"],
  "params": [
   {
    "name": "text",

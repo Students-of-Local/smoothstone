@@ -17,6 +17,7 @@
   "label",
   "blank"
  ],
+ "makes": ["faceplate", "face plate", "wall plate", "switch plate", "switch cover", "outlet cover", "outlet plate", "keystone", "blank plate", "panel", "port cover"],
  "tier": "S",
  "params": [
   {

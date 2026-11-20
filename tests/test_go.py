@@ -52,3 +52,26 @@ def test_a_bare_set_takes_the_values_the_request_names(jobenv, monkeypatch):
     assert (jobenv / "stone-job" / "plan.json").read_text().count('"SAM"') == 1
     text, _ = cli.run(["set", "figure", "--reset"])
     assert '"SAM"' not in (jobenv / "stone-job" / "plan.json").read_text(), text  # a reset is still defaults
+
+
+def test_a_request_no_recipe_makes_stops_instead_of_a_wrong_part(jobenv, monkeypatch, capsys):
+    """Blind run of 43 everyday requests, 2026-11-20: a birdhouse came back a ready box, a stove
+    knob a gear, a chip clip a cable comb. A recipe that does not make what is asked is not handed over."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    code, lines = _go(capsys, "go", "Can you make a birdhouse for my backyard?")
+    assert code == 1 and lines[-1].startswith("NEXT: ask the person: stone has no recipe for this yet"), lines
+    assert not (jobenv / "stone-job" / "plan.json").exists()
+
+
+def test_fit_reads_what_the_request_asks_for():
+    from smoothstone import recipes as rc
+    r = {n: x for n, x in rc.load_all(REPO / "recipes").items()}
+    assert rc.fit(r["box"], "Can you make a birdhouse for my backyard?") == 0
+    assert rc.fit(r["spur_gear"], "I need a new stove knob that fits a 6 mm D-shaped shaft.") == 0
+    assert rc.fit(r["cable_comb"], "I need a clip to keep my bag of chips closed.") == 0
+    assert rc.fit(r["cable_comb"], "little clips that stick under my desk and hold the cables up") == 1
+    stand = "Make a phone stand for my iPhone 15 Pro that works with the case on."
+    assert rc.fit(r["phone_stand"], stand) == 2 > rc.fit(r["phone_case"], stand)
+    assert rc.fit(r["fan_guard"], "fan gaurd for an 80mm fan") == 1  # a typo in a long word still fits
+    assert rc.fit(r["planter"], "plant labels for my tomatoes") == 0  # plant is not planter
+    assert rc.fit(r["hook"], "a stand for my hex keys that holds sizes from 1.5 to 10 mm") == 0

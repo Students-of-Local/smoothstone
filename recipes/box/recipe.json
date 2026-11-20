@@ -15,6 +15,7 @@
   "cover",
   "pill"
  ],
+ "makes": ["box", "container", "storage", "pill organizer", "jewelry", "trinket", "enclosure"],
  "params": [
   {
    "name": "w",

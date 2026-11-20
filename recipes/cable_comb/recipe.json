@@ -15,6 +15,7 @@
   "clip",
   "tidy"
  ],
+ "makes": ["cable comb", "cable clip", "cable organizer", "cord organizer", "cable holder", "cord holder", "wire comb", "cable management", "cable tidy", "cord clip", "keep cable", "hold cable", "keep cord", "hold cord", "cable line"],
  "tier": "S",
  "params": [
   {

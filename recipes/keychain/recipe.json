@@ -15,6 +15,7 @@
   "fob",
   "label"
  ],
+ "makes": ["keychain", "key chain", "keyring", "key ring", "name tag", "tag", "charm", "fob", "pendant"],
  "params": [
   {
    "name": "text",

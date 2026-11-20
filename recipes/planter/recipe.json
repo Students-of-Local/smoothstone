@@ -15,6 +15,7 @@
   "drain",
   "tray"
  ],
+ "makes": ["planter", "plant pot", "flower pot", "pot succulent", "pot cactus", "pot herb", "pot plant"],
  "tier": "S",
  "params": [
   {
