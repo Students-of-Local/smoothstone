@@ -23,6 +23,14 @@ class FindProblem(Exception):
     pass
 
 
+class WhichOne(FindProblem):
+    """Several well known people share the name: the person says which, nothing is downloaded."""
+
+    def __init__(self, name: str, people: list[dict]):
+        self.name, self.people = name, people
+        super().__init__(f"several people are called {name}")
+
+
 def _get(url: str, timeout: float = 30) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -57,7 +65,7 @@ def _entities(ids: list[str]) -> dict:
     if not ids:
         return {}
     return _wd(action="wbgetentities", ids="|".join(ids),
-               props="labels|aliases|claims|sitelinks").get("entities") or {}
+               props="labels|aliases|descriptions|claims|sitelinks").get("entities") or {}
 
 
 def _p31(ent: dict) -> set[str]:
@@ -104,15 +112,23 @@ def _classes(ents: list[dict]) -> dict[str, set[str]]:
     return out
 
 
+def _in_english(field: dict) -> str:
+    """English first, then "mul", the label Wikidata now keeps for a name in every language
+    (Michael Jordan's en label moved there and the first label left was Chinese), then any."""
+    text = next((field[lang].get("value", "") for lang in ("en", "mul", "en-us", "en-gb") if (field or {}).get(lang)),
+                next(iter((field or {}).values()), {}).get("value", ""))
+    return text.replace("\u2013", "-").replace("\u2014", "-")  # stone's lines carry no long dashes
+
+
 def _label(ent: dict) -> str:
-    labels = ent.get("labels") or {}
-    return (labels.get("en") or next(iter(labels.values()), {})).get("value", "")
+    return _in_english(ent.get("labels") or {})
 
 
 def _pack(ent: dict, character_classes: set[str] = frozenset()) -> dict:
     p18 = (ent.get("claims") or {}).get("P18") or []
     image = ((p18[0].get("mainsnak") or {}).get("datavalue") or {}).get("value") if p18 else None
-    return {"id": ent.get("id"), "label": _label(ent), "kind": _kind(ent, character_classes), "image": image}
+    return {"id": ent.get("id"), "label": _label(ent), "kind": _kind(ent, character_classes), "image": image,
+            "description": _in_english(ent.get("descriptions") or {})}
 
 
 def _bare(s: str) -> str:
@@ -127,6 +143,34 @@ def _names(ent: dict) -> set[str]:
     return names - {""}
 
 
+AMBIGUOUS = 3.0
+# words of a request that say nothing about which person it is
+HINT_NOISE = {"a", "an", "the", "of", "and", "or", "for", "with", "to", "in", "on", "my", "me", "i", "make",
+              "print", "figure", "figurine", "mini", "minifig", "statue", "chibi", "tall", "mm", "cm", "inch",
+              "inches", "base", "name", "his", "her", "their", "born", "please", "little", "small", "tiny",
+              "bust", "sculpture", "statuette", "model", "replica", "toy", "doll", "painting", "portrait",
+              "american", "english", "british", "famous", "known", "one"}  # a namesake within this factor of the best known's sitelinks: ask which one
+
+
+# a generational or academic suffix after a comma belongs to the name
+SUFFIX = re.compile(r"(?:jr|sr|ii|iii|iv|v|phd|md|esq)\.?(?=\s*(?:,|$|\s))", re.I)
+
+
+def split_hint(query: str) -> tuple[str, str]:
+    """"Michael Jordan, computer scientist" or "Michael Jordan (computer scientist)": the name to
+    search and the words that say which one."""
+    m = re.match(r"\s*(.+?)\s*(?:\((.+)\)|,\s*(.+))\s*$", query)
+    if m and m.group(3) and SUFFIX.match(m.group(3)):  # "Hank Williams, Jr." is one name
+        rest = query[m.end(1):]
+        sfx = SUFFIX.match(rest.lstrip(" ,"))
+        name = query[:m.end(1)] + ", " + sfx.group(0).strip()
+        more = rest.lstrip(" ,")[sfx.end():].lstrip(" ,")
+        return name.strip(), more.strip()
+    if not m:
+        return query.strip(), ""
+    return m.group(1).strip(), (m.group(2) or m.group(3) or "").strip()
+
+
 def resolve(query: str) -> dict | None:
     """The Wikidata entity a figure of query means: {id, label, kind, image}, or None.
 
@@ -136,6 +180,15 @@ def resolve(query: str) -> dict | None:
     character weighted over a thing: "Big Ben" is the tower, not a little known man of that name,
     and "Yoda" the character, not a worm genus. Ties keep the search's order.
     """
+    query, hint = split_hint(query)
+    got = _resolve(query, hint)
+    name, _, more = query.partition(" the ")
+    if got is None and more and all(w[:1].isupper() for w in name.split()):
+        got = _resolve(name, f"{more} {hint}")  # "Michael Jordan the Berkeley ...": the name, then which one
+    return got
+
+
+def _resolve(query: str, hint: str) -> dict | None:
     try:
         hits = [h["id"] for h in _wd(action="wbsearchentities", search=query, language="en",
                                      limit=str(SEARCH_HITS)).get("search") or []]
@@ -153,11 +206,31 @@ def resolve(query: str) -> dict | None:
         if not cands:  # a gene or a given name is no subject: search by the words alone
             return None
 
+        def fame(ent):
+            return len(ent.get("sitelinks") or {}) * (SUBJECT_WEIGHT if _kind(ent, chars) != "object" else 1.0)
+
+        said = set(re.findall(r"[a-z0-9]+", hint.lower())) - HINT_NOISE - set(re.findall(r"[a-z0-9]+", query.lower()))
+
+        def told_of(ent):  # how many hint words this person's description has; 0 for a thing
+            if _kind(ent, chars) != "person" or _bare(query) not in _names(ent):
+                return 0
+            return len(said & set(re.findall(r"[a-z0-9]+", _in_english(ent.get("descriptions") or {}).lower())))
+
         def score(rank_ent):
             rank, ent = rank_ent
-            weight = SUBJECT_WEIGHT if _kind(ent, chars) != "object" else 1.0
-            return (len(ent.get("sitelinks") or {}) * weight, -rank)
-        return _pack(max(enumerate(cands), key=score)[1], chars)
+            return (told_of(ent), fame(ent), -rank)
+        best = max(enumerate(cands), key=score)[1]
+        out = _pack(best, chars)
+        # people who share the name: the person may mean one the search ranks lower
+        same = [e for e in cands if e is not best and _kind(e, chars) == out["kind"] == "person"
+                and _bare(query) in _names(e)]
+        out["namesakes"] = [{"id": e.get("id"), "label": _label(e),
+                             "description": _in_english(e.get("descriptions") or {})}
+                            for e in sorted(same, key=fame, reverse=True)[:3]]
+        # the hint answers only when it fits this one better than every namesake
+        told = told_of(best) > max((told_of(e) for e in same), default=0)
+        out["ambiguous"] = bool(same) and not told and fame(same and max(same, key=fame)) * AMBIGUOUS > fame(best)
+        return out
     except Exception:  # offline or an odd reply: search Commons by the words alone
         return None
 
@@ -193,7 +266,15 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
                     data.setdefault("query", {}).setdefault("pages", {})["lead"] = p
     except Exception as e:  # network, http and json errors all mean the same thing here
         raise FindProblem(f"cannot reach Wikimedia Commons ({type(e).__name__})") from e
+    depicted = _depicting(ent["id"], common) if ent and ent.get("id") else {}
+    for title, page in depicted.items():
+        data.setdefault("query", {}).setdefault("pages", {})["d" + title] = page
     words = [w.lower() for w in re.findall(r"[A-Za-z0-9]+", query)]
+    # when others share the name, a photo whose only tie is its title must name this person in full
+    own = _bare(ent["label"]) if ent and ent.get("namesakes") else ""
+    labels = {_bare(n["label"]) for n in (ent or {}).get("namesakes", [])}
+    others = labels - {own}
+    alike = own in labels  # "Michael Jordan" and "Michael Jordan": no title tells them apart
     out = []
     for p in (data.get("query") or {}).get("pages", {}).values():
         info = (p.get("imageinfo") or [{}])[0]
@@ -206,11 +287,22 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
             continue
         title = p.get("title", "")
         t = title.lower()
+        if own and not p.get("lead") and title not in depicted and (
+                alike or own not in _bare(title) or any(o in _bare(title) for o in others)):
+            continue  # maybe the namesake: "Michael B Jordan - Sinners" is not Michael I. Jordan
         score = 10 * sum(w_ in t for w_ in words) - int(p.get("index", 0))
         if all(w_ in t for w_ in words):
             score += 20
         if p.get("lead"):
             score += 100
+        if title in depicted:  # Commons says this exact person is in it, not a namesake
+            n = depicted[title].get("depicts", 0)
+            score += 60 + (30 if n == 1 else -30 if n > 1 else 0)
+        elif depicted:
+            score -= 40  # only the words match: maybe someone else of that name
+        if any(k in t for k in (" and ", " with ", "meeting", "freeway", "road", " car ", "jersey", "statue of",
+                                "signed", "autograph", "mural", "graffiti", "poster", "museo", "museum", "shoe")):
+            score -= 25  # another person, a sign or a thing named after them
         if any(k in t for k in ("logo", "signature", "map", "diagram", "chart")):
             score -= 50
         out.append({
@@ -228,15 +320,40 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
     return uniq
 
 
+def _depicting(qid: str, common: dict, limit: int = 30) -> dict[str, dict]:
+    """Commons files whose structured data says they depict qid (P180), with how many things each
+    depicts: 1 is a photo of them alone, more is a group or a scene."""
+    try:
+        data = json.loads(_get(API + "?" + urllib.parse.urlencode(
+            {"action": "query", "generator": "search", "gsrnamespace": "6",
+             "gsrsearch": f"haswbstatement:P180={qid} filetype:bitmap", "gsrlimit": str(limit), **common})))
+        pages = {p["title"]: p for p in (data.get("query") or {}).get("pages", {}).values() if p.get("title")}
+        mids = {f"M{p['pageid']}": t for t, p in pages.items() if p.get("pageid")}
+        if mids:
+            ents = json.loads(_get(API + "?" + urllib.parse.urlencode(
+                {"action": "wbgetentities", "ids": "|".join(list(mids)[:50]), "format": "json"}))).get("entities") or {}
+            for mid, e in ents.items():
+                st = (e.get("statements") or e.get("claims") or {}).get("P180") or []
+                if mid in mids:
+                    pages[mids[mid]]["depicts"] = len(st)
+        return pages
+    except Exception:  # structured data is a bonus; the name search still runs
+        return {}
+
+
 def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     """Download the n best photos into dest (photo_1.jpg ...) and write credits.txt."""
+    # an earlier find's photos may be someone else: none outlive a new find, found or not
+    for old in [*dest.glob("photo_*"), dest / "credits.txt", dest / "found.json"]:
+        old.unlink(missing_ok=True)
     ent = resolve(query)
+    if ent and ent.get("ambiguous"):
+        raise WhichOne(split_hint(query)[0], [ent] + ent.get("namesakes", []))
+    query = ent["label"] if ent and ent.get("label") else split_hint(query)[0]
     found = search(query, entity=ent)
     if not found:
         raise FindProblem(f"no free-licensed photos of {query} on Wikimedia Commons")
     dest.mkdir(parents=True, exist_ok=True)
-    for old in dest.glob("photo_*"):
-        old.unlink()
     got = []
     for c in found:
         if len(got) >= n:
@@ -256,8 +373,21 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     (dest / "credits.txt").write_text("\n".join(lines) + "\n")
     (dest / "found.json").write_text(json.dumps({"query": query, "subject": (ent or {}).get("label") or query,
                     "kind": (ent or {}).get("kind"), "wikidata": (ent or {}).get("id"),
+                    "description": (ent or {}).get("description") or "",
                     "photos": got}, indent=1))
     return got
+
+
+def hint_after(request: str, subject: str) -> str:
+    """The words that say which one, right after the name in the request: "Michael Jordan, the
+    basketball player" gives "the basketball player"; a size, a sentence end or a clause like
+    "for my son who ..." ends them."""
+    i = request.lower().find(subject.lower())
+    if i < 0:
+        return ""
+    rest = request[i + len(subject):]
+    rest = re.split(r"[.;!?()]|\d|\b(?:for|with|who|that|which|in|on|holding|wearing|and)\b", rest, 1)[0]
+    return rest.strip(" ,:-\"'")
 
 
 NOUN = (r"(?:figure|figurine|statue|statuette|bust|sculpture|model|miniature|mini|replica|toy|doll|print|"
