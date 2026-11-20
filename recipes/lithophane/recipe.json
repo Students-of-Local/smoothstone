@@ -15,6 +15,7 @@
   "window",
   "frame"
  ],
+ "makes": ["lithophane", "backlit photo", "photo light"],
  "params": [
   {
    "name": "image",

@@ -440,8 +440,9 @@ def _remesh(m):
 
 
 def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str = "person",
-         seed: int = 7, extra: str = "", say=print) -> Path:
-    """Run every step that is not done yet and return the unit-height figure.stl."""
+         seed: int = 7, extra: str = "", say=print, shown=None) -> Path:
+    """Run every step that is not done yet and return the unit-height figure.stl.
+    shown, when given, gets the styled picture as soon as it exists."""
     if style_name not in STYLES:
         raise FigureProblem(f"style must be one of {', '.join(STYLES)}")
     if not photos:
@@ -466,6 +467,8 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
         say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
         style_checked(refs, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
                       want, say)
+    if shown:
+        shown(render)
     mesh = folder / "lift.glb"
     if not mesh.exists():
         say("Lifting the render to 3D (Hunyuan3D-2mini, about 4 minutes)...")

@@ -15,6 +15,7 @@
   "shaft",
   "mechanism"
  ],
+ "makes": ["gear", "cog", "sprocket"],
  "params": [
   {
    "name": "teeth",

@@ -15,6 +15,7 @@
   "screw",
   "mount"
  ],
+ "makes": ["hook", "hanger", "key holder", "coat rack", "headphone holder", "headphone stand", "headset holder", "towel holder", "bag holder", "hat holder"],
  "params": [
   {
    "name": "width",

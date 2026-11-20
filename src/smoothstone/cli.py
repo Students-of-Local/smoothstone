@@ -31,7 +31,7 @@ FAILS_BEFORE_RESET = 4
 DONE_NEXT = "none, the part is ready"
 NEW_NEXT = 'stone new "<what to make>"'
 # stages before a plan exists; read-only commands may move NEXT only here
-EARLY_STAGES = {"new", "image", "recipes", "show"}
+EARLY_STAGES = {"new", "image", "recipes", "show", "no_recipe"}  # no plan yet: the last step says what is next
 
 
 @dataclass
@@ -286,6 +286,25 @@ def cmd_recipes(args, job: Job) -> Out:
     words = " ".join(args.words).strip()
     query = words or (job.request() if job.exists() else "")
     ranked = rc.rank(vis, query)
+    if query and not words:
+        # a recipe that makes what the request names comes first, word for word before any order;
+        # words the caller adds only narrow the list (stone recipes fan): they never stop the job
+        fits = {r.name: rc.fit(r, query) for _, r in ranked}
+        ranked.sort(key=lambda sr: -fits[sr[1].name])  # stable: keeps the word score within a fit
+        top = ranked[0][1]
+        if fits[top.name] == 0:
+            # no recipe makes this: handing over the nearest one ready would be a wrong part
+            what = top.title.lower()
+            out.add("No recipe makes this yet. Recipes that share words with it:")
+            for _, r in ranked[:5]:
+                out.add(f"{r.name}  {r.title}")
+            out.next = (f"ask the person: stone has no recipe for this yet; the nearest is {what} ({top.name}). "
+                        f"Should I make {what}, or can you ask for it another way? "
+                        f"If they say make it: stone show {top.name}. If they ask another way: stone new \"<their words>\"")
+            out.owns_next = True
+            out.stage = "no_recipe"
+            out.result = "no recipe fits"
+            return out
     if words and ranked[0][0] == 0:
         out.add(f'No recipe matches "{words}". All recipes:')
     else:
@@ -466,6 +485,15 @@ def cmd_set(args, job: Job) -> Out:
             r = rc.load(plan["recipe"])
         else:
             return unknown_recipe(name, out, t)
+    from_request = None
+    if not items and not args.reset and not (plan and plan["recipe"] == r.name) and job.request():
+        # a bare "stone set <recipe>" means the request's values, the ones stone show offers
+        sug = match.suggest_full(r, job.request())[0]
+        shown = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items() if r.param(k) is not None]
+        from_request = " ".join(shown) or None
+        # fmt_value quotes text with a space for a command line; here no shell takes the quotes off
+        items = [k + "=" + (json.loads(v) if v.startswith('"') else v)
+                 for k, v in (it.split("=", 1) for it in shown)]
     given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
     # the set line answers the question when it names the product (phone=iphone_17_pro) or gives a length
     # (hole_d=60); so does a size measured from a photo
@@ -533,6 +561,8 @@ def cmd_set(args, job: Job) -> Out:
     job.save_plan(r.name, params)
     merged = build_params(job, r, params)
     out.add(f"Plan: {r.name} ({r.title})")
+    if from_request:
+        out.add(f"From the request: {from_request}")
     if args.reset:
         out.add("All parameters back to defaults.")
     shown = 0
@@ -845,6 +875,7 @@ def cmd_build(args, job: Job) -> Out:
         views = views_step(job, stl)
         if views:
             out.add(f"Views: {views} (look at every panel before you call it done)")
+            show([views], "The finished part")
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
         if colortool.asks_for_color(_color_text(job)):
@@ -1005,11 +1036,28 @@ def figure_seed(job: Job, params: dict) -> int:
     return int(env) if env.isdigit() else int(params.get("seed") or 7)
 
 
+# stone go sets these for a person at a terminal: "progress" takes a step's progress line,
+# "show" takes pictures and a caption; a model's run leaves them unset
+HOOKS: dict = {}
+
+
 def progress(job: Job, text: str) -> None:
     """A step that takes minutes says so as it starts: on stderr, so the person at the terminal
     sees the build working and stdout still ends with the NEXT line, and in log.txt."""
     job.log(text)
-    print(text, file=sys.stderr, flush=True)
+    if HOOKS.get("progress"):
+        HOOKS["progress"](text)
+    else:
+        print(text, file=sys.stderr, flush=True)
+
+
+def show(paths: list, caption: str) -> None:
+    """Pictures a person at a terminal sees as soon as they exist (stone go draws them inline)."""
+    if HOOKS.get("show"):
+        try:
+            HOOKS["show"]([Path(p) for p in paths], caption)
+        except Exception:  # a picture is a bonus: never a failed step
+            pass
 
 
 def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
@@ -1028,7 +1076,8 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     t0 = time.time()
     try:
         made = figuretool.make(photos, job.image_dir / "figure", style_name=style, who=who,
-                               seed=figure_seed(job, params), say=lambda s: progress(job, s))
+                               seed=figure_seed(job, params), say=lambda s: progress(job, s),
+                               shown=lambda p: show([p], "Styled picture, lifted to 3D next"))
     except figuretool.FigureProblem as e:
         job.log("figure failed:\n" + traceback.format_exc())
         out.add(f"Recipe: {r.name}")
@@ -1117,6 +1166,7 @@ def cmd_find(args, job: Job) -> Out:
     for g in got:
         out.add(f"{Path(g['file']).name}: {g['license']}, by {g['author'] or 'unknown'}")
     out.add(f"Credits: {job.image_dir / 'found' / 'credits.txt'} (name them when you share the part)")
+    show([g["file"] for g in got], f"Photos found of {query}")
     out.owns_next = True  # the photos are what the plan was waiting for
     if plan and plan.get("recipe") == "figure":
         out.next = "stone build"
@@ -2134,6 +2184,7 @@ def cmd_colors(args, job: Job) -> Out:
         out.add(f"Boundaries: {bd / 'boundaries.png'} (each color edge close up from 8 sides)")
     out.add(f"3MF: {final} (Orca, Bambu Studio, Creality Print and PrusaSlicer open it with the paint)")
     out.add(f"Views: {bd / 'views.png'} (look at every panel before you call it done)")
+    show([bd / "views.png"], "The painted part")
     out.add("In the slicer: " + ", ".join(f"filament {i} must be {fil[i - 1]}" for i in used)
             + ". The 3MF names slots, not colors; set them in stone.toml [filaments] to match the printer.")
     mapping = mapping_line(assign)
@@ -2357,7 +2408,17 @@ def run(argv: list[str]) -> tuple[str, int]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    text, code = run(sys.argv[1:] if argv is None else argv)
+    argv = sys.argv[1:] if argv is None else argv
+    first = next((a for a in argv if not a.startswith("-")), "")
+    if first == "go" or (" " in first and first not in COMMANDS):
+        # a person's one command: stone go "<request>", or the request alone
+        from .go import go
+
+        words = list(argv)
+        if first == "go":
+            words.remove("go")
+        return go(words, run)
+    text, code = run(argv)
     sys.stdout.write(text + "\n")
     sys.stdout.flush()
     return code

@@ -16,6 +16,7 @@
   "medal",
   "wall"
  ],
+ "makes": ["relief", "embossed", "emboss", "carving", "coin", "medal", "medallion"],
  "params": [
   {
    "name": "image",

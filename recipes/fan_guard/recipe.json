@@ -17,6 +17,7 @@
   "honeycomb",
   "spiral"
  ],
+ "makes": ["fan guard", "fan grill", "fan grille", "fan cover", "fan protector", "fan finger"],
  "tier": "S",
  "params": [
   {

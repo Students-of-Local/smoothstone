@@ -14,6 +14,7 @@
   "charging",
   "mobile"
  ],
+ "makes": ["phone stand", "phone holder", "phone dock", "phone cradle", "tablet stand", "tablet holder", "ipad stand", "ipad holder", "iphone stand", "iphone holder", "charging stand"],
  "params": [
   {
    "name": "width",

@@ -15,6 +15,7 @@
   "cord",
   "wire"
  ],
+ "makes": ["grommet", "cable hole", "desk hole", "cord hole", "hole cover"],
  "params": [
   {
    "name": "hole_d",

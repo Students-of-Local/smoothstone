@@ -714,7 +714,7 @@ def test_the_figure_seed_follows_the_eval_run_seed_unless_one_is_set(jobenv, mon
     _style_picture(job.image_dir / "source.png")
     seeds = []
 
-    def fake_make(photos, out, style_name="chibi", who="person", seed=7, extra="", say=print):
+    def fake_make(photos, out, style_name="chibi", who="person", seed=7, extra="", say=print, shown=None):
         seeds.append(seed)
         raise figure.FigureProblem("stop here")
 
@@ -815,7 +815,7 @@ def test_a_named_edge_on_a_figure_stone_made_offers_another_seed(jobenv, monkeyp
     _style_picture(made / "style.png")
     seeds = []
 
-    def fake_make(photos, out, style_name="chibi", who="person", seed=7, extra="", say=print):
+    def fake_make(photos, out, style_name="chibi", who="person", seed=7, extra="", say=print, shown=None):
         seeds.append(seed)
         out.mkdir(parents=True, exist_ok=True)
         (out / "latest.txt").write_text(str(made / "figure.stl"))  # as make does

@@ -19,6 +19,7 @@
   "mobile",
   "cell"
  ],
+ "makes": ["phone case", "iphone case", "phone cover", "phone bumper", "iphone cover", "iphone bumper", "phone shell"],
  "tier": "S",
  "params": [
   {

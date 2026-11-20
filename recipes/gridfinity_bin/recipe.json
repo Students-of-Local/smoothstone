@@ -16,6 +16,7 @@
   "workshop",
   "desk"
  ],
+ "makes": ["gridfinity", "bin", "tray", "drawer organizer", "parts organizer"],
  "tier": "S",
  "params": [
   {
