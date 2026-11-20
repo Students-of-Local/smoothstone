@@ -18,6 +18,7 @@ from pathlib import Path
 from . import match, check as checks
 from . import colors as colortool
 from . import config
+from . import refs as reftool
 from . import image as imagetool
 from . import measure as measuretool
 from . import find as findtool
@@ -410,6 +411,7 @@ def cmd_show(args, job: Job) -> Out:
         out.add(f"Not placed yet: {'; '.join(left[:4])}. If one is a size of this part, add it with its parameter name.")
     elif request and not sug:
         out.add("Nothing in the request names a parameter; the defaults make a good part.")
+    out.add(*reference_block(job, r, {p.name: p.default for p in r.params} | sug, request))
     out.add("Parameters (name = default):")
     room = MAX_LINES - len(out.lines) - 3
     for i, p in enumerate(r.params):
@@ -430,6 +432,25 @@ def cmd_show(args, job: Job) -> Out:
         out.next = f"stone set {r.name} {' '.join(nxt)}".rstrip()
     out.result = f"showed {r.name}"
     return out
+
+
+def reference_block(job: Job, r: rc.Recipe, params: dict, request: str) -> list[str]:
+    """References: the filament and the standards for this part, each with its source (refs.py)."""
+    try:
+        lines = reftool.show_lines(r, params, request)
+    except Exception:  # a broken library costs the block, never the command
+        if job.exists():
+            job.log("references failed:\n" + traceback.format_exc())
+        return []
+    return ["References:", *lines] if lines else []
+
+
+def build_references(job: Job, r: rc.Recipe, params: dict) -> list[str]:
+    try:
+        return reftool.build_lines(r, params, job.request())
+    except Exception:
+        job.log("references failed:\n" + traceback.format_exc())
+        return []
 
 
 # set
@@ -876,6 +897,7 @@ def cmd_build(args, job: Job) -> Out:
         if views:
             out.add(f"Views: {views} (look at every panel before you call it done)")
             show([views], "The finished part")
+        out.add(*build_references(job, r, params))
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
         if colortool.asks_for_color(_color_text(job)):
@@ -1308,6 +1330,35 @@ def cmd_note(args, job: Job) -> Out:
         out.next = f"stone show {st['ask_recipe']}"
         return out
     out.next = st.get("next") or "stone recipes"
+    return out
+
+
+def cmd_refs(args, job: Job) -> Out:
+    """The reference library: facts stone applies on its own, each with its source."""
+    out = Out(owns_next=False)
+    topic = " ".join(args.topic).strip()
+    out.next = (job.status().get("next") or "stone status") if job.exists() else NEW_NEXT
+    if not topic:
+        lib = reftool.load()
+        out.add(f"Reference library: {len(lib)} facts, each with its source and the date it was checked.",
+                "Filaments: " + " ".join(reftool.MATERIALS) + " (stone refs PETG)",
+                "Standards: clearance us fdm finger wallplate fan gridfinity keystone ada",
+                "Design: contrast colors harmony edges text legibility food",
+                "Each passing build prints the filament it picked and why; stone show prints the references.")
+        out.result = "listed reference topics"
+        return out
+    found = reftool.topic_entries(topic)
+    if not found:
+        out.add(f'No reference matches "{topic}". Topics: filament ' + " ".join(reftool.MATERIALS)
+                + " clearance fan gridfinity keystone ada contrast colors edges text food")
+        out.code = 1
+        return out
+    room = MAX_LINES - 2
+    for e in found[:room]:
+        out.add(reftool.entry_line(e))
+    if len(found) > room:
+        out.add(f"({len(found) - room} more: add a word, like stone refs {topic} nozzle)")
+    out.result = f"refs {topic}"
     return out
 
 
@@ -2246,6 +2297,9 @@ def make_parser() -> Parser:
     s = sub.add_parser("note", parents=[common], help="keep a researched fact and its source in the job")
     s.add_argument("text", nargs="*")
 
+    s = sub.add_parser("refs", parents=[common], help="sourced facts: filaments, standards, design (stone refs PETG)")
+    s.add_argument("topic", nargs="*")
+
     sub.add_parser("done", parents=[common], help="finish the job")
 
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
@@ -2284,6 +2338,7 @@ COMMANDS = {
     "measure": cmd_measure,
     "find": cmd_find,
     "note": cmd_note,
+    "refs": cmd_refs,
     "done": cmd_done,
     "colors": cmd_colors,
     "video": cmd_video,
@@ -2302,7 +2357,8 @@ def _guess_job(argv: list[str]) -> Path:
 # words small models use for a command, and commands that take no words
 SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes",
             "search": "recipes", "info": "show", "scale": "measure", "describe": "show", "finish": "done", "check_status": "status",
-            "color": "colors", "colour": "colors", "colours": "colors", "paint": "colors"}
+            "color": "colors", "colour": "colors", "colours": "colors", "paint": "colors",
+            "references": "refs", "reference": "refs", "material": "refs", "materials": "refs"}
 NO_WORDS = ("status", "build", "done")
 
 
@@ -2339,7 +2395,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "usage", "error")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "usage", "error")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:
