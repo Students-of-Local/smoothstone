@@ -30,6 +30,10 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - recipe.json: name, title, summary, tags, tier, params (name, type, default, min, max, unit,
   help; choices for choice; image_kind and required for image), dims, max_bodies,
   max_overhang, min_wall, fix (which parameter each failing check should change), examples.
+- Build anything that sits on the bed with soft_extrude, soft_slab or bed_chamfer() from
+  lib/stone.scad, so it steps in 0.4 mm at the bed (the bed_edge check). Text echoes
+  stone_text and a guard grille echoes stone_grille, so the text and finger_gap checks can
+  name the setting to change (docs/DESIGN.md, Print checks).
 - Give the defaults a part someone would be glad to print, and add two or three examples that
   show the range.
 - Write help text a 1.7B model can act on: plain words, the unit, what the number does.
