@@ -43,7 +43,7 @@ module arc_name() {
     for (i = [0 : n - 1]) {
         a = -90 - ((n - 1) / 2 - i) * step;
         rotate([0, 0, a + 90]) translate([0, -(rr - 0.3), zc]) rotate([90, 0, 0])
-            soft_extrude(1.2, r = 0.3, steps = 2)
+            soft_extrude(1.2, r = 0.3, steps = 2, bottom = 0)
                 text(name[i], size = ts, font = F, halign = "center", valign = "center");
     }
 }

@@ -41,7 +41,7 @@ module plate2d() {
 difference() {
     union() {
         soft_extrude(thickness, r = 0.6) plate2d();
-        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3) art();
+        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3, bottom = 0) art();
     }
     translate([ring_x, 0, 0]) hole(ring_d, thickness, 0.5);
 }

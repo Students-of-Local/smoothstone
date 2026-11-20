@@ -17,6 +17,14 @@ OVERHANG_COS = math.cos(math.radians(45))
 REST_TOL = 0.05  # mm
 CONTACT_TOL = 0.1  # mm
 BED_SKIP = 0.2  # mm
+# The bed chamfer (lib/stone.scad BED_CHAMFER) steps 0.4 mm in over the first 0.4 mm: a 45 degree
+# slope built from ledges. A downward face lying wholly below this height is that slope, not an
+# overhang.
+CHAMFER_ZONE = 0.45  # mm
+# bed_edge: the first layer squashes out (elephant foot). PrusaSlicer's default elephant-foot
+# compensation is 0.2 mm, so a part needs at least that much inset at the bed edge.
+BED_EDGE_Z = 0.8  # mm, the slice the bed contact is compared with
+MIN_BED_EDGE = 0.2  # mm
 
 
 @dataclass
@@ -104,6 +112,34 @@ def thinnest_wall(mesh, samples: int = WALL_SAMPLES, seed: int = 0) -> float | N
     return float(np.percentile(dist, WALL_PERCENTILE))
 
 
+def slice_area(mesh, z: float) -> tuple[float, float]:
+    """(area, perimeter) of the mesh's cross section at height z. Each segment is turned so the
+    face it came from lies on its right, which makes outlines run counterclockwise and holes
+    clockwise, so the shoelace sum is the net area."""
+    import trimesh
+
+    seg, fi = trimesh.intersections.mesh_plane(mesh, [0, 0, 1], [0, 0, z], return_faces=True)
+    if len(seg) == 0:
+        return 0.0, 0.0
+    a, b = seg[:, 0, :2], seg[:, 1, :2]
+    d = b - a
+    n = mesh.face_normals[fi][:, :2]
+    flip = (d[:, 1] * n[:, 0] - d[:, 0] * n[:, 1]) < 0
+    a, b = np.where(flip[:, None], b, a), np.where(flip[:, None], a, b)
+    area = 0.5 * float(np.sum(a[:, 0] * b[:, 1] - b[:, 0] * a[:, 1]))
+    return area, float(np.linalg.norm(d, axis=1).sum())
+
+
+def bed_edge_inset(mesh, contact: float) -> float | None:
+    """Mean inset of the bed edge, mm: (area of the slice at BED_EDGE_Z minus the bed contact
+    area) over the slice perimeter. 0 for a straight wall, about 0.4 for a 0.4 mm chamfer."""
+    zmin = float(mesh.bounds[0][2])
+    area, per = slice_area(mesh, zmin + BED_EDGE_Z)
+    if per <= 0:
+        return None
+    return (area - contact) / per
+
+
 def _hull_area(xy: np.ndarray) -> float:
     from scipy.spatial import ConvexHull, QhullError
 
@@ -178,6 +214,18 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
                       advice="too little of the part touches the bed; give it a flat base",
                       direction="up", need=need, measured=contact))
 
+    # recipe parts only: an STL from elsewhere gets its elephant-foot compensation in the slicer
+    skip = recipe.skip.get("bed_edge") if recipe else "not a recipe part"
+    inset = None if skip else bed_edge_inset(mesh, contact)
+    if inset is None:
+        out.append(Result("bed_edge", True, None, f"skipped ({skip or 'no slice above the bed'})"))
+    else:
+        out.append(Result("bed_edge", inset >= MIN_BED_EDGE, round(inset, 2),
+                          f"bed edge inset {inset:.2f} mm (need {MIN_BED_EDGE} mm)",
+                          advice="the first layer will flare past the wall (elephant foot); chamfer "
+                                 "the bottom edge 0.4 mm, as soft_extrude and bed_chamfer do",
+                          direction="up", need=MIN_BED_EDGE, measured=inset))
+
     wall = thinnest_wall(mesh)
     need_wall = recipe.min_wall if recipe else MIN_WALL
     if wall is None:
@@ -189,7 +237,8 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
                           direction="up", need=need_wall, measured=wall))
 
     face_zmin = tri_z.min(axis=1)
-    over = (nz < -OVERHANG_COS - 1e-3) & (face_zmin > zmin + BED_SKIP)
+    face_zmax = tri_z.max(axis=1)
+    over = (nz < -OVERHANG_COS - 1e-3) & (face_zmin > zmin + BED_SKIP) & (face_zmax > zmin + CHAMFER_ZONE)
     total = float(areas.sum())
     frac = float(areas[over].sum()) / total if total > 0 else 0.0
     out.append(Result("overhang", frac <= max_overhang, round(frac, 4),

@@ -22,11 +22,11 @@ module art() translate([-width / 2, 0, base_t + (invert ? 100 * k : 0)])
 
 module footprint() projection() art();
 
-union() {
+bed_chamfer() union() {
     art();
     linear_extrude(base_t + 0.01) footprint();
     // frame: a rounded rim, a little taller than the highest relief
-    soft_extrude(base_t + depth + 0.6, r = 1.2) difference() {
+    soft_extrude(base_t + depth + 0.6, r = 1.2, bottom = 0) difference() {
         offset(r = frame) offset(delta = -0.01) footprint();
         offset(delta = -0.01) footprint();
     }

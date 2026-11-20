@@ -83,9 +83,10 @@ module grille2d(r_out) {
     }
 }
 
-union() {
+// one chamfer for the outline, the opening, the screw holes and every grille bar
+bed_chamfer() union() {
     difference() {
-        soft_slab(thickness, top = edge, bottom = 0.4) rrect(size, size, corner_r);
+        soft_slab(thickness, top = edge, bottom = 0) rrect(size, size, corner_r);
         translate([0, 0, -1]) cylinder(r = op_r, h = thickness + 2);
         translate([0, 0, thickness - inner_edge])
             cylinder(r1 = op_r, r2 = op_r + inner_edge + 0.01, h = inner_edge + 0.01);
@@ -94,6 +95,6 @@ union() {
     }
     // bars inside the opening get the rounded top; where they reach into the frame they stop
     // below the opening chamfer, so no sliver pokes through it
-    soft_extrude(thickness, r = min(edge, 0.6)) grille2d(op_r - 0.01);
+    soft_extrude(thickness, r = min(edge, 0.6), bottom = 0) grille2d(op_r - 0.01);
     linear_extrude(thickness - inner_edge) difference() { grille2d(op_r + 1); circle(r = op_r - 0.5); }
 }

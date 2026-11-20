@@ -33,7 +33,7 @@ module lid() union() {
         lw = w - 2 * wall - 2 * fit;
         ld = d - 2 * wall - 2 * fit;
         lr = corner_r - wall - fit;
-        soft_extrude(lip_h, r = 0.5) rrect(lw, ld, lr);
+        soft_extrude(lip_h, r = 0.5, bottom = 0) rrect(lw, ld, lr);
         translate([0, 0, -1]) linear_extrude(lip_h + 2) rrect(lw - 2 * 1.6, ld - 2 * 1.6, max(lr - 1.6, 0.5));
     }
     // the label is on the outside of the lid, which is face down while printing, so it is

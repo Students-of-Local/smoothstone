@@ -20,7 +20,8 @@ assert(image != "", "run stone image first so the picture can be used");
 // opening: shrink then grow back, so thin strokes that could not cut dough disappear
 module shape() offset(r = smooth) offset(r = -smooth) resize([size, 0], auto = true) import(image, center = true);
 
-union() {
+// with no flange the bare wall is the whole first layer: chamfer it less, so it keeps its grip
+bed_chamfer(flange > 0 ? 0.4 : min(0.4, 0.15 * base_wall)) union() {
     linear_extrude(flange_t) difference() {
         offset(r = base_wall + flange) shape();
         shape();

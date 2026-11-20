@@ -246,7 +246,7 @@ module case() {
 // Fit-test ring: the top slice mm of the walls and lip, without the back plate.
 ring = min(slice, Htot);
 if (slice > 0) {
-    translate([0, 0, ring - Htot]) difference() {
+    bed_chamfer() translate([0, 0, ring - Htot]) difference() {
         intersection() {
             case();
             translate([-W, -H, Htot - ring]) cube([2 * W, 2 * H, ring + 1]);

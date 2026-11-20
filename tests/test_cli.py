@@ -332,6 +332,7 @@ def test_vendor_library_resolves(jobenv, openscad, recipes_root, tmp_path, monke
         "name": "fake_lib", "title": "Lib test", "tier": "S",
         "params": [{"name": "s", "type": "number", "default": 30, "min": 10, "max": 50}],
         "dims": {"x": "s", "y": "s", "z": "3"},
+        "skip": {"bed_edge": "a bare test plate"},
     }))
     stone("new", "lib test")
     stone("set", "fake_lib", "s=25")

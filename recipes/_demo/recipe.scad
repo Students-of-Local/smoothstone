@@ -5,7 +5,7 @@ h = 4;           // plate thickness, mm
 corner_r = 4;    // corner radius, mm
 hole_d = 6;      // hole diameter, mm (0 = no hole)
 hole_place = "center"; // center | left
-chamfer = true;  // 0.6 mm chamfer on the top edge
+chamfer = true;  // 0.6 mm chamfer on the top edge (the bed edge always gets 0.4 mm)
 quality = 48;    // circle segments
 
 $fn = quality;
@@ -20,9 +20,12 @@ module rounded_rect(x, y, r) {
         translate([sx * (x / 2 - rr), sy * (y / 2 - rr)]) circle(r = rr);
 }
 
+b = 0.4;         // bed-edge chamfer, so the first layer does not flare out
+
 module body() {
     hull() {
-        linear_extrude(h - c) rounded_rect(w, d, corner_r);
+        linear_extrude(0.01) rounded_rect(w - 2 * b, d - 2 * b, max(corner_r - b, 0.01));
+        translate([0, 0, b]) linear_extrude(h - c - b) rounded_rect(w, d, corner_r);
         if (c > 0)
             translate([0, 0, h - c]) linear_extrude(c) rounded_rect(w - 2 * c, d - 2 * c, max(corner_r - c, 0.01));
     }
@@ -32,6 +35,8 @@ hole_x = hole_place == "left" ? -w / 2 + hole_d / 2 + max(corner_r, 4) : 0;
 
 difference() {
     body();
-    if (hole_d > 0)
-        translate([hole_x, 0, -1]) cylinder(d = hole_d, h = h + 2);
+    if (hole_d > 0) translate([hole_x, 0, 0]) {
+        translate([0, 0, -1]) cylinder(d = hole_d, h = h + 2);
+        translate([0, 0, -0.01]) cylinder(d1 = hole_d + 2 * b + 0.02, d2 = hole_d, h = b + 0.01);
+    }
 }

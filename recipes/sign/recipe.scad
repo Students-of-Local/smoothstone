@@ -33,7 +33,7 @@ module words() translate([slot / 2, -hy / 2]) text(text, size = ts, font = F, ha
 difference() {
     union() {
         soft_slab(thickness, top = 0.8, bottom = 0.4) rrect(w, h, corner_r);
-        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3) {
+        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3, bottom = 0) {
             words();
             if (rim > 0) difference() { rrect(w - 2, h - 2, corner_r - 1); rrect(w - 2 - 2 * rim, h - 2 - 2 * rim, corner_r - 1 - rim); }
             if (icon != "") translate([-w / 2 + m + slot / 2, -hy / 2]) resize([0, ih - hy], auto = true) import(icon, center = true);
