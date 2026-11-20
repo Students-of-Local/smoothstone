@@ -466,6 +466,12 @@ def cmd_set(args, job: Job) -> Out:
             r = rc.load(plan["recipe"])
         else:
             return unknown_recipe(name, out, t)
+    from_request = None
+    if not items and not args.reset and not (plan and plan["recipe"] == r.name) and job.request():
+        # a bare "stone set <recipe>" means the request's values, the ones stone show offers
+        sug = match.suggest_full(r, job.request())[0]
+        items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items() if r.param(k) is not None]
+        from_request = " ".join(items) or None
     given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
     # the set line answers the question when it names the product (phone=iphone_17_pro) or gives a length
     # (hole_d=60); so does a size measured from a photo
@@ -533,6 +539,8 @@ def cmd_set(args, job: Job) -> Out:
     job.save_plan(r.name, params)
     merged = build_params(job, r, params)
     out.add(f"Plan: {r.name} ({r.title})")
+    if from_request:
+        out.add(f"From the request: {from_request}")
     if args.reset:
         out.add("All parameters back to defaults.")
     shown = 0
@@ -2332,7 +2340,17 @@ def run(argv: list[str]) -> tuple[str, int]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    text, code = run(sys.argv[1:] if argv is None else argv)
+    argv = sys.argv[1:] if argv is None else argv
+    first = next((a for a in argv if not a.startswith("-")), "")
+    if first == "go" or (" " in first and first not in COMMANDS):
+        # a person's one command: stone go "<request>", or the request alone
+        from .go import go
+
+        words = list(argv)
+        if first == "go":
+            words.remove("go")
+        return go(words, run)
+    text, code = run(argv)
     sys.stdout.write(text + "\n")
     sys.stdout.flush()
     return code

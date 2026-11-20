@@ -10,6 +10,14 @@ I wanted a small model running on my own computer to make 3D printable parts tha
 
 LFM3-1.7B made every part above on my own CPU through smoothstone, and each one passed every print check. I did not want to fool myself with requests I had tuned for, so a fresh agent that never saw the code wrote new requests from the parameter list alone and I sealed them before the run. Each request ran five times. On the last blind set the model finished the right part with the right sizes 39 out of 40 times, and 38 out of 40 when I wiped its memory in the middle of the job. Writing the 3D code itself it went 0 out of 15. Every set, every failed run and every fix is in [LOG.md](LOG.md), and the sets are in [evals](evals).
 
+## Try it
+
+```
+stone go "A mini figure of Sam Altman, 90 mm tall, with \"SAM\" on the base"
+```
+
+One command runs the whole job: it follows stone's own NEXT lines, shows each step as it runs (a figure prints each long step as it starts), and ends with the STL and the views opened. When a step needs you, such as the size of the hole a cover must fit, it stops with a "Needs you:" line; do that and run `stone go` again. The request alone works too: `stone "A guard for a 120 mm PC fan"`.
+
 ## How it works
 
 Every stone message ends with one line that says what to run next, and `stone status` prints that line again along with the request, the recipe, the sizes so far and the last build. A model that forgets everything runs `stone status` and keeps going.
