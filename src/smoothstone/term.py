@@ -1,8 +1,9 @@
 """What a person at a terminal sees while stone go runs: pictures drawn in the terminal and a live
 line that says which step is running, how long it has taken and how long it took last time.
 
-Pictures use the Kitty graphics protocol (Ghostty, Kitty) or the iTerm2 inline image protocol
-(iTerm2, WezTerm). STONE_IMAGES=kitty, iterm or off overrides the guess. Nothing here runs when
+Pictures use the Kitty graphics protocol (Ghostty, Kitty), the iTerm2 inline image protocol
+(iTerm2, WezTerm) or sixel (foot, Windows Terminal). STONE_IMAGES=kitty, iterm, sixel or off
+overrides the guess. Nothing here runs when
 stdout is not a terminal, so a model reading stone's output never gets escape codes.
 """
 from __future__ import annotations
@@ -11,6 +12,7 @@ import base64
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import threading
@@ -21,13 +23,60 @@ SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 CHUNK = 4096  # the Kitty protocol's largest base64 piece per escape
 
 
-def protocol(env=None, tty=None) -> str | None:
-    """kitty, iterm or None: how this terminal draws a picture, if it can."""
+_ASKED: list = []  # the terminal's own answer, asked once
+
+
+def answer(buf: bytes) -> str | None:
+    """What the terminal's reply says it draws."""
+    if b"_Gi=31;OK" in buf:
+        return "kitty"
+    da = re.search(rb"\x1b\[\?([\d;]*)c", buf)
+    if da and "4" in da.group(1).decode().split(";"):
+        return "sixel"
+    return None
+
+
+def ask_terminal(timeout: float = 0.5) -> str | None:
+    """Ask the terminal what it draws: a Kitty graphics query, then the device attributes, which
+    every terminal answers (4 in them is sixel). Works whatever TERM says (foot here says
+    xterm-256color). None when it cannot draw or does not answer."""
+    if _ASKED:
+        return _ASKED[0]
+    got = None
+    try:
+        import select
+        import termios
+        import tty as ttymod
+
+        fd = sys.stdin.fileno()
+        if os.isatty(fd) and sys.stdout.isatty():
+            old = termios.tcgetattr(fd)
+            buf = b""
+            try:
+                ttymod.setcbreak(fd)
+                os.write(sys.stdout.fileno(), b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c")
+                end = time.time() + timeout
+                while time.time() < end and not re.search(rb"\x1b\[\?[\d;]*c", buf):
+                    ready, _, _ = select.select([fd], [], [], max(0.0, end - time.time()))
+                    if not ready:
+                        break
+                    buf += os.read(fd, 1024)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+            got = answer(buf)
+    except (OSError, ValueError, ImportError, AttributeError):  # no terminal to ask (a pipe, Windows)
+        got = None
+    _ASKED.append(got)
+    return got
+
+
+def protocol(env=None, tty=None, ask=None) -> str | None:
+    """kitty, iterm, sixel or None: how this terminal draws a picture, if it can."""
     env = os.environ if env is None else env
     want = env.get("STONE_IMAGES", "").lower()
     if want in ("off", "0", "no", "none"):
         return None
-    if want in ("kitty", "iterm"):
+    if want in ("kitty", "iterm", "sixel"):
         return want
     if not (sys.stdout.isatty() if tty is None else tty):
         return None
@@ -36,7 +85,43 @@ def protocol(env=None, tty=None) -> str | None:
         return "kitty"
     if prog in ("iterm.app", "wezterm") or env.get("LC_TERMINAL") == "iTerm2":
         return "iterm"
-    return None
+    if term.startswith("foot") or env.get("WT_SESSION") or "mlterm" in term:
+        return "sixel"
+    return (ask or ask_terminal)()
+
+
+def sixel(im, colors: int = 128) -> str:
+    """A PIL image as sixel text: up to colors colors, six pixel rows per band, runs packed."""
+    import numpy as np
+    from PIL import Image
+
+    q = im.convert("RGB").quantize(colors=colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    pal = q.getpalette() or []
+    a = np.asarray(q)
+    h, w = a.shape
+    out = ["\x1bPq", f'"1;1;{w};{h}']
+    for i in map(int, np.unique(a)):  # numpy bytes overflow at 3 * i
+        r, g, b = pal[3 * i:3 * i + 3]
+        out.append(f"#{i};2;{r * 100 // 255};{g * 100 // 255};{b * 100 // 255}")
+    for y in range(0, h, 6):
+        band = a[y:y + 6]
+        weights = (1 << np.arange(band.shape[0]))[:, None]
+        lines = []
+        for c in np.unique(band):
+            bits = ((band == c) * weights).sum(axis=0)
+            last = np.flatnonzero(bits)
+            bits = bits[:last[-1] + 1]
+            cut = np.flatnonzero(np.diff(bits)) + 1
+            starts = np.concatenate(([0], cut))
+            ends = np.concatenate((cut, [len(bits)]))
+            row = []
+            for s0, e0 in zip(starts, ends):
+                ch, n = chr(63 + int(bits[s0])), int(e0 - s0)
+                row.append(f"!{n}{ch}" if n > 3 else ch * n)
+            lines.append(f"#{c}" + "".join(row))
+        out.append("$".join(lines) + "-")
+    out.append("\x1b\\")
+    return "".join(out)
 
 
 def strip(paths: list[Path], height: int = 360, gap: int = 12):
@@ -91,12 +176,17 @@ def picture(paths: list[Path], caption: str, write=None, how: str | None = None,
     im = strip([Path(p) for p in paths])
     if im is None:
         return False
-    buf = io.BytesIO()
-    im.save(buf, "PNG", optimize=True)
     width = shutil.get_terminal_size((100, 30)).columns
     # a cell is about twice as tall as wide: rows tall keeps the picture's shape at this many columns
     cols = max(16, min(width - 6, round(rows * 2 * im.width / im.height)))
     write = write or (lambda s: (sys.stdout.write(s), sys.stdout.flush()))
+    if how == "sixel":  # sixel draws pixels, not cells: about 20 pixels a row
+        scale = min(rows * 20 / im.height, (width - 6) * 10 / im.width)
+        im = im.resize((max(1, round(im.width * scale)), max(6, round(im.height * scale))))
+        write(f"    {caption}:\n" + sixel(im) + "\n")
+        return True
+    buf = io.BytesIO()
+    im.save(buf, "PNG", optimize=True)
     write(f"    {caption}:\n    " + escape(buf.getvalue(), how, cols) + "\n")
     return True
 

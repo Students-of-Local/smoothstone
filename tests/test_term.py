@@ -20,7 +20,7 @@ def test_ghostty_and_kitty_draw_with_the_kitty_protocol_and_iterm_with_its_own()
     assert term.protocol({"TERM_PROGRAM": "ghostty", "TERM": "xterm-256color"}, tty=True) == "kitty"
     assert term.protocol({"TERM": "xterm-kitty"}, tty=True) == "kitty"
     assert term.protocol({"TERM_PROGRAM": "iTerm.app"}, tty=True) == "iterm"
-    assert term.protocol({"TERM": "foot"}, tty=True) is None
+    assert term.protocol({"TERM": "linux"}, tty=True, ask=lambda: None) is None
     # a model reading stone's output never gets escape codes
     assert term.protocol({"TERM": "xterm-ghostty"}, tty=False) is None
     assert term.protocol({"TERM": "xterm-ghostty", "STONE_IMAGES": "off"}, tty=True) is None
@@ -99,3 +99,57 @@ def test_a_models_run_never_gets_escape_codes(jobenv, monkeypatch):
     cli.show(["/nowhere.png"], "nothing")  # no hook: nothing is drawn, nothing fails
     text, _ = cli.run(["new", "a small plate with one hole"])
     assert "\x1b" not in text
+
+
+def _unsixel(text):
+    """A small sixel reader: the picture's pixels as {(x, y): (r, g, b) in percent}."""
+    body = text[text.index("q") + 1:text.rindex("\x1b")]
+    body = body[body.index('"'):]
+    body = body[body.index("#"):]
+    pal, px, x, y, color = {}, {}, 0, 0, None
+    for m in re.finditer(r"#(\d+);2;(\d+);(\d+);(\d+)|#(\d+)|!(\d+)(.)|([?-~])|(\$)|(-)", body):
+        if m.group(1):
+            pal[int(m.group(1))] = tuple(int(m.group(i)) for i in (2, 3, 4))
+        elif m.group(5):
+            color = int(m.group(5))
+        elif m.group(6) or m.group(8):
+            n, ch = (int(m.group(6)), m.group(7)) if m.group(6) else (1, m.group(8))
+            for _ in range(n):
+                for bit in range(6):
+                    if (ord(ch) - 63) >> bit & 1:
+                        px[(x, y + bit)] = pal[color]
+                x += 1
+        elif m.group(9):
+            x = 0
+        elif m.group(10):
+            x, y = 0, y + 6
+    return px
+
+
+def test_foot_gets_sixel_that_reads_back_as_the_picture():
+    assert term.protocol({"TERM": "foot"}, tty=True) == "sixel"
+    im = Image.new("RGB", (40, 14), "white")
+    im.paste(Image.new("RGB", (10, 7), (255, 0, 0)), (5, 2))
+    im.paste(Image.new("RGB", (8, 14), (0, 0, 255)), (30, 0))
+    px = _unsixel(term.sixel(im))
+    assert px[(0, 0)] == (100, 100, 100) and px[(39, 13)] == (100, 100, 100)
+    assert px[(5, 2)] == px[(14, 8)] == (100, 0, 0) and px[(15, 8)] == (100, 100, 100)
+    assert px[(30, 0)] == px[(37, 13)] == (0, 0, 100)
+    assert len(px) == 40 * 14
+
+
+def test_a_terminal_that_says_another_name_is_asked_what_it_draws():
+    """Live, 2026-11-20: foot on this seat says TERM=xterm-256color, and the guess drew nothing."""
+    assert term.protocol({"TERM": "xterm-256color"}, tty=True, ask=lambda: "sixel") == "sixel"
+    assert term.answer(b"\x1b[?62;4;22c") == "sixel"  # foot
+    assert term.answer(b"\x1b_Gi=31;OK\x1b\\\x1b[?62;22c") == "kitty"  # Ghostty, Kitty
+    assert term.answer(b"\x1b[?62;22c") is None and term.answer(b"") is None
+
+
+def test_sixel_reads_back_with_many_colors():
+    """Live, 2026-11-20: a photo's palette index over 85 overflowed as a numpy byte and drew nothing."""
+    import numpy as np
+    a = np.random.default_rng(1).integers(0, 255, (12, 30, 3), dtype=np.uint8)
+    im = Image.fromarray(a)
+    px = _unsixel(term.sixel(im))
+    assert len(px) == 30 * 12
