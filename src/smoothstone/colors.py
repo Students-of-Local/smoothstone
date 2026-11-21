@@ -1479,11 +1479,14 @@ def render_views(mesh, face_rgb, out_png: Path) -> int:
 
 
 RAKE = (-0.55, -0.5, 0.67)  # close-up light, in view space: from the upper left, in front
+# for raised letters: low and from the side, so both faces of every stroke differ, a diagonal's too;
+# RAKE lit both sides of an N's diagonal the same and it read as LAMIINE (random five, round 5)
+SIDE = (-0.75, -0.45, 0.35)
 
 
 def render_closeup(mesh, face_rgb, out_png: Path, spots: list[tuple], px: int = 480) -> int:
-    """build/closeup.png: one panel per (title, center, half, azimuth, elevation), lit from the
-    upper left so the face and the raised name show their relief. Returns the number of panels."""
+    """build/closeup.png: one panel per (title, center, half, azimuth, elevation[, light]), lit from
+    the upper left (RAKE) unless the spot names its own light. Returns the number of panels."""
     from PIL import ImageFont
 
     v = np.asarray(mesh.vertices, float)
@@ -1491,8 +1494,8 @@ def render_closeup(mesh, face_rgb, out_png: Path, spots: list[tuple], px: int = 
     v, f, idx, cn = _fine(v, f, corner_normals(v, f))
     rgb = np.asarray(face_rgb, float)[idx]
     font = ImageFont.load_default(size=max(12, px // 26))
-    panels = [_panel(v, f, rgb, az, el, np.asarray(c, float), half, px, title=t, font=font, cn=cn, clip=True,
-                     light=RAKE) for t, c, half, az, el in spots]
+    panels = [_panel(v, f, rgb, s[3], s[4], np.asarray(s[1], float), s[2], px, title=s[0], font=font, cn=cn,
+                     clip=True, light=s[5] if len(s) > 5 else RAKE) for s in spots]
     if panels:
         _sheet(panels, len(panels), out_png)
     return len(panels)

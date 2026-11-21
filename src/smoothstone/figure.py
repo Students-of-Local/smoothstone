@@ -504,6 +504,8 @@ GRAFT_FIT = 0.015  # of the figure's height: the median gap a head fit may leave
 GRAFT_OVERLAP = 0.006  # of the figure's height: the blend runs this far above the neck
 GRAFT_BAND = 0.06  # of the figure's height: the body's surface fades into the head's over this, up to the neck
 GRAFT_PITCH = 1 / 800  # of the figure's height: the blend's grid, 0.1 mm on an 80 mm figure
+GRAFT_KEEP = 1 / 160  # of the figure's height: the body's neck in the blend shrinks this much by its top
+GRAFT_NECK = 0.5  # the least share of the body's neck the joined figure keeps at any height near it
 
 
 def face_box(image: Path) -> list[int] | None:
@@ -618,12 +620,33 @@ def graft(body_path: Path, head_path: Path, crop: dict, out: Path) -> dict:
     keep = max(parts, key=lambda c: c.volume())
     o = keep.to_mesh()
     m = trimesh.Trimesh(np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts), process=True)
+    thin = _thinnest(m, body, bottom, top + GRAFT_BAND / 3)
+    if thin < GRAFT_NECK:
+        return {"used": False, "fit": fit, "why": f"the joined neck keeps only {thin:.0%} of the figure's"}
     lo3, hi3 = m.bounds
     m.apply_translation([0, 0, -lo3[2]])
     m.apply_scale(1.0 / (hi3[2] - lo3[2]))  # unit height again: the recipe scales by it
     trimesh.repair.fix_normals(m)
     _landed(out, lambda tmp: m.export(tmp))
     return {"used": True, "fit": fit, "neck": neck, "top": top, "bottom": bottom, "why": ""}
+
+
+def _thinnest(m, body, z0: float, z1: float) -> float:
+    """The least share of body's cross-section m keeps at any height from z0 to z1."""
+    import numpy as np
+
+    from . import printable
+
+    p = GRAFT_PITCH
+    lo = np.minimum(m.bounds[0], body.bounds[0]) - p
+    hi = np.maximum(m.bounds[1], body.bounds[1]) + p
+    shape = (int((hi[0] - lo[0]) / p) + 1, int((hi[1] - lo[1]) / p) + 1, 1)
+    least = 1.0
+    for z in np.linspace(z0, z1, 12):
+        a = printable.solid_grid(body, lo[0], lo[1], z, shape, p).sum()
+        if a:
+            least = min(least, printable.solid_grid(m, lo[0], lo[1], z, shape, p).sum() / a)
+    return float(least)
 
 
 def _blend(b3, h3, bottom: float, top: float, lo: float, size: float):
@@ -634,6 +657,8 @@ def _blend(b3, h3, bottom: float, top: float, lo: float, size: float):
     from scipy import ndimage
     from skimage import measure
     import trimesh
+
+    from . import printable
 
     p = GRAFT_PITCH
     z0, z1 = bottom - 4 * p, top + 4 * p
@@ -649,24 +674,18 @@ def _blend(b3, h3, bottom: float, top: float, lo: float, size: float):
     for m in parts:
         o = m.to_mesh()
         tm = trimesh.Trimesh(np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts), process=False)
-        occ = np.zeros((len(xs), len(ys), len(zs)), bool)
-        X, Y = np.meshgrid(xs, ys, indexing="ij")
-        org = np.c_[X.ravel(), Y.ravel(), np.full(X.size, z0 - 1.0)]
-        loc, ri, _ = tm.ray.intersects_location(org, np.tile([0.0, 0.0, 1.0], (len(org), 1)), multiple_hits=True)
-        order = np.lexsort((loc[:, 2], ri))
-        loc, ri = loc[order], ri[order]
-        starts = np.r_[0, np.flatnonzero(np.diff(ri)) + 1, len(ri)] if len(ri) else [0]
-        for a, b in zip(starts[:-1], starts[1:]):
-            z = loc[a:b, 2]
-            z = z[np.r_[True, np.diff(z) > 1e-9]]
-            i, j = divmod(int(ri[a]), len(ys))
-            for zin, zout in zip(z[0::2], z[1::2]):
-                occ[i, j] |= (zs >= zin) & (zs < zout)
+        occ = printable.solid_grid(tm, x0, y0, z0, (len(xs), len(ys), len(zs)), p)
         d = ndimage.distance_transform_edt(~occ) - ndimage.distance_transform_edt(occ)
         sd.append(ndimage.gaussian_filter(d, 1.2))  # the grid's steps would show as rings
     t = np.clip((zs - bottom) / (top - bottom), 0, 1)
     w = t * t * (3 - 2 * t)  # smoothstep: no crease where the fade starts or ends
     d = (1 - w) * sd[0] + w * sd[1]
+    # the body's own neck stays in, shrunk GRAFT_KEEP by the top: a head lifted alone can come with
+    # a neck a sixth as thick, and the fade pinched Inde Navarrette's to 3 mm2 (random five, round 5)
+    keep = sd[0] + w * (GRAFT_KEEP / p)
+    k = 3.0  # cells the two surfaces are rounded together over, so they meet with no crease
+    h = np.clip(k - np.abs(d - keep), 0, None) / k
+    d = np.minimum(d, keep) - h * h * k / 4
     d[:, :, [0, -1]] = 1.0  # closed at both ends
     d = np.pad(d, 1, constant_values=1.0)
     try:

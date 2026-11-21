@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from smoothstone import cli, figure
+from smoothstone import cli, config, figure
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -1402,12 +1402,12 @@ def test_a_stocky_person_is_named_stocky_and_nobody_else_is():
     assert "heavyset" not in figure.prompt("chibi", "animal", "", heavy=True)
 
 
-def _person(head_r=0.12, nose=False, hair=False):
+def _person(head_r=0.12, nose=False, hair=False, neck_r=0.05):
     """A unit-height person along Z, facing -Y: a round-shouldered torso, a thin neck and a round
     head; the head lift's version adds a nose and long hair down the back that the whole-figure lift
     lost."""
     parts = [trimesh.creation.capsule(height=0.42, radius=0.15, count=[48, 48]),
-             trimesh.creation.cylinder(radius=0.05, height=0.14, sections=32),
+             trimesh.creation.cylinder(radius=neck_r, height=0.14, sections=32),
              trimesh.creation.icosphere(subdivisions=4, radius=head_r)]
     parts[0].apply_translation([0, 0, 0.36])
     parts[1].apply_translation([0, 0, 0.73])
@@ -1453,6 +1453,19 @@ def test_the_head_lifted_alone_replaces_the_figure_s_head_with_no_ledge(tmp_path
     assert step.max() < 0.012, f"the back steps {step.max():.3f} at z={zs[step.argmax()]:.3f}"
 
 
+def test_a_head_lifted_with_a_skinny_neck_is_not_put_on_a_pinched_neck(tmp_path):
+    """Inde Navarrette lost her head (random five, 2026-11-21): the head lifted alone came with a
+    neck far thinner than the body's, the blend took it, and the figure's neck pinched to 3 mm2. A
+    joined neck under GRAFT_NECK of the body's is refused, and the figure keeps its own head."""
+    _person().export(tmp_path / "body.stl")
+    head = trimesh.Trimesh(*_slab_above(_person(nose=True, neck_r=0.025), 0.6))  # a quarter the area
+    head.apply_scale(1 / head.extents[2])
+    head.export(tmp_path / "head.stl")
+    got = figure.graft(tmp_path / "body.stl", tmp_path / "head.stl",
+                       {"fig_top": 0, "fig_bottom": 1000, "cut": 400}, tmp_path / "figure.stl")
+    assert not got["used"] and "neck" in got["why"], got
+    assert not (tmp_path / "figure.stl").exists()
+
 def _slab_above(m, z):
     import manifold3d as m3d
 
@@ -1476,3 +1489,84 @@ def test_the_head_crop_is_a_square_from_the_hair_to_the_shoulders(tmp_path, monk
     assert Image.open(tmp_path / "head.png").size == (figure.HEAD_PX, figure.HEAD_PX)
     monkeypatch.setattr(figure, "face_box", lambda p: None)
     assert figure.head_crop(tmp_path / "style.png", tmp_path / "head2.png") is None
+
+
+def test_hair_strands_too_thin_to_print_are_cut_off_the_head_and_the_nose_stays():
+    """A lifted curl comes out as loose worms of half a mm that float off the head; a 0.4 mm nozzle
+    prints them as blobs (Lamine Yamal, random five round 5: the craft judge's first fault). They
+    are cut off at the root; a nose, as thick as a strand is long, stays."""
+    from smoothstone import printable
+
+    parts = [trimesh.creation.capsule(height=14, radius=5, count=[32, 32]),
+             trimesh.creation.cylinder(radius=2, height=4, sections=32),
+             trimesh.creation.icosphere(subdivisions=4, radius=6)]
+    parts[0].apply_translation([0, 0, 12])
+    parts[1].apply_translation([0, 0, 23.5])
+    parts[2].apply_translation([0, 0, 30])
+    nose = trimesh.creation.icosphere(subdivisions=2, radius=1.2)
+    nose.apply_translation([0, -6, 30])
+    worm = trimesh.creation.torus(major_radius=2.5, minor_radius=0.25, major_sections=48, minor_sections=12)
+    worm.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]))
+    worm.apply_translation([1.0, 0, 37.5])  # a loop standing on the crown, 3 mm above it
+    m = trimesh.boolean.union([*parts, nose, worm], engine="manifold")
+    out, n = printable.strands(m)
+    assert n >= 1
+    assert out.bounds[1][2] < 36.3  # the loop is gone, down to the crown
+    assert out.bounds[0][1] < -6.9  # the nose is still there
+    assert out.body_count == 1 and printable.to_manifold(out) is not None
+    assert abs(out.volume - m.volume) < 0.05 * m.volume
+
+
+
+def test_a_thin_curl_lying_on_the_head_is_kept():
+    """Cutting every thin strand chopped Christopher Abbott's sculpted curls into stubs and took his
+    craft score from 8 to 6 (random five, round 5). Only a strand that floats off the head is cut."""
+    from smoothstone import printable
+
+    parts = [trimesh.creation.capsule(height=14, radius=5, count=[32, 32]),
+             trimesh.creation.cylinder(radius=2, height=4, sections=32),
+             trimesh.creation.icosphere(subdivisions=4, radius=6)]
+    parts[0].apply_translation([0, 0, 12])
+    parts[1].apply_translation([0, 0, 23.5])
+    parts[2].apply_translation([0, 0, 30])
+    curl = trimesh.creation.torus(major_radius=1.5, minor_radius=0.25, major_sections=48, minor_sections=12)
+    curl.apply_translation([0, 0, 36.1])  # flat on the crown
+    m = trimesh.boolean.union([*parts, curl], engine="manifold")
+    out, n = printable.strands(m)
+    assert n == 0 and abs(out.bounds[1][2] - m.bounds[1][2]) < 1e-6
+
+
+def _face_tool():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("face_tool", config.REPO_ROOT / "tools" / "figure" / "face.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_a_face_crop_under_purple_stage_light_goes_back_to_daylight_color():
+    """Shane Gillis's ginger hair came out dark brown on every seed (random five, 2026-11-21): his
+    face crop was lit purple on stage. The crop's cast comes off by its cheeks; a face in daylight
+    is left alone."""
+    import cv2
+
+    face = _face_tool()
+
+    def lit(lab_skin, lab_hair):
+        lab = np.zeros((250, 220, 3), np.float32)
+        lab[:] = lab_hair
+        lab[80:250] = lab_skin
+        return np.clip(cv2.cvtColor(lab, cv2.COLOR_Lab2BGR) * 255 + 0.5, 0, 255).astype(np.uint8)
+
+    box = (60, 80, 100, 100)
+    stage = lit((59, 24.3, 22.1), (56, 20.4, 9.4))  # his crop's cheeks and hair, measured
+    out, hue = face.balance(stage, box)
+    assert hue < face.SKIN_HUE - face.SKIN_BAND
+    _, after = face.balance(out, box)
+    assert abs(after - face.SKIN_HUE) < 2
+    hair = cv2.cvtColor(out[:40].astype(np.float32) / 255, cv2.COLOR_BGR2Lab).reshape(-1, 3).mean(0)
+    assert hair[2] > 14  # yellower: the purple's pull on b* is gone
+    day = lit((59, 13.9, 21.3), (41, 12.2, 17.6))  # Christopher Abbott's, in daylight
+    same, _ = face.balance(day, box)
+    assert (same == day).all()

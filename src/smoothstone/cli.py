@@ -801,7 +801,10 @@ def closeup_step(job: Job, stl: Path, params: dict) -> Path | None:
         low = m.vertices[m.vertices[:, 2] < bh - 0.1]
         if str(params.get("name") or "") and bh > 0 and len(low):
             w = float(np.ptp(low[:, 0]))
-            spots.append(("name", (0.0, float(low[:, 1].min()), bh * 0.55), w * 0.32, 0.0, np.radians(5)))
+            # from 20 degrees up: level, the tops of the strokes do not show and an L's foot reads as
+            # a dot ("L.AMINE", random five round 5)
+            spots.append(("name", (0.0, float(low[:, 1].min()), bh * 0.55), w * 0.32, 0.0, np.radians(20),
+                          colortool.SIDE))
         if not spots or not colortool.render_closeup(m, _clay(job, m), png, spots):
             return None
     except Exception:  # a picture is never worth failing a passing build
@@ -1169,8 +1172,8 @@ def brace_step(job: Job, fig: Path, params: dict, out: Out) -> Path:
         job.log("brace failed:\n" + traceback.format_exc())
         return fig
     if cut:
-        out.add(f"Loose ends: {cut} hair tips or strands that hung in the air were cut back to where they join, "
-                f"a few tenths of a mm to {printable.TRIM_RISE:.0f} mm, so no strut runs across the face.")
+        out.add(f"Loose ends: {cut} hair strands under {2 * printable.STRAND:.1f} mm thick or tips that hung in the "
+                "air were cut back to where they join, so they print clean and no strut runs across the face.")
     if struts:
         drawn.write_text(json.dumps(printable.part_struts(struts, params)))
         at = ", ".join(sorted(set(held), key=lambda h: float(h.split()[0])))

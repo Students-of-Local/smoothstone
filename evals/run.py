@@ -70,8 +70,9 @@ def run_stone(command: str, env: dict, cwd: Path) -> str:
     p = subprocess.Popen([STONE, *argv], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
                          cwd=cwd, start_new_session=True)
     try:
-        stdout, stderr = p.communicate(timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "900")))
-    except subprocess.TimeoutExpired:  # a figure build takes about 430 s; its style and lift are kept
+        # a person's figure build is about 22 minutes since its head is lifted on its own as well
+        stdout, stderr = p.communicate(timeout=int(os.environ.get("STONE_CMD_TIMEOUT", "1800")))
+    except subprocess.TimeoutExpired:  # every model step's output is kept, so a rebuild goes on
         stop_group(p)
         return f"FIX: the command ran too long, and what it finished is kept.\nNEXT: stone {shlex.join(argv)}"
     out = (stdout or "") + (("\n" + stderr) if stderr and not stdout else "")

@@ -60,3 +60,18 @@ def test_for_slicer_returns_a_clean_closed_part():
 def test_box_passes_the_slicer_check():
     r = {x.name: x for x in check.check_mesh(trimesh.creation.box((20, 20, 20)))}
     assert r["slicer"].ok
+
+
+def test_for_slicer_drops_a_sliver_a_union_split_off():
+    """Inde Navarrette's figure failed the bodies check with three bodies (random five, 2026-11-21):
+    two were 0.01 mm slivers the union split off a fold in the hair. A real loose piece stays."""
+    import trimesh
+
+    m = trimesh.util.concatenate([
+        trimesh.creation.box(extents=[10, 10, 10]),
+        trimesh.creation.box(extents=[0.05, 0.05, 0.02], transform=trimesh.transformations.translation_matrix([8, 0, 0])),
+        trimesh.creation.box(extents=[1, 1, 1], transform=trimesh.transformations.translation_matrix([0, 9, 0])),
+    ])
+    out = clean.for_slicer(m)
+    assert len(out.split(only_watertight=False)) == 2
+    assert abs(out.volume - 1001) < 0.01
