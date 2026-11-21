@@ -1293,7 +1293,8 @@ def test_struts_hold_up_every_fingertip(tmp_path):
 
     fig, _ = _armed_mm(tmp_path)
     out = tmp_path / "braced.stl"
-    struts, held, spots = printable.brace_figure(fig, out, {"height": 70, "name": "ADA"})
+    struts, held, spots, cut = printable.brace_figure(fig, out, {"height": 70, "name": "ADA"})
+    assert cut == 0  # a hand is not a loose end
     assert len(struts) >= 2 and spots == [], (held, spots)
     b = trimesh.load(out, force="mesh")
     assert b.is_watertight and len(b.split(only_watertight=False)) == 1
@@ -1331,6 +1332,40 @@ def test_build_braces_the_figure(jobenv, openscad, monkeypatch, tmp_path):
         assert printable.strut_faces(centers, [st], margin=0.05).sum() >= 8, st
     px = np.asarray(Image.open(build / "views.png").convert("RGB")).astype(int)
     assert ((px[:, :, 2] > px[:, :, 0] + 40)).sum() > 50  # blue rods; the figure is clay
+    # random five, round 3: the face and name are too small to judge in views.png; closeup.png
+    # shows the name (and the face, when a neck is found) big and lit from the side
+    assert "Close-up:" in text, text
+    close = Image.open(build / "closeup.png")
+    assert close.height == 480 and close.width % 480 == 0, close.size
+
+
+def test_a_fringe_strand_is_cut_back_not_propped_on_the_face(tmp_path):
+    """Random five, round 3: Lamine Yamal's craft judge gave 5 for "blue support rods run from the
+    hair down across the eyes and face". Each was a strut under a hair tip less than a mm across
+    that hung 1 to 3 mm in front of the forehead. Such a tip is cut back to the hair it hangs from;
+    a hand that hangs from nothing held keeps its strut."""
+    from smoothstone import check, printable
+
+    head = trimesh.creation.box((10, 10, 70))
+    head.apply_translation((0, 0, 35))  # the face is its front, y = -5
+    fringe = trimesh.creation.box((8, 3, 3))
+    fringe.apply_translation((0, -6.5, 62.5))  # hair over the brow, held by the head beside it
+    strand = trimesh.creation.box((0.8, 0.8, 2.5))
+    strand.apply_translation((0, -7, 61 - 1.25 + 0.01))  # hangs 2.5 mm below the fringe
+    arm = trimesh.creation.box((3, 3, 20))
+    arm.apply_translation((12, 0, 55))
+    bar = trimesh.creation.box((10, 3, 3))
+    bar.apply_translation((7, 0, 66.5))  # a shoulder bar and an arm hanging from it
+    m = trimesh.boolean.union([head, fringe, strand, arm, bar], engine="manifold")
+    braced, struts, left, cut = printable.brace(m, floor=lambda x, y: 0.0)
+    assert cut == 1 and left == [], (cut, left)
+    assert all(s.top[2] < 50 for s in struts), [s.top for s in struts]  # only under the hand
+    assert len(struts) >= 1
+    assert not braced.contains([[0, -7, 59.5]])[0]  # the strand is gone
+    assert braced.contains([[0, -6.5, 62.5]])[0]  # the fringe stays
+    assert braced.is_watertight and len(braced.split(only_watertight=False)) == 1
+    res = {r.name: r for r in check.check_mesh(braced)}
+    assert res["islands"].ok, res["islands"]
 
 
 def test_no_plinth_no_strut_below_the_bed(tmp_path):
@@ -1350,7 +1385,7 @@ def test_no_plinth_no_strut_below_the_bed(tmp_path):
     fig = tmp_path / "figure.stl"
     m.export(fig)
     out = tmp_path / "braced.stl"
-    struts, _, spots = printable.brace_figure(fig, out, {"height": 70, "base": "none"})
+    struts, _, spots, _ = printable.brace_figure(fig, out, {"height": 70, "base": "none"})
     b = trimesh.load(out, force="mesh")
     assert b.bounds[0][2] > -1e-6, b.bounds  # nothing under the bed
     assert struts == [] and len(spots) == 1, (struts, spots)

@@ -21,6 +21,12 @@ STRUT_ROOT = 1.6  # mm it reaches down into what it stands on, so its slanted en
 STRUT_SLOPE = 0.8  # sideways mm per mm down: steeper than 45 degrees, so the strut prints without help
 STRUT_COVER = 1.5  # mm: every cell of an island is this close to a strut top
 STRUT_REACH = 18.0  # mm: longest strut
+TRIM_AREA = 1.5  # mm2: a hanging tip no thicker than this in any layer is a hair strand or a nub, not a hand
+TRIM_RISE = 4.0  # mm: the most a tip is cut back, up to the piece it hangs from
+TRIM_DUST = 1.0  # mm3: a loose bit this small left by a cut is dropped
+TRIM_FACE = 8.0  # mm2: a tip with only the face to stand on is cut back up to this thick
+NECK_VALLEY = 1.25  # the neck layer is at least this much smaller than the torso and the head (parts.py)
+FACE_SIDES = 0.75  # share of the head's half width that is face; the ears and hair beyond may hold a strut
 
 
 @dataclass
@@ -166,9 +172,63 @@ def _anchors(island: Island, grid: Grid) -> np.ndarray:
     return np.array(chosen)
 
 
-def plan_struts(grid: Grid, found: list[Island], floor=None) -> tuple[list[Strut], list[Island]]:
+def _inside(grid: Grid, pt) -> bool:
+    i = np.floor((np.asarray(pt, float) - grid.lo) / grid.pitch).astype(int)
+    return bool(np.all(i >= 0) and np.all(i < grid.occ.shape) and grid.occ[tuple(i)])
+
+
+def _clear(grid: Grid, top, foot) -> bool:
+    """Nothing solid on the way from top to foot, but for a cell at each end."""
+    top, foot = np.asarray(top, float), np.asarray(foot, float)
+    d = float(np.linalg.norm(top - foot))
+    t = np.arange(2 * grid.pitch, d - 2 * grid.pitch, grid.pitch / 2) / max(d, 1e-9)
+    if len(t) == 0:
+        return True
+    i = np.floor((top + (foot - top) * t[:, None] - grid.lo) / grid.pitch).astype(int)
+    ok = np.all((i >= 0) & (i < grid.occ.shape), axis=1)
+    return not grid.occ[tuple(i[ok].T)].any()
+
+
+def head(grid: Grid) -> dict | None:
+    """{"neck", "top": z, "cx", "cy": the head's middle, "hw", "hd": its half width and depth}, or
+    None when no neck is found. The neck is the narrowest layer between the shoulders and the top of
+    the head, at least NECK_VALLEY smaller than both, as parts.anatomy finds it on the mesh."""
+    occ = grid.occ
+    A = occ.sum(axis=(0, 1)).astype(float)
+    ks = np.arange(int(len(A) * 0.45), len(A) - int(round(1.0 / grid.pitch)))
+    if len(ks) < 5:
+        return None
+    a = A[ks]
+    score = np.minimum(np.maximum.accumulate(a), np.maximum.accumulate(a[::-1])[::-1]) / np.maximum(a, 1e-9)
+    score[a <= 0] = 0
+    i = int(score.argmax())
+    if score[i] < NECK_VALLEY:
+        return None
+    kn = int(ks[i])
+    xy = grid.xy(np.argwhere(occ[:, :, kn:].any(axis=2)))
+    (x0, y0), (x1, y1) = xy.min(axis=0), xy.max(axis=0)
+    top = int(np.flatnonzero(A)[-1])
+    return {"neck": float(grid.z(kn)), "top": float(grid.z(top)), "cx": float(x0 + x1) / 2,
+            "cy": float(y0 + y1) / 2, "hw": float(x1 - x0) / 2, "hd": float(y1 - y0) / 2}
+
+
+def face_zone(grid: Grid):
+    """A test for points on a figure's face, or None when no neck is found: above the neck, in the
+    front half of the head (-y), and inside FACE_SIDES of its half width. A strut that stands there
+    leaves a scar on the face when it snaps off, and reads as a bar across it."""
+    h = head(grid)
+    if h is None:
+        return None
+
+    def on_face(q) -> bool:
+        return bool(q[2] > h["neck"] and q[1] < h["cy"] and abs(q[0] - h["cx"]) < FACE_SIDES * h["hw"])
+    return on_face
+
+
+def plan_struts(grid: Grid, found: list[Island], floor=None, keep_off=None) -> tuple[list[Strut], list[Island]]:
     """A strut under each island, from the closest material below it within the steep cone.
-    floor(x, y) -> z or None gives a surface under the part (a plinth top) a strut may stand on.
+    floor(x, y) -> z or None gives a surface under the part (a plinth top) a strut may stand on;
+    keep_off(point) -> True marks a surface no strut may stand on (the face).
     Returns the struts and the islands no strut could reach."""
     from scipy import ndimage
     from scipy.spatial import cKDTree
@@ -184,20 +244,26 @@ def plan_struts(grid: Grid, found: list[Island], floor=None) -> tuple[list[Strut
         for a in _anchors(isl, grid):
             top = np.array([a[0], a[1], isl.z])
             best = None
+            near = []
             for i in tree.query_ball_point(top, STRUT_REACH):
                 q = pts[i]
                 dz = top[2] - q[2]
-                if dz < 2 * p:
+                if dz >= 2 * p and math.hypot(q[0] - top[0], q[1] - top[1]) <= STRUT_SLOPE * dz:
+                    near.append((float(np.linalg.norm(q - top)), i))
+            for d, i in sorted(near):
+                q = pts[i]
+                if not _inside(grid, q - (top - q) / d * STRUT_ROOT):
+                    continue  # its root would poke out under a thin strand and hang in the air itself
+                if keep_off is not None and keep_off(q):
                     continue
-                if math.hypot(q[0] - top[0], q[1] - top[1]) > STRUT_SLOPE * dz:
-                    continue
-                d = float(np.linalg.norm(q - top))
-                if best is None or d < best[0]:
-                    best = (d, q)
+                if not _clear(grid, top, q):
+                    continue  # it would run through the figure on the way down, as through a cheek
+                best = (d, q)
+                break
             if floor is not None:
                 fz = floor(top[0], top[1])
                 if (fz is not None and 2 * p <= top[2] - fz <= STRUT_REACH
-                        and (best is None or top[2] - fz < best[0])):
+                        and (best is None or top[2] - fz < best[0]) and _clear(grid, top, [top[0], top[1], fz])):
                     best = (top[2] - fz, np.array([top[0], top[1], fz]))
             if best is None:
                 continue
@@ -206,6 +272,60 @@ def plan_struts(grid: Grid, found: list[Island], floor=None) -> tuple[list[Strut
         if not made:
             missed.append(isl)
     return struts, missed
+
+
+def tips(grid: Grid, found: list[Island], widest: float = TRIM_AREA) -> list[list[tuple[int, np.ndarray]]]:
+    """For each island that is the end of a thin strand hanging from a piece that stands without
+    it: the strand's cells, layer by layer, up to where it joins. Cut away, the strand ends at the
+    join and needs no strut. A strut there runs down across the face (random five, round 3), and a
+    0.4 mm nozzle cannot lay a strand that thin in the air anyway."""
+    from scipy import ndimage
+
+    occ, p = grid.occ, grid.pitch
+    reach = ndimage.generate_binary_structure(2, 2)
+    out = []
+    for isl in found:
+        cur = np.zeros(occ.shape[:2], bool)
+        cur[tuple(isl.cells.T)] = True
+        if cur.sum() * p * p > widest:
+            continue
+        layers = [(isl.k, cur)]
+        for k in range(isl.k + 1, min(occ.shape[2], isl.k + int(round(TRIM_RISE / p)) + 1)):
+            lab, _ = ndimage.label(occ[:, :, k], structure=reach)
+            ids = np.unique(lab[ndimage.binary_dilation(cur, structure=reach) & (lab > 0)])
+            if len(ids) == 0:
+                break  # it ends going up too, or slants too far to follow
+            nxt = np.isin(lab, ids)
+            if (ndimage.binary_dilation(occ[:, :, k - 1] & ~cur, structure=reach) & nxt).any():
+                out.append(layers)  # it joins a piece that stands without it
+                break
+            if nxt.sum() * p * p > widest:
+                break  # it thickens before it joins: a hand or a limb, which gets a strut
+            cur = nxt
+            layers.append((k, cur))
+    return out
+
+
+def _cut_solid(grid: Grid, strands: list[list[tuple[int, np.ndarray]]]):
+    """One column of boxes per grid column of each strand, a cell wider all round so the strand's
+    surface between cell centers goes too, from the layer under its tip to the join."""
+    import manifold3d as m3d
+    from scipy import ndimage
+
+    p = grid.pitch
+    reach = ndimage.generate_binary_structure(2, 2)
+    boxes = []
+    for layers in strands:
+        span: dict[tuple[int, int], list[int]] = {}
+        for k, mask in layers:
+            for i, j in np.argwhere(ndimage.binary_dilation(mask, structure=reach)):
+                lo_hi = span.setdefault((int(i), int(j)), [k, k])
+                lo_hi[0], lo_hi[1] = min(lo_hi[0], k), max(lo_hi[1], k)
+        for (i, j), (k0, k1) in span.items():
+            x, y = grid.xy([i, j])
+            z0, z1 = float(grid.z(k0)) - p, float(grid.z(k1)) + p / 2
+            boxes.append(m3d.Manifold.cube([p, p, z1 - z0]).translate([x - p / 2, y - p / 2, z0]))
+    return m3d.Manifold.batch_boolean(boxes, m3d.OpType.Add) if boxes else None
 
 
 def _strut_solid(s: Strut):
@@ -237,9 +357,13 @@ def from_manifold(m):
     return trimesh.Trimesh(np.asarray(out.vert_properties)[:, :3], np.asarray(out.tri_verts), process=True)
 
 
-def brace(mesh, floor=None, rounds: int = 3):
-    """Add struts under every island. Returns (mesh, struts, islands left). The mesh is unchanged
-    when it is not a closed solid manifold3d accepts."""
+def brace(mesh, floor=None, rounds: int = 3, figure: bool = False):
+    """Cut back thin hanging tips, then add struts under every island left. On a figure no strut
+    stands on the face; a tip with only the face under it is cut back instead, up to TRIM_FACE
+    thick. Returns (mesh, struts, islands left, tips cut). The mesh is unchanged when it is not a
+    closed solid manifold3d accepts."""
+    import manifold3d as m3d
+
     body = to_manifold(mesh)
     ground = float(mesh.bounds[0][2])
 
@@ -255,15 +379,41 @@ def brace(mesh, floor=None, rounds: int = 3):
 
     grid = occupancy(mesh)
     if grid is None:
-        return mesh, [], []
+        return mesh, [], [], 0
     left = hanging(grid)
     if body is None:
-        return mesh, [], left
-    every = []
+        return mesh, [], left, 0
+    every, cut = [], 0
+    face = face_zone(grid) if figure else None  # found once, before any cut or strut changes the head
+
+    def trim(strands):
+        nonlocal body, mesh, grid, left, cut
+        body = body - _cut_solid(grid, strands)
+        # a cut can leave a wisp beside the strand on its own; dust that small never prints
+        body = m3d.Manifold.compose([c for c in body.decompose() if c.volume() >= TRIM_DUST])
+        cut += len(strands)
+        mesh = from_manifold(body)
+        grid = occupancy(mesh)
+        left = hanging(grid)
+
     for _ in range(rounds):
         if not left:
             break
-        struts, missed = plan_struts(grid, left, floor)
+        for _ in range(3):  # a cut can bare the tip of the strand it joined
+            strands = tips(grid, left)
+            if not strands:
+                break
+            trim(strands)
+        if not left:
+            break
+        if face is not None:
+            _, missed = plan_struts(grid, left, floor, face)
+            strands = tips(grid, missed, TRIM_FACE)
+            if strands:
+                trim(strands)
+                if not left:
+                    break
+        struts, missed = plan_struts(grid, left, floor, face)
         if not struts:
             break
         for s in struts:
@@ -272,7 +422,7 @@ def brace(mesh, floor=None, rounds: int = 3):
         mesh = from_manifold(body)
         grid = occupancy(mesh)
         left = hanging(grid)
-    return mesh, every, left
+    return mesh, every, left, cut
 
 
 def plinth(params: dict) -> tuple[float, float, float | None]:
@@ -322,10 +472,10 @@ def strut_faces(points, struts: list[dict], margin: float = 0.2) -> np.ndarray:
     return on
 
 
-def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[str]]:
-    """Write the unit-height figure at src to out with struts under its islands, sized for the
-    print the params make. Returns the struts, where they hold (part heights), and the spots
-    still in the air, in words."""
+def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[str], int]:
+    """Write the unit-height figure at src to out with thin hanging tips cut back and struts under
+    its other islands, sized for the print the params make. Returns the struts, where they hold
+    (part heights), the spots still in the air, in words, and how many tips were cut."""
     import trimesh
 
     scale, top, radius = plinth(params)
@@ -336,9 +486,9 @@ def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[s
     def floor(x, y):  # the plinth top; with no plinth a strut on the bed would be a lone pin
         return top if math.hypot(x, y) <= radius else None
 
-    braced, struts, left = brace(mesh, floor if radius is not None else None)
+    braced, struts, left, cut = brace(mesh, floor if radius is not None else None, figure=True)
     held = [f"{s.top[2] + lift:.0f} mm" for s in struts]
     spots = [where(i, braced).replace(f"{i.z:.1f} mm up", f"{i.z + lift:.1f} mm up") for i in left]
     braced.apply_scale(1.0 / scale)
     braced.export(str(out))
-    return struts, held, spots
+    return struts, held, spots, cut

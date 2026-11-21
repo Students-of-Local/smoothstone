@@ -757,20 +757,55 @@ def _grow(r: rc.Recipe, params: dict, err: str):
     return None
 
 
-def views_step(job: Job, stl: Path) -> Path | None:
-    """build/views.png: the part from every side, so a person or a large model can look at it all."""
+def _clay(job: Job, m):
+    """One clay color per face, with snap-off struts in blue so they do not read as drips."""
     import numpy as np
 
+    rgb = np.tile([217.0, 160.0, 102.0], (len(m.faces), 1))
+    struts = read_json(job.build_dir / "struts.json") or []
+    if struts:
+        rgb[printable.strut_faces(m.triangles_center, struts)] = printable.STRUT_RGB
+    return rgb
+
+
+def views_step(job: Job, stl: Path) -> Path | None:
+    """build/views.png: the part from every side, so a person or a large model can look at it all."""
     png = job.build_dir / "views.png"
     try:
         m = colortool.load_stl(stl)
-        rgb = np.tile([217.0, 160.0, 102.0], (len(m.faces), 1))
-        struts = read_json(job.build_dir / "struts.json") or []
-        if struts:  # snap-off struts in blue, so they do not read as drips on the figure
-            rgb[printable.strut_faces(m.triangles_center, struts)] = printable.STRUT_RGB
-        colortool.render_views(m, rgb, png)
+        colortool.render_views(m, _clay(job, m), png)
     except Exception:  # a picture is never worth failing a passing build
         job.log("views failed:\n" + traceback.format_exc())
+        return None
+    return png
+
+
+def closeup_step(job: Job, stl: Path, params: dict) -> Path | None:
+    """build/closeup.png for a figure: the face from the front and both sides, and the name on the
+    plinth, lit from the side and big enough to judge, which views.png's small panels are not
+    (random five, round 3: every craft judge called the face soft and the name faint there)."""
+    import numpy as np
+
+    png = job.build_dir / "closeup.png"
+    try:
+        m = colortool.load_stl(stl)
+        spots = []
+        g = printable.occupancy(m)
+        h = printable.head(g) if g is not None else None
+        if h is not None:
+            half = max(h["hw"], h["hd"], (h["top"] - h["neck"]) / 2) * 1.2
+            c = (h["cx"], h["cy"], (h["neck"] + h["top"]) / 2 + half * 0.1)
+            spots += [(f"face {a} deg", c, half, np.radians(a), np.radians(8)) for a in (0, 35, 325)]
+        scale, sink, _ = printable.plinth(params)
+        bh = float(params.get("height") or 90) - scale + sink  # the plinth's top
+        low = m.vertices[m.vertices[:, 2] < bh - 0.1]
+        if str(params.get("name") or "") and bh > 0 and len(low):
+            w = float(np.ptp(low[:, 0]))
+            spots.append(("name", (0.0, float(low[:, 1].min()), bh * 0.55), w * 0.32, 0.0, np.radians(5)))
+        if not spots or not colortool.render_closeup(m, _clay(job, m), png, spots):
+            return None
+    except Exception:  # a picture is never worth failing a passing build
+        job.log("closeup failed:\n" + traceback.format_exc())
         return None
     return png
 
@@ -831,7 +866,7 @@ def cmd_build(args, job: Job) -> Out:
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
-    for f in ("regions.json", "regions.npy", "regions.npz", "paint.npy", "slivers.json", "regions.png", "colors.png", "atlas.png", "views.png", "boundaries.png"):
+    for f in ("regions.json", "regions.npy", "regions.npz", "paint.npy", "slivers.json", "regions.png", "colors.png", "atlas.png", "views.png", "boundaries.png", "closeup.png"):
         (bd / f).unlink(missing_ok=True)
     if job.status().get("colors"):
         job.update(colors=None)
@@ -929,7 +964,11 @@ def cmd_build(args, job: Job) -> Out:
         views = views_step(job, stl)
         if views:
             out.add(f"Views: {views} (look at every panel before you call it done)")
-            show([views], "The finished part")
+        close = closeup_step(job, stl, params) if fig is not None else None
+        if close:
+            out.add(f"Close-up: {close} (the face and the name, lit from the side)")
+        if views:
+            show([views, *([close] if close else [])], "The finished part")
         out.add(*build_references(job, r, params))
         out.add(f"Part ready: {final}")
         out.next = DONE_NEXT
@@ -1125,10 +1164,13 @@ def brace_step(job: Job, fig: Path, params: dict, out: Out) -> Path:
     drawn = job.build_dir / "struts.json"  # where views.png draws them
     drawn.unlink(missing_ok=True)
     try:
-        struts, held, spots = printable.brace_figure(fig, braced, params)
+        struts, held, spots, cut = printable.brace_figure(fig, braced, params)
     except Exception:  # a figure that will not brace still builds; the islands check names the spots
         job.log("brace failed:\n" + traceback.format_exc())
         return fig
+    if cut:
+        out.add(f"Loose ends: {cut} hair tips or strands that hung in the air were cut back to where they join, "
+                f"a few tenths of a mm to {printable.TRIM_RISE:.0f} mm, so no strut runs across the face.")
     if struts:
         drawn.write_text(json.dumps(printable.part_struts(struts, params)))
         at = ", ".join(sorted(set(held), key=lambda h: float(h.split()[0])))

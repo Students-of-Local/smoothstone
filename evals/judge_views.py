@@ -58,8 +58,8 @@ before printing it.
 The request the part was made for:
 {request}
 
-Read the picture with the Read tool:
-  {views}: the whole part from several sides.
+Read the pictures with the Read tool:
+  {views}: the whole part from several sides.{closeup}
 
 Score the shape as a finished print:
 - 10: a clean, well-formed figure of what the request asks; the surface is smooth where it should be
@@ -113,8 +113,13 @@ def judge(build: Path, request: str, model: str = "opus") -> dict:
             if not src.exists():
                 raise SystemExit(f"missing {src}")
             shutil.copy(src, t / name)
+        close = ""
+        if (build / "closeup.png").exists():  # a figure's face and name, big and lit from the side
+            shutil.copy(build / "closeup.png", t / "closeup.png")
+            close = (f"\n  {t / 'closeup.png'}: the face from the front and both sides, and the name on the "
+                     "plinth, close up and lit from the side. Judge the face and the name here.")
         prompt = (RUBRIC.format(request=request, views=t / "views.png", boundaries=t / "boundaries.png") if painted
-                  else SHAPE.format(request=request, views=t / "views.png"))
+                  else SHAPE.format(request=request, views=t / "views.png", closeup=close))
         env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
         p = subprocess.run(["claude", "-p", "--model", model, "--tools", "Read", "--allowedTools", "Read",
                             "--strict-mcp-config", "--no-session-persistence", "--add-dir", str(t),

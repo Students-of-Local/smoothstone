@@ -1365,7 +1365,7 @@ def _fine(v, f, cn: np.ndarray, max_edge: float = RENDER_EDGE):
 
 
 def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, show=None, clip=False, font=None,
-           ss: int = SUPERSAMPLE, cn: np.ndarray | None = None):
+           ss: int = SUPERSAMPLE, cn: np.ndarray | None = None, light=None):
     """One flat-shaded orthographic view as a PIL image, `half` mm from the center to each edge.
     Drawn at `ss` times the size and box-filtered down, so a smooth edge does not show as pixel
     stairs that a reader (or the blind judge) takes for a stepped paint line. With `cn` (from
@@ -1415,7 +1415,11 @@ def _panel(v, f, face_rgb, az, elev, center, half, px, title="", numbers=None, s
             w /= w.sum(1, keepdims=True) + 1e-12
             nn[s0:s1] = np.einsum("pi,pij->pj", w, rcv[fc])
         nn /= np.linalg.norm(nn, axis=1)[:, None] + 1e-12
-    shade = 0.35 + 0.65 * np.clip(-nn[:, 1] * 0.7 + nn[:, 2] * 0.3, 0, 1)
+    if light is None:  # from the camera and a little above: even, so paint reads true
+        shade = 0.35 + 0.65 * np.clip(-nn[:, 1] * 0.7 + nn[:, 2] * 0.3, 0, 1)
+    else:  # from one side: relief (letters, eyes, lips) casts light and dark as on a lit shelf
+        lv = np.asarray(light, float) / np.linalg.norm(light)
+        shade = 0.25 + 0.75 * np.clip(nn @ lv, 0, 1)
     img[hit] = face_rgb[fid] * shade[:, None]
     if ss > 1:
         img = img.reshape(px, ss, px, ss, 3).mean((1, 3))
@@ -1472,6 +1476,26 @@ def render(mesh, face_rgb: np.ndarray, out_png: Path, views=(("front", 0.0, 0.0)
 def render_views(mesh, face_rgb, out_png: Path) -> int:
     """build/views.png: 8 sides at 20 degrees up, top and bottom, 5 panels a row."""
     return render(mesh, face_rgb, out_png, views=VIEWS, px=VIEW_PX, cols=5)
+
+
+RAKE = (-0.55, -0.5, 0.67)  # close-up light, in view space: from the upper left, in front
+
+
+def render_closeup(mesh, face_rgb, out_png: Path, spots: list[tuple], px: int = 480) -> int:
+    """build/closeup.png: one panel per (title, center, half, azimuth, elevation), lit from the
+    upper left so the face and the raised name show their relief. Returns the number of panels."""
+    from PIL import ImageFont
+
+    v = np.asarray(mesh.vertices, float)
+    f = np.asarray(mesh.faces)
+    v, f, idx, cn = _fine(v, f, corner_normals(v, f))
+    rgb = np.asarray(face_rgb, float)[idx]
+    font = ImageFont.load_default(size=max(12, px // 26))
+    panels = [_panel(v, f, rgb, az, el, np.asarray(c, float), half, px, title=t, font=font, cn=cn, clip=True,
+                     light=RAKE) for t, c, half, az, el in spots]
+    if panels:
+        _sheet(panels, len(panels), out_png)
+    return len(panels)
 
 
 def render_boundaries(V, F, face_rgb, lines: list[dict], out_png: Path, most: int = 6, px: int = 300,
