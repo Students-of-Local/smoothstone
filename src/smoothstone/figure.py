@@ -61,8 +61,10 @@ PERSON_LOOK = {
 }
 # for a render that came back with lettering or logos on the clothes (DHH's race suit): a figure
 # cannot print or paint them, and they are other people's marks. Only then, as the first try it
-# turned Jensen's leather jacket into a sweater.
-PLAIN = ("the same clothes,", "the same kind of clothes in plain solid colors,")
+# turned Jensen's leather jacket into a sweater. "The same kind of clothes in plain solid colors"
+# turned Lamine Yamal's red Spain kit into a navy tee and trousers on both seeds; this kept the kit's
+# cut and colors without the crest on one of two (random five, 2026-11-21)
+PLAIN = ("the same clothes,", "the same clothes in the same colors and cut, in plain solid fabric,")
 LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
                "hairstyle, the same face shape, expression and skin tone. "),

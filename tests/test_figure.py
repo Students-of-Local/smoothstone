@@ -609,8 +609,8 @@ def test_a_render_with_plain_clothes_keeps_the_clothes_it_has():
     """The plain look is only for a render that came back with lettering: as the first try it
     turned Jensen's leather jacket into a sweater."""
     same, plain = figure.prompt("chibi", "person"), figure.prompt("chibi", "person", plain=True)
-    assert "the same clothes," in same and "plain solid colors" not in same
-    assert "plain solid colors" in plain and "the same clothes," not in plain
+    assert "the same clothes," in same and "plain solid" not in same
+    assert "the same colors and cut, in plain solid fabric," in plain and "the same clothes," not in plain
 
 
 def test_the_render_check_asks_about_lettering_on_the_clothes():
