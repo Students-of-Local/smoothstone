@@ -43,3 +43,13 @@ counts as card "next"), the best pass rate and mean judge score so far and the s
   seeded control's score (judge_control.py, then judge_views.py on it), which must be under 8.
 - A spec with `"colors": {"black": ["jacket"], "rest": "white"}` checks the painted 3MF: it reads back
   clean, its color edges pass, and every part prints in the color asked for.
+
+## The teacher loop
+
+A failing run says something is wrong, not where. `uv run python evals/distill.py <runs dir> ...`
+reads each model run and finds its first divergence from stone's path (every stone message ends
+with a NEXT line, so the path is known), then says where the fix goes: the card (`off`, `stopped`,
+`values`), stone itself (`tool`, `steps`), or the trial's setup (`setup`, which does not count).
+After a card edit, run each case twice and read the card-version ledger at the bottom: a version
+with a lower pass rate on the specs both versions ran is reverted, not patched on top of. Adapted
+from sybil-solutions/skill-distill.

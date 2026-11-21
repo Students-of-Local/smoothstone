@@ -603,6 +603,12 @@ def cmd_set(args, job: Job) -> Out:
         except (ValueError, TypeError, ZeroDivisionError, KeyError):
             pass
     out.next = "stone build"
+    # a figure with no photos would only build to a FIX that says stone find: go there directly,
+    # a step a small model would otherwise spend (its runs ran out of steps at stone colors)
+    who = findtool.subject_from_request(job.request()) if r.name == "figure" and not job.photos() else None
+    if who:
+        out.add(f"Next the figure needs photos of {who}.")
+        out.next = f'stone find "{who}"'
     out.result = "plan " + (" ".join(changed_params(r, merged)) or "defaults")
     if args.reset:
         job.update(failed_builds=0)
