@@ -127,12 +127,14 @@ def missing_part(text: str) -> str | None:
 
 
 def prompt(style: str, who: str = "person", extra: str = "", glasses: bool | None = None,
-           plain: bool = False) -> str:
+           plain: bool = False, skin: str | None = None) -> str:
     """The style prompt. For a person the photo carries the look and the description stays out:
     its "light brown hair" drew Elon's hair too light (judge 8 with it, 9 without). Glasses come
     from the photo check when it ran, else from the description."""
     extra = positive(extra)
     likeness = LIKENESS.get(who, "")
+    if skin:  # only on a retry after a render that drifted from the photo's skin
+        likeness = likeness.replace("and skin tone", f"and the same {skin} skin tone")
     look = (PERSON_LOOK if who == "person" else LOOK).get(style, LOOK[style])
     if plain:
         look = look.replace(*PLAIN)
@@ -262,15 +264,17 @@ def screen(photos: list[Path], who: str, folder: Path, say=print) -> tuple[list[
 
 
 def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str,
-                  want: dict | None, say=print) -> Path:
+                  want: dict | None, say=print, skin_ita: float | None = None) -> Path:
     """style(), then the render checked against the photo: one that added or left out glasses,
-    a beard or a hat is styled again with the next seed, and the closest of STYLE_TRIES is kept."""
-    best, plain = None, False
+    a beard or a hat, or drifted SKIN_DRIFT from the photos' skin (skin_ita), is styled again with
+    the next seed, and the closest of STYLE_TRIES is kept."""
+    best, plain, named = None, False, None
     check = bool(want) and any(k in want for k in KEEP)  # nothing to hold a render to otherwise
     for i in range(STYLE_TRIES if check else 1):
         s = seed + i
         o = out.with_name(f"style-{s}.png") if check else out
-        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"), plain=plain)
+        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"), plain=plain,
+              **({"skin": named} if named else {}))
         if not check:
             return o
         got = (traits([o], who, out.with_name("check.log")) or [None])[0]
@@ -279,16 +283,27 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
             break
         miss = [k for k in KEEP if k in want and k in got and bool(got[k]) != bool(want[k])]
         miss += ["lettering"] if got.get("lettering") else []  # never wanted, whatever the photo has
+        drift = None
+        if skin_ita is not None:
+            r = skin([o])[0]
+            drift = None if r is None else r - skin_ita
+        if drift is not None and abs(drift) > SKIN_DRIFT:
+            miss.append("skin")
+            named = skin_word(skin_ita)
         if best is None or len(miss) < len(best[1]):
             best = (o, miss)
         if not miss:
             break
-        how = " and ".join(("added " if got[k] else "left out ") + KEEP[k] for k in miss if k in KEEP)
+        how = " and ".join([("added " if got[k] else "left out ") + KEEP[k] for k in miss if k in KEEP]
+                           + ([f"made the skin {'lighter' if drift > 0 else 'darker'} ({drift:+.0f} ITA from "
+                               f"the photos' {named})"] if "skin" in miss else []))
         if "lettering" in miss:
             plain = True
             how = " and ".join(x for x in (how, "put lettering or a logo on the clothes, which a figure cannot "
                                                 "print") if x)
-        again = " in plain colors" if plain else ""
+        again = " and ".join(x for x in ("in plain colors" if plain else "",
+                                         f"with {named} skin named" if "skin" in miss else "") if x)
+        again = f" {again}" if again else ""
         if i + 1 < STYLE_TRIES:
             say(f"The render {how}, unlike the photo; styling again{again} with seed {s + 1}.")
         else:
@@ -299,17 +314,46 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
     return out
 
 
+# a render whose cheeks drift this far in ITA from the photos' is styled again with the skin named:
+# Lamine Yamal's photos measured -20 and -8, both renders 32 and 41; the other four of the random
+# five drifted 2 to 21 (2026-11-21)
+SKIN_DRIFT = 30.0
+# Chardon's ITA bands, lightest first: the words the retry names
+SKIN_WORDS = ((55, "very light"), (41, "light"), (28, "light tan"), (10, "tan"), (-30, "brown"))
+
+
+def skin_word(ita: float) -> str:
+    return next((w for lo, w in SKIN_WORDS if ita > lo), "dark brown")
+
+
+def _face_py() -> list[str]:
+    # the lift venv pins opencv 4, whose Haar face finder opencv 5 (in the style venv) dropped
+    lift_py = config.REPO_ROOT / "tools" / "lift" / ".venv" / "bin" / "python"
+    py = lift_py if lift_py.exists() else _mflux_bin().parent / "python"
+    return [str(py), "-I", str(config.REPO_ROOT / "tools" / "figure" / "face.py")]
+
+
+def skin(images: list[Path]) -> list[float | None]:
+    """Each image's skin as an ITA angle from its biggest face's cheeks (tools/figure/face.py --skin),
+    None where no face is found or the face finder is missing."""
+    try:
+        r = subprocess.run([*_face_py(), "--skin", *map(str, images)], capture_output=True, text=True,
+                           timeout=120)
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+    except (FigureProblem, OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        return [None] * len(images)
+    return got if isinstance(got, list) and len(got) == len(images) else [None] * len(images)
+
+
 def face_crop(photo: Path | list[Path], out: Path) -> Path | None:
     """The face and hair of the biggest face in the photos (tools/figure/face.py), or None when there
     is no face or the style venv is missing: the figure is then styled from the whole photo."""
     if out.exists():
         return out
     photos = [photo] if isinstance(photo, Path) else list(photo)
-    try:  # the lift venv pins opencv 4, whose Haar face finder opencv 5 (in the style venv) dropped
-        lift_py = config.REPO_ROOT / "tools" / "lift" / ".venv" / "bin" / "python"
-        py = lift_py if lift_py.exists() else _mflux_bin().parent / "python"
-        r = subprocess.run([str(py), "-I", str(config.REPO_ROOT / "tools" / "figure" / "face.py"),
-                            *map(str, photos), str(out)], capture_output=True, text=True, timeout=120)
+    try:
+        r = subprocess.run([*_face_py(), *map(str, photos), str(out)], capture_output=True, text=True,
+                           timeout=120)
     except (FigureProblem, OSError, subprocess.TimeoutExpired):
         return None
     return out if r.returncode == 0 and out.exists() else None
@@ -367,12 +411,12 @@ def _run(cmd: list[str], log: Path, timeout: int) -> None:
 
 
 def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "",
-          glasses: bool | None = None, plain: bool = False) -> Path:
+          glasses: bool | None = None, plain: bool = False, skin: str | None = None) -> Path:
     if out.exists():
         return out
     cmd = [str(_mflux_bin()), *_style_model(),
            "--image-paths", *map(str, photos),
-           "--prompt", prompt(style_name, who, extra, glasses, plain),
+           "--prompt", prompt(style_name, who, extra, glasses, plain, skin),
            "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed),
            "--low-ram",
            "--output"]
@@ -474,6 +518,8 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
         # the face comes from whichever photo shows it biggest: a found lead photo is often a whole
         # person on a stage, and a few pixels of face come out a generic one (Shane Gillis, 2026-11-21)
         face = face_crop(photos[:4], folder / "face.png") if who == "person" else None
+        tones = sorted(t for t in skin(photos[:4]) if t is not None) if who == "person" else []
+        skin_ita = tones[len(tones) // 2] if tones else None  # the median photo: one may be blown out
         if face:
             refs = [face, *refs]
         elif who == "person":
@@ -481,7 +527,7 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
                 "whole photo, so the face may come out generic.")
         say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
         style_checked(refs, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
-                      want, say)
+                      want, say, skin_ita=skin_ita)
     if shown:
         shown(render)
     mesh = folder / "lift.glb"

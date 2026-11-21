@@ -496,14 +496,17 @@ def test_the_positive_words_of_a_description():
     assert figure.positive("He is not wearing glasses. He has a black jacket.") == "He has a black jacket."
 
 
-def _models(tmp_path, monkeypatch, answers):
-    """Fake describe, style and lift; traits answers by file name. Returns the style calls."""
+def _models(tmp_path, monkeypatch, answers, tones=None):
+    """Fake describe, style and lift; traits answers by file name, skin ITA by file name (tones).
+    Returns the style calls."""
     calls = []
 
-    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False):
-        calls.append((photos[0].name, seed) + (("plain",) if plain else ()))
+    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False, skin=None):
+        calls.append((photos[0].name, seed) + (("plain",) if plain else ()) + ((f"skin {skin}",) if skin else ()))
         out.write_bytes(f"render {seed}".encode())
         return out
+
+    monkeypatch.setattr(figure, "skin", lambda images: [(tones or {}).get(Path(i).name) for i in images])
 
     def fake_traits(images, who, log):
         return [answers(Path(i).name) for i in images]
@@ -567,6 +570,39 @@ def test_a_render_with_lettering_on_the_clothes_is_styled_again_in_plain_colors(
     assert calls == [("dhh.jpg", 7), ("dhh.jpg", 8, "plain")]
     assert (fig.parent / "style.png").read_bytes() == b"render 8"
     assert any("lettering" in x and "plain" in x and "seed 8" in x for x in said)
+
+
+def test_a_render_that_lightens_the_skin_is_styled_again_with_the_skin_named(tmp_path, monkeypatch):
+    """Random five, round 2: Lamine Yamal's photos measure ITA -20 and -8 at the cheeks and both
+    renders 32 and 41, and the likeness judge gave 4 with 'light beige skin' first. A render that
+    drifts more than SKIN_DRIFT is styled again with the photos' skin named."""
+    photos = [tmp_path / "p1.jpg", tmp_path / "p2.jpg"]
+    for p in photos:
+        p.write_bytes(p.name.encode())
+    said = []
+    calls = _models(tmp_path, monkeypatch, lambda n: BARE,
+                    tones={"p1.jpg": -20.4, "p2.jpg": -7.7, "style-7.png": 40.9, "style-8.png": -5.0})
+    figure.make(photos, tmp_path / "fig", seed=7, say=said.append)
+    assert calls == [("p1.jpg", 7), ("p1.jpg", 8, "skin brown")], calls
+    assert any("made the skin lighter (+49 ITA from the photos' brown)" in x and "brown skin named" in x
+               for x in said), said
+
+
+def test_a_render_close_to_the_photos_skin_is_kept():
+    """Chris Abbott's render drifted 10 from his photos and Shane Gillis's 2: neither is styled again,
+    and the prompt names a skin tone only on that retry."""
+    assert figure.skin_word(-14) == "brown" and figure.skin_word(34) == "light tan"
+    assert figure.skin_word(50) == "light" and figure.skin_word(-40) == "dark brown"
+    assert "skin tone" in figure.prompt("chibi", "person") and "brown skin" not in figure.prompt("chibi", "person")
+    assert "the same brown skin tone" in figure.prompt("chibi", "person", skin="brown")
+
+
+def test_a_skin_drift_under_the_limit_tries_once(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    calls = _models(tmp_path, monkeypatch, lambda n: BARE, tones={"p.jpg": 33.5, "style-7.png": 42.9})
+    figure.make([photo], tmp_path / "fig", seed=7, say=lambda s: None)
+    assert calls == [("p.jpg", 7)], calls
 
 
 def test_a_render_with_plain_clothes_keeps_the_clothes_it_has():
