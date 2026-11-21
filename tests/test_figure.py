@@ -34,6 +34,21 @@ def standin(path: Path) -> Path:
     return path
 
 
+def armed(path: Path) -> Path:
+    """The stand-in with arms hanging at its sides from a shoulder bar: each fingertip is the lowest
+    point of its arm and has only air under it, like the hands of every lifted figure (2026-11-20)."""
+    body = trimesh.load(standin(path.with_name("body.glb")), force="mesh")
+    parts = [body, trimesh.creation.box([1.1, 0.1, 0.14])]
+    parts[1].apply_translation([0, 1.2, 0])
+    for x in (-0.5, 0.5):
+        arm = trimesh.creation.capsule(height=0.5, radius=0.08)
+        arm.apply_transform(trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0]))
+        arm.apply_translation([x, 0.9, 0])
+        parts.append(arm)
+    trimesh.boolean.union(parts, engine="manifold").export(path)
+    return path
+
+
 def test_repair_orients_and_scales(tmp_path):
     info = figure.repair(standin(tmp_path / "lift.glb"), tmp_path / "figure.stl")
     m = trimesh.load(tmp_path / "figure.stl")
@@ -1126,4 +1141,100 @@ def test_figure_without_plinth_gets_the_bed_chamfer(tmp_path, openscad, monkeypa
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
     m, res = _plinth(tmp_path, openscad, base="none")
     assert res["bed_edge"].ok, res["bed_edge"].detail
-    assert all(x.ok for x in res.values()), [x for x in res.values() if not x.ok]
+    # two small feet and no plinth: the stand-in tips (test_a_figure_that_tips_gets_a_plinth)
+    assert all(x.ok for x in res.values() if x.name != "tipping"), [x for x in res.values() if not x.ok]
+
+
+def test_a_figure_that_tips_gets_a_plinth(tmp_path, openscad, monkeypatch):
+    """A figure on two small feet with no plinth leans 8 degrees before it falls: a nozzle bump
+    knocks it over mid-print. The fix is the plinth."""
+    from smoothstone import recipes
+
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    r = recipes.load("figure", REPO / "recipes")
+    _, got = _plinth(tmp_path, openscad, base="none")
+    res = [x for x in got.values() if not x.ok]
+    assert [x.name for x in res] == ["tipping"], res
+    texts, nxt = cli.plan_fix(r, {"base": "none"}, res)
+    assert nxt == "stone set base=round", (texts, nxt)
+
+
+def _armed_mm(tmp_path, height=70.0):
+    from smoothstone import printable
+
+    fig = tmp_path / "figure.stl"
+    figure.repair(armed(tmp_path / "lift.glb"), fig)
+    m = trimesh.load(fig, force="mesh")
+    m.apply_scale(printable.plinth({"height": height, "name": "ADA"})[0])
+    return fig, m
+
+
+def test_the_islands_check_finds_hanging_fingertips(tmp_path):
+    """Donovan, 2026-11-20: "This needs to be utter and total perfection designed to be printed".
+    Every lifted figure had fingertips that start in mid-air and stone said nothing about it."""
+    from smoothstone import check, recipes
+
+    _, m = _armed_mm(tmp_path)
+    res = {r.name: r for r in check.check_mesh(m)}
+    assert not res["islands"].ok and res["islands"].value == 2, res["islands"]
+    assert "mm up" in res["islands"].detail
+    sup = {r.name: r for r in check.check_mesh(m, recipe=recipes.load("figure"))}
+    assert sup["islands"].ok and "supports on" in sup["islands"].detail
+
+
+def test_struts_hold_up_every_fingertip(tmp_path):
+    from smoothstone import check, printable
+
+    fig, _ = _armed_mm(tmp_path)
+    out = tmp_path / "braced.stl"
+    struts, held, spots = printable.brace_figure(fig, out, {"height": 70, "name": "ADA"})
+    assert len(struts) >= 2 and spots == [], (held, spots)
+    b = trimesh.load(out, force="mesh")
+    assert b.is_watertight and len(b.split(only_watertight=False)) == 1
+    b.apply_scale(printable.plinth({"height": 70, "name": "ADA"})[0])
+    res = {r.name: r for r in check.check_mesh(b)}
+    assert res["islands"].ok and res["islands"].value == 0, res["islands"]
+    for s in struts:  # steep enough to print without help, and short
+        drop = s.top[2] - s.foot[2]
+        assert drop > 0 and np.hypot(*(s.top[:2] - s.foot[:2])) <= printable.STRUT_SLOPE * drop + 1e-6
+        assert np.linalg.norm(s.top - s.foot) <= printable.STRUT_REACH
+
+
+def test_build_braces_the_figure(jobenv, openscad, monkeypatch, tmp_path):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    fig = tmp_path / "abc123" / "figure.stl"
+    fig.parent.mkdir()
+    figure.repair(armed(tmp_path / "lift.glb"), fig)
+    stone("new", 'A figure 70 mm tall with "ADA" on the base')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    text, code, nxt = stone("build")
+    assert code == 0 and "Part ready" in text, text
+    assert "Built-in supports:" in text and "In the slicer" not in text, text
+    assert "PASS islands: every layer stands on the one below" in text, text
+    assert "PASS tipping" in text, text
+
+
+def test_no_plinth_no_strut_below_the_bed(tmp_path):
+    """Review first-F1 and second-F4 (PR #50): with base=none a low island far from the body got a
+    strut standing on the bed, whose root reached below z = 0. With no plinth the spot goes to the
+    slicer instead."""
+    from smoothstone import printable
+
+    post = trimesh.creation.box((6, 6, 70))
+    post.apply_translation((0, 0, 35))
+    arm = trimesh.creation.box((30, 6, 3))
+    arm.apply_translation((14, 0, 68.5))
+    drop = trimesh.creation.box((4, 4, 63))
+    drop.apply_translation((26, 0, 4 + 31.5))  # its foot 4 mm over the bed, 23 mm from the post
+    m = trimesh.boolean.union([post, arm, drop], engine="manifold")
+    m.apply_scale(1 / 70)
+    fig = tmp_path / "figure.stl"
+    m.export(fig)
+    out = tmp_path / "braced.stl"
+    struts, _, spots = printable.brace_figure(fig, out, {"height": 70, "base": "none"})
+    b = trimesh.load(out, force="mesh")
+    assert b.bounds[0][2] > -1e-6, b.bounds  # nothing under the bed
+    assert struts == [] and len(spots) == 1, (struts, spots)
+    with_plinth = printable.brace_figure(fig, out, {"height": 70, "base_d": 80})
+    assert len(with_plinth[0]) >= 1 and with_plinth[2] == []  # the plinth top holds it
+    assert all(s.top[2] - s.foot[2] >= 2 * printable.PITCH for s in with_plinth[0])

@@ -143,6 +143,10 @@
     "bed": {
       "param": "height",
       "dir": "down"
+    },
+    "tipping": {
+      "param": "base",
+      "to": "round"
     }
   },
   "examples": [],

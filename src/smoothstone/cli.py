@@ -24,6 +24,7 @@ from . import measure as measuretool
 from . import find as findtool
 from . import figure as figuretool
 from . import recipes as rc
+from . import printable
 from . import scad
 from .job import Job, read_json, write_json
 
@@ -149,7 +150,7 @@ def build_stamp(job: Job, r: rc.Recipe, given: dict) -> dict:
     files = {k: _file_sig(v) for k, v in sorted(params.items())
              if v and r.param(k) is not None and r.param(k).type == "image"}
     return {"recipe": r.name, "params": params, "files": files, "source": _file_sig(r.scad),
-            "photos": [_file_sig(p) for p in job.photos()]}
+            "photos": [_file_sig(p) for p in job.photos()], "print": printable.VERSION}
 
 
 def build_params(job: Job | None, r: rc.Recipe, given: dict) -> dict:
@@ -816,7 +817,7 @@ def cmd_build(args, job: Job) -> Out:
             return out
     bd = job.build_dir
     bd.mkdir(parents=True, exist_ok=True)
-    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad", "stamp.json"):
+    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad", "stamp.json", "figure-braced.stl"):
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
@@ -833,7 +834,10 @@ def cmd_build(args, job: Job) -> Out:
     if dropped:
         out.add(f"Ignored old parameters: {', '.join(dropped)}")
     stl = bd / "part.stl"
-    run = scad.build_stl(binary, r, params, stl)
+    made = params
+    if fig is not None and params.get(fig.name) and Path(params[fig.name]).is_file():
+        made = {**params, fig.name: str(brace_step(job, Path(params[fig.name]), params, out))}
+    run = scad.build_stl(binary, r, made, stl)
     (bd / "openscad.log").write_text(run.log)
     job.log(f"openscad build ({'ok' if run.ok else 'failed'}):\n{run.log}")
     if not run.ok:
@@ -1102,6 +1106,24 @@ def show(paths: list, caption: str) -> None:
             HOOKS["show"]([Path(p) for p in paths], caption)
         except Exception:  # a picture is a bonus: never a failed step
             pass
+
+
+def brace_step(job: Job, fig: Path, params: dict, out: Out) -> Path:
+    """Struts under every spot of the figure that would start in mid-air, so it prints without
+    slicer supports. Returns the figure to build: braced, or as it was when bracing failed."""
+    braced = job.build_dir / "figure-braced.stl"
+    try:
+        struts, held, spots = printable.brace_figure(fig, braced, params)
+    except Exception:  # a figure that will not brace still builds; the islands check names the spots
+        job.log("brace failed:\n" + traceback.format_exc())
+        return fig
+    if struts:
+        at = ", ".join(sorted(set(held), key=lambda h: float(h.split()[0])))
+        out.add(f"Built-in supports: {len(struts)} thin struts hold up the spots that would print onto air "
+                f"(at {at}). They print with the figure; snip them off after, or keep them.")
+    if spots:
+        out.add(f"In the slicer: supports on, everywhere. No strut reaches {'; '.join(spots[:4])}.")
+    return braced
 
 
 def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
