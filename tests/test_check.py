@@ -130,3 +130,33 @@ def test_safe_eval():
         with pytest.raises(ValueError):
             recipes.safe_eval(bad, {"w": 1})
 
+
+
+def test_a_bead_hanging_under_a_shelf_fails_islands():
+    # a post, a shelf off its top, and a bead hanging under the shelf's far end: the bead's
+    # bottom layer has nothing under it
+    post = trimesh.creation.box((6, 6, 30))
+    post.apply_translation((0, 0, 15))
+    shelf = trimesh.creation.box((30, 6, 3))
+    shelf.apply_translation((12, 0, 28.5))
+    bead = trimesh.creation.box((4, 4, 6))
+    bead.apply_translation((24, 0, 24))
+    m = on_bed(trimesh.boolean.union([post, shelf, bead], engine="manifold"))
+    res = by_name(check.check_mesh(m))
+    assert not res["islands"].ok and res["islands"].value == 1, res["islands"]
+    assert "21.0 mm up" in res["islands"].detail, res["islands"].detail
+
+
+def test_a_box_stands_on_every_layer_and_does_not_tip():
+    res = by_name(check.check_mesh(box(20, 20, 10)))
+    assert res["islands"].ok and res["islands"].value == 0
+    assert res["tipping"].ok and res["tipping"].value > 60
+
+
+def test_a_leaning_tower_fails_tipping():
+    m = box(6, 6, 60)
+    shear = np.eye(4)
+    shear[0, 2] = 0.5  # the top sits 30 mm over, far past a 6 mm foot
+    m.apply_transform(shear)
+    res = by_name(check.check_mesh(on_bed(m)))
+    assert not res["tipping"].ok and res["tipping"].value == 0, res["tipping"]

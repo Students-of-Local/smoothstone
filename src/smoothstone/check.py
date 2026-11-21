@@ -344,6 +344,8 @@ def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Resul
                       f"(max {max_overhang * 100:.0f}%)",
                       advice="too much of the part hangs in the air; add a chamfer or flip it"))
 
+    out.extend(layer_checks(mesh, recipe))
+
     if recipe is not None and recipe.dims:
         try:
             want = recipe.expected_dims(recipe.merged(params or {}))
@@ -360,6 +362,39 @@ def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Resul
             detail = "; ".join(bad) if bad else "size matches the recipe"
             out.append(Result("dims", not bad, bad or "ok", detail,
                               advice="size does not match the recipe; go back to the defaults"))
+    return out
+
+
+def layer_checks(mesh, recipe=None) -> list[Result]:
+    """What a slicer sees layer by layer: pieces that start in the air, and how far the part can
+    lean before it tips over."""
+    from . import printable
+
+    grid = printable.occupancy(mesh)
+    if grid is None:
+        return [Result("islands", True, None, "skipped (no ray engine)"),
+                Result("tipping", True, None, "skipped (no ray engine)")]
+    out = []
+    big = [i for i in printable.islands(grid) if i.area >= printable.ISLAND_MIN]
+    big.sort(key=lambda i: -i.area)
+    spots = "; ".join(f"{i.area:.1f} mm2 at {printable.where(i, mesh)}" for i in big[:4])
+    if not big:
+        out.append(Result("islands", True, 0, "every layer stands on the one below"))
+    elif recipe is not None and recipe.supports:
+        out.append(Result("islands", True, len(big),
+                          f"{len(big)} spots start in the air ({spots}): in the slicer, supports on, everywhere"))
+    else:
+        out.append(Result("islands", False, len(big), f"{len(big)} pieces start in the air: {spots}",
+                          advice="a piece starts in mid-air and would print onto nothing; give it a "
+                                 "45 degree chamfer from below or turn the part so it grows from the bed"))
+    angle = printable.tip_angle(mesh, grid)
+    if angle is None:
+        out.append(Result("tipping", True, None, "skipped (nothing on the bed)"))
+    else:
+        out.append(Result("tipping", angle >= printable.TIP_MIN, round(angle, 1),
+                          f"leans {angle:.0f} deg before it tips (need {printable.TIP_MIN:.0f})",
+                          advice="the part is top-heavy for what it stands on; widen its base",
+                          direction="up", need=printable.TIP_MIN, measured=angle))
     return out
 
 
