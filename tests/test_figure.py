@@ -1491,12 +1491,9 @@ def test_the_head_crop_is_a_square_from_the_hair_to_the_shoulders(tmp_path, monk
     assert figure.head_crop(tmp_path / "style.png", tmp_path / "head2.png") is None
 
 
-def test_hair_strands_too_thin_to_print_are_cut_off_the_head_and_the_nose_stays():
-    """A lifted curl comes out as loose worms of half a mm that float off the head; a 0.4 mm nozzle
-    prints them as blobs (Lamine Yamal, random five round 5: the craft judge's first fault). They
-    are cut off at the root; a nose, as thick as a strand is long, stays."""
-    from smoothstone import printable
-
+def _head_with_loops(k):
+    """A torso, neck and round head (crown at z 36) with a nose, and k thin loops standing off the
+    crown like lifted worm hair, each rising about 2 mm off it."""
     parts = [trimesh.creation.capsule(height=14, radius=5, count=[32, 32]),
              trimesh.creation.cylinder(radius=2, height=4, sections=32),
              trimesh.creation.icosphere(subdivisions=4, radius=6)]
@@ -1505,17 +1502,45 @@ def test_hair_strands_too_thin_to_print_are_cut_off_the_head_and_the_nose_stays(
     parts[2].apply_translation([0, 0, 30])
     nose = trimesh.creation.icosphere(subdivisions=2, radius=1.2)
     nose.apply_translation([0, -6, 30])
-    worm = trimesh.creation.torus(major_radius=2.5, minor_radius=0.25, major_sections=48, minor_sections=12)
-    worm.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]))
-    worm.apply_translation([1.0, 0, 37.5])  # a loop standing on the crown, 3 mm above it
-    m = trimesh.boolean.union([*parts, nose, worm], engine="manifold")
+    parts.append(nose)
+    for i in range(k):
+        el, az = np.radians(55 if i % 2 else 70), 2 * np.pi * i / k
+        d = np.array([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az), np.sin(el)])
+        if d[1] < -0.3 and el < 1.0:  # not over the face
+            d[1] = -d[1]
+        t = np.cross([0, 0, 1], d)
+        loop = trimesh.creation.torus(major_radius=1.0, minor_radius=0.25, major_sections=32, minor_sections=10)
+        loop.apply_transform(trimesh.geometry.align_vectors([0, 0, 1], t / np.linalg.norm(t)))
+        loop.apply_translation(np.array([0, 0, 30]) + 6.9 * d)
+        parts.append(loop)
+    return trimesh.boolean.union(parts, engine="manifold")
+
+
+def test_hair_strands_too_thin_to_print_are_cut_off_the_head_and_the_nose_stays():
+    """A lifted curl comes out as loose worms of half a mm that float off the head; a 0.4 mm nozzle
+    prints them as blobs (Lamine Yamal, random five round 5: the craft judge's first fault). A head
+    of them has them cut off at the root; a nose, as thick as a strand is long, stays."""
+    from smoothstone import printable
+
+    m = _head_with_loops(24)  # 20 come out apart: a flipped one meets its neighbour
+    assert m.bounds[1][2] > 37
     out, n = printable.strands(m)
-    assert n >= 1
-    assert out.bounds[1][2] < 36.3  # the loop is gone, down to the crown
+    assert n >= printable.STRAND_MANY
+    assert out.bounds[1][2] < 36.3  # the loops are gone, down to the crown
     assert out.bounds[0][1] < -6.9  # the nose is still there
     assert out.body_count == 1 and printable.to_manifold(out) is not None
     assert abs(out.volume - m.volume) < 0.05 * m.volume
 
+
+def test_a_few_locks_floating_off_the_head_are_kept():
+    """Inde Navarrette's long hair had three locks floating 1.7 to 3.2 mm off her head (random five,
+    2026-11-21); cut, they ended in flat slabs beside her cheek. Only a head of many is cut."""
+    from smoothstone import printable
+
+    m = _head_with_loops(3)
+    out, n = printable.strands(m)
+    assert n == 0
+    assert out is m
 
 
 def test_a_thin_curl_lying_on_the_head_is_kept():

@@ -33,6 +33,9 @@ STRAND_PITCH = 0.1  # mm: the grid that finds such strands
 # strands are cut; sculpted curls lie closer (Christopher Abbott's reach 1.3 mm, Lamine Yamal's
 # worms 3.1: random five round 5), and cutting them took his craft score from 8 to 6
 STRAND_FAR = 1.5
+# and a head with that many strands: Lamine Yamal's worm hair had 31, Inde Navarrette's long locks 8,
+# three of them floating as far; cut, her locks ended in flat slabs (craft 6 cut, 7 kept)
+STRAND_MANY = 16
 STRAND_SEAM = 1.0  # mm round a cut whose points are moved onto the blurred surface
 STRAND_BLUR = 0.4  # mm the surface round a cut is blurred, so the cut leaves no crack
 STRAND_RELAX = 4  # rounds that untangle those points
@@ -444,8 +447,8 @@ def strands(mesh, r: float = STRAND, pitch: float = STRAND_PITCH, blur: float = 
     lab, n = ndimage.label(ndimage.binary_propagation(thick, mask=gone))
     ids = np.arange(1, n + 1)
     real = ids[np.asarray(ndimage.sum(thick, lab, ids)) >= 3] if n else ids
-    # a head whose hair came out as worms has one floating far off it; a sculpted head has none
-    if not len(real) or float(np.max(ndimage.maximum(edt(~opened) * pitch, lab, real))) < STRAND_FAR:
+    # a head whose hair came out as worms has many, some floating far off it; a sculpted head has none
+    if len(real) < STRAND_MANY or float(np.max(ndimage.maximum(edt(~opened) * pitch, lab, real))) < STRAND_FAR:
         real = real[:0]
     worms, n = np.isin(lab, real), len(real)
     cut = ndimage.binary_dilation(worms, iterations=2)  # past the strand's true surface
