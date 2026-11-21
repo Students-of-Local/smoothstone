@@ -70,8 +70,8 @@ Score the shape as a finished print:
 - 4 to 6: a flaw anyone would see: lumps, holes, melted or noisy patches, a missing or fused hand or
   foot, a broken or cut-off letter, a part floating off the body, a strut through the face.
 - 1 to 3: not a figure of a person, badly broken, or would not print.
-Thin straight rods from a hand or chin down to the body or the base are built-in supports, there on
-purpose; they are not a fault unless one crosses the face or the name. A plinth with the name on its
+Thin rods drawn in blue, from a hand, hem, chin or hair down to the body or the base, are built-in
+supports that snap off after printing; they are not a fault unless one crosses the face or the name. A plinth with the name on its
 front is the design. List in faults only what you judge to be wrong. Name each fault with the panel
 it is in (such as "views front") and what is wrong in a few words.
 

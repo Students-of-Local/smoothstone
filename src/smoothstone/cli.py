@@ -764,7 +764,11 @@ def views_step(job: Job, stl: Path) -> Path | None:
     png = job.build_dir / "views.png"
     try:
         m = colortool.load_stl(stl)
-        colortool.render_views(m, np.tile([217.0, 160.0, 102.0], (len(m.faces), 1)), png)
+        rgb = np.tile([217.0, 160.0, 102.0], (len(m.faces), 1))
+        struts = read_json(job.build_dir / "struts.json") or []
+        if struts:  # snap-off struts in blue, so they do not read as drips on the figure
+            rgb[printable.strut_faces(m.triangles_center, struts)] = printable.STRUT_RGB
+        colortool.render_views(m, rgb, png)
     except Exception:  # a picture is never worth failing a passing build
         job.log("views failed:\n" + traceback.format_exc())
         return None
@@ -1118,15 +1122,18 @@ def brace_step(job: Job, fig: Path, params: dict, out: Out) -> Path:
     """Struts under every spot of the figure that would start in mid-air, so it prints without
     slicer supports. Returns the figure to build: braced, or as it was when bracing failed."""
     braced = job.build_dir / "figure-braced.stl"
+    drawn = job.build_dir / "struts.json"  # where views.png draws them
+    drawn.unlink(missing_ok=True)
     try:
         struts, held, spots = printable.brace_figure(fig, braced, params)
     except Exception:  # a figure that will not brace still builds; the islands check names the spots
         job.log("brace failed:\n" + traceback.format_exc())
         return fig
     if struts:
+        drawn.write_text(json.dumps(printable.part_struts(struts, params)))
         at = ", ".join(sorted(set(held), key=lambda h: float(h.split()[0])))
         out.add(f"Built-in supports: {len(struts)} thin struts hold up the spots that would print onto air "
-                f"(at {at}). They print with the figure; snip them off after, or keep them.")
+                f"(at {at}; blue in views.png). They print with the figure; snip them off after, or keep them.")
     if spots:
         out.add(f"In the slicer: supports on, everywhere. No strut reaches {'; '.join(spots[:4])}.")
     return braced

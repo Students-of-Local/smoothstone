@@ -382,11 +382,20 @@ def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, e
     return out
 
 
+# marching cubes grid of the lift: 256 left a 90 mm figure's face soft, about 0.43 mm a cell (random
+# five, 2026-11-21); 384 is about 0.29 mm, finer than a 0.4 mm nozzle, and peaks near 12.4 GB
+LIFT_OCTREE = 384
+
+
+def lift_octree() -> str:
+    return os.environ.get("STONE_LIFT_OCTREE", str(LIFT_OCTREE))
+
+
 def lift(render: Path, out: Path, seed: int) -> Path:
     if out.exists():
         return out
     _landed(out, lambda tmp: _run(_lift_cmd() + [str(render), str(tmp), "--seed", str(seed),
-                                                 "--octree", os.environ.get("STONE_LIFT_OCTREE", "256"),
+                                                 "--octree", lift_octree(),
                                                  "--chunks", os.environ.get("STONE_LIFT_CHUNKS", "4000")],
                                   out.with_name("lift.log"), timeout=3600))
     if not out.exists():
@@ -476,10 +485,15 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
     if shown:
         shown(render)
     mesh = folder / "lift.glb"
-    if not mesh.exists():
-        say("Lifting the render to 3D (Hunyuan3D-2mini, about 4 minutes)...")
-        lift(render, mesh, seed)
     fig = folder / "figure.stl"
+    grid = folder / "lift-octree.txt"  # a lift on a coarser grid is lifted again
+    if mesh.exists() and (grid.read_text().strip() if grid.exists() else "256") != lift_octree():
+        mesh.unlink()
+        fig.unlink(missing_ok=True)
+    if not mesh.exists():
+        say("Lifting the render to 3D (Hunyuan3D-2mini, about 5 minutes)...")
+        lift(render, mesh, seed)
+        grid.write_text(lift_octree() + "\n")
     if not fig.exists():
         repair(mesh, fig)
     latest = folder.parent / "latest.txt"

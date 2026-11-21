@@ -295,6 +295,33 @@ def plinth(params: dict) -> tuple[float, float, float | None]:
     return fh + sink, sink, dr - STRUT_FOOT - 0.5
 
 
+STRUT_RGB = (110.0, 165.0, 225.0)  # struts in views.png: blue, so a snap-off strut does not read as a drip
+
+
+def part_struts(struts: list[Strut], params: dict) -> list[dict]:
+    """The struts in the built part's mm, where recipes/figure/recipe.scad puts the figure: turned by
+    spin, then raised onto the plinth."""
+    scale, _, _ = plinth(params)
+    lift = float(params.get("height") or 90) - scale
+    a = math.radians(float(params.get("spin") or 0))
+    rz = np.array([[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1]])
+    return [{"foot": (rz @ s.foot + [0, 0, lift]).round(3).tolist(),
+             "top": (rz @ s.top + [0, 0, lift]).round(3).tolist()} for s in struts]
+
+
+def strut_faces(points, struts: list[dict], margin: float = 0.2) -> np.ndarray:
+    """Which points (face centers of the built part) lie on a strut's tapered rod."""
+    pts = np.asarray(points, float)
+    on = np.zeros(len(pts), bool)
+    for s in struts:
+        a, b = np.asarray(s["foot"], float), np.asarray(s["top"], float)
+        ab = b - a
+        t = np.clip((pts - a) @ ab / max(float(ab @ ab), 1e-9), 0.0, 1.0)
+        d = np.linalg.norm(pts - (a + t[:, None] * ab), axis=1)
+        on |= d <= STRUT_FOOT + (STRUT_TOP - STRUT_FOOT) * t + margin
+    return on
+
+
 def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[str]]:
     """Write the unit-height figure at src to out with struts under its islands, sized for the
     print the params make. Returns the struts, where they hold (part heights), and the spots

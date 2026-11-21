@@ -134,6 +134,11 @@ def test_cached_steps_skip_models(tmp_path, monkeypatch):
     a = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     b = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     assert a == b and a.exists() and calls == ["describe", "style", "lift"]
+    # random five: a lift on the old 256 grid left faces soft; one cached from before is lifted again
+    (a.parent / "lift-octree.txt").unlink()
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert calls == ["describe", "style", "lift", "lift"] and a.exists()
+    assert (a.parent / "lift-octree.txt").read_text().strip() == str(figure.LIFT_OCTREE) == "384"
 
 
 def test_find_leaves_other_plans_alone(jobenv, monkeypatch):
@@ -1157,6 +1162,36 @@ def test_hex_plinth_name_stands_proud_on_the_front_face(tmp_path, openscad, monk
     assert len(letters) == 6, letters
 
 
+def test_round_plinth_name_is_evenly_spaced_and_reads_at_arms_length(tmp_path, openscad, monkeypatch):
+    """Random five, round 1: the craft judge read LAMINE as LAMENI and SHANE as SHANI. Every letter
+    got the same arc, so an M crowded its neighbors and an I floated in a wide gap, and the letters
+    stood 0.9 mm proud, faint on a one-color print. Letters go by their own widths now."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    m, res = _plinth(tmp_path, openscad, name="LAMINE")
+    assert all(x.ok for x in res.values()), [x for x in res.values() if not x.ok]
+    v = m.vertices
+    rad = np.hypot(v[:, 0], v[:, 1])
+    dr = rad[v[:, 2] < 0.8].max() - 1.2  # the lip is the plinth's full radius; the drum is c = 1.2 in
+    tri = v[m.faces]
+    band = (tri[:, :, 2] > 2.5).all(axis=1) & (tri[:, :, 2] < 12 - 1.2).all(axis=1)  # above the lip
+    front = tri[band & (np.hypot(tri[:, :, 0], tri[:, :, 1]) > dr + 1.0).all(axis=1)]  # the letters' faces
+    assert len(front), "no letter stands 1 mm proud of the drum"
+    ang = np.degrees(np.arctan2(front[:, :, 0], -front[:, :, 1]))  # 0 at the front, -Y
+    spans = sorted((a.min(), a.max()) for a in ang)
+    letters = []
+    for lo, hi in spans:
+        if letters and lo <= letters[-1][1] + 0.05:
+            letters[-1][1] = max(letters[-1][1], hi)
+        else:
+            letters.append([lo, hi])
+    assert len(letters) == 6, letters
+    widths = [b - a for a, b in letters]  # left to right, seen from the front
+    assert widths.index(min(widths)) == 3, widths  # the I, fourth: the name reads left to right
+    gaps = [np.radians(b[0] - a[1]) * dr for a, b in zip(letters, letters[1:])]  # mm along the drum
+    assert min(gaps) >= 0.6, gaps  # a nozzle line apart, so neighbors do not merge
+    assert max(gaps) <= 1.6 * min(gaps), gaps
+
+
 def test_short_plinth_name_fix_is_base_h_12(jobenv, monkeypatch, openscad, tmp_path):
     """base_h 8 leaves 3.6 mm letters, strokes of 0.54 mm: too thin for a 0.4 mm nozzle."""
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
@@ -1241,12 +1276,25 @@ def test_build_braces_the_figure(jobenv, openscad, monkeypatch, tmp_path):
     fig.parent.mkdir()
     figure.repair(armed(tmp_path / "lift.glb"), fig)
     stone("new", 'A figure 70 mm tall with "ADA" on the base')
-    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA", "spin=90")
     text, code, nxt = stone("build")
     assert code == 0 and "Part ready" in text, text
     assert "Built-in supports:" in text and "In the slicer" not in text, text
     assert "PASS islands: every layer stands on the one below" in text, text
     assert "PASS tipping" in text, text
+    # random five, round 1: the judge read the struts as drips and melted hands. views.png draws them
+    # blue, and the saved struts sit on the rods of the part as built, turned by spin
+    from PIL import Image
+    from smoothstone import printable
+
+    build = next(Path(jobenv).rglob("build/struts.json")).parent
+    struts = json.loads((build / "struts.json").read_text())
+    part = trimesh.load(build.parent / "figure.stl", force="mesh")
+    centers = part.triangles_center
+    for st in struts:
+        assert printable.strut_faces(centers, [st], margin=0.05).sum() >= 8, st
+    px = np.asarray(Image.open(build / "views.png").convert("RGB")).astype(int)
+    assert ((px[:, :, 2] > px[:, :, 0] + 40)).sum() > 50  # blue rods; the figure is clay
 
 
 def test_no_plinth_no_strut_below_the_bed(tmp_path):
