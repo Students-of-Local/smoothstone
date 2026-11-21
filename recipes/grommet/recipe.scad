@@ -21,7 +21,7 @@ assert(2 * wall < ins - 4, "wall is too thick for the hole: make it thinner");
 assert(slot_w == 0 || slot_w < ins - 2 * wall, "slot_w is wider than the insert: make it narrower");
 assert(slot_w == 0 || slot_depth > lip + wall, "slot_depth does not reach past the insert: make it longer");
 
-difference() {
+bed_chamfer() difference() {
     union() {
         cylinder(d = top_d, h = top_t);
         translate([0, 0, top_t - 0.01]) difference() {

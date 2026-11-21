@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 
-from . import config
+from . import config, refs
 
 MIN_WALL = 0.8  # mm
 WALL_SAMPLES = 3000
@@ -17,6 +18,31 @@ OVERHANG_COS = math.cos(math.radians(45))
 REST_TOL = 0.05  # mm
 CONTACT_TOL = 0.1  # mm
 BED_SKIP = 0.2  # mm
+# The bed chamfer (lib/stone.scad BED_CHAMFER) steps 0.4 mm in over the first 0.4 mm: a 45 degree
+# slope built from ledges. A downward face lying wholly below this height is that slope, not an
+# overhang.
+CHAMFER_ZONE = 0.45  # mm
+# bed_edge: the first layer squashes out (elephant foot). PrusaSlicer's default elephant-foot
+# compensation is 0.2 mm, so a part needs at least that much inset at the bed edge.
+BED_EDGE_Z = 0.8  # mm, the slice the bed contact is compared with
+MIN_BED_EDGE = 0.2  # mm
+# text: a 0.4 mm nozzle lays a letter stroke as at least two lines, so it needs 0.8 mm.
+MIN_STROKE = 0.8  # mm
+# Thin strokes of each bold font as a share of the letter height (text size): the 10th percentile
+# of the stroke widths along the letters' center lines, measured from OpenSCAD's own text().
+TEXT_STROKE = {"sans": 0.15, "serif": 0.07, "mono": 0.14}
+# A recipe tells the check what text it made with
+#   echo(stone_text = [letter height, font, setting that grows it, that setting's value now]);
+# the setting is then raised in proportion. "font" as the setting means no size can pass.
+# finger_gap: a guard's largest opening must stop the IEC 61032 test finger (IP2X), whose
+# diameter and source live in the reference library (recipes/lib/refs, ip2x.finger).
+MAX_FINGER_GAP = float(refs.get("ip2x.finger")["value"]["diameter"])  # mm, 12
+GAP_PX = 0.1  # mm, raster step for the gap
+# A guard tells the check where its opening is and what closes it up:
+#   echo(stone_grille = [center x, center y, radius, z of the middle, setting, its value, "up" | "down"]);
+GRILLE_ECHO = re.compile(
+    r'ECHO: stone_grille = \[([-\d.e+]+), ([-\d.e+]+), ([-\d.e+]+), ([-\d.e+]+), "(\w+)", ([-\d.e+]+), "(up|down)"\]')
+TEXT_ECHO = re.compile(r'ECHO: stone_text = \[([-\d.e+]+), "(\w+)", "(\w+)", ([-\d.e+]+)\]')
 
 
 @dataclass
@@ -31,6 +57,9 @@ class Result:
     direction: str = ""
     need: float | None = None
     measured: float | None = None
+    # the setting the part itself names as the fix, and its value now (see TEXT_ECHO)
+    param: str = ""
+    at: float | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -104,6 +133,106 @@ def thinnest_wall(mesh, samples: int = WALL_SAMPLES, seed: int = 0) -> float | N
     return float(np.percentile(dist, WALL_PERCENTILE))
 
 
+def slice_area(mesh, z: float) -> tuple[float, float]:
+    """(area, perimeter) of the mesh's cross section at height z. Each segment is turned so the
+    face it came from lies on its right, which makes outlines run counterclockwise and holes
+    clockwise, so the shoelace sum is the net area."""
+    import trimesh
+
+    seg, fi = trimesh.intersections.mesh_plane(mesh, [0, 0, 1], [0, 0, z], return_faces=True)
+    if len(seg) == 0:
+        return 0.0, 0.0
+    a, b = seg[:, 0, :2], seg[:, 1, :2]
+    d = b - a
+    n = mesh.face_normals[fi][:, :2]
+    flip = (d[:, 1] * n[:, 0] - d[:, 0] * n[:, 1]) < 0
+    a, b = np.where(flip[:, None], b, a), np.where(flip[:, None], a, b)
+    area = 0.5 * float(np.sum(a[:, 0] * b[:, 1] - b[:, 0] * a[:, 1]))
+    return area, float(np.linalg.norm(d, axis=1).sum())
+
+
+def bed_edge_inset(mesh, contact: float) -> float | None:
+    """Mean inset of the bed edge, mm: (area of the slice at BED_EDGE_Z minus the bed contact
+    area) over the slice perimeter. 0 for a straight wall, about 0.4 for a 0.4 mm chamfer."""
+    zmin = float(mesh.bounds[0][2])
+    area, per = slice_area(mesh, zmin + BED_EDGE_Z)
+    if per <= 0:
+        return None
+    return (area - contact) / per
+
+
+def slice_mask(mesh, z: float, x0: float, y0: float, n: int, px: float) -> np.ndarray:
+    """n x n raster (rows along y) of the cross section at height z, cells of px from (x0, y0):
+    True where the cell center is inside the part, by the crossings of each row (even-odd)."""
+    import trimesh
+
+    seg = trimesh.intersections.mesh_plane(mesh, [0, 0, 1], [0, 0, z])
+    xs = x0 + (np.arange(n) + 0.5) * px
+    ys = y0 + (np.arange(n) + 0.5) * px
+    out = np.zeros((n, n), bool)
+    if len(seg) == 0:
+        return out
+    ax, ay, bx, by = seg[:, 0, 0], seg[:, 0, 1], seg[:, 1, 0], seg[:, 1, 1]
+    lo, hi = np.minimum(ay, by), np.maximum(ay, by)
+    for i, y in enumerate(ys):
+        m = (lo <= y) & (hi > y)
+        if not m.any():
+            continue
+        x = np.sort(ax[m] + (y - ay[m]) / (by[m] - ay[m]) * (bx[m] - ax[m]))
+        out[i] = np.searchsorted(x, xs) % 2 == 1
+    return out
+
+
+def largest_gap(mesh, cx: float, cy: float, r: float, z: float, px: float = GAP_PX) -> float:
+    """Diameter of the biggest ball that passes the grille: twice the largest distance from an
+    empty point of the slice at z, inside the opening circle, to the part or the circle."""
+    from scipy import ndimage
+
+    n = int(math.ceil(2 * r / px)) + 2
+    x0, y0 = cx - n * px / 2, cy - n * px / 2
+    solid = slice_mask(mesh, z, x0, y0, n, px)
+    c = (np.arange(n) + 0.5) * px - n * px / 2
+    inside = c[None, :] ** 2 + c[:, None] ** 2 < r * r
+    empty = inside & ~solid
+    if not empty.any():
+        return 0.0
+    return 2 * float(ndimage.distance_transform_edt(empty).max()) * px
+
+
+def grille_results(mesh, log: str | None) -> list[Result]:
+    out = []
+    for m in GRILLE_ECHO.finditer(log or ""):
+        cx, cy, r, z = (float(m[i]) for i in range(1, 5))
+        gap = largest_gap(mesh, cx, cy, r, float(mesh.bounds[0][2]) + z)
+        out.append(Result("finger_gap", gap <= MAX_FINGER_GAP, round(gap, 1),
+                          f"largest opening {gap:.1f} mm (max {MAX_FINGER_GAP:.0f} mm, the test finger)",
+                          advice="a finger fits through the grille; make the openings smaller",
+                          direction=m[7], need=MAX_FINGER_GAP, measured=gap, param=m[5], at=float(m[6])))
+    return out
+
+
+def text_echoes(log: str | None) -> list[tuple[float, str, str, float]]:
+    """(letter height, font, setting, its value) for each stone_text echo in an OpenSCAD log."""
+    return [(float(m[1]), m[2], m[3], float(m[4])) for m in TEXT_ECHO.finditer(log or "")]
+
+
+def text_results(log: str | None) -> list[Result]:
+    """One text check for the thinnest lettering the part has, or none when it has no text."""
+    worst = None
+    for size, font, param, at in text_echoes(log):
+        k = TEXT_STROKE.get(font, TEXT_STROKE["sans"])
+        if worst is None or size * k < worst[0]:
+            worst = (size * k, size, font, param, at, MIN_STROKE / k)
+    if worst is None:
+        return []
+    stroke, size, font, param, at, need = worst
+    return [Result("text", stroke >= MIN_STROKE - 1e-6, round(stroke, 2),
+                   f"letter strokes {stroke:.2f} mm at {size:.1f} mm {font} (need {MIN_STROKE} mm, "
+                   f"{need:.1f} mm letters)",
+                   advice="the letters are too thin for a 0.4 mm nozzle; make them bigger",
+                   direction="up", need=need, measured=size, param=param, at=at)]
+
+
 def _hull_area(xy: np.ndarray) -> float:
     from scipy.spatial import ConvexHull, QhullError
 
@@ -115,7 +244,8 @@ def _hull_area(xy: np.ndarray) -> float:
         return 0.0
 
 
-def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
+def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Result]:
+    """log: the OpenSCAD output of the build, which carries the stone_text echoes."""
     out: list[Result] = []
     bed = bed or config.DEFAULT_BED
     max_bodies = recipe.max_bodies if recipe else 1
@@ -178,6 +308,22 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
                       advice="too little of the part touches the bed; give it a flat base",
                       direction="up", need=need, measured=contact))
 
+    # recipe parts only: an STL from elsewhere gets its elephant-foot compensation in the slicer
+    skip = recipe.skip.get("bed_edge") if recipe else "not a recipe part"
+    inset = None if skip else bed_edge_inset(mesh, contact)
+    if inset is None:
+        out.append(Result("bed_edge", True, None, f"skipped ({skip or 'no slice above the bed'})"))
+    else:
+        out.append(Result("bed_edge", inset >= MIN_BED_EDGE, round(inset, 2),
+                          f"bed edge inset {inset:.2f} mm (need {MIN_BED_EDGE} mm)",
+                          advice="the first layer will flare past the wall (elephant foot); chamfer "
+                                 "the bottom edge 0.4 mm, as soft_extrude and bed_chamfer do",
+                          direction="up", need=MIN_BED_EDGE, measured=inset))
+
+    out.extend(grille_results(mesh, log))
+    # before min_wall: thin letters are thin walls too, and the text fix sizes both at once
+    out.extend(text_results(log))
+
     wall = thinnest_wall(mesh)
     need_wall = recipe.min_wall if recipe else MIN_WALL
     if wall is None:
@@ -189,7 +335,8 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
                           direction="up", need=need_wall, measured=wall))
 
     face_zmin = tri_z.min(axis=1)
-    over = (nz < -OVERHANG_COS - 1e-3) & (face_zmin > zmin + BED_SKIP)
+    face_zmax = tri_z.max(axis=1)
+    over = (nz < -OVERHANG_COS - 1e-3) & (face_zmin > zmin + BED_SKIP) & (face_zmax > zmin + CHAMFER_ZONE)
     total = float(areas.sum())
     frac = float(areas[over].sum()) / total if total > 0 else 0.0
     out.append(Result("overhang", frac <= max_overhang, round(frac, 4),
@@ -216,14 +363,14 @@ def check_mesh(mesh, recipe=None, params=None, bed=None) -> list[Result]:
     return out
 
 
-def check_stl(path, recipe=None, params=None, bed=None) -> list[Result]:
+def check_stl(path, recipe=None, params=None, bed=None, log=None) -> list[Result]:
     path = Path(path)
     try:
         mesh = _load(path)
     except Exception as e:  # trimesh raises many types on bad files
         return [Result("loads", False, None, f"cannot read {path.name}: {type(e).__name__}",
                        advice="the STL is missing or broken; rebuild the part")]
-    return check_mesh(mesh, recipe=recipe, params=params, bed=bed)
+    return check_mesh(mesh, recipe=recipe, params=params, bed=bed, log=log)
 
 
 def passed(results: list[Result]) -> bool:

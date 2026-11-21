@@ -60,11 +60,12 @@ A recipe is a tested, parametric, good-looking part that prints without supports
 - `recipe.json`: `{"name", "title", "summary", "tags": [...], "tier": "S", "params": [{"name",
   "type": "number|int|bool|text|choice|image", "default", "min", "max", "choices", "unit", "help",
   "required", "required_unless", "image_kind"}], "dims": {"x": "<expression of params>", ...},
-  "dims_tol", "max_bodies", "max_overhang", "min_wall", "fix": {check: param}, "examples": [...],
+  "dims_tol", "max_bodies", "max_overhang", "min_wall", "fix": {check: param}, "skip": {check:
+  why}, "examples": [...],
   "aliases": {param: [words]}}`. Every parameter has a default, so `stone set <recipe>` with nothing
   builds a good part.
 - Design bar: fillets or chamfers on outside edges, no knife edges, walls at least 1.2 mm (3
-  perimeters at 0.4 mm), first layer flat, overhangs at most 45 degrees or chamfered, text at least
+  perimeters at 0.4 mm), first layer flat with a 0.4 mm bed chamfer, overhangs at most 45 degrees or chamfered, text at least
   6 mm cap height and 0.8 mm deep, holes sized for real screws (M3 = 3.4 mm clearance).
 - Each recipe ships a test: defaults and every example in recipe.json compile, pass `stone check`, and match
   their own dimension claims.
@@ -85,7 +86,21 @@ Generic, from the STL, with trimesh: compiles, watertight, one body (unless the 
 more), positive volume, fits the bed (default 256 x 256 x 256 mm, set in stone.toml), resting on z = 0
 with a first-layer contact area of at least 15% of the footprint or 200 mm2, thinnest wall
 estimate at least 0.8 mm (ray casting from sampled surface points), unsupported overhang area
-under 5% of surface (faces steeper than 45 degrees from vertical facing down, not on the bed),
+under 5% of surface (faces steeper than 45 degrees from vertical facing down, not on the bed or
+in the 0.45 mm bed chamfer).
+Engineering checks on recipe parts:
+- `bed_edge`: the first layer squashes out (elephant foot), so the bed edge must step in. Mean
+  inset = (area of the slice at z = 0.8 mm minus the bed contact area) / slice perimeter, at least
+  0.2 mm (PrusaSlicer's default elephant-foot compensation). `soft_extrude`, `soft_slab` and
+  `bed_chamfer()` in `recipes/lib/stone.scad` give 0.4 mm at 45 degrees. A recipe that has a reason
+  not to chamfer names it in `"skip": {"bed_edge": "<why>"}`.
+- `text`: a recipe with lettering echoes `stone_text = [letter height, font, setting, its value]`.
+  The thin strokes of a bold font are a share of the letter height (`TEXT_STROKE` in check.py:
+  sans 0.15, serif 0.07, mono 0.14); a stroke under 0.8 mm (two lines of a 0.4 mm nozzle) fails,
+  and the FIX raises that setting in proportion.
+- `finger_gap`: a guard echoes `stone_grille = [x, y, radius, middle z, setting, its value, up |
+  down]`. Twice the largest distance from an empty point of the mid-thickness slice, inside the
+  opening, to the part must be at most 12 mm (the IEC 61032 test finger, IP2X).
 Recipe `dims` add size claims: each expression of the parameters must match the measured
 bounding box within `dims_tol` (default 0.6 mm). The checks run on the OFF that OpenSCAD writes,
 and the binary STL is written from it (ASCII STL rounding breaks watertightness). Output: one line per check, PASS or FIX with the parameter to change.

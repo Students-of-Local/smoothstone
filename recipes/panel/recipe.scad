@@ -16,7 +16,7 @@ hole_d = 3.4;        // screw hole diameter, mm (3.4 fits M3)
 hole_inset = 5;      // hole center distance from the edge, mm
 countersink = false; // countersink the screw holes for flat head screws
 label = "";          // text on the plate ("" = none)
-label_size = 5;      // text height, mm
+label_size = 6;      // text height, mm
 label_y = -99;       // text center along Y, mm; -99 = auto, under the cutouts
 label_style = "raised"; // raised | engraved
 edge = 0.8;          // top edge rounding, mm
@@ -41,11 +41,15 @@ hole_pos = holes == "ends" ? [[-(w / 2 - hole_inset), 0], [w / 2 - hole_inset, 0
          : holes == "corners" ? [for (sx = [-1, 1], sy = [-1, 1]) [sx * (w / 2 - hole_inset), sy * (d / 2 - hole_inset)]]
          : [];
 
-difference() {
+// the letters, for the stroke check: [height, font, the setting that grows them, its value]
+if (label != "") echo(stone_text = [label_size, "sans", "label_size", label_size]);
+
+// one chamfer for the outline, the cutouts and the holes alike
+bed_chamfer() difference() {
     union() {
-        soft_slab(thickness, top = edge, bottom = 0.4) rrect(w, d, corner_r);
+        soft_slab(thickness, top = edge, bottom = 0) rrect(w, d, corner_r);
         if (label != "" && label_style == "raised")
-            translate([0, ly, thickness - 0.01]) soft_extrude(depth + 0.01, r = 0.3, steps = 2) label2d(label, label_size);
+            translate([0, ly, thickness - 0.01]) soft_extrude(depth + 0.01, r = 0.3, steps = 2, bottom = 0) label2d(label, label_size);
     }
     for (i = [0:max(cutouts, 1) - 1]) if (cutouts > 0)
         translate([(i - (cutouts - 1) / 2) * pitch, cut_y, 0]) {

@@ -156,7 +156,7 @@
   {
    "name": "label_size",
    "type": "number",
-   "default": 5,
+   "default": 6,
    "min": 4,
    "max": 40,
    "unit": "mm",
@@ -228,7 +228,7 @@
     "cut_shape": "square",
     "holes": "ends",
     "label": "NETWORK",
-    "label_size": 5
+    "label_size": 6
    }
   },
   {
@@ -244,7 +244,7 @@
     "holes": "corners",
     "countersink": true,
     "label": "TEMP  VOLTS  AMPS",
-    "label_size": 4.5
+    "label_size": 6
    }
   },
   {

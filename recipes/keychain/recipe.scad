@@ -16,6 +16,11 @@ F = font == "serif" ? "Liberation Serif:style=Bold" : font == "mono" ? "Liberati
 
 assert(text != "" || image != "", "give text, or run stone image first so the picture can be used");
 
+// the letters are stretched to size wide; for the stroke check: [height, font, setting, its value]
+tm = text != "" ? textmetrics(text, size = 10, font = F) : undef;
+w10 = is_undef(tm) ? len(text) * 6.8 : tm.size[0];
+if (text != "") echo(stone_text = [10 * size / w10, font, "size", size]);
+
 module art() {
     if (text != "") resize([size, 0], auto = true) text(text, size = 10, font = F, halign = "center", valign = "center");
     else resize([size, 0], auto = true) import(image, center = true);
@@ -41,7 +46,7 @@ module plate2d() {
 difference() {
     union() {
         soft_extrude(thickness, r = 0.6) plate2d();
-        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3) art();
+        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3, bottom = 0) art();
     }
     translate([ring_x, 0, 0]) hole(ring_d, thickness, 0.5);
 }

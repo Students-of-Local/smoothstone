@@ -35,7 +35,7 @@ module framed() union() {
     linear_extrude(frame_t) difference() { offset(r = frame) offset(delta = -0.01) footprint(); offset(delta = -0.01) footprint(); }
 }
 
-if (!stand) framed();
+if (!stand) bed_chamfer() framed();
 else union() {
     // upright: the bottom frame edge rests on the foot; the photo faces -Y
     translate([0, frame_t / 2, 3 + frame - 0.01]) rotate([90, 0, 0]) framed();

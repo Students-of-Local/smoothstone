@@ -1071,3 +1071,59 @@ def test_find_asks_which_person_when_two_well_known_people_share_the_name(jobenv
     assert "computer scientist" in nxt and "basketball player" in nxt
     assert 'stone find "Michael Jordan, ' in nxt
     assert stone("status")[2] == nxt  # a compacted model finds the question again
+
+
+def _plinth(tmp_path, openscad, **given):
+    """Build the figure recipe with the stand-in figure; (mesh, results by name)."""
+    from smoothstone import check, recipes, scad
+
+    fig = tmp_path / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    r = recipes.load("figure", REPO / "recipes")
+    params = r.merged({"figure": str(fig), **given})
+    run = scad.build_stl(openscad, r, params, tmp_path / "part.stl")
+    assert run.ok, run.error
+    res = {x.name: x for x in check.check_stl(tmp_path / "part.stl", recipe=r, params=params, log=run.log)}
+    return check._load(tmp_path / "part.stl"), res
+
+
+def test_hex_plinth_name_stands_proud_on_the_front_face(tmp_path, openscad, monkeypatch):
+    """The audit: on a hex plinth the letters sat on an arc while the faces are flat, so the outer
+    letters of a 4 letter name sank into the faces (and the front of the hex was a corner)."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    m, res = _plinth(tmp_path, openscad, base="hex", name="IIIIII")
+    assert all(x.ok for x in res.values()), [x for x in res.values() if not x.ok]
+    bd = 2 * m.bounds[1][0]  # the hex's corners lie on X
+    face = (bd / 2 - 1.2) * np.cos(np.radians(30))  # the drum's front face, base_h 12: c = 1.2
+    seg = trimesh.intersections.mesh_plane(m, [0, 0, 1], [0, 0, 2.4 + 8.4 / 2])
+    front = seg[(seg[:, :, 1] < -(face + 0.6)).all(axis=1)]  # letters stand 0.9 mm proud of the face
+    spans = sorted((min(a, b), max(a, b)) for a, b in front[:, :, 0])
+    letters = []  # each I's front, merged from its segments
+    for lo, hi in spans:
+        if letters and lo <= letters[-1][1] + 0.05:
+            letters[-1][1] = max(letters[-1][1], hi)
+        else:
+            letters.append([lo, hi])
+    assert len(letters) == 6, letters
+
+
+def test_short_plinth_name_fix_is_base_h_12(jobenv, monkeypatch, openscad, tmp_path):
+    """base_h 8 leaves 3.6 mm letters, strokes of 0.54 mm: too thin for a 0.4 mm nozzle."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    fig = tmp_path / "figure.stl"
+    figure.repair(standin(tmp_path / "lift.glb"), fig)
+    stone("new", 'A figure 70 mm tall with "ADA" on a low base')
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA", "base_h=8")
+    text, code, nxt = stone("build")
+    assert code == 1 and "FIX: text letter strokes 0.54 mm" in text, text
+    assert nxt == "stone set base_h=12", text
+    stone("set", "base_h=12")
+    text, code, nxt = stone("build")
+    assert "Part ready" in text, text
+
+
+def test_figure_without_plinth_gets_the_bed_chamfer(tmp_path, openscad, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    m, res = _plinth(tmp_path, openscad, base="none")
+    assert res["bed_edge"].ok, res["bed_edge"].detail
+    assert all(x.ok for x in res.values()), [x for x in res.values() if not x.ok]

@@ -10,7 +10,7 @@ module rrect(w, d, r) {
 
 // Extrude a CONVEX 2D child with a small bottom chamfer (keeps the first layer from
 // flaring out) and a rounded top edge. True slopes, made with hull().
-module soft_slab(h, top = 0.8, bottom = 0.4, steps = 6) {
+module soft_slab(h, top = 0.8, bottom = BED_CHAMFER, steps = 6) {
     t = min(top, h / 2);
     b = min(bottom, h / 4);
     hull() {
@@ -24,20 +24,41 @@ module soft_slab(h, top = 0.8, bottom = 0.4, steps = 6) {
     }
 }
 
-// Extrude ANY 2D child (grilles, text, outlines) with a rounded top edge built from
-// thin layers that step inward. Every ledge faces up, so nothing overhangs.
-module soft_extrude(h, r = 0.5, steps = 4) {
+// Bed-edge chamfer: how far the first layer is inset, mm. The first layer squashes out by
+// about this much (elephant foot), so a part with no inset prints with a lip at the bed.
+BED_CHAMFER = 0.4;
+
+// Extrude ANY 2D child (grilles, text, outlines) with a 45 degree bottom chamfer and a
+// rounded top edge, both built from thin layers that step inward. The top ledges face up;
+// the bottom steps are BED_CHAMFER / 4 wide, finer than any layer, so a slicer reads a slope.
+// Use bottom = 0 when the extrusion stands on another part instead of the bed.
+module soft_extrude(h, r = 0.5, steps = 4, bottom = BED_CHAMFER) {
     rr = max(min(r, h / 2), 0);
-    if (rr <= 0) linear_extrude(h) children();
-    else {
-        linear_extrude(h - rr + 0.001) children();
-        for (i = [1:steps]) {
-            a0 = 90 * (i - 1) / steps;
-            a1 = 90 * i / steps;
-            translate([0, 0, h - rr + rr * sin(a0)])
-                linear_extrude(rr * (sin(a1) - sin(a0)) + 0.001)
-                    offset(delta = -rr * (1 - cos((a0 + a1) / 2))) children();
-        }
+    b = max(min(bottom, h / 4), 0);
+    if (b > 0) for (i = [0:3])
+        translate([0, 0, b * i / 4]) linear_extrude(b / 4 + 0.001) offset(delta = -b * (4 - i) / 4) children();
+    translate([0, 0, b]) linear_extrude(h - rr - b + 0.001) children();
+    if (rr > 0) for (i = [1:steps]) {
+        a0 = 90 * (i - 1) / steps;
+        a1 = 90 * i / steps;
+        translate([0, 0, h - rr + rr * sin(a0)])
+            linear_extrude(rr * (sin(a1) - sin(a0)) + 0.001)
+                offset(delta = -rr * (1 - cos((a0 + a1) / 2))) children();
+    }
+}
+
+// Give ANY 3D child resting on z = 0 the same 45 degree bed chamfer: the slice just above the
+// bed sets the outline, and each step below b cuts away a band outside it. For parts not made
+// with soft_extrude or soft_slab (cylinders, gears, height maps).
+module bed_chamfer(b = BED_CHAMFER) {
+    if (b <= 0) children();
+    else difference() {
+        children();
+        for (i = [0:3]) translate([0, 0, i == 0 ? -1 : b * i / 4])
+            linear_extrude(b / 4 + (i == 0 ? 1 : 0) + 0.001) difference() {
+                square(4000, center = true);
+                offset(delta = -b * (4 - i) / 4) projection(cut = true) translate([0, 0, -0.01]) children();
+            }
     }
 }
 

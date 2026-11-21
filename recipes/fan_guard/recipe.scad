@@ -8,14 +8,14 @@ opening = 0;         // round opening diameter, mm; 0 = auto
 hole_spacing = 0;    // screw hole spacing, mm; 0 = the standard for this fan size
 hole_d = 0;          // screw hole diameter, mm; 0 = auto
 corner_r = 5;        // outer corner radius, mm
-rings = 3;           // rings style: number of rings
+rings = 4;           // rings style: number of rings (4 keeps a 120 mm guard finger safe)
 ring_w = 2;          // rings style: ring width, mm
 ring_pitch = 0;      // rings style: distance between rings, mm; 0 = auto
 spokes = 4;          // rings style: number of spokes
 spoke_w = 3;         // rings style: spoke width, mm
 cell = 9;            // honeycomb and grid: cell size, mm
 bar_w = 1.6;         // honeycomb and grid: bar width, mm
-blades = 11;         // spiral style: number of blades
+blades = 16;         // spiral style: number of blades (16 keeps a 120 mm guard finger safe)
 blade_w = 2.4;       // spiral style: blade width, mm
 blade_sweep = 70;    // spiral style: how far each blade curves, degrees
 hub_d = -1;          // center disc diameter, mm; -1 = auto, 0 = none
@@ -83,9 +83,17 @@ module grille2d(r_out) {
     }
 }
 
-union() {
+// the opening, for the finger check: [x, y, radius, middle z, setting that closes it up, its value,
+// whether it goes "up" or "down"]
+echo(stone_grille = [0, 0, op_r, thickness / 2,
+    style == "rings" ? "rings" : style == "spiral" ? "blades" : "cell",
+    style == "rings" ? rings : style == "spiral" ? blades : cell,
+    style == "rings" || style == "spiral" ? "up" : "down"]);
+
+// one chamfer for the outline, the opening, the screw holes and every grille bar
+bed_chamfer() union() {
     difference() {
-        soft_slab(thickness, top = edge, bottom = 0.4) rrect(size, size, corner_r);
+        soft_slab(thickness, top = edge, bottom = 0) rrect(size, size, corner_r);
         translate([0, 0, -1]) cylinder(r = op_r, h = thickness + 2);
         translate([0, 0, thickness - inner_edge])
             cylinder(r1 = op_r, r2 = op_r + inner_edge + 0.01, h = inner_edge + 0.01);
@@ -94,6 +102,6 @@ union() {
     }
     // bars inside the opening get the rounded top; where they reach into the frame they stop
     // below the opening chamfer, so no sliver pokes through it
-    soft_extrude(thickness, r = min(edge, 0.6)) grille2d(op_r - 0.01);
+    soft_extrude(thickness, r = min(edge, 0.6), bottom = 0) grille2d(op_r - 0.01);
     linear_extrude(thickness - inner_edge) difference() { grille2d(op_r + 1); circle(r = op_r - 0.5); }
 }

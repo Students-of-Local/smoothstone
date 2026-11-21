@@ -2,6 +2,7 @@
 // flat for a D shaft, and lightening holes.
 include <BOSL2/std.scad>
 include <BOSL2/gears.scad>
+use <lib/stone.scad>
 
 teeth = 30;          // number of teeth
 module_mm = 2;       // gear module, mm (tooth size; meshing gears need the same module)
@@ -25,7 +26,8 @@ hole_r = min(r_fit, hole_c * sin(180 / max(holes, 1)) - 2.5);  // leaves spokes 
 
 assert(bore < root * 2 - 4, "bore is too big for this gear");
 
-difference() {
+// the chamfer insets every tooth flank at the bed too: a first layer that flares binds the mesh
+bed_chamfer() difference() {
     union() {
         spur_gear(mod = module_mm, teeth = teeth, thickness = thickness,
                   helical = style == "spur" ? 0 : helix, herringbone = style == "herringbone",

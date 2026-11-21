@@ -80,6 +80,7 @@ class Recipe:
     size_order: list = field(default_factory=list)
     grow: dict = field(default_factory=dict)  # assert text -> {"param", "value"}: "the cutouts do not fit" widens the plate
     makes: list = field(default_factory=list)  # the objects it really makes: "phone stand"; none listed fits any request
+    skip: dict = field(default_factory=dict)  # check name -> why this recipe does not run it
     phrases: dict = field(default_factory=dict)  # "with a saucer" -> {"part": "both"}, read before single words  # params for "A by B by C"; default: from dims x, y, z  # word -> [param, offset]: "3 compartments" sets div_x = 2
 
     @property
@@ -189,6 +190,7 @@ def _load_one(d: Path) -> Recipe:
         size_order=list(data.get("size_order") or []),
         phrases=dict(data.get("phrases") or {}),
         grow=dict(data.get("grow") or {}),
+        skip=dict(data.get("skip") or {}),
         path=d,
     )
 

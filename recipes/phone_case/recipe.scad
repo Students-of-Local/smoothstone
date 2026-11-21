@@ -219,9 +219,12 @@ module receiver_cut() {
 }
 
 // Text: a V-sided groove in the back, read from behind, so the first layer bridges nothing wide.
+text_ts = text_size > 0 ? text_size : min(10, W * 0.6 / max(1, len(text)) * 1.5);
+// the letters, for the stroke check: [height, font, the setting that grows them, its value]
+if (text != "") echo(stone_text = [text_ts, font, "text_size", text_ts]);
 module text_cut() {
     s = min(0.45, (back - 0.6) / 1.25);
-    ts = text_size > 0 ? text_size : min(10, W * 0.6 / max(1, len(text)) * 1.5);
+    ts = text_ts;
     translate([0, -H * 0.24, -0.01]) mirror([1, 0, 0]) minkowski() {
         linear_extrude(0.01) offset(delta = -s) label2d(text, ts, F);
         cylinder(r1 = s, r2 = 0, h = s * 1.25, $fn = 12);
@@ -246,7 +249,7 @@ module case() {
 // Fit-test ring: the top slice mm of the walls and lip, without the back plate.
 ring = min(slice, Htot);
 if (slice > 0) {
-    translate([0, 0, ring - Htot]) difference() {
+    bed_chamfer() translate([0, 0, ring - Htot]) difference() {
         intersection() {
             case();
             translate([-W, -H, Htot - ring]) cube([2 * W, 2 * H, ring + 1]);

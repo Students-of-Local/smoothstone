@@ -33,14 +33,20 @@ module lid() union() {
         lw = w - 2 * wall - 2 * fit;
         ld = d - 2 * wall - 2 * fit;
         lr = corner_r - wall - fit;
-        soft_extrude(lip_h, r = 0.5) rrect(lw, ld, lr);
+        soft_extrude(lip_h, r = 0.5, bottom = 0) rrect(lw, ld, lr);
         translate([0, 0, -1]) linear_extrude(lip_h + 2) rrect(lw - 2 * 1.6, ld - 2 * 1.6, max(lr - 1.6, 0.5));
     }
     // the label is on the outside of the lid, which is face down while printing, so it is
     // engraved, mirrored to read right when the lid is turned over
 }
 
-module lid_with_label() difference() {
+module lid_with_label() {
+    // the letters, for the stroke check: [height, font, the setting that grows them, its value]
+    if (label != "") echo(stone_text = [label_size, "sans", "label_size", label_size]);
+    lid_engraved();
+}
+
+module lid_engraved() difference() {
     lid();
     if (label != "") translate([0, 0, -0.01]) linear_extrude(0.6) mirror([1, 0]) label2d(label, label_size);
 }

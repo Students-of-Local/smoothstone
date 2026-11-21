@@ -26,6 +26,12 @@ fit = min(tw_avail / t10[0], ih / t10[1]) * 10;
 ts = text_size > 0 ? text_size : fit * 0.95;
 hy = holes == "top" ? 4 : 0;       // nudge the art down when there are holes
 
+// the letters, for the stroke check: [height, font, the setting that grows them, its value].
+// Fitted letters grow with the side that limits them.
+wide = tw_avail / t10[0] <= ih / t10[1];
+if (text != "") echo(stone_text = [ts, font, text_size > 0 ? "text_size" : wide ? "w" : "h",
+                                   text_size > 0 ? text_size : wide ? w : h]);
+
 assert(h > 2 * m + 6, "the sign is too short for the rim: make h bigger");
 
 module words() translate([slot / 2, -hy / 2]) text(text, size = ts, font = F, halign = "center", valign = "center");
@@ -33,7 +39,7 @@ module words() translate([slot / 2, -hy / 2]) text(text, size = ts, font = F, ha
 difference() {
     union() {
         soft_slab(thickness, top = 0.8, bottom = 0.4) rrect(w, h, corner_r);
-        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3) {
+        translate([0, 0, thickness - 0.01]) soft_extrude(relief + 0.01, r = 0.4, steps = 3, bottom = 0) {
             words();
             if (rim > 0) difference() { rrect(w - 2, h - 2, corner_r - 1); rrect(w - 2 - 2 * rim, h - 2 - 2 * rim, corner_r - 1 - rim); }
             if (icon != "") translate([-w / 2 + m + slot / 2, -hy / 2]) resize([0, ih - hy], auto = true) import(icon, center = true);
