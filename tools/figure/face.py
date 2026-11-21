@@ -4,6 +4,8 @@ python face.py <photo> [<photo> ...] <out.png>   (exit 0 wrote the crop and prin
 came from, 3 found no face)
 python face.py --skin <image> [<image> ...]       (prints a JSON list: each image's skin as an ITA
 angle in degrees from its biggest face's cheeks, null where no face is found)
+python face.py --box <image> [<image> ...]        (prints a JSON list: each image's biggest face as
+[x, y, w, h] in pixels, null where no face is found)
 
 The face that is biggest in pixels wins across all the photos: a found lead photo is often a whole
 person on a stage, with a face a third the size of a close-up's.
@@ -50,6 +52,13 @@ def main() -> int:
         for src in sys.argv[2:]:
             got = biggest(src)
             out.append(ita(*got) if got else None)
+        print(json.dumps(out))
+        return 0
+    if sys.argv[1:2] == ["--box"]:
+        out = []
+        for src in sys.argv[2:]:
+            got = biggest(src)
+            out.append([int(v) for v in got[1]] if got else None)
         print(json.dumps(out))
         return 0
     *srcs, out = sys.argv[1:]

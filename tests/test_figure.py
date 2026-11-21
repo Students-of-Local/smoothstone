@@ -501,7 +501,7 @@ def _models(tmp_path, monkeypatch, answers, tones=None):
     Returns the style calls."""
     calls = []
 
-    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False, skin=None):
+    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False, skin=None, heavy=False):
         calls.append((photos[0].name, seed) + (("plain",) if plain else ()) + ((f"skin {skin}",) if skin else ()))
         out.write_bytes(f"render {seed}".encode())
         return out
@@ -1392,3 +1392,87 @@ def test_no_plinth_no_strut_below_the_bed(tmp_path):
     with_plinth = printable.brace_figure(fig, out, {"height": 70, "base_d": 80})
     assert len(with_plinth[0]) >= 1 and with_plinth[2] == []  # the plinth top holds it
     assert all(s.top[2] - s.foot[2] >= 2 * printable.PITCH for s in with_plinth[0])
+
+
+def test_a_stocky_person_is_named_stocky_and_nobody_else_is():
+    """Shane Gillis came out slim on every seed (random five, 2026-11-21): the photo check's yes
+    names the build; a no names nothing, so nobody is drawn heavier than they are."""
+    assert figure.HEAVY in figure.prompt("chibi", "person", "", heavy=True)
+    assert "heavyset" not in figure.prompt("chibi", "person", "")
+    assert "heavyset" not in figure.prompt("chibi", "animal", "", heavy=True)
+
+
+def _person(head_r=0.12, nose=False, hair=False):
+    """A unit-height person along Z, facing -Y: a round-shouldered torso, a thin neck and a round
+    head; the head lift's version adds a nose and long hair down the back that the whole-figure lift
+    lost."""
+    parts = [trimesh.creation.capsule(height=0.42, radius=0.15, count=[48, 48]),
+             trimesh.creation.cylinder(radius=0.05, height=0.14, sections=32),
+             trimesh.creation.icosphere(subdivisions=4, radius=head_r)]
+    parts[0].apply_translation([0, 0, 0.36])
+    parts[1].apply_translation([0, 0, 0.73])
+    parts[2].apply_translation([0, 0, 0.88])
+    if nose:
+        n = trimesh.creation.icosphere(subdivisions=2, radius=0.025)
+        n.apply_translation([0, -head_r, 0.88])
+        parts.append(n)
+    if hair:  # down past the crop's bottom, so its own end is not in the test
+        h = trimesh.creation.cylinder(radius=0.09, height=0.32, sections=48)
+        h.apply_translation([0, 0.03, 0.8])
+        parts.append(h)
+    m = trimesh.boolean.union(parts, engine="manifold")
+    m.apply_translation([0, 0, -m.bounds[0][2]])
+    m.apply_scale(1 / m.extents[2])
+    return m
+
+
+def test_the_head_lifted_alone_replaces_the_figure_s_head_with_no_ledge(tmp_path):
+    """The head lifted alone is put on the figure in place of its own head; where its hair and the
+    body's differ, the surface fades from one to the other with no step (Sienna Miller, round 5
+    trial: a flat cut at the neck left a ledge round the back of the hair)."""
+    _person().export(tmp_path / "body.stl")
+    head = trimesh.Trimesh(*_slab_above(_person(nose=True, hair=True), 0.6))  # the crop's bottom
+    head.apply_translation([0.01, 0.0, 0.0])  # the repair centered it a little off
+    head.apply_scale(1 / head.extents[2])
+    head.export(tmp_path / "head.stl")
+    got = figure.graft(tmp_path / "body.stl", tmp_path / "head.stl",
+                       {"fig_top": 0, "fig_bottom": 1000, "cut": 400}, tmp_path / "figure.stl")
+    assert got["used"], got
+    assert 0.7 < got["neck"] < 0.78, got  # the thin neck, not the shoulders
+    m = trimesh.load(tmp_path / "figure.stl", force="mesh")
+    assert m.body_count == 1 and abs(m.extents[2] - 1) < 1e-6
+    assert m.bounds[0][1] < -0.125  # the head lift's nose is on the figure
+    # the back of the hair, height by height: a flat cut steps it in by the hair's thickness at once
+    zs = np.arange(got["bottom"] - 0.02, got["top"] + 0.02, 0.002)
+    org = np.c_[np.zeros(len(zs)), np.full(len(zs), 1.0), zs]
+    loc, ri, _ = m.ray.intersects_location(org, np.tile([0.0, -1.0, 0.0], (len(zs), 1)))
+    back = np.full(len(zs), -1.0)
+    np.maximum.at(back, ri, loc[:, 1])
+    assert (back > 0).all() and back[-1] > 0.1  # the long hair is there above the blend
+    step = np.abs(np.diff(back))
+    assert step.max() < 0.012, f"the back steps {step.max():.3f} at z={zs[step.argmax()]:.3f}"
+
+
+def _slab_above(m, z):
+    import manifold3d as m3d
+
+    s = m3d.Manifold(m3d.Mesh(vert_properties=np.asarray(m.vertices, np.float32),
+                              tri_verts=np.asarray(m.faces, np.uint32)))
+    o = (s ^ m3d.Manifold.cube([4, 4, 4]).translate([-2, -2, z])).to_mesh()
+    return np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts)
+
+
+def test_the_head_crop_is_a_square_from_the_hair_to_the_shoulders(tmp_path, monkeypatch):
+    from PIL import Image
+
+    im = Image.new("RGB", (768, 1024), "white")
+    im.paste((120, 100, 90), (300, 40, 470, 1000))  # the figure, rows 40 to 999
+    im.save(tmp_path / "style.png")
+    monkeypatch.setattr(figure, "face_box", lambda p: [345, 90, 80, 100])
+    got = figure.head_crop(tmp_path / "style.png", tmp_path / "head.png")
+    assert got["fig_top"] == 40 and got["fig_bottom"] == 999
+    side = int(max(90 + figure.HEAD_BELOW * 100 - 40, figure.HEAD_WIDE * 80))  # 240
+    assert got["cut"] == 40 - side // 25 + side
+    assert Image.open(tmp_path / "head.png").size == (figure.HEAD_PX, figure.HEAD_PX)
+    monkeypatch.setattr(figure, "face_box", lambda p: None)
+    assert figure.head_crop(tmp_path / "style.png", tmp_path / "head2.png") is None
