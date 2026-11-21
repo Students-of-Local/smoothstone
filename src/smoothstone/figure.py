@@ -3,8 +3,8 @@
 Local models do the work, none of them the model that drives stone:
 - describe: LFM3-VL-2B (4 bit, about 3 GB) writes one sentence on how an animal or a thing looks,
   and answers yes or no on a face, glasses, a beard and a hat to check photos and renders.
-- face: tools/figure/face.py (on the lift venv's opencv) crops a person's face out of the lead
-  photo, for the style model to see first.
+- face: tools/figure/face.py (on the lift venv's opencv) crops a person's face out of whichever
+  photo shows it biggest, for the style model to see first.
 - style: FLUX.2 klein 4B edit through mflux (Apache 2.0, about 5 GB at 4 bit) turns the face crop
   and the photo into a clean front view of a collectible figure on white.
 - lift: tools/lift/lift.py turns that render into a mesh (single-image 3D).
@@ -299,16 +299,17 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
     return out
 
 
-def face_crop(photo: Path, out: Path) -> Path | None:
-    """The face and hair of the photo's biggest face (tools/figure/face.py), or None when there is
-    no face or the style venv is missing: the figure is then styled from the whole photo."""
+def face_crop(photo: Path | list[Path], out: Path) -> Path | None:
+    """The face and hair of the biggest face in the photos (tools/figure/face.py), or None when there
+    is no face or the style venv is missing: the figure is then styled from the whole photo."""
     if out.exists():
         return out
+    photos = [photo] if isinstance(photo, Path) else list(photo)
     try:  # the lift venv pins opencv 4, whose Haar face finder opencv 5 (in the style venv) dropped
         lift_py = config.REPO_ROOT / "tools" / "lift" / ".venv" / "bin" / "python"
         py = lift_py if lift_py.exists() else _mflux_bin().parent / "python"
         r = subprocess.run([str(py), "-I", str(config.REPO_ROOT / "tools" / "figure" / "face.py"),
-                            str(photo), str(out)], capture_output=True, text=True, timeout=120)
+                            *map(str, photos), str(out)], capture_output=True, text=True, timeout=120)
     except (FigureProblem, OSError, subprocess.TimeoutExpired):
         return None
     return out if r.returncode == 0 and out.exists() else None
@@ -461,9 +462,14 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
                 say("Describing the photo (LFM3-VL-2B, under a minute)...")
             desc = describe(photos[0], look, who)
         refs = photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]
-        face = face_crop(photos[0], folder / "face.png") if who == "person" else None
+        # the face comes from whichever photo shows it biggest: a found lead photo is often a whole
+        # person on a stage, and a few pixels of face come out a generic one (Shane Gillis, 2026-11-21)
+        face = face_crop(photos[:4], folder / "face.png") if who == "person" else None
         if face:
             refs = [face, *refs]
+        elif who == "person":
+            say("No face crop (no clear face found, or tools/lift/.venv is missing): styling from the "
+                "whole photo, so the face may come out generic.")
         say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
         style_checked(refs, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
                       want, say)

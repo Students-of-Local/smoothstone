@@ -52,6 +52,33 @@ Reply with one JSON object and nothing else:
 {{"score": <1-10>, "faults": [{{"panel": "...", "what": "..."}}]}}"""
 
 
+SHAPE = """You judge a one-color 3D printable figure from a rendered picture, as a careful owner would
+before printing it.
+
+The request the part was made for:
+{request}
+
+Read the picture with the Read tool:
+  {views}: the whole part from several sides.
+
+Score the shape as a finished print:
+- 10: a clean, well-formed figure of what the request asks; the surface is smooth where it should be
+  and detailed where it should be (face, hair, hands, clothes); the name on the base is complete and
+  legible; nothing would need fixing by hand.
+- 7 to 9: good; small flaws a person might not notice in the print (a faint ridge, a slightly soft
+  detail).
+- 4 to 6: a flaw anyone would see: lumps, holes, melted or noisy patches, a missing or fused hand or
+  foot, a broken or cut-off letter, a part floating off the body, a strut through the face.
+- 1 to 3: not a figure of a person, badly broken, or would not print.
+Thin straight rods from a hand or chin down to the body or the base are built-in supports, there on
+purpose; they are not a fault unless one crosses the face or the name. A plinth with the name on its
+front is the design. List in faults only what you judge to be wrong. Name each fault with the panel
+it is in (such as "views front") and what is wrong in a few words.
+
+Reply with one JSON object and nothing else:
+{{"score": <1-10>, "faults": [{{"panel": "...", "what": "..."}}]}}"""
+
+
 def find_request(d: Path) -> str:
     for p in (d / "log.json", d.parent / "log.json"):
         if p.exists():
@@ -80,12 +107,14 @@ def parse(text: str) -> dict:
 def judge(build: Path, request: str, model: str = "opus") -> dict:
     with tempfile.TemporaryDirectory(prefix="judge-") as tmp:
         t = Path(tmp)
-        for name in ("views.png", "boundaries.png"):
+        painted = (build / "boundaries.png").exists()  # a one-color part has no color edges to judge
+        for name in ("views.png", "boundaries.png") if painted else ("views.png",):
             src = build / name
             if not src.exists():
                 raise SystemExit(f"missing {src}")
             shutil.copy(src, t / name)
-        prompt = RUBRIC.format(request=request, views=t / "views.png", boundaries=t / "boundaries.png")
+        prompt = (RUBRIC.format(request=request, views=t / "views.png", boundaries=t / "boundaries.png") if painted
+                  else SHAPE.format(request=request, views=t / "views.png"))
         env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
         p = subprocess.run(["claude", "-p", "--model", model, "--tools", "Read", "--allowedTools", "Read",
                             "--strict-mcp-config", "--no-session-persistence", "--add-dir", str(t),

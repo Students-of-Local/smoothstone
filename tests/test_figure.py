@@ -623,6 +623,22 @@ def test_no_face_crop_for_an_animal_or_when_it_fails(tmp_path, monkeypatch):
     assert refs == [["dog.jpg"], ["dog.jpg"]]
 
 
+def test_the_face_comes_from_every_photo_and_a_missing_crop_is_said(tmp_path, monkeypatch):
+    """Shane Gillis, 2026-11-21: the lead photo was a whole man on a stage and the figure came out a
+    generic one (likeness 3); his close-up was photo 2. And the crop had failed without a word."""
+    photos = []
+    for n in ("stage.jpg", "close.jpg", "side.jpg"):
+        (tmp_path / n).write_bytes(n.encode())
+        photos.append(tmp_path / n)
+    seen, said = [], []
+    _models(tmp_path, monkeypatch, lambda n: BARE)
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: out.write_bytes(b"r") and out)
+    monkeypatch.setattr(figure, "face_crop", lambda src, out: seen.append([p.name for p in src]))
+    figure.make(photos, tmp_path / "fig", say=said.append)
+    assert seen == [["stage.jpg", "close.jpg", "side.jpg"]]
+    assert any(s.startswith("No face crop") for s in said)
+
+
 def test_face_crop_fails_open_without_a_face_or_a_venv(tmp_path, monkeypatch):
     monkeypatch.setenv("STONE_MFLUX", str(tmp_path / "nowhere"))
     photo = tmp_path / "p.jpg"
