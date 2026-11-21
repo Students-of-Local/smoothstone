@@ -603,6 +603,12 @@ def cmd_set(args, job: Job) -> Out:
         except (ValueError, TypeError, ZeroDivisionError, KeyError):
             pass
     out.next = "stone build"
+    # a figure with no photos would only build to a FIX that says stone find: go there directly,
+    # a step a small model would otherwise spend (its runs ran out of steps at stone colors)
+    who = photos_from(job) if r.name == "figure" and not job.photos() else None
+    if who:
+        out.add(f"Next the figure needs photos of {who}.")
+        out.next = f'stone find "{who}"'
     out.result = "plan " + (" ".join(changed_params(r, merged)) or "defaults")
     if args.reset:
         job.update(failed_builds=0)
@@ -1126,11 +1132,16 @@ def brace_step(job: Job, fig: Path, params: dict, out: Out) -> Path:
     return braced
 
 
+def photos_from(job: Job) -> str | None:
+    """Who stone find looks up for a figure with no photos; set and build both point there."""
+    return findtool.subject_from_request(job.request()) if job.exists() else None
+
+
 def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
     """Photos -> styled render -> 3D figure, cached in images/figure. None after a FIX."""
     photos = job.photos()
     if not photos:
-        who = findtool.subject_from_request(job.request()) if job.exists() else None
+        who = photos_from(job)
         out.add(f"Recipe: {r.name}")
         out.fix("the figure needs photos" + (f" of {who}" if who else "") + " first")
         out.next = f'stone find "{who}"' if who else "stone image <path to photo>"

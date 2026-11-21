@@ -303,3 +303,21 @@ a change to `stone find` after the 2026-11-19 seal, so the sealed runs' report m
 - regressions/r5_jordan_stencil and r6_altman_group_shot check found.json (expect.found): the
   person's Wikidata id, never those two files, one clear face in every photo. Both fail on the
   photos the faulty finds took.
+
+## 2026-11-21 the teacher's half of the loop: where a run first left stone's path
+
+Taken from sybil-solutions/skill-distill (0xSero): the teacher runs the student, finds the first
+divergence, fixes the skill there, and reverts a version that scores worse.
+
+- evals/distill.py reads every model run's log.json and finds the first step that explains the
+  result: off the NEXT line (fix the card), stopped early (the card's stop rule), a wrong value
+  (the card), out of steps on the path (shorten stone's path), every NEXT followed to a failing
+  part (fix stone), or a setup FIX (the trial does not count). It also prints the pass rate per
+  card version on the specs both versions ran, and flags a version that did worse.
+- On the 30 LFM3 runs kept from 2026-11-18 and 11-19, no failure was the card's: 3 were setup,
+  4 were stone's own NEXT path (a jagged color edge's NEXT drops a named color, which the shoes
+  work addresses), 2 ran out of steps on the path (f5_elon_colors, f6_dhh_colors), and the one
+  "off" run kept shoes=black when stone's NEXT dropped it.
+- For the steps: stone set on a figure with no photos now says NEXT: stone find "<who>",
+  not stone build, which could only end in that FIX. One step less on the figure path. The S card's
+  figure lines and example say so, so the S card's SHA changes here (a new version in the ledger).
