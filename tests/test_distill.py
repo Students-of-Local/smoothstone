@@ -101,3 +101,20 @@ def test_the_next_driver_and_other_logs_are_skipped(tmp_path):
     (tmp_path / "b").mkdir()
     (tmp_path / "b" / "log.json").write_text("[]")
     assert distill.load([str(tmp_path)]) == []
+
+
+def test_only_setup_runs_report_without_a_ledger(tmp_path, capsys):
+    (tmp_path / "a").mkdir()
+    lg = log(START[:1] + [[call("stone build", "FIX: the lift model is not set up, run tools/figure/setup.sh once")]])
+    (tmp_path / "a" / "log.json").write_text(json.dumps(lg))
+    assert distill.main([str(tmp_path)]) == 0
+    assert "setup" in capsys.readouterr().out
+
+
+def test_no_card_runs_are_left_out_and_compacted_runs_are_their_own_row(tmp_path):
+    for name, extra in [("a", {"card_sha256": None}), ("b", {"compact_at": 3}), ("c", {})]:
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "log.json").write_text(json.dumps({**log(START, ok=True), **extra}))
+    runs = distill.load([str(tmp_path)])
+    assert sorted(r["card"] for r in runs) == ["aaaaaaaa", "aaaaaaaa+c3"]
+    assert all("vs" not in row for row in distill.ledger(runs))  # +c3 is not compared with the full card

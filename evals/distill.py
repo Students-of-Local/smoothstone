@@ -15,8 +15,10 @@ says whose fault it is, because the fix goes in a different place:
   steps    the model stayed on the path and ran out of steps. Shorten stone's path.
   tool     the model ran every NEXT line and stone still led it to a failing part. Fix stone, not the card.
 
-Then a ledger: the pass rate per card version (the card's SHA-256, which every log records), counting
-only specs both versions ran, so a card edit that did worse shows up and can be reverted. A spec with
+Then a ledger: the pass rate per card version (the card's SHA-256, which every log records; a run
+compacted after step K is its own row, +cK, compared only with compacted runs), counting only specs
+both versions ran, so a card edit that did worse shows up and can be reverted. Runs with no card are
+the baseline and are left out. A spec with
 fewer than 2 counted runs on a card proves nothing yet: one lucky run is not a pass rate.
 
 Adapted from sybil-solutions/skill-distill (MIT): the teacher runs the student, judges the first
@@ -137,8 +139,11 @@ def load(paths: list[str]) -> list[dict]:
                 continue
             if not isinstance(log, dict) or "steps" not in log or log.get("driver") == "next":
                 continue  # the next driver is stone alone, no model to teach
+            if not log.get("card_sha256"):
+                continue  # the no-card baseline: there is no card to fix
+            card = log["card_sha256"][:8] + (f"+c{log['compact_at']}" if log.get("compact_at") else "")
             runs.append({"path": str(f.parent), "spec": log.get("spec"), "seed": log.get("seed"),
-                         "card": (log.get("card_sha256") or "none")[:8], "date": log.get("started", ""),
+                         "card": card, "date": log.get("started", ""),
                          "pass": bool(log.get("pass")), **walk(log)})
     return runs
 
@@ -151,8 +156,9 @@ def ledger(runs: list[dict]) -> list[dict]:
         if r["kind"] != "setup":
             by[r["card"]].append(r)
     order = sorted(by, key=lambda k: min(r["date"] for r in by[k]))
-    out, prev = [], None
+    out, prevs = [], {}
     for k in order:
+        prev = prevs.get(k.partition("+")[2])  # a compacted run is compared only with compacted runs
         rs = by[k]
         row = {"card": k, "first": min(r["date"] for r in rs)[:10], "runs": len(rs),
                "pass": sum(r["pass"] for r in rs), "specs": sorted({r["spec"] for r in rs})}
@@ -164,7 +170,7 @@ def ledger(runs: list[dict]) -> list[dict]:
                 row["vs"] = {"card": prev["card"], "specs": sorted(common), "before": rate(prev["card"]),
                              "after": rate(k)}
         out.append(row)
-        prev = row
+        prevs[k.partition("+")[2]] = row
     return out
 
 
@@ -187,8 +193,9 @@ def report(runs: list[dict]) -> str:
     lucky = [r for r in runs if r["pass"] and r["kind"] != "pass"]
     if lucky:
         lines.append(f"  {len(lucky)} passing runs left the path and passed anyway; that is luck, not the card")
+    rows = ledger(runs)
     lines += ["", "Card versions (pass rate; vs the version before on the specs both ran)"]
-    for row in ledger(runs):
+    for row in rows:
         s = f"  {row['card']}  from {row['first']}  {row['pass']}/{row['runs']} pass"
         v = row.get("vs")
         if v:
@@ -196,7 +203,7 @@ def report(runs: list[dict]) -> str:
             if v["after"] < v["before"]:
                 s += "  WORSE: revert the change that caused it"
         lines.append(s)
-    latest = ledger(runs)[-1]["card"] if runs else None
+    latest = rows[-1]["card"] if rows else None
     thin = defaultdict(int)
     for r in runs:
         if r["card"] == latest and r["kind"] != "setup":

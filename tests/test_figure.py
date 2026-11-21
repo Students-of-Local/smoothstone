@@ -86,6 +86,15 @@ def test_set_points_a_figure_without_photos_at_find(jobenv, monkeypatch):
     assert stone("set", "fan_guard", "size=92")[2] == "stone build"
 
 
+def test_set_after_a_given_photo_goes_to_build(jobenv, monkeypatch, tmp_path):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A mini figure of Ada Lovelace, 80 mm tall")
+    from PIL import Image
+    Image.new("RGB", (64, 64), "white").save(tmp_path / "me.png")
+    stone("image", str(tmp_path / "me.png"))
+    assert stone("set", "figure", "height=80")[2] == "stone build"
+
+
 def test_figure_on_plinth_passes_checks(jobenv, monkeypatch, openscad, tmp_path):
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
     fig = tmp_path / "figure.stl"

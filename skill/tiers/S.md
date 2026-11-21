@@ -48,7 +48,8 @@ stone find "Ada Lovelace" -> NEXT: stone build
 stone build -> Part ready
 
 Request: A mini figure of Ada Lovelace, white with a red dress, with "ADA" on the base.
-stone set figure name=ADA
+stone set figure name=ADA -> NEXT: stone find "Ada Lovelace"
+stone find "Ada Lovelace" -> NEXT: stone build
 stone build -> Part ready, NEXT: stone colors
 stone colors -> a list of parts, like: 2  red     30% of surface  dress
   NEXT: stone colors dress=red rest=white
