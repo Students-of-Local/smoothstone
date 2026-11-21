@@ -196,7 +196,8 @@ def plan_struts(grid: Grid, found: list[Island], floor=None) -> tuple[list[Strut
                     best = (d, q)
             if floor is not None:
                 fz = floor(top[0], top[1])
-                if fz is not None and top[2] - fz <= STRUT_REACH and (best is None or top[2] - fz < best[0]):
+                if (fz is not None and 2 * p <= top[2] - fz <= STRUT_REACH
+                        and (best is None or top[2] - fz < best[0])):
                     best = (top[2] - fz, np.array([top[0], top[1], fz]))
             if best is None:
                 continue
@@ -240,10 +241,22 @@ def brace(mesh, floor=None, rounds: int = 3):
     """Add struts under every island. Returns (mesh, struts, islands left). The mesh is unchanged
     when it is not a closed solid manifold3d accepts."""
     body = to_manifold(mesh)
+    ground = float(mesh.bounds[0][2])
+
+    def hanging(grid):
+        # a strut root sinks below the feet into the plinth: what is at the feet or under the
+        # plinth top still stands
+        out = []
+        for i in islands(grid):
+            fz = floor(i.x, i.y) if floor is not None else None
+            if i.area >= 2 * grid.pitch ** 2 and i.z > max(ground, fz if fz is not None else ground) + grid.pitch:
+                out.append(i)
+        return out
+
     grid = occupancy(mesh)
     if grid is None:
         return mesh, [], []
-    left = [i for i in islands(grid) if i.area >= 2 * grid.pitch ** 2]
+    left = hanging(grid)
     if body is None:
         return mesh, [], left
     every = []
@@ -258,7 +271,7 @@ def brace(mesh, floor=None, rounds: int = 3):
         every += struts
         mesh = from_manifold(body)
         grid = occupancy(mesh)
-        left = [i for i in islands(grid) if i.area >= 2 * grid.pitch ** 2]
+        left = hanging(grid)
     return mesh, every, left
 
 
@@ -293,12 +306,10 @@ def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[s
     mesh = trimesh.load(str(src), force="mesh")
     mesh.apply_scale(scale)
 
-    def floor(x, y):
-        if radius is None:
-            return 0.0
+    def floor(x, y):  # the plinth top; with no plinth a strut on the bed would be a lone pin
         return top if math.hypot(x, y) <= radius else None
 
-    braced, struts, left = brace(mesh, floor)
+    braced, struts, left = brace(mesh, floor if radius is not None else None)
     held = [f"{s.top[2] + lift:.0f} mm" for s in struts]
     spots = [where(i, braced).replace(f"{i.z:.1f} mm up", f"{i.z + lift:.1f} mm up") for i in left]
     braced.apply_scale(1.0 / scale)

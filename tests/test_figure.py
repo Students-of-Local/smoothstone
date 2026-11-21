@@ -1212,3 +1212,29 @@ def test_build_braces_the_figure(jobenv, openscad, monkeypatch, tmp_path):
     assert "Built-in supports:" in text and "In the slicer" not in text, text
     assert "PASS islands: every layer stands on the one below" in text, text
     assert "PASS tipping" in text, text
+
+
+def test_no_plinth_no_strut_below_the_bed(tmp_path):
+    """Review first-F1 and second-F4 (PR #50): with base=none a low island far from the body got a
+    strut standing on the bed, whose root reached below z = 0. With no plinth the spot goes to the
+    slicer instead."""
+    from smoothstone import printable
+
+    post = trimesh.creation.box((6, 6, 70))
+    post.apply_translation((0, 0, 35))
+    arm = trimesh.creation.box((30, 6, 3))
+    arm.apply_translation((14, 0, 68.5))
+    drop = trimesh.creation.box((4, 4, 63))
+    drop.apply_translation((26, 0, 4 + 31.5))  # its foot 4 mm over the bed, 23 mm from the post
+    m = trimesh.boolean.union([post, arm, drop], engine="manifold")
+    m.apply_scale(1 / 70)
+    fig = tmp_path / "figure.stl"
+    m.export(fig)
+    out = tmp_path / "braced.stl"
+    struts, _, spots = printable.brace_figure(fig, out, {"height": 70, "base": "none"})
+    b = trimesh.load(out, force="mesh")
+    assert b.bounds[0][2] > -1e-6, b.bounds  # nothing under the bed
+    assert struts == [] and len(spots) == 1, (struts, spots)
+    with_plinth = printable.brace_figure(fig, out, {"height": 70, "base_d": 80})
+    assert len(with_plinth[0]) >= 1 and with_plinth[2] == []  # the plinth top holds it
+    assert all(s.top[2] - s.foot[2] >= 2 * printable.PITCH for s in with_plinth[0])
