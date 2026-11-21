@@ -6,8 +6,8 @@ import pytest
 from smoothstone import cli, faces, find
 
 
-def _page(title, lic, idx, w=1200, h=1600, mime="image/jpeg", cats=""):
-    meta = {"LicenseShortName": {"value": lic}, "Artist": {"value": "<a>Someone</a>"}}
+def _page(title, lic, idx, w=1200, h=1600, mime="image/jpeg", cats="", artist="Someone"):
+    meta = {"LicenseShortName": {"value": lic}, "Artist": {"value": f"<a>{artist}</a>"}}
     if cats:
         meta["Categories"] = {"value": cats}
     return {"title": title, "index": idx, "imageinfo": [{
@@ -24,7 +24,8 @@ def _ent(qid, label, p31, image=None, aliases=(), sites=0, desc="", lang="en"):
             "sitelinks": {f"w{i}wiki": {} for i in range(sites)}}
 
 
-def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=(), lead_cats=""):
+def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicted=(), lead_cats="",
+          lead_artist="Someone"):
     """A fake Wikidata and Commons. hits: entities the name search returns, best first;
     people: humans the full text search returns; classes: P31 classes with their labels;
     seen collects every Commons search; depicted: the files Commons says depict the subject (P180)."""
@@ -42,7 +43,8 @@ def _fake(pages, lead=None, hits=None, people=(), seen=None, classes=(), depicte
         if "wikidata" in url and "list=search" in url:
             return json.dumps({"query": {"search": [{"title": e["id"]} for e in people]}}).encode()
         if "titles=" in url:
-            return json.dumps({"query": {"pages": {"9": _page(q["titles"][0], "Public domain", 5, cats=lead_cats)}}}).encode()
+            return json.dumps({"query": {"pages": {"9": _page(q["titles"][0], "Public domain", 5, cats=lead_cats,
+                                                              artist=lead_artist)}}}).encode()
         if url.startswith("https://x/"):
             return b"\xff\xd8" + url.encode()  # each photo its own bytes, for a stub face checker
         if seen is not None:
@@ -595,3 +597,22 @@ def test_a_photographers_credit_or_a_loose_category_is_no_artwork(monkeypatch):
     art = {c["title"]: c["artwork"] for c in find.search("Elon Musk", entity=find._pack(ent))}
     assert art == {"File:Elon Musk, portrait by Steve Jurvetson.jpg": False, "File:Elon Musk 2015.jpg": False,
                    "File:Elon Musk (1).jpg": True}
+
+
+def test_a_crop_is_the_same_photo_and_one_shoot_does_not_fill_every_slot(monkeypatch, tmp_path):
+    """Random five, round 3: Shane Gillis's three photos were one stage set by one photographer under
+    colored light, one a crop of another, and the figure came out dark-haired with a dark mustache
+    (likeness 3). A crop of a kept photo is left out, and another author's photo comes before a
+    second from the same one."""
+    ent = _ent("Q67464067", "Shane Gillis", ["Q5"], "Shane Gillis (cropped).jpg", sites=20)
+    pages = [_page("File:Shane Gillis (cropped) (cropped).jpg", "CC BY 4.0", 1, artist="Quintin Soloviev"),
+             _page("File:Shane Gillis 2025.jpg", "CC BY 4.0", 2, artist="Quintin Soloviev"),
+             _page("File:Shane Gillis at MOA (cropped).jpg", "CC BY 4.0", 3, artist="Kevin Payravi"),
+             _page("File:Shane Gillis at MOA.jpg", "CC BY 4.0", 4, artist="Kevin Payravi")]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent], lead_artist="Quintin Soloviev"))
+    _with_faces(monkeypatch, {i: _one(E0) for i in range(6)})
+    got = [g["title"] for g in find.fetch("Shane Gillis", tmp_path)]
+    assert got == ["File:Shane Gillis (cropped).jpg", "File:Shane Gillis at MOA (cropped).jpg",
+                   "File:Shane Gillis 2025.jpg"], got
+    left = json.loads((tmp_path / "found.json").read_text())["left_out"]
+    assert {"title": "File:Shane Gillis (cropped) (cropped).jpg", "why": "copy"} in left

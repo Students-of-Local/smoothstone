@@ -428,7 +428,35 @@ def _by_face(tried: list[tuple[int, dict]], chk, n: int) -> tuple[list[tuple[int
     else:
         same, why = [ok[j] for j in faces.agree([emb[k] for k in ok])], "unlike"
     left.update({tried[k][0]: why for k in ok if k not in same})
-    return [(tried[k][0], tried[k][1], raws[k]) for k in same[:n]], left
+    kept, copies = varied([tried[k][1] for k in same], n)
+    left.update({tried[same[j]][0]: "copy" for j in copies})
+    return [(tried[same[j]][0], tried[same[j]][1], raws[same[j]]) for j in kept], left
+
+
+def _root(title: str) -> str:
+    """A file's name without its extension and its "(cropped)" marks: a crop of a photo is that photo."""
+    t = re.sub(r"\.[a-z0-9]+$", "", title.removeprefix("File:"), flags=re.I)
+    return re.sub(r"\s*\(cropped\)", "", t, flags=re.I).strip().lower()
+
+
+def varied(cands: list[dict], n: int) -> tuple[list[int], list[int]]:
+    """Positions of the n photos to keep, best first, and of the crops left out. A crop of a photo
+    already kept is the same photo; a photo by an author already kept, usually the same shoot in the
+    same light, waits behind every other author's. Shane Gillis's three were one stage set under
+    colored light, one a crop of another, and the figure came out dark-haired (2026-11-21)."""
+    kept, later, copies, roots = [], [], [], set()
+    for j, c in enumerate(cands):
+        r = _root(c.get("title", ""))
+        if r in roots:
+            copies.append(j)
+            continue
+        roots.add(r)
+        by = (c.get("author") or "").strip().lower()
+        if by and any(by == (cands[k].get("author") or "").strip().lower() for k in kept):
+            later.append(j)
+        else:
+            kept.append(j)
+    return (kept + later)[:n], copies
 
 
 def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
