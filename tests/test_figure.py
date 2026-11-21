@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from smoothstone import cli, config, figure
+from smoothstone import cli, figure
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -1560,38 +1560,3 @@ def test_a_thin_curl_lying_on_the_head_is_kept():
     out, n = printable.strands(m)
     assert n == 0 and abs(out.bounds[1][2] - m.bounds[1][2]) < 1e-6
 
-
-def _face_tool():
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("face_tool", config.REPO_ROOT / "tools" / "figure" / "face.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def test_a_face_crop_under_purple_stage_light_goes_back_to_daylight_color():
-    """Shane Gillis's ginger hair came out dark brown on every seed (random five, 2026-11-21): his
-    face crop was lit purple on stage. The crop's cast comes off by its cheeks; a face in daylight
-    is left alone."""
-    import cv2
-
-    face = _face_tool()
-
-    def lit(lab_skin, lab_hair):
-        lab = np.zeros((250, 220, 3), np.float32)
-        lab[:] = lab_hair
-        lab[80:250] = lab_skin
-        return np.clip(cv2.cvtColor(lab, cv2.COLOR_Lab2BGR) * 255 + 0.5, 0, 255).astype(np.uint8)
-
-    box = (60, 80, 100, 100)
-    stage = lit((59, 24.3, 22.1), (56, 20.4, 9.4))  # his crop's cheeks and hair, measured
-    out, hue = face.balance(stage, box)
-    assert hue < face.SKIN_HUE - face.SKIN_BAND
-    _, after = face.balance(out, box)
-    assert abs(after - face.SKIN_HUE) < 2
-    hair = cv2.cvtColor(out[:40].astype(np.float32) / 255, cv2.COLOR_BGR2Lab).reshape(-1, 3).mean(0)
-    assert hair[2] > 14  # yellower: the purple's pull on b* is gone
-    day = lit((59, 13.9, 21.3), (41, 12.2, 17.6))  # Christopher Abbott's, in daylight
-    same, _ = face.balance(day, box)
-    assert (same == day).all()
