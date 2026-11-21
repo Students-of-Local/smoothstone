@@ -1141,7 +1141,22 @@ def test_figure_without_plinth_gets_the_bed_chamfer(tmp_path, openscad, monkeypa
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
     m, res = _plinth(tmp_path, openscad, base="none")
     assert res["bed_edge"].ok, res["bed_edge"].detail
-    assert all(x.ok for x in res.values()), [x for x in res.values() if not x.ok]
+    # two small feet and no plinth: the stand-in tips (test_a_figure_that_tips_gets_a_plinth)
+    assert all(x.ok for x in res.values() if x.name != "tipping"), [x for x in res.values() if not x.ok]
+
+
+def test_a_figure_that_tips_gets_a_plinth(tmp_path, openscad, monkeypatch):
+    """A figure on two small feet with no plinth leans 8 degrees before it falls: a nozzle bump
+    knocks it over mid-print. The fix is the plinth."""
+    from smoothstone import recipes
+
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    r = recipes.load("figure", REPO / "recipes")
+    _, got = _plinth(tmp_path, openscad, base="none")
+    res = [x for x in got.values() if not x.ok]
+    assert [x.name for x in res] == ["tipping"], res
+    texts, nxt = cli.plan_fix(r, {"base": "none"}, res)
+    assert nxt == "stone set base=round", (texts, nxt)
 
 
 def _armed_mm(tmp_path, height=70.0):
