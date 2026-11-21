@@ -1560,3 +1560,39 @@ def test_a_thin_curl_lying_on_the_head_is_kept():
     out, n = printable.strands(m)
     assert n == 0 and abs(out.bounds[1][2] - m.bounds[1][2]) < 1e-6
 
+
+
+def test_a_figure_that_is_not_a_person_keeps_its_strands(tmp_path, monkeypatch):
+    """The worm-hair cut is for a person's hair: a hedgehog's spines or a lion's mane are the
+    figure (review of the random five, first-F2)."""
+    from smoothstone import printable
+
+    calls = []
+    real = printable.strands
+    monkeypatch.setattr(printable, "strands", lambda m: calls.append(1) or real(m))
+    fig, _ = _armed_mm(tmp_path)
+    printable.brace_figure(fig, tmp_path / "a.stl", {"height": 70}, hair=False)
+    assert calls == []
+    printable.brace_figure(fig, tmp_path / "b.stl", {"height": 70})
+    assert calls == [1]
+
+
+def test_cheeks_under_blue_light_have_no_skin_angle():
+    """Under blue or purple stage light the cheeks' b* goes below zero, and atan2 read them as
+    116 degrees, 'very light' (review of the random five, first-F3). No yellow, no reading."""
+    import importlib.util
+
+    import cv2
+
+    spec = importlib.util.spec_from_file_location("face_tool", Path(__file__).parents[1] / "tools" / "figure" / "face.py")
+    face = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(face)
+
+    def cheeks(bgr):
+        return np.full((100, 100, 3), bgr, np.uint8)
+
+    assert face.ita(cheeks((200, 140, 150)), (0, 0, 100, 100)) is None  # blue-violet light
+    warm = face.ita(cheeks((140, 170, 210)), (0, 0, 100, 100))  # light tan skin
+    assert warm is not None and 0 < warm < 90
+    lab = cv2.cvtColor(np.float32([[[140 / 255, 170 / 255, 210 / 255]]]), cv2.COLOR_BGR2Lab)[0, 0]
+    assert warm == round(float(np.degrees(np.arctan((lab[0] - 50) / lab[2]))), 1)

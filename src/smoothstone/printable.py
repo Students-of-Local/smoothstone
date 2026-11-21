@@ -627,10 +627,11 @@ def strut_faces(points, struts: list[dict], margin: float = 0.2) -> np.ndarray:
     return on
 
 
-def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[str], int]:
+def brace_figure(src, out, params: dict, hair: bool = True) -> tuple[list[Strut], list[str], list[str], int]:
     """Write the unit-height figure at src to out with thin hanging tips cut back and struts under
     its other islands, sized for the print the params make. Returns the struts, where they hold
-    (part heights), the spots still in the air, in words, and how many tips were cut."""
+    (part heights), the spots still in the air, in words, and how many tips were cut. A head of
+    worm hair is cut only when hair is set: a person's figure, never a hedgehog's spines."""
     import trimesh
 
     scale, top, radius = plinth(params)
@@ -642,7 +643,7 @@ def brace_figure(src, out, params: dict) -> tuple[list[Strut], list[str], list[s
         return top if math.hypot(x, y) <= radius else None
 
     tall = float(mesh.bounds[1][2])
-    mesh, worms = strands(mesh)
+    mesh, worms = strands(mesh) if hair else (mesh, 0)
     if float(mesh.bounds[1][2]) < tall:  # a strand or a lock was the top: the figure keeps its height
         mesh.apply_scale(tall / float(mesh.bounds[1][2]))
     braced, struts, left, cut = brace(mesh, floor if radius is not None else None, figure=True)

@@ -1167,7 +1167,8 @@ def brace_step(job: Job, fig: Path, params: dict, out: Out) -> Path:
     drawn = job.build_dir / "struts.json"  # where views.png draws them
     drawn.unlink(missing_ok=True)
     try:
-        struts, held, spots, cut = printable.brace_figure(fig, braced, params)
+        person = figure_who(job, str(params.get("style") or "chibi")) == "person"
+        struts, held, spots, cut = printable.brace_figure(fig, braced, params, hair=person)
     except Exception:  # a figure that will not brace still builds; the islands check names the spots
         job.log("brace failed:\n" + traceback.format_exc())
         return fig

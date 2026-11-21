@@ -35,15 +35,18 @@ def biggest(src: str):
     return (im, faces[0]) if len(faces) else None
 
 
-def ita(im, face) -> float:
+def ita(im, face) -> float | None:
     """Individual typology angle of the cheeks: atan((L* - 50) / b*) in degrees. Over 55 is very
-    light skin, under -30 dark; light and shadow move it less than raw brightness does."""
+    light skin, under -30 dark; light and shadow move it less than raw brightness does. None when
+    the cheeks are not yellow at all (b* under 1): blue stage light or a grey render has no ITA."""
     x, y, w, h = face
     lab = cv2.cvtColor(im.astype(np.float32) / 255.0, cv2.COLOR_BGR2Lab)
     cheeks = np.concatenate([lab[int(y + 0.55 * h):int(y + 0.72 * h), int(x + a * w):int(x + b * w)].reshape(-1, 3)
                              for a, b in ((0.2, 0.38), (0.62, 0.8))])
     L, B = float(np.median(cheeks[:, 0])), float(np.median(cheeks[:, 2]))
-    return round(math.degrees(math.atan2(L - 50.0, B)), 1)
+    if B < 1.0:
+        return None
+    return round(math.degrees(math.atan((L - 50.0) / B)), 1)
 
 
 def main() -> int:
