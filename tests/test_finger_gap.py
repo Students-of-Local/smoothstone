@@ -5,7 +5,7 @@ import shutil
 import pytest
 import trimesh
 
-from smoothstone import check, recipes, scad
+from smoothstone import check, recipes, refs, scad
 from test_cli import REPO, stone
 
 
@@ -29,6 +29,12 @@ def test_grille_echo_runs_the_check_and_names_the_setting():
     assert not res.ok and res.param == "rings" and res.at == 3 and res.direction == "up"
     (res,) = check.grille_results(plate_with_hole(8), log)
     assert res.ok
+
+
+def test_limit_is_the_sourced_test_finger():
+    finger = refs.get("ip2x.finger")
+    assert check.MAX_FINGER_GAP == finger["value"]["diameter"] == 12
+    assert "61032" in finger["standard"] and finger["url"]
 
 
 def test_fan_guard_defaults_stop_a_finger(openscad, tmp_path):

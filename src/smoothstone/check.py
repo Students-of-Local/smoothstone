@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import config
+from . import config, refs
 
 MIN_WALL = 0.8  # mm
 WALL_SAMPLES = 3000
@@ -34,8 +34,9 @@ TEXT_STROKE = {"sans": 0.15, "serif": 0.07, "mono": 0.14}
 # A recipe tells the check what text it made with
 #   echo(stone_text = [letter height, font, setting that grows it, that setting's value now]);
 # the setting is then raised in proportion. "font" as the setting means no size can pass.
-# finger_gap: a guard's largest opening must stop the IEC 61032 test finger (12 mm, IP2X).
-MAX_FINGER_GAP = 12.0  # mm
+# finger_gap: a guard's largest opening must stop the IEC 61032 test finger (IP2X), whose
+# diameter and source live in the reference library (recipes/lib/refs, ip2x.finger).
+MAX_FINGER_GAP = float(refs.get("ip2x.finger")["value"]["diameter"])  # mm, 12
 GAP_PX = 0.1  # mm, raster step for the gap
 # A guard tells the check where its opening is and what closes it up:
 #   echo(stone_grille = [center x, center y, radius, z of the middle, setting, its value, "up" | "down"]);
