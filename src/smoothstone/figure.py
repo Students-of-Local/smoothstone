@@ -541,7 +541,11 @@ def head_crop(render: Path, out: Path) -> dict | None:
     top = max(0, t - side // 25)
     x0 = int(x + w / 2 - side / 2)
     sq = Image.new("RGB", (side, side), (255, 255, 255))
-    sq.paste(im.crop((x0, top, x0 + side, top + side)), (0, 0))
+    # only the part inside the render: PIL fills a crop past its edge with black, and the lift
+    # took the bars for part of the head (a face over 256 px makes the square wider than a render)
+    x1, y1 = max(0, x0), max(0, top)
+    x2, y2 = min(im.width, x0 + side), min(im.height, top + side)
+    sq.paste(im.crop((x1, y1, x2, y2)), (x1 - x0, y1 - top))
     sq.resize((HEAD_PX, HEAD_PX), Image.LANCZOS).save(out)
     return {"fig_top": t, "fig_bottom": b, "cut": min(top + side, b), "face": box}
 

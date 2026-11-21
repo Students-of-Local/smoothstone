@@ -1368,6 +1368,26 @@ def test_a_fringe_strand_is_cut_back_not_propped_on_the_face(tmp_path):
     assert res["islands"].ok, res["islands"]
 
 
+def test_a_hand_no_strut_can_reach_keeps_its_fingers(tmp_path):
+    """A tip missed for a reason other than the face (here too far from anything below) was cut
+    back up to TRIM_FACE like a fringe strand over the face, so a small hand hanging from an arm
+    lost its fingers (baney-review of #52, first-F1). Only what the face alone keeps a strut from
+    is cut; the hand stays and goes to the slicer."""
+    from smoothstone import printable
+
+    m = _person()
+    m.apply_scale(70)
+    bar = trimesh.creation.box((30, 3, 3))
+    bar.apply_translation((22, 0, 45))  # an arm held out from the shoulder
+    hand = trimesh.creation.box((2.5, 2.5, 4))
+    hand.apply_translation((35.5, 0, 41.51))  # under 8 mm2, hanging from the arm's end
+    m = trimesh.boolean.union([m, bar, hand], engine="manifold")
+    assert printable.face_zone(printable.occupancy(m)) is not None
+    braced, struts, left, cut = printable.brace(m, None, figure=True)
+    assert cut == 0 and len(left) == 1, (cut, left)
+    assert braced.contains([[35.5, 0, 41]])[0]  # the hand is still there
+
+
 def test_no_plinth_no_strut_below_the_bed(tmp_path):
     """Review first-F1 and second-F4 (PR #50): with base=none a low island far from the body got a
     strut standing on the bed, whose root reached below z = 0. With no plinth the spot goes to the
@@ -1473,6 +1493,24 @@ def _slab_above(m, z):
                               tri_verts=np.asarray(m.faces, np.uint32)))
     o = (s ^ m3d.Manifold.cube([4, 4, 4]).translate([-2, -2, z])).to_mesh()
     return np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts)
+
+
+def test_a_head_crop_wider_than_the_render_is_white_past_its_edges(tmp_path, monkeypatch):
+    """A face box over 256 px wide makes the head square wider than a 768 px render, and PIL fills
+    the part past the render's edge with black, bars the lift takes for part of the head
+    (baney-review of #52, first-F4). The square is white wherever the render does not reach."""
+    from PIL import Image
+
+    im = Image.new("RGB", (768, 1024), "white")
+    im.paste((120, 100, 90), (200, 40, 568, 1000))
+    im.save(tmp_path / "style.png")
+    monkeypatch.setattr(figure, "face_box", lambda p: [234, 90, 300, 330])
+    got = figure.head_crop(tmp_path / "style.png", tmp_path / "head.png")
+    assert got is not None
+    a = np.asarray(Image.open(tmp_path / "head.png").convert("RGB")).astype(int)
+    assert a.shape[:2] == (figure.HEAD_PX, figure.HEAD_PX)
+    assert (a.sum(axis=2) > 60).all(), "black past the render's edge"
+    assert (a[:, 0] > 250).all() and (a[:, -1] > 250).all()  # white at both sides
 
 
 def test_the_head_crop_is_a_square_from_the_hair_to_the_shoulders(tmp_path, monkeypatch):
