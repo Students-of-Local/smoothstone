@@ -41,6 +41,9 @@ counts as card "next"), the best pass rate and mean judge score so far and the s
   (`judge_views.py`, judge.json), which never fails a run on its own. `evals/bar.py <runs dir>` prints
   per mode the runs that pass out of cases x 2 seeds against 80%, and the craft mean against 8 with the
   seeded control's score (judge_control.py, then judge_views.py on it), which must be under 8.
+- `figure-random/`: five people drawn at random on 2026-11-21 (seed 20261121) from en.wikipedia's
+  top 400 articles of 2026-10 with a photo, for Donovan's "5/5 perfection from the random pulled
+  people". Research mode, with its likeness bar of 7; a run needs the craft judge at 8 too.
 - A spec with `"colors": {"black": ["jacket"], "rest": "white"}` checks the painted 3MF: it reads back
   clean, its color edges pass, and every part prints in the color asked for.
 

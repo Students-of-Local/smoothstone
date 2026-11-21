@@ -1,0 +1,12 @@
+{
+ "id": "x2_christopher_abbott",
+ "request": "A mini figure of Christopher Abbott, 90 mm tall, with \"CHRIS\" on the base",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "CHRIS"
+  }
+ },
+ "why": "Random draw 2026-11-21 (seed 20261121) from en.wikipedia's top 400 articles of 2026-10, people with a photo. Donovan: 5/5 perfection from the random pulled people."
+}

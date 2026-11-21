@@ -1,0 +1,12 @@
+{
+ "id": "x3_inde_navarrette",
+ "request": "A mini figure of Inde Navarrette, 90 mm tall, with \"INDE\" on the base",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "INDE"
+  }
+ },
+ "why": "Random draw 2026-11-21 (seed 20261121) from en.wikipedia's top 400 articles of 2026-10, people with a photo. Donovan: 5/5 perfection from the random pulled people."
+}

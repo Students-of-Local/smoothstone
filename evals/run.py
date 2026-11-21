@@ -361,7 +361,8 @@ def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> d
     return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
 
 
-MODES = ("figure-research", "figure-photo", "figure-desc")  # the held-out sets of LOG.md, 2026-11-19
+# the held-out sets of LOG.md, 2026-11-19, and the random five of 2026-11-21 (research mode)
+MODES = ("figure-random", "figure-research", "figure-photo", "figure-desc")
 MODE_LIKENESS = 7  # the likeness bar of the research and photo modes, set with them
 
 
