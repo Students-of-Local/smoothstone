@@ -351,8 +351,9 @@ the craft judge on the shape (judge_views). The craft judge moves about one poin
   another year's photo with stubble and a hoodie. Correcting the face crop's color cast by its
   cheeks (hue 42 to 56) scored 3 and 3, and naming his age or dropping "full round face" scored
   3 to 4 on two seeds each: none kept. The photo's hair measured no ginger to name.
-- Round 6, all of it on this code, fresh from find to slicer: likeness 8 / 9 / 6 / 4 for the
-  first four, craft 7 / 8 / 7 / 7; Sienna Miller's run was cut off when the Mac dropped off the
-  network. Every figure built passes every print check as one body. Inde's 6 is
+- Round 6, all of it on this code, fresh from find to slicer: likeness 8 / 9 / 6 / 4 / 8,
+  craft 7 / 8 / 7 / 7 / 6. Every figure passes every print check as one body. Sienna's 6 names
+  flecks at her outer eye corners and a few thin fins at her hair ends; her round 5 render rebuilt
+  on this code scored 8 with the same flecks named. Inde's 6 is
   the judge's reference pick (7 on round 5 with the same render path); Shane's 4 is his photos.
   Craft stops at 7 to 8 where the lift model leaves soft eyes and hands.
