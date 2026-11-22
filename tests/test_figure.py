@@ -122,7 +122,7 @@ def test_a_new_job_reuses_a_figure_made_before_without_any_model(tmp_path, monke
         shutil.copyfile(photo, out)
         return out
 
-    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("") and "")
+    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("a man") and "a man")
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", lambda render, out, seed: standin(out))
     a = figure.make([photo], tmp_path / "job1" / "fig", say=lambda s: None)
@@ -160,7 +160,7 @@ def test_a_setting_that_changes_the_mesh_misses_the_cache(tmp_path, monkeypatch)
         calls.append("lift")
         return standin(out)
 
-    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("") and "")
+    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("a man") and "a man")
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", fake_lift)
     figure.make([photo], tmp_path / "job1" / "fig", say=lambda s: None)
@@ -192,7 +192,7 @@ def test_a_rerun_with_other_settings_never_caches_the_old_files(tmp_path, monkey
         calls.append("lift")
         return standin(out)
 
-    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("") and "")
+    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("a man") and "a man")
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", fake_lift)
     real_repair = figure.repair
@@ -208,6 +208,20 @@ def test_a_rerun_with_other_settings_never_caches_the_old_files(tmp_path, monkey
     monkeypatch.setattr(figure, "repair", real_repair)
     figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
     assert calls == ["lift", "lift"], "the stand-in lift.glb was reused for the real figure"
+
+
+def test_a_figure_whose_description_came_back_empty_stays_out_of_the_cache(tmp_path, monkeypatch):
+    """The key says the photo was described; when the describe model gave nothing, this figure is
+    not the one that key names, so no other job reuses it (PR 8 review, second-S2)."""
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"jpeg")
+    monkeypatch.setenv("STONE_HEAD_GRAFT", "0")
+    monkeypatch.setattr(figure, "_describe_on", lambda: True)
+    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("") and "")
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: shutil.copyfile(photo, out))
+    monkeypatch.setattr(figure, "lift", lambda render, out, seed: standin(out))
+    a = figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None, who="dog")
+    assert a.exists() and not (figure.cache_dir() / a.parent.name).exists()
 
 
 def test_a_job_made_before_the_cache_key_folder_keeps_its_figure(tmp_path, monkeypatch):
@@ -228,7 +242,7 @@ def test_a_job_made_before_the_cache_key_folder_keeps_its_figure(tmp_path, monke
 
     monkeypatch.setenv("STONE_FIGURE_CACHE", "0")
     monkeypatch.setenv("STONE_HEAD_GRAFT", "0")
-    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("") and "")
+    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("a man") and "a man")
     monkeypatch.setattr(figure, "style", fake_style)
     monkeypatch.setattr(figure, "lift", fake_lift)
     monkeypatch.setattr(figure, "cache_key", lambda k: k)  # as before: the folder is the plain key
