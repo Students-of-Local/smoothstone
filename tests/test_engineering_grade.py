@@ -288,7 +288,7 @@ def test_every_engineering_spec_is_well_formed():
         assert exp["retention"] in ("friction", "snap", "screw", "none", "any")
         assert set(exp["covered"]) <= set(eg.FACES) and set(exp["open"]) <= set(eg.FACES)
         assert not set(exp["covered"]) & set(exp["open"])
-        assert set(exp.get("face_gap", {})) <= set(exp["covered"])
+        assert set(exp.get("face_gap", {})) <= set(exp["covered"]) | {exp.get("support")}
         assert exp.get("support", "-z") in eg.FACES and exp.get("support") not in exp["open"]
         for ph in exp.get("part_holes", []):
             assert ph["axis"] in eg.FACES and ph["d"] > 0 and ph["pattern"] and ph["source"]
@@ -620,3 +620,36 @@ def test_run_still_wants_the_recipe_of_a_non_engineering_spec(tmp_path):
     job.mkdir()
     with pytest.raises(KeyError):
         run.grade_job(job, {"id": "t0_typo", "request": "a box", "expect": {"recipe_typo": "box"}}, [])
+
+
+def pi5_case(post_top: float = 1.45):
+    """A PLA case for e01's Pi 5 on four Ø6 standoffs up to the PCB underside (frame z 1.45, above
+    the microSD socket that sets the body's -z), floor 2 mm under the body, walls 0.3 off the sides,
+    top open."""
+    sp = spec("e01_rpi5_case")
+    w, d, h = (sp["product"]["body"][k] for k in ("w", "d", "h"))
+    case = _box([-2.3, -2.3, -4.0], [w + 2.3, d + 2.3, h]) - _box([-0.3, -0.3, -2.0], [w + 0.3, d + 0.3, h + 1])
+    for x in (12.0, w - 12.0):
+        for y in (8.0, d - 8.0):
+            case = case + _cyl(x, y, -2.5, post_top, 3.0)
+    return sp, _mesh(case)
+
+
+def test_pi5_case_on_standoffs_passes():
+    """Review round 2 F1: e01 covered -z at a slip gap under the microSD socket, so standoffs that
+    reach the PCB 1.45 mm above it read as inside the product and a normal Pi case failed."""
+    sp, mesh = pi5_case()
+    why, fit = eg.check_fit(mesh, sp, np.eye(4), "PLA")
+    assert not [w for w in why if w.startswith("fit: ") and "inside the part" in w], why
+    sw, out = eg.check_support(sp, fit)
+    assert sw == [], (sw, out)
+    old = {**sp, "expect": {**sp["expect"], "covered": sp["expect"]["covered"] + ["-z"], "face_gap": {}}}
+    why_old, _ = eg.check_fit(mesh, old, np.eye(4), "PLA")
+    assert any("inside the part" in w for w in why_old), why_old
+
+
+def test_pi5_standoffs_into_the_board_fail():
+    """Standoffs 1 mm past the PCB underside push into the board."""
+    sp, mesh = pi5_case(post_top=2.45)
+    why, _ = eg.check_fit(mesh, sp, np.eye(4), "PLA")
+    assert any("inside the part" in w for w in why), why

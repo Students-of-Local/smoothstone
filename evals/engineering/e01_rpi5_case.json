@@ -166,7 +166,6 @@
     "retention": "snap",
     "safety": 2,
     "covered": [
-      "-z",
       "+x",
       "-x",
       "+y",
@@ -174,7 +173,15 @@
     ],
     "open": [
       "+z"
-    ]
+    ],
+    "support": "-z",
+    "face_gap": {
+      "-z": [
+        -1.5,
+        0.45
+      ]
+    },
+    "why_minus_z": "The body's -z face is the bottom of the lowest underside part (the microSD socket, STEP z -1.45); the PCB underside is 1.45 mm above it. A Pi case holds the board on standoffs that reach the PCB, so -z is not covered at a slip gap: the part must bear on it (support -z), and up to 1.5 mm into the box from below is allowed for standoffs and ledges under the PCB. The grader does not check that such a standoff clears the underside parts."
   },
   "why": "Pi 5 lying component side up (+z up, USB-C and HDMI on the -y front, USB and Ethernet on +x, power button and microSD on -x): tests a snap case that clears nine ports and controls on three walls, with heights from Raspberry Pi's own STEP because the drawing gives none."
 }

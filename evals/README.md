@@ -98,7 +98,7 @@ back to the axis at the top, revolved about the middle of the w x d box. Then th
 shape, not the box (e04's AirTag dome, from Apple's Detail A).
 
 `support` (default `load_dir`): the face the product bears on, which the part must hold up without
-covering it. `face_gap`: a face's own gap range when it carries no fit (a shaft's end).
+covering it. `face_gap`: a face's own gap range when it carries no fit (a shaft's end), on a covered face or the support face (a board on standoffs that rise into the box from below its lowest underside part, e01).
 `part_holes`: a hole pattern the part itself must carry, on the product's `axis` face side.
 
 | face | seen from | u (right) | v (up) |
