@@ -127,7 +127,12 @@
           2.0,
           2.0
         ],
-        "source": "y: drawing left edge '18.4' from the front board edge (u = 57.63 - (18.4 + 1.63)); the '0.45' overhang on the drawing is this part. v and size: STEP RP-010083 body bbox x -0.45 to 0.6, y 17.4 to 19.4, z 2.036 to 4.036. Naming it the power button is mine: the drawing does not label it"
+        "source": "y: drawing left edge '18.4' from the front board edge (u = 57.63 - (18.4 + 1.63)); the '0.45' overhang on the drawing is this part. v and size: STEP RP-010083 body bbox x -0.45 to 0.6, y 17.4 to 19.4, z 2.036 to 4.036. Naming it the power button is mine: the drawing does not label it; plug: a bare fingertip, Ø10, the least pushbutton diameter for fingertip use in MIL-STD-1472F, https://www.denix.osd.mil/soh/denix-files/sites/21/2016/03/02_MIL-STD-1472F-Human-Engineering.pdf Figure 12 'Push button (finger or hand operated)', p73: diameter, fingertip, bare hand, 'MIN 10 mm (0.4”)'. The button sits 2 to 3 mm in behind the case wall, so the fingertip must pass the wall",
+        "shape": "circle",
+        "plug": [
+          10.0,
+          10.0
+        ]
       },
       {
         "name": "status_led",

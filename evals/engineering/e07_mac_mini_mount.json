@@ -38,7 +38,14 @@
     "open": [
       "-y",
       "+y"
-    ]
+    ],
+    "attach": {
+      "face": "+z",
+      "against": "the desk",
+      "screw": "M4",
+      "min": 2,
+      "source": "ISO 273 clearance hole for M4, fine 4.3, medium 4.5, coarse 4.8 mm (https://www.iso.org/standard/4183.html, sold; values as charted by https://mechcodex.com/reference/metric-clearance-hole-sizes). A 4 mm wood screw up into the desk; two at least, so the mount cannot turn about one (our number)"
+    }
   },
-  "why": "Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin. The Mac has no screw points, so nothing screws into it: the mount wraps the sides and top and must bear on the bottom (support -z) in three of its four quarters so the Mac cannot drop out. Apple lists the ports 'On front' and 'On back' with no positions and does not locate the power button on the bottom, so front and back stay open and the bottom is supported, not covered."
+  "why": "Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin. The Mac has no screw points, so nothing screws into it: the mount wraps the sides and top and must bear on the bottom (support -z) in three of its four quarters so the Mac cannot drop out. Apple lists the ports 'On front' and 'On back' with no positions and does not locate the power button on the bottom, so front and back stay open and the bottom is supported, not covered. The mount screws up into the desk through its top (attach +z), and the strength check's arm runs from where the Mac bears on the mount to the nearest of those screws."
 }

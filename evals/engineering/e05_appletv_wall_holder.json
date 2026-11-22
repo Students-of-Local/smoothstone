@@ -36,7 +36,14 @@
       "+y",
       "-y",
       "+z"
-    ]
+    ],
+    "attach": {
+      "face": "-x",
+      "against": "the wall",
+      "screw": "M4",
+      "min": 2,
+      "source": "ISO 273 clearance hole for M4, fine 4.3, medium 4.5, coarse 4.8 mm (https://www.iso.org/standard/4183.html, sold; values as charted by https://mechcodex.com/reference/metric-clearance-hole-sizes). A 4 mm wood or machine screw into the wall; two at least, so the holder cannot turn about one (our number)"
+    }
   },
-  "why": "Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page."
+  "why": "Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page. The holder screws to the wall through its -x side (attach -x): the Apple TV sits on its bottom with its left side to the wall, so its back's ports and its front face along the wall and stay open."
 }
