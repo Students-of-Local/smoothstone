@@ -35,8 +35,12 @@
           2.7,
           2.7
         ],
-        "source": "drawing: hole center '3.5' from the left edge and '3.5' from the front edge, hole diameter '2.7' (callouts '6' and '2.7' at the hole by the micro HDMI ports); u = 85 - 3.5",
-        "shape": "circle"
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: hole center '3.5' from the left edge and '3.5' from the front edge, hole diameter '2.7' (callouts '6' and '2.7' at the hole by the micro HDMI ports); u = 85 - 3.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
       },
       {
         "name": "mount_hole_front_right",
@@ -50,8 +54,12 @@
           2.7,
           2.7
         ],
-        "source": "drawing: '3.5' plus hole spacing '58' along x gives x 61.5, '3.5' from the front edge, diameter '2.7'; u = 85 - 61.5",
-        "shape": "circle"
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: '3.5' plus hole spacing '58' along x gives x 61.5, '3.5' from the front edge, diameter '2.7'; u = 85 - 61.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
       },
       {
         "name": "mount_hole_back_left",
@@ -65,8 +73,12 @@
           2.7,
           2.7
         ],
-        "source": "drawing: '3.5' from the left edge, '3.5' plus hole spacing '49' along y gives y 52.5 (also '3.5' from the back edge), diameter '2.7'; u = 85 - 3.5",
-        "shape": "circle"
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: '3.5' from the left edge, '3.5' plus hole spacing '49' along y gives y 52.5 (also '3.5' from the back edge), diameter '2.7'; u = 85 - 3.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
       },
       {
         "name": "mount_hole_back_right",
@@ -80,8 +92,12 @@
           2.7,
           2.7
         ],
-        "source": "drawing: x 3.5 + 58 = 61.5, y 3.5 + 49 = 52.5, diameter '2.7'; u = 85 - 61.5",
-        "shape": "circle"
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: x 3.5 + 58 = 61.5, y 3.5 + 49 = 52.5, diameter '2.7'; u = 85 - 61.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
       }
     ]
   },
@@ -120,7 +136,11 @@
         ],
         "source": "https://glenwing.github.io/docs/VESA-FDMI-1.1.pdf sections 5.2.1 and 5.2.3: MIS-D 75, a 75 x 75 mm +/- 0.25 square of M4 x 0.7 screws; d 4.5 is the ISO 273 medium clearance hole for M4"
       }
-    ]
+    ],
+    "min_gap": {
+      "-z": 2.5
+    },
+    "min_gap_note": "Under the board, outside each hole's Ø6 pad, the plate stays 2.5 mm clear: the Pi 4's through-hole headers and jacks put their leads out of its underside, and the drawing gives no height for them. 2.5 mm is the most lead protrusion IPC-A-610 allows for class 2 as commonly quoted (https://aptpcb.com/en/blog/visual-inspection-checklist; the standard itself is sold), so any board built to it clears. Our number, until a Pi 4 lead height is published."
   },
   "why": "Pi 4 lying component side up on the plate (+z up, -z toward the plate and monitor): the plate must carry a hole that lines up with each of the board's four 2.7 mm holes (58 x 49 mm) with the plate around it to bear on, and the VESA MIS-D 75 pattern as its own four clear 4.5 mm holes, 75 x 75 mm +/- 0.25 mm for M4 x 0.7 screws (VESA FDMI v1.1 sections 5.2.1 and 5.2.3), with the top left clear."
 }

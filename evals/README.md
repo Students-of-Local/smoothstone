@@ -72,13 +72,14 @@ size but no corner radius, `corner_r` is 0: the sharp box encloses the real body
    "body": {"w": 85, "d": 56, "h": 17, "corner_r": 3, "profile": [[0, 0], [15.9, 0], "...", [0, 7.98]]},
    "features": [{"name": "usb_c_power", "kind": "port | button | switch | vent | lens | screen | led | slot | hole",
                  "face": "+x | -x | +y | -y | +z | -z", "c": [u, v], "size": [w, h], "plug": [w, h],
-                 "shape": "rect | circle", "depth": 14.0, "plug_note": "why no plug size",
+                 "shape": "rect | circle", "depth": 14.0, "plug_note": "why no plug size", "pad": [6, 6],
                  "source": "https://... and where"}]},
  "expect": {"kind": "case | holder | mount | adapter | replacement", "material": "PLA | PETG | TPU",
             "fit": "slip | snug | press", "retention": "friction | snap | screw | none | any",
             "load_n": 20, "load_dir": "-z", "support": "-z", "safety": 2,
             "covered": ["faces the part wraps"], "open": ["faces that stay clear"],
-            "face_gap": {"+z": [0.0, 1.0]},
+            "face_gap": {"+z": [0.0, 1.0]}, "min_gap": {"-z": 2.5}, "min_gap_note": "why",
+            "attach": {"face": "+z", "against": "the desk", "screw": "M4", "min": 2, "source": "..."},
             "part_holes": [{"name": "vesa_75", "axis": "-z", "d": 4.5, "pattern": [[-37.5, -37.5], "..."],
                             "source": "..."}]}}
 ```
@@ -87,10 +88,15 @@ The product frame: x is width, y depth, z height as the part holds the product, 
 min corner, so the body is the box [0,w] x [0,d] x [0,h] with its four vertical edges rounded by
 `corner_r`. A feature's `c` is its center on its face, mm from the face's lower-left corner as seen
 from outside the product; `size` is its opening and `plug` (optional) the plug or fingertip that must
-pass through the part. A port with no published plug size says why in `plug_note`, and only its
-opening is checked. `shape: circle` makes the feature round, its size and plug a diameter. `depth`
+pass through the part. A port, button or switch with no published plug size says why in
+`plug_note`, and only its opening is checked; a button's plug is a fingertip (e01: Ø10, our lower
+bound, from the least fingertip pushbutton diameter in MIL-STD-1472F Figure 12, which sizes the
+button, not a finger). A hole's `pad` (optional) is the area around it a standoff may bear on, left
+out of the fit numbers like the hole itself but counted where the part bears (support). `shape: circle` makes the feature round, its size and
+plug a diameter. `depth`
 (optional) is how far out from the face the path must stay clear, when the maker publishes one.
-A `hole` feature is a mounting hole the part screws through. A face in neither `covered` nor `open`
+A `hole` feature is a mounting hole the part screws through; when the part does not screw to the
+product (e01's snap case), it marks only where a standoff may bear. A face in neither `covered` nor `open`
 is not checked for coverage, but no part may sit inside the product anywhere.
 
 A round body may give its `profile`: [r, z] points from the axis at the bottom, out and up its side,
@@ -100,6 +106,14 @@ shape, not the box (e04's AirTag dome, from Apple's Detail A).
 `support` (default `load_dir`): the face the product bears on, which the part must hold up without
 covering it. `face_gap`: a face's own gap range when it carries no fit (a shaft's end), on a covered face or the support face (a board on standoffs that rise into the box from below its lowest underside part, e01).
 `part_holes`: a hole pattern the part itself must carry, on the product's `axis` face side.
+`min_gap`: per face, how far the part must stay off it outside its features (e08: 2.5 mm under a
+board whose through-hole leads stand out; e01: 1.05 mm under its body, which is 2.5 mm under the PCB),
+with why in `min_gap_note`.
+`attach`: how the part is fixed to a desk or wall: at least `min` screw holes through the part's wall
+on the `face` side, each an ISO 273 clearance hole for `screw`. A spec with `attach` has `load_n` too,
+since the part hangs from it (e05, e07).
+Each number's source (`body_sources`, a feature's `source`) cites the URL it comes from;
+`product.sources` lists the documents and ties none of them to a number.
 
 | face | seen from | u (right) | v (up) |
 | --- | --- | --- | --- |
@@ -125,21 +139,25 @@ where the product sits (no engineering.json)".
   rotation plus a move only. It puts the product where the design centers it, so each side's gap is
   its designed clearance.
 - `clearance`: mm per side, a number or per face (`{"+x": 0.3, ...}`).
-- `retention`, by type: `snap` {y undercut, t arm thickness at the root, L arm length, w arm width,
-  at the root point, t_dir, L_dir}; `friction` {gap, mm, negative for interference}; `screw` {size
-  M2 | M2.5 | M3, method self_tap | insert, hole_d, holes [{at the mouth, axis into the part}]};
-  `none` {}.
+- `retention`, by type: `snap` {y the catch's overhang past the arm's face toward the product, t arm
+  thickness at the root, L arm length to its tip, w arm width, at the root point where the arm joins
+  the part, t_dir, L_dir}; `friction` {gap, mm, negative for interference}; `screw` {size M2 | M2.5 | M3, method
+  self_tap | insert | through (a bolt and nut, or a bought standoff), hole_d, holes [{at the mouth,
+  axis into the part}]}; `none` {}.
 - `load` (when the spec has `load_n`): the force in N, its direction, and the critical section as a
-  rectangle b x h mm at `arm` mm from the load, whether the stress runs across the layers, and
-  `section` {at a point in it, b_dir, h_dir}.
+  rectangle b x h mm whose moment is F x `arm`, whether the stress runs across the layers, and
+  `section` {at a point in it, b_dir, h_dir along the load}.
+- `attach` (when the spec has it): `holes` [{at the mouth, on the side that goes against the desk or
+  wall}].
 - `part_holes` (when the spec has them): per pattern, `c` its center on the part's face and `u` its
   first axis.
-- `sources`: for w, d, h, corner_r and every feature by name. From text or a model number, a URL the
-  spec itself cites (the part cannot have measured the product); from a photo, any URL with a host,
-  "calipers", or "photo with <the reference in the photo>".
+- `sources`: for w, d, h, corner_r, a profiled body's `profile`, and every feature by name. From text
+  or a model number, a URL the spec cites for that number in its own body or feature source (the
+  part cannot have measured the product); from a photo, any URL with a host, "calipers", or "photo
+  with <the reference in the photo>".
 
-Points and directions are in the part's STL coordinates: the arm, holes and section are measured in
-the mesh, so engineering.json cannot claim a part it does not have.
+Points and directions are in the part's STL coordinates: the snap arm, the holes and the section are
+measured in the mesh, so engineering.json cannot claim a part it does not have.
 
 `engineering_grade.py` checks, each failure a line with its measured number:
 
@@ -155,17 +173,53 @@ the mesh, so engineering.json cannot claim a part it does not have.
   cylinder for a round one, from the product's face out through the wall plus 3 mm, or its `depth`,
   or 20 mm on an open face (manifold3d intersection, at most 0.5 mm3). A part that is not a closed
   solid fails here, since an open mesh reads as empty.
-- holes: each `hole` feature has a bore (the screw's hole_d, or the feature's size, less 0.15 mm a
-  side) clear 3 mm into the part and the part around it to bear on; each `part_holes` hole is a bore
-  clear through the part with the part around it.
+- clear (with `min_gap`): no spot of that face, outside its features and pads, has the part nearer
+  than the gap.
+- holes: when the part screws to the product, each `hole` feature has a bore (the screw's hole_d,
+  less 0.15 mm a side) and the part around it to bear on: for `self_tap` and `insert` clear 3 mm into
+  the part within the face's most gap plus 1 mm of the product (a standoff up to the board); for
+  `through` (a bolt and nut, or a bought standoff) wherever the part is along the hole's axis, clear
+  through that wall and the part around it through the wall. Each `part_holes` hole is a bore clear
+  through the part with the part around it.
+- attach (with `attach`): at least `min` distinct holes, each with its mouth on the part's outermost
+  plane on that side, a bore of the ISO 273 fine hole less 0.15 mm clear through the wall there (its
+  thickness read beside the hole), the part around the coarse hole plus 0.15 mm, and room for the
+  screw's head inside: an M4 pan head (Ø8.2 x 3.1 mm, the larger of DIN 7981 ST4.2 and ISO 7045 M4)
+  on the part's face beside the hole (the wall's inner face or a counterbore's floor) must meet
+  neither the product nor the part, or a countersink must hold an ISO 7046 flat head (Ø8.4, 90
+  degrees) flush with the wall's inner face. The holes that count spread at least a quarter of the
+  part's largest extent across that face, so it cannot turn about them.
 - retention: the type matches; a snap arm's strain 1.5 y t / L^2 is at most PLA 2%, PETG 3%, TPU 20%;
   a friction gap is in the fit range; a screw hole matches the EJOT PT pilot table (PLA 0.80 d, PETG
-  0.75 d) or the heat-set insert hole (M2 3.2, M2.5 3.6, M3 4.0 mm), within 0.15 mm. In the mesh:
-  the arm is t thick at its root and L long within 0.2 mm and free at its sides; each screw hole is
-  a bore 2 d deep with the part around it. Every input is a finite number above 0.
+  0.75 d), the heat-set insert hole (M2 3.2, M2.5 3.6, M3 4.0 mm), or for `through` the ISO 273
+  clearance hole from fine to coarse (M2.5 2.7 to 3.1 mm), within 0.15 mm. In the mesh: the arm is t
+  thick at its root and runs L from it within 0.2 mm either way; 0.5 mm behind the root the part is
+  wider than w (the arm joins it there); from 5% of its length every 0.5 mm to 0.25 mm short of its
+  tip it is no wider than w (free at its sides); and in its outer half it stands out y past its root
+  face on the side the product is on, within 0.2 mm (its catch; a bump on the far face hooks nothing;
+  the overhang is at least the deflection, so the strain errs high). Each screw hole is a bore 2 d
+  deep, or for `through` clear through the wall at the hole (its thickness read beside the hole, not
+  on to a lid past it), with the part around it as deep as the bore. Its mouth must lie on the part's
+  surface (beside it, the part starts there along the axis). Every input is a finite number above 0.
 - strength (with `load_n`): 6 F arm / (b h^2) at most the printed yield (PLA 50, PETG 47 MPa), halved
   across layers, over the spec's safety factor; TPU is not checked. b and h are measured through
-  the section's point, and the smaller of the declared and measured counts.
+  the section's point, and the smaller of the declared and measured counts. h_dir must lie along the
+  load and b_dir square to it. The arm is measured as the moment the section carries over F: each
+  bearing spot of the product carries a share of F by statics (the product a rigid body on equal
+  springs, so the shares' centroid lies on the load's line through its middle: a strap under one side
+  takes that side's half, whatever its area), at its distance from the section along the beam's axis
+  (b_dir x h_dir). On each side of the section's plane only the piece of the part the
+  section belongs to counts, so a lip under the far side of the product loads its own root, not this
+  one. With `attach` each share goes to its nearest screw hole square to the load and counts only when
+  that screw is not on its own piece, both sides added; without, the larger side counts. A declared
+  arm shorter than the measured one fails and the longer counts, and a section that carries none of
+  the load fails, since it is not the critical one. The load path is then swept: the part is cut
+  square to the beam's axis every 0.5 mm (at most 160 cuts) from the declared section out to the
+  bearing spots it carries and on to their screws, and each piece on either side of each cut bends at
+  its own cut face (I / c of that face, about its centroid) under the moment of the shares it
+  carries. The worst cut must pass too, so a section declared in a thick wall cannot stand in for a
+  thin strap beside it. The stress is across the layers when the beam's axis is more than 15 degrees
+  out of the STL's xy plane, whatever `across_layers` says.
 - walls: the thinnest wall at least 1.2 mm; printable: stone's slicer pass is clean.
 - sources: every body size and feature has one, as above.
 

@@ -15,10 +15,10 @@
       "corner_r": 0
     },
     "body_sources": {
-      "w": "Raspberry Pi 5 STEP RP-010083 (rpi-5b_no_graphics.step), overall bounding box x -0.45 to 88.05. Cross check, mechanical drawing https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf: board '85', left edge part overhang '0.45', Ethernet overhang '3' (sum 88.45)",
-      "d": "Raspberry Pi 5 STEP RP-010083, overall bounding box y -1.63 (micro HDMI shells past the front edge) to 56.0. Board depth '56' on the mechanical drawing; the 1.63 front overhang is not on the drawing",
-      "h": "Raspberry Pi 5 STEP RP-010083, overall bounding box z -1.45 (underside part) to 17.526 (USB stack top). The mechanical drawing publishes no overall height",
-      "corner_r": "no radius published (the Pi 5 drawing draws rounded board corners with no label); 0 is the enclosing box, which here includes the port overhangs"
+      "w": "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: Raspberry Pi 5 STEP RP-010083 (rpi-5b_no_graphics.step), overall bounding box x -0.45 to 88.05. Cross check, mechanical drawing https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf: board '85', left edge part overhang '0.45', Ethernet overhang '3' (sum 88.45)",
+      "d": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: Raspberry Pi 5 STEP RP-010083, overall bounding box y -1.63 (micro HDMI shells past the front edge) to 56.0. Board depth '56' on the mechanical drawing; the 1.63 front overhang is not on the drawing",
+      "h": "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: Raspberry Pi 5 STEP RP-010083, overall bounding box z -1.45 (underside part) to 17.526 (USB stack top). The mechanical drawing publishes no overall height",
+      "corner_r": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf: no radius published (the Pi 5 drawing draws rounded board corners with no label); 0 is the enclosing box, which here includes the port overhangs"
     },
     "features": [
       {
@@ -33,7 +33,7 @@
           8.94,
           4.26
         ],
-        "source": "u: drawing https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf front edge '11.2' from the left board edge, plus 0.45 frame offset. v and size: STEP RP-010083 body centered at x 11.20, bbox z 0.336 to 4.596, width 8.94. Drawing side view '3.2' (connector top above PCB top) vs STEP 3.29; plug: Apple's 'RECOMMENDED CONNECTOR KEEPOUT' for a mating USB-C plug, '12.45' by '6.60', reaching 'OUTWARD 14.0 mm' (https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf p2, Detail C and note 2), the one first-party USB-C plug envelope we found; the USB-IF overmold figure (Type-C R2.0 Figure 3-80) could not be read",
+        "source": "u: drawing https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf front edge '11.2' from the left board edge, plus 0.45 frame offset. v and size: STEP RP-010083 https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip body centered at x 11.20, bbox z 0.336 to 4.596, width 8.94. Drawing side view '3.2' (connector top above PCB top) vs STEP 3.29; plug: Apple's 'RECOMMENDED CONNECTOR KEEPOUT' for a mating USB-C plug, '12.45' by '6.60', reaching 'OUTWARD 14.0 mm' (https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf p2, Detail C and note 2), the one first-party USB-C plug envelope we found; the USB-IF overmold figure (Type-C R2.0 Figure 3-80) could not be read",
         "plug": [
           12.45,
           6.6
@@ -52,7 +52,7 @@
           7.19,
           4.45
         ],
-        "source": "u: drawing front edge '25.8' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 25.80, bbox z 0.235 to 4.682, width 7.19. Drawing side view '3.4' (connector top above PCB top) vs STEP 3.376",
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: u: drawing front edge '25.8' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 25.80, bbox z 0.235 to 4.682, width 7.19. Drawing side view '3.4' (connector top above PCB top) vs STEP 3.376",
         "plug_note": "no first-party micro HDMI (Type D) plug size found: the HDMI spec is licensed and Raspberry Pi's own cable page gives none, so only the receptacle is checked"
       },
       {
@@ -67,7 +67,7 @@
           7.19,
           4.45
         ],
-        "source": "u: drawing front edge '39.2' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 39.20, bbox z 0.235 to 4.682, width 7.19",
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: u: drawing front edge '39.2' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 39.20, bbox z 0.235 to 4.682, width 7.19",
         "plug_note": "no first-party micro HDMI (Type D) plug size found: the HDMI spec is licensed and Raspberry Pi's own cable page gives none, so only the receptacle is checked"
       },
       {
@@ -82,7 +82,7 @@
           15.93,
           15.3
         ],
-        "source": "u: drawing right edge '10.2' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 jack bbox y 2.285 to 18.215 (center 10.25), z -0.664 to 14.636 (includes its through pins)",
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: u: drawing right edge '10.2' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 jack bbox y 2.285 to 18.215 (center 10.25), z -0.664 to 14.636 (includes its through pins)",
         "plug_note": "no first-party RJ45 plug size found (IEC 60603-7 is paid; only distributor listings), so only the jack's opening is checked"
       },
       {
@@ -97,7 +97,7 @@
           14.5,
           17.69
         ],
-        "source": "u: drawing right edge '29.1' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 21.75 to 36.25 (center 29.0), z -0.164 to 17.526",
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: u: drawing right edge '29.1' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 21.75 to 36.25 (center 29.0), z -0.164 to 17.526",
         "plug_note": "no first-party USB-A plug overmold size found (the USB 2.0 figure is typical, not normative, and was not read), so only the receptacle is checked"
       },
       {
@@ -112,7 +112,7 @@
           14.5,
           17.53
         ],
-        "source": "u: drawing right edge '47' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 39.75 to 54.25 (center 47.0), z -0.166 to 17.361",
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: u: drawing right edge '47' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 39.75 to 54.25 (center 47.0), z -0.166 to 17.361",
         "plug_note": "no first-party USB-A plug overmold size found (the USB 2.0 figure is typical, not normative, and was not read), so only the receptacle is checked"
       },
       {
@@ -127,7 +127,12 @@
           2.0,
           2.0
         ],
-        "source": "y: drawing left edge '18.4' from the front board edge (u = 57.63 - (18.4 + 1.63)); the '0.45' overhang on the drawing is this part. v and size: STEP RP-010083 body bbox x -0.45 to 0.6, y 17.4 to 19.4, z 2.036 to 4.036. Naming it the power button is mine: the drawing does not label it"
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: y: drawing left edge '18.4' from the front board edge (u = 57.63 - (18.4 + 1.63)); the '0.45' overhang on the drawing is this part. v and size: STEP RP-010083 body bbox x -0.45 to 0.6, y 17.4 to 19.4, z 2.036 to 4.036. Naming it the power button is mine: the drawing does not label it; plug: Ø10, our number, a lower bound and not the size of a finger. MIL-STD-1472F, https://www.denix.osd.mil/soh/denix-files/sites/21/2016/03/02_MIL-STD-1472F-Human-Engineering.pdf Figure 12 'Push button (finger or hand operated)', p73, gives 'MIN 10 mm (0.4”)' as the least diameter of a button pressed with a bare fingertip; that sizes the button, not the opening a finger reaches through, and a fingertip is wider. The button sits 2 to 3 mm in behind the case wall, so an opening narrower than this cannot let any fingertip reach it",
+        "shape": "circle",
+        "plug": [
+          10.0,
+          10.0
+        ]
       },
       {
         "name": "status_led",
@@ -141,7 +146,7 @@
           3.2,
           1.0
         ],
-        "source": "y: drawing left edge '13.3' from the front board edge (u = 57.63 - (13.3 + 1.63)). v and size: STEP RP-010083 body bbox y 11.7 to 14.9, z 1.336 to 2.336. Naming it the LED is mine: the drawing does not label it"
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf and https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: y: drawing left edge '13.3' from the front board edge (u = 57.63 - (13.3 + 1.63)). v and size: STEP RP-010083 body bbox y 11.7 to 14.9, z 1.336 to 2.336. Naming it the LED is mine: the drawing does not label it"
       },
       {
         "name": "microsd_slot",
@@ -155,7 +160,83 @@
           11.95,
           1.42
         ],
-        "source": "STEP RP-010083 only: underside socket bbox x 2.25 to 13.65, y 22.11 to 34.06, z -1.42 to 0.0. The drawing shows the card at this edge but gives it no dimension"
+        "source": "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: STEP RP-010083 only: underside socket bbox x 2.25 to 13.65, y 22.11 to 34.06, z -1.42 to 0.0. The drawing shows the card at this edge but gives it no dimension"
+      },
+      {
+        "name": "mount_hole_front_left",
+        "kind": "hole",
+        "face": "-z",
+        "c": [
+          84.55,
+          5.13
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf drawing: hole centers '3.5' from the left edge, '58' apart across and '49' apart front to back (3.5 from the front edge of the '56' board), hole diameter '2.7'; pad: the '6' callout at the holes, the Ø6 area around each a standoff may bear on. Board x 3.5, y 3.5 plus the 0.45 and 1.63 frame offsets; u = 88.5 - x on -z",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
+      },
+      {
+        "name": "mount_hole_front_right",
+        "kind": "hole",
+        "face": "-z",
+        "c": [
+          26.55,
+          5.13
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf drawing: hole centers '3.5' from the left edge, '58' apart across and '49' apart front to back (3.5 from the front edge of the '56' board), hole diameter '2.7'; pad: the '6' callout at the holes, the Ø6 area around each a standoff may bear on. Board x 61.5, y 3.5 plus the 0.45 and 1.63 frame offsets; u = 88.5 - x on -z",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
+      },
+      {
+        "name": "mount_hole_back_left",
+        "kind": "hole",
+        "face": "-z",
+        "c": [
+          84.55,
+          54.13
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf drawing: hole centers '3.5' from the left edge, '58' apart across and '49' apart front to back (3.5 from the front edge of the '56' board), hole diameter '2.7'; pad: the '6' callout at the holes, the Ø6 area around each a standoff may bear on. Board x 3.5, y 52.5 plus the 0.45 and 1.63 frame offsets; u = 88.5 - x on -z",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
+      },
+      {
+        "name": "mount_hole_back_right",
+        "kind": "hole",
+        "face": "-z",
+        "c": [
+          26.55,
+          54.13
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf drawing: hole centers '3.5' from the left edge, '58' apart across and '49' apart front to back (3.5 from the front edge of the '56' board), hole diameter '2.7'; pad: the '6' callout at the holes, the Ø6 area around each a standoff may bear on. Board x 61.5, y 52.5 plus the 0.45 and 1.63 frame offsets; u = 88.5 - x on -z",
+        "shape": "circle",
+        "pad": [
+          6.0,
+          6.0
+        ]
       }
     ]
   },
@@ -181,7 +262,11 @@
         0.45
       ]
     },
-    "why_minus_z": "The body's -z face is the bottom of the lowest underside part (the microSD socket, STEP z -1.45); the PCB underside is 1.45 mm above it. A Pi case holds the board on standoffs that reach the PCB, so -z is not covered at a slip gap: the part must bear on it (support -z), and up to 1.5 mm into the box from below is allowed for standoffs and ledges under the PCB. The grader does not check that such a standoff clears the underside parts."
+    "min_gap": {
+      "-z": 1.05
+    },
+    "min_gap_note": "Under the board, outside each mounting hole's Ø6 pad, the part stays 1.05 mm below the body's -z face, which is 2.5 mm under the PCB: the Pi 5's through-hole GPIO header and fan connector put their leads out of its underside, and neither the drawing nor the STEP gives their length. 2.5 mm is the most lead protrusion IPC-A-610 allows for class 2 as commonly quoted (https://aptpcb.com/en/blog/visual-inspection-checklist; the standard itself is sold), less the 1.45 mm the microSD socket hangs below the PCB. Our number, as for e08, until a Pi 5 lead length is published.",
+    "why_minus_z": "The body's -z face is the bottom of the lowest underside part (the microSD socket, STEP z -1.45); the PCB underside is 1.45 mm above it. A Pi case holds the board on standoffs that reach the PCB, so -z is not covered at a slip gap: the part must bear on it (support -z), and up to 1.5 mm into the box from below is allowed for standoffs under the PCB. Outside the four mounting holes' Ø6 pads the part must stay min_gap clear below, so a floor or ledge cannot crush the socket or the leads."
   },
   "why": "Pi 5 lying component side up (+z up, USB-C and HDMI on the -y front, USB and Ethernet on +x, power button and microSD on -x): tests a snap case that clears nine ports and controls on three walls, with heights from Raspberry Pi's own STEP because the drawing gives none."
 }
