@@ -1,0 +1,128 @@
+{
+  "id": "h07",
+  "request": "wall shelf for my Apple TV 4K (the 2026 one), screws to the wall behind the TV. has to hold 20 N. I'll print it in PETG",
+  "input": "text",
+  "product": {
+    "name": "Apple TV 4K (4th generation)",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/apple-tv-4k-4th-generation.pdf",
+      "https://www.apple.com/apple-tv-4k/specs/"
+    ],
+    "body": {
+      "w": 93.24,
+      "d": 93.24,
+      "h": 31.0,
+      "corner_r": 25.14
+    },
+    "features": [
+      {
+        "name": "IR window",
+        "kind": "lens",
+        "face": "-y",
+        "c": [
+          46.62,
+          24.48
+        ],
+        "size": [
+          18.08,
+          13.04
+        ]
+      },
+      {
+        "name": "status light / front mic",
+        "kind": "led",
+        "face": "-y",
+        "c": [
+          46.62,
+          12.7
+        ],
+        "size": [
+          1.25,
+          1.25
+        ]
+      },
+      {
+        "name": "power inlet",
+        "kind": "port",
+        "face": "+y",
+        "c": [
+          23.27,
+          16.43
+        ],
+        "size": [
+          16.65,
+          8.36
+        ]
+      },
+      {
+        "name": "Ethernet",
+        "kind": "port",
+        "face": "+y",
+        "c": [
+          46.62,
+          17.38
+        ],
+        "size": [
+          12.78,
+          10.23
+        ]
+      },
+      {
+        "name": "HDMI",
+        "kind": "port",
+        "face": "+y",
+        "c": [
+          68.84,
+          16.43
+        ],
+        "size": [
+          14.29,
+          4.85
+        ]
+      },
+      {
+        "name": "left mic",
+        "kind": "vent",
+        "face": "-x",
+        "c": [
+          46.62,
+          12.7
+        ],
+        "size": [
+          0.9,
+          0.9
+        ]
+      },
+      {
+        "name": "right mic",
+        "kind": "vent",
+        "face": "+x",
+        "c": [
+          46.62,
+          12.7
+        ],
+        "size": [
+          0.9,
+          0.9
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "kind": "mount",
+    "material": "PETG",
+    "fit": "slip",
+    "retention": "any",
+    "load_n": 20,
+    "load_dir": "-z",
+    "safety": 2,
+    "covered": [
+      "-z"
+    ],
+    "open": [
+      "+z",
+      "-y",
+      "+y"
+    ]
+  }
+}

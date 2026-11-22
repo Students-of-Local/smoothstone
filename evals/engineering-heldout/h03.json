@@ -1,0 +1,53 @@
+{
+  "id": "h03",
+  "request": "cover for my Apple MagSafe Charger puck (the newer 25W one) so it stops getting scuffed in my bag. leave the charging face open",
+  "input": "text",
+  "product": {
+    "name": "Apple MagSafe Charger (1 m / 2 m), A2580 / A3250",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/apple-magsafe-charger-1-m-and-apple-magsafe-charger-2-m.pdf"
+    ],
+    "body": {
+      "w": 55.5,
+      "d": 55.5,
+      "h": 4.37,
+      "corner_r": 27.75
+    },
+    "features": [
+      {
+        "name": "cable exit",
+        "kind": "slot",
+        "face": "-y",
+        "c": [
+          27.75,
+          2.185
+        ],
+        "size": [
+          3.05,
+          4.37
+        ],
+        "plug": [
+          12.35,
+          6.49
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "kind": "case",
+    "material": "TPU",
+    "fit": "snug",
+    "retention": "friction",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": [
+      "+z"
+    ]
+  }
+}

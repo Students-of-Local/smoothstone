@@ -1,0 +1,145 @@
+{
+  "id": "h01",
+  "request": "need a grippy sleeve for the new Siri Remote, the one with Find My. I'll print it in TPU. keep the buttons and the top end clear",
+  "input": "text",
+  "product": {
+    "name": "Apple Siri Remote (4th generation)",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/siri-remote-4th-generation.pdf",
+      "https://www.apple.com/apple-tv-4k/specs/"
+    ],
+    "body": {
+      "w": 35.0,
+      "d": 136.0,
+      "h": 9.25,
+      "corner_r": 9.17
+    },
+    "features": [
+      {
+        "name": "power button",
+        "kind": "button",
+        "face": "+z",
+        "c": [
+          28.0,
+          129.0
+        ],
+        "size": [
+          6.0,
+          6.0
+        ]
+      },
+      {
+        "name": "Siri mic",
+        "kind": "vent",
+        "face": "+z",
+        "c": [
+          17.5,
+          129.0
+        ],
+        "size": [
+          2.5,
+          1.0
+        ]
+      },
+      {
+        "name": "clickpad",
+        "kind": "button",
+        "face": "+z",
+        "c": [
+          17.5,
+          107.56
+        ],
+        "size": [
+          31.0,
+          31.0
+        ]
+      },
+      {
+        "name": "back button",
+        "kind": "button",
+        "face": "+z",
+        "c": [
+          10.0,
+          84.62
+        ],
+        "size": [
+          12.25,
+          12.25
+        ]
+      },
+      {
+        "name": "TV button",
+        "kind": "button",
+        "face": "+z",
+        "c": [
+          25.0,
+          84.62
+        ],
+        "size": [
+          12.25,
+          12.25
+        ]
+      },
+      {
+        "name": "play/pause button",
+        "kind": "button",
+        "face": "+z",
+        "c": [
+          10.0,
+          69.87
+        ],
+        "size": [
+          12.25,
+          12.25
+        ]
+      },
+      {
+        "name": "mute button",
+        "kind": "button",
+        "face": "+z",
+        "c": [
+          10.0,
+          55.12
+        ],
+        "size": [
+          12.25,
+          12.25
+        ]
+      },
+      {
+        "name": "USB-C port",
+        "kind": "port",
+        "face": "-y",
+        "c": [
+          17.5,
+          5.22
+        ],
+        "size": [
+          8.8,
+          3.01
+        ],
+        "plug": [
+          13.65,
+          6.85
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "kind": "case",
+    "material": "TPU",
+    "fit": "snug",
+    "retention": "friction",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+x",
+      "-x",
+      "-y"
+    ],
+    "open": [
+      "+z",
+      "+y"
+    ]
+  }
+}

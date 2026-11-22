@@ -1,0 +1,145 @@
+{
+  "id": "h04",
+  "request": "bumper for iPad mini, the A17 Pro one. open back. I'll print it in PETG",
+  "input": "text",
+  "product": {
+    "name": "Apple iPad mini (A17 Pro)",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/ipad-mini-a17-pro.pdf",
+      "https://support.apple.com/en-us/121456"
+    ],
+    "body": {
+      "w": 134.75,
+      "d": 195.43,
+      "h": 6.32,
+      "corner_r": 13.15
+    },
+    "features": [
+      {
+        "name": "top button / Touch ID",
+        "kind": "button",
+        "face": "+y",
+        "c": [
+          113.5,
+          3.18
+        ],
+        "size": [
+          17.12,
+          3.45
+        ]
+      },
+      {
+        "name": "volume up",
+        "kind": "button",
+        "face": "+y",
+        "c": [
+          29.91,
+          3.18
+        ],
+        "size": [
+          10.06,
+          2.46
+        ]
+      },
+      {
+        "name": "volume down",
+        "kind": "button",
+        "face": "+y",
+        "c": [
+          17.85,
+          3.18
+        ],
+        "size": [
+          10.06,
+          2.46
+        ]
+      },
+      {
+        "name": "top speaker left",
+        "kind": "vent",
+        "face": "+y",
+        "c": [
+          93.03,
+          3.18
+        ],
+        "size": [
+          19.72,
+          1.76
+        ]
+      },
+      {
+        "name": "top speaker right",
+        "kind": "vent",
+        "face": "+y",
+        "c": [
+          44.28,
+          3.18
+        ],
+        "size": [
+          14.58,
+          1.76
+        ]
+      },
+      {
+        "name": "USB-C port",
+        "kind": "port",
+        "face": "-y",
+        "c": [
+          67.375,
+          3.18
+        ],
+        "size": [
+          12.45,
+          6.6
+        ],
+        "plug": [
+          12.45,
+          6.6
+        ]
+      },
+      {
+        "name": "bottom speaker left",
+        "kind": "vent",
+        "face": "-y",
+        "c": [
+          39.15,
+          3.18
+        ],
+        "size": [
+          24.84,
+          1.76
+        ]
+      },
+      {
+        "name": "bottom speaker right",
+        "kind": "vent",
+        "face": "-y",
+        "c": [
+          95.6,
+          3.18
+        ],
+        "size": [
+          24.84,
+          1.76
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "kind": "case",
+    "material": "PETG",
+    "fit": "snug",
+    "retention": "snap",
+    "safety": 2,
+    "covered": [
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": [
+      "+z",
+      "-z"
+    ]
+  }
+}

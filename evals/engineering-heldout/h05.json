@@ -1,0 +1,35 @@
+{
+  "id": "h05",
+  "request": "small riser stand for my HomePod mini 2 on the desk, white PLA. the cable comes out low on the back",
+  "input": "text",
+  "product": {
+    "name": "Apple HomePod mini 2",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/homepod-mini-2.pdf"
+    ],
+    "body": {
+      "w": 98.1,
+      "d": 98.1,
+      "h": 84.04,
+      "corner_r": 49.05
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "holder",
+    "material": "PLA",
+    "fit": "slip",
+    "retention": "none",
+    "safety": 2,
+    "covered": [
+      "-z"
+    ],
+    "open": [
+      "+z",
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ]
+  }
+}

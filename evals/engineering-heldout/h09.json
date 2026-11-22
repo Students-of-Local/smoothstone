@@ -1,0 +1,35 @@
+{
+  "id": "h09",
+  "request": "volume knob snapped off my amp. it's a Bourns PEC11R encoder with the 20 mm flatted shaft. need a new knob about 30 mm across",
+  "input": "text",
+  "product": {
+    "name": "Bourns PEC11R rotary encoder, 20 mm metal flatted shaft (PEC11R-4220F)",
+    "sources": [
+      "https://www.bourns.com/docs/Product-Datasheets/PEC11R.pdf"
+    ],
+    "body": {
+      "w": 6.0,
+      "d": 6.0,
+      "h": 13.0,
+      "corner_r": 3.0
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "replacement",
+    "material": "PLA",
+    "fit": "press",
+    "retention": "friction",
+    "safety": 2,
+    "covered": [
+      "+z",
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": [
+      "-z"
+    ]
+  }
+}
