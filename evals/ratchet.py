@@ -9,8 +9,8 @@ Above it, or for a group the floor does not have yet, it raises the floor in the
 so. It never lowers a floor.
 
 --check-git BASE: fails when the working tree, against BASE, lowers any number in floor.json,
-drops a group or a passing spec from it, or deletes a spec from evals/tuning, figure or
-regressions, unless a line added to LOG.md names that group or spec and says why.
+drops a group or a passing spec from it, or deletes a spec from evals/tuning, figure,
+regressions or engineering, unless a line added to LOG.md names that group or spec and says why.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FLOOR = ROOT / "evals" / "floor.json"
-GUARDED = ("evals/tuning", "evals/figure", "evals/regressions")
+GUARDED = ("evals/tuning", "evals/figure", "evals/regressions", "evals/engineering")
 
 
 def _suite_of(spec_id: str, evals: Path) -> str:

@@ -1,0 +1,42 @@
+{
+  "id": "e10_model_number_case",
+  "request": "A case for an ABX00080.",
+  "input": "model_number",
+  "product": {
+    "name": "Arduino UNO R4 Minima (SKU ABX00080)",
+    "sources": [
+      "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf"
+    ],
+    "body": {
+      "w": 68.58,
+      "d": 53.34,
+      "h": 9.5,
+      "corner_r": 0
+    },
+    "body_sources": {
+      "w": "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf page 15, section 11 'Mounting Holes And Board Outline', drawing 'Mechanical View of Arduino UNO R4 Minima', '68.58 mm'",
+      "d": "same drawing, '53.34 mm'",
+      "h": "same drawing, side view: PCB '1 mm' plus header top '8.5 mm' above the PCB top = 9.5. The drawing shows no DC jack, though the datasheet lists 'J4 DC Jack', so a part may stand taller than 9.5; +z and -x are open for that reason",
+      "corner_r": "no radius published (the drawing gives '2x 3.6 mm x 45°' chamfers on the right corners and draws small unlabeled rounds on the left); 0 is the enclosing box"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "case",
+    "material": "PLA",
+    "fit": "slip",
+    "retention": "any",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+x",
+      "+y",
+      "-y"
+    ],
+    "open": [
+      "-x",
+      "+z"
+    ]
+  },
+  "why": "Request gives only the SKU: tests looking up ABX00080 as the Arduino UNO R4 Minima and building to its outline (68.58 x 53.34, 1 mm PCB, 8.5 mm headers, +z up, USB-C end at -x). The -x end stays open because the datasheet locates only the USB-C top edge (0.73 + 6.4 + 3.88 = 11.01 mm from the back edge, 3 mm tall) and does not draw the DC jack."
+}

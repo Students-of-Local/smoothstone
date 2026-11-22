@@ -1,0 +1,42 @@
+{
+  "id": "e09_pot_knob",
+  "request": "a replacement knob for a Bourns PTV09A-4020S-B103 potentiometer",
+  "input": "text",
+  "product": {
+    "name": "Bourns PTV09A-4020S-B103 (S-type knurled shaft, 20 mm)",
+    "sources": [
+      "https://www.bourns.com/data/global/pdfs/PTV09.pdf"
+    ],
+    "body": {
+      "w": 6.0,
+      "d": 6.0,
+      "h": 7.0,
+      "corner_r": 3.0
+    },
+    "body_sources": {
+      "w": "https://www.bourns.com/data/global/pdfs/PTV09.pdf (p2, Shaft Styles, S-Type: '6.0 +0.0/-0.1 (.236 +.000/-.004)' shaft diameter over the 18 teeth knurl)",
+      "d": "https://www.bourns.com/data/global/pdfs/PTV09.pdf (p2, S-Type, same '6.0 +0.0/-0.1'; the shaft is round)",
+      "h": "https://www.bourns.com/data/global/pdfs/PTV09.pdf (p2, Shaft Styles, S-Type table: A = 7 (.275) for L = 20, the 18 teeth knurl from the shaft tip; the knob grips this length)",
+      "corner_r": "https://www.bourns.com/data/global/pdfs/PTV09.pdf (half of the 6.0 diameter: a round shaft)"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "replacement",
+    "material": "PLA",
+    "fit": "press",
+    "retention": "friction",
+    "safety": 2,
+    "covered": [
+      "+x",
+      "-x",
+      "+y",
+      "-y",
+      "+z"
+    ],
+    "open": [
+      "-z"
+    ]
+  },
+  "why": "z along the shaft, the body is the knurled 7 mm at the tip of the 20 mm S-Type shaft (A in the p2 S-Type table), -z where the knurl starts: a press fit knob on the 6.0 mm 18 teeth knurl, covering its sides and tip, open below where the plain shaft runs to the housing."
+}

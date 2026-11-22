@@ -1,0 +1,43 @@
+{
+  "id": "e03_power_bank_case",
+  "request": "a snug TPU sleeve for my Anker Power Bank (10000mAh, 22.5W)",
+  "input": "text",
+  "product": {
+    "name": "Anker Power Bank (10000mAh, 22.5W), model A1388",
+    "sources": [
+      "https://service.anker.com/product-description/a08J1000000YcHgIAK/anker-power-bank-10000mah-225w",
+      "https://salesforce-knowledge-download.s3.us-west-2.amazonaws.com/000019000/en_US/000019000.pdf"
+    ],
+    "body": {
+      "w": 71.4,
+      "d": 151.0,
+      "h": 15.9,
+      "corner_r": 0.0
+    },
+    "body_sources": {
+      "w": "https://service.anker.com/product-description/a08J1000000YcHgIAK/anker-power-bank-10000mah-225w (spec row 'Dimension: 151*71.4*15.9mm', middle value)",
+      "d": "https://service.anker.com/product-description/a08J1000000YcHgIAK/anker-power-bank-10000mah-225w (spec row 'Dimension: 151*71.4*15.9mm', first value, the length)",
+      "h": "https://service.anker.com/product-description/a08J1000000YcHgIAK/anker-power-bank-10000mah-225w (spec row 'Dimension: 151*71.4*15.9mm', last value, the thickness)",
+      "corner_r": "no radius published on https://service.anker.com/product-description/a08J1000000YcHgIAK/anker-power-bank-10000mah-225w; 0 is the enclosing box"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "case",
+    "material": "TPU",
+    "fit": "snug",
+    "retention": "friction",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+x",
+      "-x",
+      "-y"
+    ],
+    "open": [
+      "+z",
+      "+y"
+    ]
+  },
+  "why": "Lying flat, display up (+z), ports end at +y: Anker publishes the size and 'Ports: 1 USB-C port,1 USB-A port' but no positions; its A1388 user guide (https://salesforce-knowledge-download.s3.us-west-2.amazonaws.com/000019000/en_US/000019000.pdf, pages 1 to 3 figures) shows the button and display on the front face and both ports on one short end, so those two faces stay open and the TPU sleeve grips the rest."
+}

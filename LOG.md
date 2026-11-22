@@ -357,3 +357,33 @@ the craft judge on the shape (judge_views). The craft judge moves about one poin
   on this code scored 8 with the same flecks named. Inde's 6 is
   the judge's reference pick (7 on round 5 with the same render path); Shane's 4 is his photos.
   Craft stops at 7 to 8 where the lift model leaves soft eyes and hands.
+
+## 2026-11-22 engineering evals: the measuring stick before the capability
+
+Step 1 of the engineering program: a 1.7B model, given "a case for <product>", should climb with
+stone until the part is engineered right. Before any capability, a suite measures it:
+evals/engineering (e01 to e10, tuning) and evals/engineering_grade.py (fit, covered and open faces,
+port access, retention, strength, walls, printable, sources; README "Engineering specs"). Every
+product number comes from the maker's own page or drawing, URLs in each spec. e01's heights and port
+sizes come from Raspberry Pi's own Pi 5 STEP model (PIP RP-010083), because no Pi drawing gives a
+height; it matches every center and height the drawing does give. Dropped for unpublished numbers:
+Anker 313 (two sizes on one page), Pi Zero 2 W (no height or connector sizes). Ports with no
+published position leave their face open, never guessed. The ratchet now guards evals/engineering.
+
+Baseline, NEXT driver, seed 1, at f20a82f: 0 of 10 pass. engineering/next floor 0.00 of 10.
+
+| spec | product | where it stops | top failure |
+| --- | --- | --- | --- |
+| e01_rpi5_case | Raspberry Pi 5 | no recipe (nearest phone_case), asks | no finished part |
+| e02_flipper_zero_case | Flipper Zero | no recipe (nearest phone_case), asks | no finished part |
+| e03_power_bank_case | Anker A1388 10000 mAh | no recipe (nearest phone_case), asks | no finished part |
+| e04_airtag_case | Apple AirTag | no recipe (nearest phone_case), asks | no finished part |
+| e05_appletv_wall_holder | Apple TV 4K (3rd gen) | no recipe (nearest hook), asks | no finished part |
+| e06_iphone_desk_holder | iPhone 17 Pro | builds phone_stand | no engineering.json |
+| e07_mac_mini_mount | Mac mini (M4, 2024), 20 N | no recipe (nearest grommet), asks | no finished part |
+| e08_rpi4_vesa_adapter | Raspberry Pi 4 on VESA 75 | builds panel 75 x 75, 4.5 mm holes | no engineering.json |
+| e09_pot_knob | Bourns PTV09A-4020S-B103 | no recipe (nearest box), asks | no finished part |
+| e10_model_number_case | ABX00080 (UNO R4 Minima) | no recipe (nearest phone_case), asks | no finished part |
+
+Every run also fails "the part does not say where the product sits (no engineering.json)": no
+recipe writes the file yet.

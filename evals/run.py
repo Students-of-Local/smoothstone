@@ -312,7 +312,8 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         why = [] if not done and "?" in last else (["built a part with a made-up size"] if done else ["ended without asking"])
         return {"pass": not why, "why": why or ["asked for the size"], "recipe": recipe, "params": params,
                 "checks": [], "stl": None, "stl_sha256": None}
-    if recipe != exp["recipe"]:
+    # an engineering spec (evals/engineering) names the product and the job, not the recipe
+    if "recipe" in exp and recipe != exp["recipe"]:
         why.append(f"recipe {recipe} (want {exp['recipe']})")
     for k, want in exp.get("params", {}).items():
         got = params.get(k)
@@ -341,6 +342,10 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
                 why.append(f"starts in the air at a slicer's resolution: {air['detail']}")
     if exp.get("found"):
         why += grade_found(job, exp["found"])
+    eng = None
+    if spec.get("product"):
+        eng = engineering_grade().grade(job, spec, final if done else None)
+        why += eng["why"]
     col = None
     if exp.get("colors"):
         col = grade_colors(job, recipe, exp["colors"])
@@ -350,7 +355,17 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
            "checks": res, "stl": str(final) if done else None, "stl_sha256": stl_sha}
     if col is not None:
         out["colors"] = col
+    if eng is not None:
+        out["engineering"] = eng["measured"]
     return out
+
+
+def engineering_grade():
+    """evals/engineering_grade.py, for a spec with a product (evals/engineering)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import engineering_grade as eg
+
+    return eg
 
 
 def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> dict:

@@ -1,0 +1,56 @@
+{
+  "id": "e04_airtag_case",
+  "request": "a case for an Apple AirTag (the 2021 one)",
+  "input": "text",
+  "product": {
+    "name": "Apple AirTag (2021)",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf"
+    ],
+    "body": {
+      "w": 31.87,
+      "d": 31.87,
+      "h": 7.98,
+      "corner_r": 15.935
+    },
+    "body_sources": {
+      "w": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, AirTag Dimensional Drawings sheet 1, outer ring '\u00d8 31.87')",
+      "d": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, same '\u00d8 31.87'; the tag is round)",
+      "h": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, side view, top of dome '7.98' above datum '0.00' at the back plate)",
+      "corner_r": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, half of '\u00d8 31.87': a round body)"
+    },
+    "features": [
+      {
+        "name": "speaker_keepout",
+        "kind": "vent",
+        "face": "+z",
+        "c": [
+          15.935,
+          15.935
+        ],
+        "size": [
+          25.75,
+          25.75
+        ],
+        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, top view above the side view, third angle projection per title block: note 1 'SPEAKER KEEPOUT. DO NOT OBSTRUCT THIS AREA \u00d8 25.75', centered; note 1 'CASE SHOULD NOT OBSTRUCT ACOUSTIC AREA')"
+      }
+    ]
+  },
+  "expect": {
+    "kind": "case",
+    "material": "PETG",
+    "fit": "snug",
+    "retention": "snap",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+z",
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": []
+  },
+  "why": "Dome up (+z), steel back plate down: the case wraps the whole tag but must leave Apple's \u00d825.75 speaker keepout on the dome open; round body as a box with corner_r half the diameter."
+}

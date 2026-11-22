@@ -1,0 +1,96 @@
+{
+  "id": "e08_rpi4_vesa_adapter",
+  "request": "An adapter plate to screw a Raspberry Pi 4 Model B onto the back of a monitor through its VESA 75 mount (75 x 75 mm hole pattern, M4 screws).",
+  "input": "text",
+  "product": {
+    "name": "Raspberry Pi 4 Model B",
+    "sources": [
+      "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+      "https://pip-assets.raspberrypi.com/categories/545-raspberry-pi-4-model-b/documents/RP-008341-DS-1-raspberry-pi-4-datasheet.pdf",
+      "https://glenwing.github.io/docs/VESA-FDMI-1.1.pdf",
+      "https://vesa.org/mounting-standard/"
+    ],
+    "body": {
+      "w": 85.0,
+      "d": 56.0,
+      "h": 16.0,
+      "corner_r": 3.0
+    },
+    "body_sources": {
+      "w": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf top dimension '85' (same drawing as Figure 1 'Mechanical Dimensions' in the Pi 4 datasheet RP-008341)",
+      "d": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf right dimension '56'",
+      "h": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf tallest part label 'Z=16.0' on both USB stacks. The drawing does not say whether Z counts the PCB and gives no board thickness, so the real top may sit higher; h only places the open +z face",
+      "corner_r": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf callout 'CORNER RADIUS = 3.0mm'"
+    },
+    "features": [
+      {
+        "name": "mount_hole_front_left",
+        "kind": "slot",
+        "face": "-z",
+        "c": [
+          81.5,
+          3.5
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "drawing: hole center '3.5' from the left edge and '3.5' from the front edge, hole diameter '2.7' (callouts '6' and '2.7' at the hole by the micro HDMI ports); u = 85 - 3.5"
+      },
+      {
+        "name": "mount_hole_front_right",
+        "kind": "slot",
+        "face": "-z",
+        "c": [
+          23.5,
+          3.5
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "drawing: '3.5' plus hole spacing '58' along x gives x 61.5, '3.5' from the front edge, diameter '2.7'; u = 85 - 61.5"
+      },
+      {
+        "name": "mount_hole_back_left",
+        "kind": "slot",
+        "face": "-z",
+        "c": [
+          81.5,
+          52.5
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "drawing: '3.5' from the left edge, '3.5' plus hole spacing '49' along y gives y 52.5 (also '3.5' from the back edge), diameter '2.7'; u = 85 - 3.5"
+      },
+      {
+        "name": "mount_hole_back_right",
+        "kind": "slot",
+        "face": "-z",
+        "c": [
+          23.5,
+          52.5
+        ],
+        "size": [
+          2.7,
+          2.7
+        ],
+        "source": "drawing: x 3.5 + 58 = 61.5, y 3.5 + 49 = 52.5, diameter '2.7'; u = 85 - 61.5"
+      }
+    ]
+  },
+  "expect": {
+    "kind": "adapter",
+    "material": "PETG",
+    "fit": "slip",
+    "retention": "screw",
+    "safety": 2,
+    "covered": [],
+    "open": [
+      "+z"
+    ]
+  },
+  "why": "Pi 4 lying component side up on the plate (+z up, -z against the plate and monitor): tests an adapter that screws the board through its four 2.7 mm holes (58 x 49 mm) and carries the VESA MIS-D 75 pattern, 75 x 75 mm +/- 0.25 mm for M4 x 0.7 screws (VESA FDMI v1.1 sections 5.2.1 and 5.2.3), with the top left clear."
+}
