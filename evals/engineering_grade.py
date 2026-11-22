@@ -1223,6 +1223,91 @@ def _sweep(path: _LoadPath, part, at: np.ndarray, axis: np.ndarray, bd: np.ndarr
     return worst
 
 
+def _cut_stress(piece, p: np.ndarray, toward: np.ndarray, pts: np.ndarray, share: np.ndarray, load: np.ndarray,
+                bd: np.ndarray):
+    """The highest normal stress on the piece's face on the cut through p, per newton of the whole
+    load, MPa/N, under the shares at pts (all on the piece): their pull through the face's area and
+    their moment about its centroid, read by the face's own second moment of area in its plane, so a
+    cut whose face the load runs along is graded too. With the face's size along b_dir and square to
+    it, mm, and the moment per newton, mm; None when the piece has no face there."""
+    V, F = np.asarray(piece.vertices), np.asarray(piece.faces)
+    on = np.abs((V - p) @ toward) < 1e-3
+    cap = F[on[F].all(axis=1) & (np.asarray(piece.face_normals) @ toward < -0.99)]
+    if not len(cap):
+        return None
+    T = V[cap]
+    A = 0.5 * np.linalg.norm(np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]), axis=1)
+    area = float(A.sum())
+    if area < 1e-6:
+        return None
+    c = np.sum(A[:, None] * T.mean(axis=1), axis=0) / area
+    D = T - c
+    S = D.sum(axis=1)
+    J = (np.einsum("t,tvi,tvj->ij", A, D, D) + np.einsum("t,ti,tj->ij", A, S, S)) / 12  # integral of d d^T dA
+    m = -toward  # the face's outward normal
+    e1 = np.cross(m, bd)
+    if np.linalg.norm(e1) < 1e-6:
+        e1 = np.cross(m, [1.0, 0, 0] if abs(m[0]) < 0.9 else [0, 1.0, 0])
+    e1 /= np.linalg.norm(e1)
+    E = np.stack([e1, np.cross(m, e1)], axis=1)  # 3 x 2, the face's plane
+    J2 = E.T @ J @ E
+    if np.linalg.det(J2) <= 1e-12:
+        return None
+    f = float(share.sum()) * load  # the shares' pull on the piece, per newton
+    mom = np.sum(share[:, None] * np.cross(pts - c, load), axis=0)
+    mb = mom - (mom @ m) * m  # bending; twist about the normal is not graded here
+    # the face holds the piece: its stresses sum to -f and their moment to -mb
+    s0 = -float(f @ m) / area
+    a = np.linalg.solve(J2, E.T @ np.cross(-m, mb))
+    P = V[np.unique(cap)]
+    k = float(np.max(np.abs(s0 + ((P - c) @ E) @ a)))
+    return k, float(np.ptp(P @ bd)), float(np.ptp(P @ e1)), float(np.linalg.norm(mb))
+
+
+def _sweep_load(path: _LoadPath, part, at: np.ndarray, bd: np.ndarray) -> dict | None:
+    """The worst cut square to the load, on a part that hangs from screws: the part cut at stations
+    along the load from the farthest share to the farthest screw (SWEEP_PITCH apart, at most
+    SWEEP_MAX), and on each side of each cut every piece that carries a share (_LoadPath.carried)
+    graded on its whole cut face by _cut_stress. A side wall or a hanger the load runs down is cut
+    across here; the beam sweep (_sweep) cuts only square to the declared axis. {"s": the station
+    along the load from the declared section, "k": MPa per newton, "b", "h", "mom"} or None."""
+    import manifold3d as m3
+
+    if not len(path.H):
+        return None
+    load = path.load
+    u = np.concatenate([(path.pts - at) @ load, (path.H - at) @ load])
+    lo, hi = float(u.min()), float(u.max())
+    n = int(min(SWEEP_MAX, max(1, math.ceil((hi - lo) / SWEEP_PITCH))))
+    s_all = (path.pts - at) @ load
+    worst = None
+    for k in range(n + 1):
+        s = lo + (hi - lo) * k / max(n, 1) + SWEEP_SHIFT * (1 if k < n else -1)
+        p = at + load * s
+        for side in (1.0, -1.0):
+            toward = load * side
+            idx = np.flatnonzero((s_all - s) * side > 0)
+            if not len(idx):
+                continue
+            half, _ = part.split_by_plane(tuple(float(x) for x in toward), float(p @ toward))
+            for piece_m in half.decompose():
+                if piece_m.status() != m3.Error.NoError or piece_m.is_empty():
+                    continue
+                piece = _trimesh(piece_m)
+                if not len(piece.faces):
+                    continue
+                mine = idx[path.carried(piece, idx, p, toward)]
+                if not len(mine) or float(path.share[mine].sum()) <= 1e-9:
+                    continue
+                got = _cut_stress(piece, p, toward, path.pts[mine], path.share[mine], load, bd)
+                if got is None:
+                    continue
+                kk, b, h, mom = got
+                if worst is None or kk > worst["k"]:
+                    worst = {"s": round(float(s), 2), "k": kk, "b": b, "h": h, "mom": mom}
+    return worst
+
+
 def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarray | None = None,
                    fit: dict | None = None, holes: list | None = None, part=None) -> tuple[list[str], dict]:
     """Bending at the critical section. With the mesh, b and h are measured through the section's
@@ -1299,7 +1384,12 @@ def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarra
                         if weak is not None:
                             out["weakest"] = {"along_mm": weak["s"], "arm_mm": round(weak["arm"], 2),
                                               "cut_mm": [round(weak["b"], 2), round(weak["h"], 2)],
-                                              "z_mm3": round(weak["z"], 2)}
+                                              "z_mm3": round(weak["z"], 2), "k": weak["arm"] / weak["z"]}
+                        down = _sweep_load(path, part, at, bd)
+                        if down is not None and down["k"] > out.get("weakest", {}).get("k", 0.0):
+                            out["weakest"] = {"across_load": True, "along_mm": down["s"],
+                                              "moment_mm": round(down["mom"], 2),
+                                              "cut_mm": [round(down["b"], 2), round(down["h"], 2)], "k": down["k"]}
     # bending of a rectangle: sigma = M c / I, M = F arm, c = h / 2, I = b h^3 / 12, so 6 F arm / (b h^2)
     sigma = F * arm * (h / 2) / (b * h ** 3 / 12)
     allowed = STRENGTH[mat] * (ACROSS_LAYERS if across else 1.0) / safety
@@ -1310,9 +1400,13 @@ def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarra
                    f"allowed {allowed:.1f} MPa {rule}")
     weak = out.get("weakest")
     if weak:  # the load path swept: the weakest cut is graded whatever section was declared
-        ws = F * weak["arm_mm"] / weak["z_mm3"]
+        ws = F * weak.pop("k")
         weak["sigma_mpa"] = round(ws, 2)
-        if ws > allowed:
+        if ws > allowed and weak.get("across_load"):
+            why.append(f"strength: {ws:.1f} MPa at the weakest cut across the load, {weak['along_mm']:g} mm along it "
+                       f"from the declared section ({F:g} N, its moment {weak['moment_mm']:g} mm, on a cut "
+                       f"{weak['cut_mm'][0]:g} x {weak['cut_mm'][1]:g} mm), allowed {allowed:.1f} MPa {rule}")
+        elif ws > allowed:
             why.append(f"strength: {ws:.1f} MPa at the weakest cut on the load path, {weak['along_mm']:g} mm along the "
                        f"beam from the declared section ({F:g} N x {weak['arm_mm']:g} mm on a cut "
                        f"{weak['cut_mm'][0]:g} x {weak['cut_mm'][1]:g} mm), allowed {allowed:.1f} MPa {rule}")

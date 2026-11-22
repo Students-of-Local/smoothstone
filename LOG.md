@@ -420,3 +420,10 @@ part's surface. e01 gains the Pi 5's four mounting holes with Ø6 pads and a 1.0
 body (2.5 mm under the PCB), so a flat floor flush with the PCB fails; product holes are graded as
 screw seats only when the part screws to them, and their pads count for support. e01's w and
 usb_c_power sources cite the STEP URL they come from. e10 is still left for its own change.
+
+Review round 1 of PR 65: the sweep cut only square to the declared beam axis, so e07's cradle with
+its -x wall joined to the top through a 5 x 1.2 mm neck passed with a section at the lip root; every
+plane x = const through the neck took the whole wall with it. On a part that hangs from screws the
+part is now also cut square to the load, from the farthest share to the farthest screw, and each
+cut face is graded whole: the shares' pull over its area plus their moment over its own second
+moment of area. The neck reads 70 MPa against 23.5 allowed; a 20 x 3 neck 3.2, the whole wall 0.75.

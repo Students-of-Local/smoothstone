@@ -1054,6 +1054,40 @@ def test_the_weakest_cut_on_the_load_path_is_graded():
     assert why == [] and 2.0 < m["weakest"]["sigma_mpa"] < 3.5, (why, m)
 
 
+def mac_neck(t: float, wide: float):
+    """e07's cradle on flange screws with its -x side wall joined to the top only through a neck `t`
+    thick (x) and `wide` wide (y), at the Mac's middle (y 63.5), 1 to 6 mm under the top."""
+    sp, mesh, e = mac_mount(FLANGE_HOLES, flange=15.0)
+    h = sp["product"]["body"]["h"]
+    z0, z1 = h - 6.0, h - 1.0
+    m = eg._to_manifold(mesh) - _box([-3.4, -1, z0], [-0.3, 63.5 - wide / 2, z1]) - \
+        _box([-3.4, 63.5 + wide / 2, z0], [-0.3, 128, z1]) - _box([-3.4, 60, z0], [-0.3 - t, 67, z1])
+    return sp, _mesh(m), e
+
+
+def test_a_neck_the_load_runs_down_is_cut_across():
+    """Review r1 first-F1 of PR 65: e07's cradle with its -x wall joined to the top only through a
+    5 x 1.2 mm neck passed, with the section declared at the lip root (beam axis x): every cut was a
+    plane x = const, and the one through the neck took the whole 127 mm wall with it. The neck
+    carries the lip's half (10 N) about 8 mm out: about 70 MPa against 23.5. The part is now cut
+    square to the load too, from the shares to the screws, and each cut face graded whole."""
+    sec = {"at": [-1.8, 63.5, -1.8], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}
+    load = {"n": 20, "dir": "-z", "arm": 10, "b": 15, "h": 3, "across_layers": False, "section": sec}
+    sp, mesh, e = mac_neck(1.2, 5.0)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    _, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    why, m = eg.check_strength({"material": "PETG", "load": load}, sp, 2, mesh, np.eye(4), fit, good)
+    weak = [w for w in why if "at the weakest cut across the load" in w]
+    assert weak and "on a cut 5 x 1.2 mm" in weak[0], (why, m)
+    assert m["weakest"]["sigma_mpa"] > 50, m
+    # the whole wall carries it
+    sp, mesh, e = mac_mount(FLANGE_HOLES, flange=15.0)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    _, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    why, m = eg.check_strength({"material": "PETG", "load": load}, sp, 2, mesh, np.eye(4), fit, good)
+    assert why == [] and m["weakest"]["sigma_mpa"] < 10, (why, m)
+
+
 def test_the_load_is_shared_by_statics():
     """Review r2 first-F1: two bearing groups at x 0 (3 points) and x 10 (30), the load's line at x 5: each takes half,
     whatever its area; the line at x 7.5 puts three quarters on the group at 10."""
