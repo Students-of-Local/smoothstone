@@ -426,4 +426,7 @@ its -x wall joined to the top through a 5 x 1.2 mm neck passed with a section at
 plane x = const through the neck took the whole wall with it. On a part that hangs from screws the
 part is now also cut square to the load, from the farthest share to the farthest screw, and each
 cut face is graded whole: the shares' pull over its area plus their moment over its own second
-moment of area. The neck reads 70 MPa against 23.5 allowed; a 20 x 3 neck 3.2, the whole wall 0.75.
+moment of area. Its stress runs along the load, so a cut across a -z load is graded across the
+layers (x0.5) whatever layers the declared section lies in (review round 2): the neck reads 70 MPa
+against 11.75 allowed, a 15 x 1.5 neck 15 (it passed against 23.5 before), a 20 x 3 neck 3.2, the
+whole wall 0.75.

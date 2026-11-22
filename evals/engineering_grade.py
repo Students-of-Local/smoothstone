@@ -1387,7 +1387,9 @@ def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarra
                                               "z_mm3": round(weak["z"], 2), "k": weak["arm"] / weak["z"]}
                         down = _sweep_load(path, part, at, bd)
                         if down is not None and down["k"] > out.get("weakest", {}).get("k", 0.0):
-                            out["weakest"] = {"across_load": True, "along_mm": down["s"],
+                            # its stress runs along the load: across the layers when the load is
+                            out["weakest"] = {"across_load": True, "across_layers": across or abs(float(load[2])) > IN_LAYERS_TILT,
+                                              "along_mm": down["s"],
                                               "moment_mm": round(down["mom"], 2),
                                               "cut_mm": [round(down["b"], 2), round(down["h"], 2)], "k": down["k"]}
     # bending of a rectangle: sigma = M c / I, M = F arm, c = h / 2, I = b h^3 / 12, so 6 F arm / (b h^2)
@@ -1402,10 +1404,15 @@ def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarra
     if weak:  # the load path swept: the weakest cut is graded whatever section was declared
         ws = F * weak.pop("k")
         weak["sigma_mpa"] = round(ws, 2)
-        if ws > allowed and weak.get("across_load"):
+        down = weak.get("across_layers", across)  # a cut across the load reads its own layers
+        allowed_w = STRENGTH[mat] * (ACROSS_LAYERS if down else 1.0) / safety
+        rule_w = f"({mat} {STRENGTH[mat]:g} MPa" + (f", x{ACROSS_LAYERS} across layers" if down else "") + \
+            f", safety {safety:g})"
+        weak["allowed_mpa"] = round(allowed_w, 2)
+        if ws > allowed_w and weak.get("across_load"):
             why.append(f"strength: {ws:.1f} MPa at the weakest cut across the load, {weak['along_mm']:g} mm along it "
                        f"from the declared section ({F:g} N, its moment {weak['moment_mm']:g} mm, on a cut "
-                       f"{weak['cut_mm'][0]:g} x {weak['cut_mm'][1]:g} mm), allowed {allowed:.1f} MPa {rule}")
+                       f"{weak['cut_mm'][0]:g} x {weak['cut_mm'][1]:g} mm), allowed {allowed_w:.1f} MPa {rule_w}")
         elif ws > allowed:
             why.append(f"strength: {ws:.1f} MPa at the weakest cut on the load path, {weak['along_mm']:g} mm along the "
                        f"beam from the declared section ({F:g} N x {weak['arm_mm']:g} mm on a cut "

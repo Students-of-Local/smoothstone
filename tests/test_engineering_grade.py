@@ -1061,7 +1061,7 @@ def mac_neck(t: float, wide: float):
     h = sp["product"]["body"]["h"]
     z0, z1 = h - 6.0, h - 1.0
     m = eg._to_manifold(mesh) - _box([-3.4, -1, z0], [-0.3, 63.5 - wide / 2, z1]) - \
-        _box([-3.4, 63.5 + wide / 2, z0], [-0.3, 128, z1]) - _box([-3.4, 60, z0], [-0.3 - t, 67, z1])
+        _box([-3.4, 63.5 + wide / 2, z0], [-0.3, 128, z1]) - _box([-3.4, 62.5 - wide / 2, z0], [-0.3 - t, 64.5 + wide / 2, z1])
     return sp, _mesh(m), e
 
 
@@ -1080,6 +1080,15 @@ def test_a_neck_the_load_runs_down_is_cut_across():
     weak = [w for w in why if "at the weakest cut across the load" in w]
     assert weak and "on a cut 5 x 1.2 mm" in weak[0], (why, m)
     assert m["weakest"]["sigma_mpa"] > 50, m
+    # review r2 first-F1: the neck is pulled across its layers (the load is the STL's -z), so it is
+    # graded against x0.5 whatever layers the declared section lies in: 15 x 1.5 reads about 15 MPa,
+    # under 23.5 in the layers but over 11.75 across them
+    sp, mesh, e = mac_neck(1.5, 15.0)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    _, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    why, m = eg.check_strength({"material": "PETG", "load": load}, sp, 2, mesh, np.eye(4), fit, good)
+    assert 11.75 < m["weakest"]["sigma_mpa"] < 23.5 and m["weakest"]["allowed_mpa"] == 11.75, m
+    assert [w for w in why if "at the weakest cut across the load" in w and "across layers" in w], why
     # the whole wall carries it
     sp, mesh, e = mac_mount(FLANGE_HOLES, flange=15.0)
     _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
