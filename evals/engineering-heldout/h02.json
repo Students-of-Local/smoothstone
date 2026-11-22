@@ -1,0 +1,36 @@
+{
+  "id": "h02",
+  "request": "TPU bumper for my AirTag (the original one) with a loop for a split ring",
+  "input": "text",
+  "product": {
+    "name": "Apple AirTag (1st generation)",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf",
+      "https://support.apple.com/en-us/111847"
+    ],
+    "body": {
+      "w": 31.87,
+      "d": 31.87,
+      "h": 7.98,
+      "corner_r": 15.935
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "case",
+    "material": "TPU",
+    "fit": "snug",
+    "retention": "friction",
+    "safety": 2,
+    "covered": [
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": [
+      "+z",
+      "-z"
+    ]
+  }
+}

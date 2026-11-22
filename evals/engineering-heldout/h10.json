@@ -1,0 +1,49 @@
+{
+  "id": "h10",
+  "request": "stand for an A2140",
+  "input": "model_number",
+  "product": {
+    "name": "Apple MagSafe Charger, model A2140",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/apple-magsafe-charger.pdf"
+    ],
+    "body": {
+      "w": 55.9,
+      "d": 55.9,
+      "h": 5.3,
+      "corner_r": 27.95
+    },
+    "features": [
+      {
+        "name": "cable exit",
+        "kind": "slot",
+        "face": "-y",
+        "c": [
+          27.95,
+          2.65
+        ],
+        "size": [
+          3.94,
+          5.3
+        ],
+        "plug": [
+          12.35,
+          6.49
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "kind": "holder",
+    "material": "PLA",
+    "fit": "slip",
+    "retention": "none",
+    "safety": 2,
+    "covered": [
+      "-z"
+    ],
+    "open": [
+      "+z"
+    ]
+  }
+}

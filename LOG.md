@@ -357,3 +357,16 @@ the craft judge on the shape (judge_views). The craft judge moves about one poin
   on this code scored 8 with the same flecks named. Inde's 6 is
   the judge's reference pick (7 on round 5 with the same render path); Shane's 4 is his photos.
   Craft stops at 7 to 8 where the lift model leaves soft eyes and hands.
+
+## 2026-11-22 engineering held-out set sealed
+
+    a0838ab66ce66edf42a905beb8ac9937f1c4f670bc8701c207b0f2d947b95da4  evals/engineering-heldout/h01.json
+    d5246a2bda8fccda01243f7a11ff25628949c6fca1a9576c9beb512463ee8e2c  evals/engineering-heldout/h02.json
+    eba710061bde4c5bb61eb35021393b902ffb43ed56bd9b22eb30fbd21baa4676  evals/engineering-heldout/h03.json
+    2fa1931b14930262c8fe2fb7f304d173324ff871f8e751b92dd8b1533bc7a8a1  evals/engineering-heldout/h04.json
+    b5faf4b3cecc5661f19138e6e81b7d2e2065329892f19d80a1ac10183e82c11d  evals/engineering-heldout/h05.json
+    776df56677b3dbc33167078676e8abc53fed8109ba086f88c7ee72df7e12ca73  evals/engineering-heldout/h06.json
+    be375c41e179f4f6d99bd8b3e66cb40b883de95c21d7013e2e77d7e1b2b5ef6a  evals/engineering-heldout/h07.json
+    8c32f8cbb337e1cefc3da2863795ca429c9225f1f1faafc29962dfe677a2f860  evals/engineering-heldout/h08.json
+    b3b51284c955da007ca3f4724d8725955f795ca6926e900554ba55b87a59089f  evals/engineering-heldout/h09.json
+    4c2841fada22d16402d7a77fc87f81f075655ee9cce8c6d23b30415a0e1a095e  evals/engineering-heldout/h10.json
