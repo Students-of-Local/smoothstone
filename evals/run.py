@@ -1,7 +1,8 @@
 """Round 2 harness: one model, one tool (stone), one job folder per run.
 
-uv run python evals/run.py <spec.json> --seed N [--card S|M|L|none] [--driver lfm3|next]
-                          [--compact-at K] [--out DIR] [--server URL]
+uv run python evals/run.py <spec.json> --seed N [--card S|M|L|none]
+                          [--driver lfm3|next|openai|claude|codex] [--model M]
+                          [--base-url URL] [--api-key-env NAME] [--compact-at K] [--out DIR] [--server URL]
 
 Fixed for every condition (same as lfm3-3d-skill harness v3): 10 steps, 2048 new tokens per
 step, the model card's sampling, a cut step continues the same thought on the next step. Only
@@ -11,6 +12,8 @@ Drivers:
   lfm3  a llama.cpp server (raw chat template through /apply-template, then /completion)
   next  no model: runs stone status, then every NEXT line stone prints, until it stops. This
         is the baseline that shows what the tool does without any model.
+  openai, claude, codex  any OpenAI-compatible server, Claude Code and Codex on the person's own
+        sign-in (evals/drivers.py). Their condition is <driver>-<model>_card<card>.
 
 --compact-at K: after step K, every earlier turn is dropped. The model keeps only the system
 prompt and the request, plus a note that its context was compacted.
@@ -35,6 +38,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from smoothstone import check as checks  # noqa: E402
 from smoothstone import recipes as rc  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import drivers  # noqa: E402
 
 HARNESS = "r2.1 (v3 settings; one stone tool; lenient call parse; optional forced compaction)"
 MAX_STEPS = 10
@@ -136,16 +142,25 @@ def main():
     ap.add_argument("spec")
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--card", default="S", choices=["S", "M", "L", "none"])
-    ap.add_argument("--driver", default="lfm3", choices=["lfm3", "next"])
+    ap.add_argument("--driver", default="lfm3", choices=["lfm3", "next", *drivers.MODEL_DRIVERS])
     ap.add_argument("--compact-at", type=int, default=0)
     ap.add_argument("--out", default=str(ROOT.parent / "runs2"))
     ap.add_argument("--server", default="http://127.0.0.1:8091")
     ap.add_argument("--model-name", default="LFM3-1.7B Q4_K_M (LiquidAI/LFM3-1.7B-GGUF)")
+    ap.add_argument("--model", help="openai, claude, codex: the model (an alias like haiku works for claude)")
+    ap.add_argument("--base-url", default="http://127.0.0.1:8091/v1", help="openai: the server's /v1 address")
+    ap.add_argument("--api-key-env", help="openai: the environment variable that holds the key, if one is needed")
+    ap.add_argument("--cli-timeout", type=int, default=int(os.environ.get("STONE_CLI_TIMEOUT", "3600")),
+                    help="claude, codex: seconds for one phase")
     a = ap.parse_args()
+    if a.driver in drivers.MODEL_DRIVERS and not a.model:
+        ap.error(f"--driver {a.driver} needs --model")
+    if a.driver in ("claude", "codex") and a.compact_at:
+        ap.error(f"--compact-at needs a harness that holds the chat; {a.driver} holds its own")
 
     spec_path = Path(a.spec).resolve()
     spec = json.loads(spec_path.read_text())
-    cond = a.driver if a.driver == "next" else f"card{a.card}" + (f"_compact{a.compact_at}" if a.compact_at else "")
+    cond = drivers.cond_name(a.driver, a.card, a.compact_at, a.model)
     run_id = f"{spec['id']}__{cond}__s{a.seed}__{time.strftime('%Y%m%d-%H%M%S')}"
     rdir = Path(a.out) / run_id
     job = rdir / "job"
@@ -157,7 +172,7 @@ def main():
     # the environment, set up before the model starts: the job with the request (and pictures)
     setup, photos = setup_job(spec, spec_path, a.seed, env, rdir)
 
-    system = SYSTEM
+    system = SYSTEM + ("\n" + drivers.CLI_NOTE if a.driver in ("claude", "codex") else "")
     card_sha = None
     if a.card != "none":
         card = (ROOT / "skill" / "tiers" / f"{a.card}.md").read_text()
@@ -170,11 +185,16 @@ def main():
 
     log = {"run_id": run_id, "spec": spec["id"], "suite": spec_path.parent.name, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
            "seed": a.seed, "figure_seed": a.seed, "driver": a.driver, "card": a.card, "card_sha256": card_sha, "compact_at": a.compact_at,
-           "model": a.model_name if a.driver == "lfm3" else None, "sampling": SAMPLING if a.driver == "lfm3" else None,
+           "model": a.model_name if a.driver == "lfm3" else a.model, "sampling": SAMPLING if a.driver == "lfm3" else
+           drivers.OPENAI_SAMPLING if a.driver == "openai" else None,
            "harness": HARNESS, "max_steps": MAX_STEPS, "max_new_tokens": MAX_NEW, "setup": setup,
            "system_sha256": sha(system.encode()), "steps": [], "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     if photos:
         log["photos"] = photos
+    if a.driver == "openai":
+        log.update({"base_url": a.base_url, "api_key_env": a.api_key_env})  # the variable's name, never its value
+    if a.driver in ("claude", "codex"):
+        log.update({"cli_timeout": a.cli_timeout, "cli": []})
     t0 = time.time()
     pending = ""
     nxt = "stone status"
@@ -183,6 +203,7 @@ def main():
     # a follow-up is the person asking for a change after the model stopped: the same chat goes on
     says = [None] + [f["say"] for f in spec.get("followups", [])]
     first = None  # an "asks" spec with follow-ups: the first phase must end in a question, not a part
+    session = None  # claude and codex: the CLI's session, resumed for a follow-up
     for phase, say in enumerate(says):
         if phase == 1 and spec["expect"].get("asks"):
             first = grade_job(job, spec, messages)
@@ -190,9 +211,12 @@ def main():
             messages.append({"role": "user", "content": say})
             nxt = "stone status"
             print(f"   person: {say}", flush=True)
+        if a.driver in ("claude", "codex"):
+            session = cli_run(a, log, messages, system, say or user, env, job, rdir, phase, session)
+            continue
         for step in range(1, MAX_STEPS + 1):
             st = {"step": step, "phase": phase, "t": round(time.time() - t0, 2)}
-            if a.compact_at and step == a.compact_at + 1 and a.driver == "lfm3":
+            if a.compact_at and step == a.compact_at + 1 and a.driver in ("lfm3", "openai"):
                 messages = [{"role": "system", "content": system}, {"role": "user", "content": user + "\n\n" + COMPACTED}]
                 pending = ""
                 st["compacted"] = True
@@ -204,6 +228,22 @@ def main():
                     break
                 calls = [{"id": f"n{step}", "type": "function", "function": {"name": "stone", "arguments": json.dumps({"command": nxt})}}]
                 am = {"role": "assistant", "content": "", "tool_calls": calls}
+            elif a.driver == "openai":
+                r = drivers.openai_step(a.base_url, a.model, messages, TOOLS, a.seed, MAX_NEW, a.api_key_env)
+                calls = r["tool_calls"]
+                st.update({"generated": r["content"], "finish_reason": r["finish_reason"], "usage": r["usage"]})
+                if r["reasoning"]:
+                    st["reasoning"] = r["reasoning"]
+                am = {"role": "assistant", "content": r["content"]}
+                if calls:
+                    am["tool_calls"] = calls
+                if r["finish_reason"] == "length" and not calls:
+                    # a cut turn: kept in the chat, and the model goes on from it on the next step
+                    messages.append(am)
+                    st["tool_calls"] = []
+                    log["steps"].append(st)
+                    print(f"{step:>2} (cut at {MAX_NEW} tokens, continues)", flush=True)
+                    continue
             else:
                 prompt = _post(a.server, "/apply-template", {"messages": messages, "tools": TOOLS})["prompt"] + pending
                 r = _post(a.server, "/completion", {"prompt": prompt, "n_predict": MAX_NEW, "seed": a.seed, "stop": ["<|im_end|>"],
@@ -258,6 +298,25 @@ def main():
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
     print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
+
+
+def cli_run(a, log: dict, messages: list, system: str, prompt: str, env: dict, job: Path, rdir: Path,
+            phase: int, session: str | None) -> str | None:
+    """One phase through claude or codex: its transcript joins the messages and steps, its call
+    (the prompt and card left out), exit, time and error join log["cli"]. Returns the session."""
+    got = drivers.cli_phase(a.driver, a.model, system, prompt, env, Path(STONE).parent, job, rdir, phase,
+                            session, a.cli_timeout)
+    messages += got["messages"]
+    log["steps"] += got["steps"]
+    log["cli"].append({k: got[k] for k in ("argv", "exit", "seconds", "error", "usage", "session", "init", "stderr")})
+    for st in got["steps"]:
+        for c in st["tool_calls"]:
+            res = c["result"] or ""
+            print(f"{st['step']:>2} {str(c['args'].get('command', '?'))[:70]}  ->  "
+                  f"{(last_next(res) or (res.splitlines() or [''])[-1])[:60]}", flush=True)
+    if got["error"]:
+        print(f"   {a.driver}: {got['error'][:200]}", flush=True)
+    return got["session"] or session
 
 
 def held_back(spec: dict, spec_path: Path, seed: int) -> tuple[list[Path], Path | None]:
@@ -491,6 +550,8 @@ def score_line(log: dict) -> dict:
     line = {"date": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sha": head, "suite": log.get("suite"),
             "spec": log["spec"], "card": log["card"], "driver": log["driver"], "pass": int(bool(log["pass"])),
             "total": 1, "judge": log.get("judge"), "likeness": log.get("likeness"), "run": log["run_id"]}
+    if log["driver"] in drivers.MODEL_DRIVERS:  # lfm3 and next lines stay as they were
+        line.update({"model": log.get("model"), "condition": log.get("condition")})
     return line
 
 

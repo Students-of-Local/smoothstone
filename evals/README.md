@@ -47,6 +47,53 @@ counts as card "next"), the best pass rate and mean judge score so far and the s
 - A spec with `"colors": {"black": ["jacket"], "rest": "white"}` checks the painted 3MF: it reads back
   clean, its color edges pass, and every part prints in the color asked for.
 
+## Drivers: one harness for every model class
+
+`evals/run.py` runs a spec with a driver. Every driver gets the same request, the same card
+(`--card S|M|L|none`, its sha256 in the log), the same job made by `stone new` before the model
+starts, and the same grading: the part and build files left in the job. Each log records the
+driver, the model, the card's sha256 and the wall time (`seconds`).
+
+- `lfm3` (default): LFM3-1.7B on a llama.cpp server, a raw chat template through `/apply-template`
+  and `/completion`, tool calls read from the `<tool_call>` text. Condition `cardS`, or
+  `cardS_compact4` with `--compact-at 4`.
+
+  `uv run python evals/run.py evals/tuning/t1_fan_guard.json --seed 1 --server http://127.0.0.1:8091`
+- `next`: no model; runs every NEXT line stone prints. Condition `next`.
+
+  `uv run python evals/run.py evals/tuning/t1_fan_guard.json --seed 1 --driver next`
+- `openai`: any OpenAI-compatible `/v1/chat/completions` server with native tool calling (llama.cpp
+  server, LM Studio, Ollama, vLLM), for small and large local models. The same one `stone` tool and
+  10 step budget as `lfm3`, temperature 0.1 and the run's seed. `--api-key-env NAME` sends the key in
+  that variable as a Bearer header; the log keeps the variable's name, never the key.
+
+  `uv run python evals/run.py evals/tuning/t1_fan_guard.json --seed 1 --driver openai --base-url http://127.0.0.1:11434/v1 --model hf.co/LiquidAI/LFM3-1.7B-GGUF:Q4_K_M`
+- `claude`: Claude Code headless on the person's own sign-in. The driver always removes
+  `ANTHROPIC_API_KEY` from its environment, so a run can never bill the API; the log's
+  `cli[].init.apiKeySource` says `none` when it ran on the sign-in. Bash is its only tool, only
+  `stone` commands are allowed (`--allowedTools "Bash(stone:*)" --permission-mode dontAsk`), and
+  `--safe-mode` keeps the person's CLAUDE.md, skills, hooks and MCP servers out, so the card
+  (`--append-system-prompt`) is its only instruction. It runs in the job folder.
+
+  `uv run python evals/run.py evals/tuning/t1_fan_guard.json --seed 1 --driver claude --model haiku`
+- `codex`: `codex exec -s workspace-write -C <job>` on the person's own sign-in (`OPENAI_API_KEY` and
+  `CODEX_API_KEY` removed), the card ahead of the request.
+
+  `uv run python evals/run.py evals/tuning/t1_fan_guard.json --seed 1 --driver codex --model gpt-6.1-sol`
+
+A model driver's condition is `<driver>-<model>_card<card>` (the model lower case, other characters
+a dash), for example `claude-haiku_cardS` or `openai-qwen3-8b_cardM`, so `summary.py` gives each
+driver and model its own column. Its line in `scores.jsonl` adds `model` and `condition`. The `lfm3`
+and `next` conditions, logs and score lines are as they were.
+
+For `claude` and `codex` the CLI holds the chat: its stream (`claude_stream0.jsonl`,
+`codex_stream0.jsonl` in the run folder; one per follow-up, which resumes the session) is read back
+into the same `messages` and `steps` the other drivers log, and `log["cli"]` keeps the call (the
+request and card left out), its exit, time and any error. Neither CLI has a step limit, so its step
+count is recorded, not capped at 10. `--cli-timeout` (default 3600 s, or `STONE_CLI_TIMEOUT`) stops
+a phase that runs too long, with every process it started. `--compact-at` works for `lfm3` and
+`openai` only.
+
 ## The teacher loop
 
 A failing run says something is wrong, not where. `uv run python evals/distill.py <runs dir> ...`

@@ -19,11 +19,14 @@ if "--json" in sys.argv:
     sys.exit()
 conds = sorted({c for _, c in tab})
 specs = sorted({s for s, _ in tab})
-print("spec".ljust(18) + "".join(c.ljust(18) for c in conds))
+# a model driver's condition names the driver and the model (openai-qwen3-8b_cardS): a column
+# wide enough for it, and 18 as before when every name fits
+W = max([18] + [len(c) + 2 for c in conds])
+print("spec".ljust(18) + "".join(c.ljust(W) for c in conds))
 for s in specs:
-    print(s.ljust(18) + "".join((f"{tab[(s, c)][0]}/{tab[(s, c)][1]}" if (s, c) in tab else "-").ljust(18) for c in conds))
+    print(s.ljust(18) + "".join((f"{tab[(s, c)][0]}/{tab[(s, c)][1]}" if (s, c) in tab else "-").ljust(W) for c in conds))
 tot = {c: [sum(tab[(s, c)][i] for s in specs if (s, c) in tab) for i in (0, 1)] for c in conds}
-print("total".ljust(18) + "".join(f"{a}/{b}".ljust(18) for a, b in tot.values()))
+print("total".ljust(18) + "".join(f"{a}/{b}".ljust(W) for a, b in tot.values()))
 for k, v in fails.items():
     print(f"\n{k[0]} {k[1]}:")
     for x in v:
