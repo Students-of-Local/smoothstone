@@ -430,3 +430,49 @@ moment of area. Its stress runs along the load, so a cut across a -z load is gra
 layers (x0.5) whatever layers the declared section lies in (review round 2): the neck reads 70 MPa
 against 11.75 allowed, a 15 x 1.5 neck 15 (it passed against 23.5 before), a 20 x 3 neck 3.2, the
 whole wall 0.75.
+
+## 2026-11-22 climb 1: a fitted case from a product catalog
+
+The first step up the engineering suite. Stone now has a product catalog,
+src/smoothstone/products/<slug>.json, one file per product: the product block of its engineering
+spec word for word (name, body, body_sources, features, sources) plus the names and model numbers
+people type (aliases, ABX00080 included), which faces must stay open, and for a board where its PCB
+sits. These ten products are the tuning set. Products for a held-out set come later and must not be
+tuned on.
+
+A new recipe, fitted_case, builds a tray case from a catalog product: a window for every feature
+the maker locates on a walled side (its plug or opening plus 0.5 mm), open faces where the maker
+locates nothing, standoffs on a board's hole pads (or two ledges under its short ends) 2.75 mm over
+the floor for the leads, a clearance per side inside the grader's band (PLA slip 0.3, snug 0.15,
+TPU snug 0.1 interference), and retention none, friction, or two snap arms cut free from opposite
+walls (strain at 75% of the limit). The build writes build/engineering.json from what the OpenSCAD
+echoes it built, with the URL the catalog cites for every size. The request picks the product
+(stone show says "Product: <name> (catalog, sourced: ...)"); a product not in the catalog gets a
+question for its width, depth and height and which faces have ports, never a guess. It ranks first
+only when the request names a catalog product, so iPhone cases stay phone_case. It learns from two
+open designs: YAPP_Box (MIT, https://github.com/mrWheel/YAPP_Box) for per-face center-and-size
+cutouts, no code copied; BOSL2 (BSD-2, vendored) is the library it may
+build on, unused so far.
+
+NEXT driver, seed 1, before (origin/main 887ef71, and the 7e38f42 table above for e04 to e09) and after:
+
+| spec | before | after | after: top failure |
+| --- | --- | --- | --- |
+| e01_rpi5_case | no recipe, asks | pass | |
+| e02_flipper_zero_case | no recipe, asks | pass | |
+| e03_power_bank_case | no recipe, asks | pass | |
+| e04_airtag_case | no recipe, asks | asks: the catalog has the AirTag, a tray cannot hold its dome | no finished part |
+| e05_appletv_wall_holder | no recipe, asks | builds a fitted_case tray | attach: no M4 holes to screw it to the wall |
+| e06_iphone_desk_holder | phone_stand | phone_stand | no engineering.json |
+| e07_mac_mini_mount | no recipe, asks | no recipe, asks | no finished part |
+| e08_rpi4_vesa_adapter | panel | panel | no engineering.json |
+| e09_pot_knob | no recipe, asks | no recipe, asks | no finished part |
+| e10_model_number_case | no recipe, asks | pass | |
+
+4 of 10. The floor in evals/floor.json is left for the lead to raise.
+
+Known gap: e01's snap arms sit on the -y and +y walls at x 64.5 and catch over the body box's top
+edge (18.98 mm, the USB stack's top). The grader measures the arms in the mesh and passes them, but
+on the real board nothing that tall stands near those edges: the catches hook air and the board can
+lift off its standoffs. A catch over the PCB's own edge needs the PCB's thickness, which the spec
+does not give, and would sit inside the body box, which the grader forbids.
