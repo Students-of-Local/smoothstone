@@ -446,8 +446,10 @@ def test_vesa_adapter_flat_plate_with_no_holes_fails():
     mesh, e = pi4_plate(vesa_shift=1.0)
     why, _ = eg.check_holes(mesh, sp, e, np.eye(4), fit)
     assert [w for w in why if w.startswith("holes: vesa_75:")], why
-    # a plate far under the board, holes and all, gives the board nothing to bear on
+    # a plate far under the board, holes and all, gives a self-tapping screw nothing to bear on (a
+    # through hole is found wherever the plate is: test_pi4_plate_on_bought_standoffs_passes)
     mesh, e = pi4_plate(standoffs=False)
+    assert e["retention"]["method"] == "self_tap"
     why, _ = eg.check_holes(mesh, sp, e, np.eye(4), fit)
     assert len([w for w in why if "nothing to bear on" in w]) == 4, why
     del e["part_holes"]
@@ -650,16 +652,20 @@ def test_run_still_wants_the_recipe_of_a_non_engineering_spec(tmp_path):
         run.grade_job(job, {"id": "t0_typo", "request": "a box", "expect": {"recipe_typo": "box"}}, [])
 
 
-def pi5_case(post_top: float = 1.45):
-    """A PLA case for e01's Pi 5 on four Ø6 standoffs up to the PCB underside (frame z 1.45, above
-    the microSD socket that sets the body's -z), floor 2 mm under the body, walls 0.3 off the sides,
-    top open."""
+PI5_HOLES = [(3.95, 5.13), (61.95, 5.13), (3.95, 54.13), (61.95, 54.13)]  # e01's frame: board + 0.45, + 1.63
+
+
+def pi5_case(post_top: float = 1.45, floor_top: float = -2.0):
+    """A PLA case for e01's Pi 5 on four Ø6 standoffs at its mounting holes, up to the PCB underside
+    (frame z 1.45, above the microSD socket that sets the body's -z), floor top at `floor_top` (2 mm
+    under the body), walls 0.3 off the sides, top open."""
     sp = spec("e01_rpi5_case")
     w, d, h = (sp["product"]["body"][k] for k in ("w", "d", "h"))
     case = _box([-2.3, -2.3, -4.0], [w + 2.3, d + 2.3, h]) - _box([-0.3, -0.3, -2.0], [w + 0.3, d + 0.3, h + 1])
-    for x in (12.0, w - 12.0):
-        for y in (8.0, d - 8.0):
-            case = case + _cyl(x, y, -2.5, post_top, 3.0)
+    if floor_top > -2.0:  # a floor flat across the underside, stopping 0.01 mm inside the side faces
+        case = case + _box([0.01, 0.01, -2.01], [w - 0.01, d - 0.01, floor_top])
+    for x, y in PI5_HOLES:
+        case = case + _cyl(x, y, -2.5, post_top, 3.0)
     return sp, _mesh(case)
 
 
@@ -668,7 +674,7 @@ def test_pi5_case_on_standoffs_passes():
     reach the PCB 1.45 mm above it read as inside the product and a normal Pi case failed."""
     sp, mesh = pi5_case()
     why, fit = eg.check_fit(mesh, sp, np.eye(4), "PLA")
-    assert not [w for w in why if w.startswith("fit: ") and "inside the part" in w], why
+    assert why == [], why
     sw, out = eg.check_support(sp, fit)
     assert sw == [], (sw, out)
     old = {**sp, "expect": {**sp["expect"], "covered": sp["expect"]["covered"] + ["-z"], "face_gap": {}}}
@@ -933,6 +939,8 @@ def test_sources_are_tied_to_their_number():
     src = {k: drawing for k in ["w", "d", "corner_r"] + [f["name"] for f in e01["product"]["features"]]}
     src.update(h=step, microsd_slot=step)
     assert eg.check_sources({"sources": src}, e01) == []
+    # review r2 first-F2: the STEP is where w's 88.5 and usb_c_power's v and size come from
+    assert eg.check_sources({"sources": {**src, "w": step, "usb_c_power": step}}, e01) == []
     src["usb_c_power"] = iphone  # its own source cites Apple's USB-C keepout
     assert eg.check_sources({"sources": src}, e01) == []
     src["w"] = iphone
@@ -1008,3 +1016,139 @@ def test_wall_holder_carries_its_load():
     assert e05["expect"]["load_n"] >= 10 and e05["expect"]["load_dir"] == "-z"
     why, _ = eg.check_strength({"material": "PLA"}, e05, 2)
     assert why == ["strength: no load in engineering.json (the spec asks 10 N)"]
+
+
+# --- review round 2 of PR 64 (review-r2), each on a part built by hand ------------------------------
+
+def mac_strap(t: float, wide: float):
+    """e07's cradle on flange screws with its -x lip cut to a strap `t` thick and `wide` wide, under
+    the Mac's middle (y 63.5), out 15 mm from the -x wall."""
+    sp, mesh, e = mac_mount(FLANGE_HOLES, flange=15.0)
+    m = eg._to_manifold(mesh) - _box([-0.3, -1, -4.0], [15.5, 63.5 - wide / 2, 0.0]) - \
+        _box([-0.3, 63.5 + wide / 2, -4.0], [15.5, 128, 0.0]) - _box([-0.3, 60, -4.0], [15.5, 67, -0.3 - t])
+    return sp, _mesh(m), e
+
+
+def test_the_weakest_cut_on_the_load_path_is_graded():
+    """Review r2 first-F1: on e07's cradle with its -x lip cut to a 1.2 x 5 mm strap, a section
+    declared in the thick -x wall (h 50) passed strength, though the strap's root carries half the
+    Mac (the far lip the other half) 7.5 mm out: about 60 MPa against 23.5 allowed. The load is now
+    shared by statics, not by bearing area, and every cut from the declared section out to the
+    bearing points and on to the screws is graded on its own cut face."""
+    sp, mesh, e = mac_strap(1.2, 5.0)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    assert eg.check_support(sp, fit)[0] == []
+    _, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    sec = {"at": [-1.8, 63.5, -1.8], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}
+    load = {"n": 20, "dir": "-z", "arm": 10, "b": 5, "h": 50, "across_layers": False, "section": sec}
+    why, m = eg.check_strength({"material": "PETG", "load": load}, sp, 2, mesh, np.eye(4), fit, good)
+    weak = [w for w in why if w.startswith("strength: ") and "at the weakest cut on the load path" in w]
+    assert weak and "on a cut 5 x 1.2 mm" in weak[0], (why, m)
+    assert m["weakest"]["sigma_mpa"] > 50, m  # about 10 N at 7 mm on 5 x 1.2^2 / 6
+    # a strap 20 x 3 carries it: 10 N x 7.5 mm on 20 x 3^2 / 6 is 2.5 MPa
+    sp, mesh, e = mac_strap(3.0, 20.0)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    _, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    ok = {**load, "b": 20, "h": 3, "section": {**sec, "at": [0.0, 63.5, -1.8]}}
+    why, m = eg.check_strength({"material": "PETG", "load": ok}, sp, 2, mesh, np.eye(4), fit, good)
+    assert why == [] and 2.0 < m["weakest"]["sigma_mpa"] < 3.5, (why, m)
+
+
+def test_the_load_is_shared_by_statics():
+    """Review r2 first-F1: two bearing groups at x 0 (3 points) and x 10 (30), the load's line at x 5: each takes half,
+    whatever its area; the line at x 7.5 puts three quarters on the group at 10."""
+    pts = np.array([[0, y, 0] for y in (13.5, 14.5, 15.5)] + [[10, y, 0] for y in range(30)], float)
+    z = np.array([0, 0, -1.0])
+    w = eg._statics(pts, np.array([5.0, 14.5, 9.0]), z)
+    assert w[:3].sum() == pytest.approx(0.5, abs=1e-6) and w.sum() == pytest.approx(1.0)
+    w = eg._statics(pts, np.array([7.5, 14.5, 9.0]), z)
+    assert w[3:].sum() == pytest.approx(0.75, abs=1e-6)
+
+
+def test_pi5_flat_floor_under_the_board_fails():
+    """Review r2 second-F6: a Pi 5 case whose floor runs flat across the underside 1.45 mm up into the
+    body's box, flush with the PCB, passed support and fit, though it fills the microSD socket's and
+    the leads' room. e01 now has the four mounting holes with their Ø6 pads, and outside them the
+    part stays 1.05 mm under the body (2.5 mm under the PCB); standoffs on the pads still pass."""
+    sp, mesh = pi5_case(floor_top=1.45)
+    why, fit = eg.check_fit(mesh, sp, np.eye(4), "PLA")
+    assert [w for w in why if w.startswith("clear: ") and "of -z have the part" in w], why
+    assert eg.check_support(sp, fit)[0] == []  # it bears; it is the clearance that fails
+    sp, mesh = pi5_case()
+    why, fit = eg.check_fit(mesh, sp, np.eye(4), "PLA")
+    assert why == [] and eg.check_support(sp, fit)[0] == [], why
+    # the pads are where the standoffs bear: support counts them
+    assert all(q >= eg.SUPPORT_MM2 for q in eg.check_support(sp, fit)[1]["quarters_mm2"])
+    # a snap case is not graded as a screw seat on the product's holes; its standoffs need no bore
+    assert eg.check_holes(mesh, sp, {"retention": {"type": "snap"}}, np.eye(4), fit)[0] == []
+
+
+def bought_standoff_plate(holes: bool = True, window: bool = False):
+    """e08's plate for bought M2.5 brass standoffs: a flat 3 mm PETG plate 5 mm under the Pi 4 (z -8 to
+    -5), no printed standoffs, Ø2.9 clearance holes through it under the board's four holes, the VESA
+    75 holes, and with `window` a cutout under the front left hole."""
+    mesh, e = pi4_plate(pi_holes=False, standoffs=False)
+    plate = eg._to_manifold(mesh)
+    at = []
+    for x in (3.5, 61.5):
+        for y in (3.5, 52.5):
+            if holes:
+                plate = plate - _cyl(x, y, -9.0, 1.0, 2.9 / 2)
+            at.append({"at": [x, y, -8.0], "axis": [0, 0, 1]})
+    if window:
+        plate = plate - _box([-2.0, -2.0, -9.0], [9.0, 9.0, -4.0])
+    e["retention"] = {"type": "screw", "size": "M2.5", "method": "through", "hole_d": 2.9, "holes": at}
+    return _mesh(plate), e
+
+
+def test_pi4_plate_on_bought_standoffs_passes():
+    """Review r2 second-F4: a flat plate on bought M2.5 standoffs with Ø2.9 clearance holes, the
+    commonest Pi mount, failed check_holes four times ("nothing to bear on"), since the seat was looked
+    for only 1.45 mm under the board. A through hole is now found along its axis wherever the part
+    is: clear through that wall, with the part around it there."""
+    sp = spec("e08_rpi4_vesa_adapter")
+    mesh, e = bought_standoff_plate()
+    why, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    assert why == [], why
+    hw, out = eg.check_holes(mesh, sp, e, np.eye(4), fit)
+    assert hw == [], (hw, out)
+    assert out["mount_hole_front_left"]["from_mm"] == pytest.approx(4.95, abs=0.05)
+    assert out["mount_hole_front_left"]["wall_mm"] == pytest.approx(3.0, abs=0.05)
+    assert eg.check_retention_mesh(mesh, e) == []
+    assert eg.check_retention(e | {"material": "PETG"}, sp) == []
+    # the plate without the holes: the bore now reaches the plate, 5 mm down
+    mesh, e = bought_standoff_plate(holes=False)
+    hw, _ = eg.check_holes(mesh, sp, e, np.eye(4), fit)
+    assert len([w for w in hw if "has no hole in the part" in w and "clear through the part's wall" in w]) == 4, hw
+    # no plate under a hole: nothing for its standoff to stand on
+    mesh, e = bought_standoff_plate(window=True)
+    hw, _ = eg.check_holes(mesh, sp, e, np.eye(4), fit)
+    assert hw == ["holes: mount_hole_front_left has nothing to bear on: no part under it along its axis"], hw
+
+
+def test_a_through_bolt_in_a_thin_wall_passes():
+    """Review r2 second-F5: an M3 bolt through a sound 2.5 mm wall failed "no part around it (42% of a
+    1.2 mm ring 6.0 mm deep)": the ring was probed 2 x d deep, past the wall. It is probed through
+    the wall the bolt passes now."""
+    for size, d, t in (("M3", 3.4, 2.5), ("M2.5", 2.9, 2.0)):
+        block = _mesh(_box([0, 0, 0], [20, 20, t]) - _cyl(10, 10, -1.0, t + 1.0, d / 2))
+        ret = {"type": "screw", "size": size, "method": "through", "hole_d": d,
+               "holes": [{"at": [10, 10, t], "axis": [0, 0, -1]}]}
+        assert eg.check_retention_mesh(block, {"retention": ret}) == [], (size, t)
+    # a wall with no hole is still no through hole
+    solid = _mesh(_box([0, 0, 0], [20, 20, 2.0]))
+    ret = {"type": "screw", "size": "M2.5", "method": "through", "hole_d": 2.9,
+           "holes": [{"at": [10, 10, 2.0], "axis": [0, 0, -1]}]}
+    assert eg.check_retention_mesh(solid, {"retention": ret})[0].startswith("retention: screw hole 0 is not in the part")
+
+
+def test_a_screw_hole_mouth_is_on_the_part():
+    """Review r2 second-F7: a through hole declared 1 mm under a solid plate, in the air, read the
+    1 mm of air as its wall: the bore was empty, and the plate had no hole. The mouth must lie on the
+    part's surface."""
+    plate = _mesh(_box([0, 0, 0], [20, 20, 3.0]) + _cyl(10, 10, 3.0, 9.0, 3.0))
+    ret = {"type": "screw", "size": "M2.5", "method": "through", "hole_d": 2.9,
+           "holes": [{"at": [10, 10, -1.0], "axis": [0, 0, 1]}]}
+    assert eg.check_retention_mesh(plate, {"retention": ret}) == [
+        "retention: screw hole 0's mouth [10.0, 10.0, -1.0] is not on the part's surface (beside it the part "
+        "must start there along its axis)"]
