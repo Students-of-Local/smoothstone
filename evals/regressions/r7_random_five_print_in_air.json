@@ -1,0 +1,13 @@
+{
+ "id": "r7_random_five_print_in_air",
+ "request": "A mini figure of Inde Navarrette, 90 mm tall, with \"INDE\" on the base",
+ "why": "Every round 6 figure of the random five passed stone's checks, yet cut into 0.2 mm layers each had pieces that start in mid air: hair locks, fingertips and hem edges thinner than brace's grid sees. Creality Print's CLI crashed on them. The owner's words: they also need to be PRINTABLE, and use the slicers' CLI or make our own.",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "INDE"
+  },
+  "slices": true
+ }
+}

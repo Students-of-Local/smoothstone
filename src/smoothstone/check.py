@@ -256,6 +256,19 @@ def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Resul
     if len(mesh.faces) == 0:
         return out
 
+    # the slicer pass needs nothing the other checks find, so it runs beside them; trimesh's
+    # caches it reads are filled here first, so the thread only reads them
+    from concurrent.futures import ThreadPoolExecutor
+
+    from . import slicer
+
+    mesh.bounds, mesh.triangles, mesh.faces
+    with ThreadPoolExecutor(1) as pool:
+        sliced = pool.submit(slicer.slice_mesh, mesh, bed=bed)
+        return _check_rest(mesh, out, sliced, recipe, params, bed, log, max_bodies, max_overhang)
+
+
+def _check_rest(mesh, out, sliced, recipe, params, bed, log, max_bodies, max_overhang) -> list[Result]:
     wt = bool(mesh.is_watertight)
     out.append(Result("watertight", wt, wt, "closed surface" if wt else "surface has holes",
                       advice="the surface has holes; go back to the default parameters"))
@@ -344,7 +357,7 @@ def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Resul
                       f"(max {max_overhang * 100:.0f}%)",
                       advice="too much of the part hangs in the air; add a chamfer or flip it"))
 
-    out.extend(layer_checks(mesh, recipe))
+    out.extend(layer_checks(mesh, recipe, bed, sliced.result()))
 
     if recipe is not None and recipe.dims:
         try:
@@ -365,19 +378,16 @@ def check_mesh(mesh, recipe=None, params=None, bed=None, log=None) -> list[Resul
     return out
 
 
-def layer_checks(mesh, recipe=None) -> list[Result]:
-    """What a slicer sees layer by layer: pieces that start in the air, and how far the part can
-    lean before it tips over."""
-    from . import printable
+def layer_checks(mesh, recipe=None, bed=None, rep=None) -> list[Result]:
+    """What a slicer sees layer by layer (slicer.py, at a slicer's own resolution): pieces that
+    start in the air, cross-sections that do not close, and how far the part can lean before it
+    tips over."""
+    from . import printable, slicer
 
-    grid = printable.occupancy(mesh)
-    if grid is None:
-        return [Result("islands", True, None, "skipped (no ray engine)"),
-                Result("tipping", True, None, "skipped (no ray engine)")]
     out = []
-    big = [i for i in printable.islands(grid) if i.area >= printable.ISLAND_MIN]
-    big.sort(key=lambda i: -i.area)
-    spots = "; ".join(f"{i.area:.1f} mm2 at {printable.where(i, mesh)}" for i in big[:4])
+    rep = rep or slicer.slice_mesh(mesh, bed=bed)
+    big = sorted((p for p in rep.problems if p.kind == "floating"), key=lambda p: -p.area)
+    spots = "; ".join(f"{p.area:.1f} mm2 at {p.z:.1f} mm up (x {p.where[0]}, y {p.where[1]})" for p in big[:4])
     if not big:
         out.append(Result("islands", True, 0, "every layer stands on the one below"))
     elif recipe is not None and recipe.supports:
@@ -387,6 +397,18 @@ def layer_checks(mesh, recipe=None) -> list[Result]:
         out.append(Result("islands", False, len(big), f"{len(big)} pieces start in the air: {spots}",
                           advice="a piece starts in mid-air and would print onto nothing; give it a "
                                  "45 degree chamfer from below or turn the part so it grows from the bed"))
+    bad = [p for p in rep.problems if p.kind == "open"]
+    ledges = [p for p in rep.problems if p.kind == "ledge"]
+    note = f"{rep.layers} layers of {rep.layer} mm; {rep.dropped} mm2 too thin for a {rep.nozzle} mm nozzle"
+    if ledges:
+        note += f"; {len(ledges)} ledges may sag (worst {max(p.area for p in ledges):.1f} mm2 at {ledges[0].z:.1f} mm up)"
+    out.append(Result("sliced", not bad, len(bad),
+                      f"{len(bad)} layers do not close, first at {bad[0].z:.1f} mm up" if bad else note,
+                      advice="a cross-section does not close, so the slicer guesses the inside; rebuild the part"))
+    grid = printable.occupancy(mesh)
+    if grid is None:
+        out.append(Result("tipping", True, None, "skipped (no ray engine)"))
+        return out
     angle = printable.tip_angle(mesh, grid)
     if angle is None:
         out.append(Result("tipping", True, None, "skipped (nothing on the bed)"))

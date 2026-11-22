@@ -333,6 +333,12 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         bad = [x["name"] for x in res if not x["ok"]]
         if bad:
             why.append("print checks fail: " + ", ".join(bad))
+        if exp.get("slices"):
+            # printable with supports off: no piece the slicer pass finds in the air, even where
+            # the recipe allows slicer supports (a figure)
+            air = next((x for x in res if x["name"] == "islands"), None)
+            if air and air["value"]:
+                why.append(f"starts in the air at a slicer's resolution: {air['detail']}")
     if exp.get("found"):
         why += grade_found(job, exp["found"])
     col = None

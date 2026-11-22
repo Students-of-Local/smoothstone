@@ -455,3 +455,21 @@ def test_rejudge_takes_a_description_run_to_the_traits_judge(tmp_path, monkeypat
     log = rejudge.rejudge(rdir)
     assert log["pass"] and log["traits"] == f"{n}/{n}" and sorted(asked[-1]["files"]) == ["views.png"]
     assert json.loads((tmp_path / "scores.jsonl").read_text())["pass"] == 1
+
+
+def test_a_spec_that_wants_a_clean_slice_fails_a_part_with_pieces_in_the_air(tmp_path, monkeypatch):
+    """The figure recipe may lean on slicer supports, so its islands check passes with spots in the
+    air; a spec with "slices": true still fails it (random five, round 6: the owner, PRINTABLE)."""
+    from smoothstone import check as checks
+
+    job = tmp_path / "job"
+    (job / "build").mkdir(parents=True)
+    (job / "build" / "params.json").write_text(json.dumps({"recipe": "figure", "params": {"height": 90, "name": "INDE"}}))
+    (job / "figure.stl").write_bytes(b"solid")
+    air = checks.Result("islands", True, 2, "2 spots start in the air (1.2 mm2 at 73.1 mm up): in the slicer, supports on, everywhere")
+    monkeypatch.setattr(run.checks, "check_stl", lambda *a, **k: [air])
+    spec = {"expect": {"recipe": "figure", "params": {"height": 90, "name": "INDE"}}}
+    assert run.grade_job(job, spec)["pass"]
+    spec["expect"]["slices"] = True
+    got = run.grade_job(job, spec)
+    assert not got["pass"] and "starts in the air" in got["why"][0]

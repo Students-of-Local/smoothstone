@@ -44,6 +44,7 @@ the NEXT line. Nothing the model needs lives only in its context.
 | `stone set <recipe> k=v ...` | writes plan.json; validates names, types, ranges; unknown name lists the valid ones | NEXT: stone build |
 | `stone build` | plan -> params file -> OpenSCAD -> STL -> checks -> preview PNG | when every check passes, copies the part to the job folder (Part ready); else the one parameter to change |
 | `stone check [file.stl]` | print checks on any STL | NEXT |
+| `stone slice [file.stl] [--layer 0.2] [--nozzle 0.4] [--json]` | cuts the part into layers as a slicer does and names what prints wrong; needs no slicer installed | NEXT |
 | `stone image PATH` | reference image -> silhouette SVG and height PNG in the job, aspect ratio, suggested recipes | NEXT |
 | `stone done` | final summary of the last passing build, paths to STL and preview | (none) |
 
@@ -101,6 +102,18 @@ Engineering checks on recipe parts:
 - `finger_gap`: a guard echoes `stone_grille = [x, y, radius, middle z, setting, its value, up |
   down]`. Twice the largest distance from an empty point of the mid-thickness slice, inside the
   opening, to the part must be at most 12 mm (the IEC 61032 test finger, IP2X).
+Layer checks (`slicer.py`, also `stone slice`): the part is cut at the middle of each 0.2 mm
+layer and drawn on a 0.05 mm grid, the way Creality Print, Orca, Prusa, Bambu and Cura see it.
+- `islands`: a piece with nothing under it within half a 0.4 mm line, followed up to where it
+  joins the part. It fails when its first layer is 0.5 mm2 or more, or when it grows that big
+  while it hangs for two layers or more (a lock of hair that starts as a speck). A piece held on
+  the very next layer is an overhang, not an island. The figure recipe may leave these to slicer
+  supports; a spec with `"slices": true` does not.
+- `sliced`: every cross-section closes. Detail thinner than Arachne's minimum feature (25% of
+  the nozzle) is counted as dropped, and a ledge that reaches more than 0.6 mm past the layer
+  below over 4 mm2 or more is noted as one that may sag; neither fails.
+Brace (`printable.brace`) takes the islands this pass finds as well as its own 0.25 mm grid's,
+struts them or cuts thin ones back, and never puts a strut's top or foot on the face.
 Recipe `dims` add size claims: each expression of the parameters must match the measured
 bounding box within `dims_tol` (default 0.6 mm). The checks run on the OFF that OpenSCAD writes,
 and the binary STL is written from it (ASCII STL rounding breaks watertightness). Output: one line per check, PASS or FIX with the parameter to change.

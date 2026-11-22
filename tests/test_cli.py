@@ -653,3 +653,13 @@ def test_a_package_missing_from_stones_install_asks_the_person_instead_of_a_rese
     assert "uv tool install --reinstall" in nxt and nxt.endswith("When they say to go on: stone build")
     assert status_json(jobenv)["stage"] == "needs_setup"
     assert stone("status")[2] == nxt
+
+
+def test_a_long_report_folds_its_first_passes_and_keeps_the_part_line():
+    """The slicer check added a line to a figure build, and the cap cut "Part ready" off the end."""
+    out = cli.Out().add("Recipe: figure", *[f"PASS check{k}: fine" for k in range(22)], "STL: a.stl",
+                        "Views: v.png", "Part ready: a.stl")
+    text = out.render()
+    assert len(text.splitlines()) <= cli.MAX_LINES
+    assert "Part ready: a.stl" in text and "PASS check21: fine" in text
+    assert "PASS 3 checks: check0, check1, check2" in text and "more lines" not in text

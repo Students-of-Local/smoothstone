@@ -51,6 +51,17 @@ class Island:
     y: float
     cells: np.ndarray  # (n, 2) grid cells of its first layer
     k: int  # layer index
+    peak: float = 0.0  # mm2: its biggest layer before it joins what stands on the bed
+    rise: float = 0.0  # mm it climbs, resting only on itself, before it joins
+    # found by the slicer check: the grid cells of every layer it hangs, so it can be cut away
+    # even where this grid is too coarse to follow it
+    layers: list | None = None
+
+    def hangs(self, area: float, pitch: float) -> bool:
+        """Big enough to matter: its first layer is, or it grows that big while it hangs for two
+        layers or more. A hair lock starts as a speck under one strand's width and widens layer by
+        layer on that speck (Inde Navarrette, random five round 6); every layer of it is in the air."""
+        return self.area >= area or (self.peak >= area and self.rise >= 2 * pitch)
 
 
 @dataclass
@@ -104,25 +115,43 @@ def occupancy(mesh, pitch: float = PITCH) -> Grid | None:
 
 
 def islands(grid: Grid) -> list[Island]:
-    """Pieces of a layer with no material under them, within 45 degrees, in the layer below."""
+    """Pieces of a layer with nothing that stands on the bed under them, within 45 degrees, in the
+    layer below. A piece resting only on such a piece is in the air too: each is followed up to the
+    layer where it joins what stands, and reported once, at its first layer, with its peak and rise."""
     from scipy import ndimage
 
     occ, p = grid.occ, grid.pitch
     reach = ndimage.generate_binary_structure(2, 2)
-    found = []
+    found: list[Island] = []
+    stands = occ[:, :, 0]
+    hang = np.zeros(occ.shape[:2], np.int32)  # which island each hanging cell of the layer below is part of
     for k in range(1, occ.shape[2]):
         layer = occ[:, :, k]
-        if not layer.any():
-            continue
         lab, n = ndimage.label(layer, structure=reach)
-        below = ndimage.binary_dilation(occ[:, :, k - 1], structure=reach)
-        held = np.unique(lab[below & layer])
+        held = np.zeros(n + 1, bool)
+        held[np.unique(lab[ndimage.binary_dilation(stands, structure=reach) & layer])] = True
+        held[0] = False
+        near = ndimage.grey_dilation(hang, footprint=reach) if hang.any() else hang
+        nxt = np.zeros_like(hang)
         for c in range(1, n + 1):
-            if c in held:
+            mine = lab == c
+            ids = np.unique(near[mine])
+            ids = ids[ids > 0]
+            if held[c]:
+                continue  # it joins what stands: any island under it ends here
+            cells = np.argwhere(mine)
+            area = len(cells) * p * p
+            if len(ids):
+                isl = found[int(ids.min()) - 1]
+                isl.peak = max(isl.peak, area)
+                isl.rise = float(grid.z(k) - p / 2) - isl.z + p
+                nxt[mine] = ids.min()
                 continue
-            cells = np.argwhere(lab == c)
             x, y = grid.xy(cells).mean(axis=0)
-            found.append(Island(float(grid.z(k) - p / 2), len(cells) * p * p, float(x), float(y), cells, k))
+            found.append(Island(float(grid.z(k) - p / 2), area, float(x), float(y), cells, k, area, p))
+            nxt[mine] = len(found)
+        stands = held[lab]
+        hang = nxt
     return found
 
 
@@ -257,6 +286,8 @@ def plan_struts(grid: Grid, found: list[Island], floor=None, keep_off=None) -> t
         made = 0
         for a in _anchors(isl, grid):
             top = np.array([a[0], a[1], isl.z])
+            if keep_off is not None and keep_off(top):
+                continue  # a strut that holds the face up runs across it, from the brow to the shoulder
             best = None
             near = []
             for i in tree.query_ball_point(top, STRUT_REACH):
@@ -299,6 +330,11 @@ def tips(grid: Grid, found: list[Island], widest: float = TRIM_AREA) -> list[lis
     reach = ndimage.generate_binary_structure(2, 2)
     out = []
     for isl in found:
+        if isl.layers is not None:
+            # the slicer check followed it layer by layer up to where it joins
+            if isl.peak <= widest and isl.rise <= TRIM_RISE:
+                out.append(isl.layers)
+            continue
         cur = np.zeros(occ.shape[:2], bool)
         cur[tuple(isl.cells.T)] = True
         if cur.sum() * p * p > widest:
@@ -512,6 +548,30 @@ def strands(mesh, r: float = STRAND, pitch: float = STRAND_PITCH, blur: float = 
     return out, n
 
 
+def sliced(mesh, grid: Grid) -> list[Island]:
+    """The pieces slicer.slice_mesh finds floating, as islands on this grid."""
+    from . import slicer
+
+    out = []
+    for pc in slicer.slice_mesh(mesh).floating:
+        cells = np.unique(np.floor((pc["xy"] - grid.lo[:2]) / grid.pitch).astype(int), axis=0)
+        cells = cells[(cells >= 0).all(1) & (cells < grid.occ.shape[:2]).all(1)]
+        if not len(cells):
+            continue
+        def k_of(z):
+            return int(np.clip((z - grid.lo[2]) // grid.pitch, 0, grid.occ.shape[2] - 1))
+
+        layers: dict[int, np.ndarray] = {}
+        for z, xy in pc["layers"]:
+            c = np.floor((xy - grid.lo[:2]) / grid.pitch).astype(int)
+            c = c[(c >= 0).all(1) & (c < grid.occ.shape[:2]).all(1)]
+            mask = layers.setdefault(k_of(z), np.zeros(grid.occ.shape[:2], bool))
+            mask[tuple(c.T)] = True
+        out.append(Island(pc["bottom"], pc["area"], *pc["where"], cells, k_of(pc["bottom"]), pc["peak"], pc["rise"],
+                          sorted(layers.items())))
+    return out
+
+
 def brace(mesh, floor=None, rounds: int = 3, figure: bool = False):
     """Cut back thin hanging tips, then add struts under every island left. On a figure no strut
     stands on the face; a tip with only the face under it is cut back instead, up to TRIM_FACE
@@ -525,10 +585,18 @@ def brace(mesh, floor=None, rounds: int = 3, figure: bool = False):
     def hanging(grid):
         # a strut root sinks below the feet into the plinth: what is at the feet or under the
         # plinth top still stands
-        out = []
-        for i in islands(grid):
+        def up(i):
             fz = floor(i.x, i.y) if floor is not None else None
-            if i.area >= 2 * grid.pitch ** 2 and i.z > max(ground, fz if fz is not None else ground) + grid.pitch:
+            return i.z > max(ground, fz if fz is not None else ground) + grid.pitch
+
+        # on this coarse grid only a piece big from its first layer: a speck that grows here is
+        # most often a hem's edge a cell off its layer below (22 struts under Shane Gillis's shirt);
+        # the slicer check below judges growth at a slicer's resolution
+        out = [i for i in islands(grid) if i.area >= 2 * grid.pitch ** 2 and up(i)]
+        # and what the slicer check finds that this grid is too coarse to see: a hem's edge or a
+        # lock tip a cell wide (random five round 6, all five parts)
+        for i in sliced(mesh, grid):
+            if up(i) and not any(math.hypot(i.x - j.x, i.y - j.y) < STRUT_COVER and abs(i.z - j.z) < 1.0 for j in out):
                 out.append(i)
         return out
 
