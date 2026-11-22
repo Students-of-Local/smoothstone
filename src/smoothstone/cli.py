@@ -2631,10 +2631,32 @@ def main(argv: list[str] | None = None) -> int:
         if first == "go":
             words.remove("go")
         return go(words, run)
-    text, code = run(argv)
+    text, code = _plain(argv)
     sys.stdout.write(text + "\n")
     sys.stdout.flush()
+    if first == "new" and sys.stdout.isatty() and code == 0:
+        # a person typing the steps by hand: say once that one command runs all of them
+        print('One command runs every step for you, with a live line: stone go', file=sys.stderr, flush=True)
     return code
+
+
+def _plain(argv: list[str]) -> tuple[str, int]:
+    """One command typed by a person at a terminal gets the live line stone go draws under a long
+    step (a spinner, the time so far, what it took last time), so a build is never a silent wait.
+    A model's run, with no terminal, gets the plain progress lines on stderr."""
+    from . import term
+    from .go import _live_wanted
+
+    if HOOKS.get("progress") or not _live_wanted():
+        return run(argv)
+    live = term.Live()
+    live.start("stone " + next((a for a in argv if not a.startswith("-")), ""))  # from the first second
+    HOOKS["progress"] = live.note
+    try:
+        return run(argv)
+    finally:
+        HOOKS.pop("progress", None)
+        live.stop()
 
 
 if __name__ == "__main__":

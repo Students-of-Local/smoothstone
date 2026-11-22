@@ -110,7 +110,9 @@ def test_fast_on_200k_faces():
     m = on_bed(trimesh.Trimesh(m.vertices, m.faces))
     t = time.perf_counter()
     check.check_mesh(m)
-    assert time.perf_counter() - t < 3.0
+    # 3 s before check_mesh sliced every layer (slicer.py, PR 56); the slicer adds about 1.5 s here
+    # and CI's runner took 4.1 s, so the budget is 6 s
+    assert time.perf_counter() - t < 6.0
 
 
 def test_format_lines_one_per_check():

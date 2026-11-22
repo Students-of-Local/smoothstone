@@ -663,3 +663,45 @@ def test_a_long_report_folds_its_first_passes_and_keeps_the_part_line():
     assert len(text.splitlines()) <= cli.MAX_LINES
     assert "Part ready: a.stl" in text and "PASS check21: fine" in text
     assert "PASS 3 checks: check0, check1, check2" in text and "more lines" not in text
+
+
+def test_a_build_typed_at_a_terminal_shows_a_live_line(monkeypatch, tmp_path):
+    """The owner ran stone build by hand and saw nothing for minutes: "where in the hell is the live
+    progress bar????" A command a person types gets the live line stone go draws."""
+    import io
+
+    from smoothstone import go, term
+
+    seen = io.StringIO()
+    monkeypatch.setattr(go, "_live_wanted", lambda: True)
+    real = term.Live
+    monkeypatch.setattr(term, "Live", lambda: real(stream=seen, timings=tmp_path / "t.json", tick=0.01))
+
+    class J:
+        def log(self, text):
+            pass
+
+    def slow(argv):
+        import time
+
+        time.sleep(0.1)
+        cli.progress(J(), "Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
+        time.sleep(0.1)
+        return "Part ready: a.stl\nNEXT: none", 0
+
+    monkeypatch.setattr(cli, "run", slow)
+    assert cli.main(["build"]) == 0
+    out = seen.getvalue()
+    assert "stone build  0:00" in out  # the line runs from the first second, before any step speaks
+    assert "Styling the photo" in out and "progress" not in cli.HOOKS
+
+
+def test_new_at_a_terminal_names_the_one_command(monkeypatch, capsys):
+    """The owner typed stone new, then recipes, show, set and build by hand: "why is this so damn
+    confusing to use". At a terminal, stone new says stone go runs every step."""
+    import sys
+
+    monkeypatch.setattr(cli, "run", lambda argv: ("Job: x\nNEXT: stone recipes", 0))
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    cli.main(["new", "a mini figure of Palmer Luckey"])
+    assert "stone go" in capsys.readouterr().err
