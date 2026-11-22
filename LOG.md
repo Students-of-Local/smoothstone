@@ -370,7 +370,9 @@ height; it matches every center and height the drawing does give. Dropped for un
 Anker 313 (two sizes on one page), Pi Zero 2 W (no height or connector sizes). Ports with no
 published position leave their face open, never guessed. The ratchet now guards evals/engineering.
 
-Baseline, NEXT driver, seed 1, at f20a82f: 0 of 10 pass. engineering/next floor 0.00 of 10.
+Baseline, NEXT driver, seed 1, at 7e38f42 (a frozen worktree of it): 0 of 10 pass. engineering/next floor
+0.00 of 10. The first baseline named f20a82f, which has no grader: it ran from an uncommitted tree, so
+its ten rows in scores.jsonl are replaced by the rerun's.
 
 | spec | product | where it stops | top failure |
 | --- | --- | --- | --- |
@@ -387,3 +389,10 @@ Baseline, NEXT driver, seed 1, at f20a82f: 0 of 10 pass. engineering/next floor 
 
 Every run also fails "the part does not say where the product sits (no engineering.json)": no
 recipe writes the file yet.
+
+Review round 1 (7e38f42) fixed specs that a correct part could not pass or a wrong one passed: e04's
+keepout is round and the tag is Apple's Detail A dome profile, not a 7.98 mm cylinder; e08 checks the
+board's four holes and the VESA 75 holes in the mesh; e07 and e10 need the part under the product in
+3 of 4 quarters instead of a screw into the Mac (e07) or a slip gap under the bare PCB (e10, whose
+leads are unpublished); e09's shaft tip has its own gap band. The snap arm, screw holes and critical
+section are now measured in the mesh. The rerun's stops and top failures match the table above.
