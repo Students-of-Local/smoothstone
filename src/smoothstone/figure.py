@@ -10,8 +10,14 @@ Local models do the work, none of them the model that drives stone:
 - lift: tools/lift/lift.py turns that render into a mesh (single-image 3D).
 - repair: trimesh keeps the main body, closes it and scales it to unit height, feet on z = 0.
 
-Every step writes its file into the job's images/figure folder and is skipped when the file is
+Every step writes its file into the job's image/figure folder and is skipped when the file is
 already there and its inputs have not changed, so a build that dies half way picks up again.
+A finished figure is also kept in a shared cache (STONE_FIGURE_CACHE, default
+~/.cache/stone-figure; "0" turns it off) under that key plus every setting that changes the mesh
+(style refs and model, lift octree and chunks, describe on or off, REPAIR_VERSION), so a new job with
+the same photos and settings reuses it instead of running the models again. A stand-in lift
+(STONE_LIFT) never reads or writes it. A machine without the style model (Linux
+has no mflux) can build a figure that was made once elsewhere, by copying that key folder in.
 """
 
 from __future__ import annotations
@@ -711,6 +717,87 @@ def _remesh(m):
     return v.marching_cubes.apply_transform(v.transform)
 
 
+# graft.json and lift-octree.txt too: without them a cached figure is lifted and grafted again;
+# figure.stl last, since it marks a whole copy
+CACHED = ("look.txt", "style.png", "lift.glb", "lift-octree.txt", "graft.json", "figure.json", "figure.stl")
+REPAIR_VERSION = 1  # bump whenever repair() changes what it writes: old cached figures stop matching
+
+
+def cache_dir() -> Path | None:
+    env = os.environ.get("STONE_FIGURE_CACHE")
+    if env == "0" or os.environ.get("STONE_LIFT"):
+        return None  # off, or a stand-in lift whose mesh must never pass for a real one
+    return Path(env).expanduser() if env else Path.home() / ".cache" / "stone-figure"
+
+
+def _can_style() -> bool:
+    try:
+        _mflux_bin()
+        return True
+    except FigureProblem:
+        return False
+
+
+def _model_id(env: str | None) -> str:
+    """A custom style model by its path and the sizes of its weight files; "" for the default."""
+    if not env:
+        return ""
+    p = Path(env).expanduser()
+    files = sorted(p.rglob("*.safetensors")) if p.is_dir() else []
+    return str(p.resolve()) + ":" + ",".join(str(f.stat().st_size) for f in files)
+
+
+def _describe_on() -> bool:
+    """Whether a description is part of the figure here: a host with no style model can only reuse
+    a figure, so it asks for one made as its settings request."""
+    return os.environ.get("STONE_DESCRIBE", "1") != "0" and (_describe_model() is not None or not _can_style())
+
+
+def cache_key(key: str) -> str:
+    """The folder key plus every setting outside it that changes the finished mesh. Describe counts
+    as it will really run here; a host with no style model can only reuse a figure, so it asks
+    for one made as its settings request. The job's figure folder is named by it."""
+    e = os.environ.get
+    return _digest(key, e("STONE_STYLE_REFS", "1"), _model_id(e("STONE_STYLE_MODEL")), e("STONE_LIFT") or "",
+                   lift_octree(), e("STONE_LIFT_CHUNKS", "4000"), _describe_on(),
+                   e("STONE_HEAD_GRAFT", "1") != "0", REPAIR_VERSION)
+
+
+def _from_cache(key: str, folder: Path) -> bool:
+    c = cache_dir()
+    k = folder.name
+    if c is None or not (c / k / "figure.stl").exists():
+        return False
+    for name in CACHED:
+        src = c / k / name
+        if src.exists() and not (folder / name).exists():
+            tmp = folder / f".{name}.tmp{os.getpid()}"
+            shutil.copyfile(src, tmp)
+            os.replace(tmp, folder / name)  # a killed copy never leaves a short figure.stl
+    return True
+
+
+NOT_CACHED = ".not-cached"  # this folder's figure is not the one its key names
+
+
+def _to_cache(key: str, folder: Path) -> None:
+    c = cache_dir()
+    key = folder.name
+    if (folder / NOT_CACHED).exists():
+        return  # carried from a job made before the key named the folder: its settings are unknown
+    if c is None or (c / key / "figure.stl").exists():
+        return
+    try:
+        tmp = c / f".{key}.tmp{os.getpid()}"
+        tmp.mkdir(parents=True, exist_ok=True)
+        for name in CACHED:
+            if (folder / name).exists():
+                shutil.copyfile(folder / name, tmp / name)
+        tmp.rename(c / key)
+    except OSError:
+        shutil.rmtree(c / f".{key}.tmp{os.getpid()}", ignore_errors=True)
+
+
 def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str = "person",
          seed: int = 7, extra: str = "", say=print, shown=None) -> Path:
     """Run every step that is not done yet and return the unit-height figure.stl.
@@ -723,8 +810,35 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
     key = _digest(*photos, style_name, who, seed, extra,
                   prompt(style_name, who, extra, (want or {}).get("glasses"),
                          heavy=bool((want or {}).get("heavy"))))
-    folder = folder / key
+    head_on = (who == "person" and style_name in GRAFT_STYLES and os.environ.get("STONE_HEAD_GRAFT", "1") != "0")
+
+    def current(f: Path) -> bool:  # lifted on this grid, and grafted when the graft is on
+        grid = f / "lift-octree.txt"
+        return ((f / "figure.stl").exists()
+                and (grid.read_text().strip() if grid.exists() else "256") == lift_octree()
+                and (not head_on or (f / "graft.json").exists()))
+
+    # the folder is named by the cache key, so a change of mesh settings starts a fresh folder and
+    # the files in it always match the key they are cached under
+    legacy = folder / key
+    folder = folder / cache_key(key)
     folder.mkdir(parents=True, exist_ok=True)
+    fig = folder / "figure.stl"
+    latest = folder.parent / "latest.txt"
+    if not fig.exists() and current(legacy):
+        # a job made before the folder took the cache key keeps its figure instead of running the
+        # models again (a Linux host cannot style one at all)
+        shutil.copytree(legacy, folder, dirs_exist_ok=True)
+        (folder / NOT_CACHED).write_text(str(legacy) + "\n")
+    if not fig.exists() and _from_cache(key, folder):
+        say("Using the figure made before from these photos (shared cache).")
+    if current(folder):
+        # a finished figure needs no model, even with the style and lift files gone; one lifted on a
+        # coarser grid, or made before the head graft, goes on to be made again below
+        if shown and (folder / "style.png").exists():
+            shown(folder / "style.png")
+        latest.write_text(str(fig) + "\n")
+        return fig
     render = folder / "style.png"
     if not render.exists():
         desc = ""
@@ -733,6 +847,10 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
             if not look.exists():
                 say("Describing the photo (LFM3-VL-2B, under a minute)...")
             desc = describe(photos[0], look, who)
+            if not desc and _describe_on():
+                # the key says described, but the model gave nothing: this figure is not the one
+                # that key names, so it stays out of the shared cache
+                (folder / NOT_CACHED).write_text("no description\n")
         refs = photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]
         # the face comes from whichever photo shows it biggest: a found lead photo is often a whole
         # person on a stage, and a few pixels of face come out a generic one (Shane Gillis, 2026-11-21)
@@ -787,6 +905,6 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
             shutil.copyfile(body, fig)
         if head_on:
             done.write_text(json.dumps(res, indent=1) + "\n")
-    latest = folder.parent / "latest.txt"
+    _to_cache(key, folder)
     latest.write_text(str(fig) + "\n")
     return fig

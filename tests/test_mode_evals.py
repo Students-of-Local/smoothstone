@@ -267,11 +267,11 @@ def test_a_traits_judge_that_cannot_answer_fails_the_case(tmp_path, judges):
 def test_the_craft_judge_scores_a_mode_run_without_failing_it(tmp_path, monkeypatch):
     import judge_views
 
-    monkeypatch.setattr(judge_views, "judge", lambda build, request: {"score": 7, "faults": []})
+    monkeypatch.setattr(judge_views, "judge", lambda build, request, model="opus": {"score": 7, "faults": []})
     assert run.craft_run(tmp_path, _job(tmp_path), REQUEST) == 7
     assert json.loads((tmp_path / "judge.json").read_text())["score"] == 7
 
-    def broken(build, request):
+    def broken(build, request, model="opus"):
         raise SystemExit("claude exited 1")
     monkeypatch.setattr(judge_views, "judge", broken)
     assert run.craft_run(tmp_path, _job(tmp_path / "b"), REQUEST) is None

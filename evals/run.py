@@ -254,6 +254,9 @@ def main():
         grade = likeness_for(rdir, job, spec, spec_path, exp, grade)
     if spec_path.parent.name in MODES:
         grade["judge"] = craft_run(rdir, job, spec["request"])
+    # a figure from the shared cache ran no style or lift model in this run: say so in the log
+    jl = job / "log.txt"
+    log["figure_from_cache"] = jl.exists() and "(shared cache)" in jl.read_text(errors="replace")
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
@@ -355,17 +358,22 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
 
 def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> dict:
     """The blind judge on the run's pictures (judge_views.py), saved as judge.json next to the run.
-    want {"faults_in": ["boundaries"]}: a fault the judge names in one of those pictures fails it."""
+    want {"faults_in": ["boundaries"]}: the part fails when most judge runs name a fault in one of
+    those pictures (a vote of up to 3, so one noisy run does not flip it). With no faults_in the
+    judge only scores."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_views
 
-    res = judge_views.judge(job / "build", request)
-    (rdir / "judge.json").write_text(json.dumps(res, indent=1))
     why = [w for w in grade["why"] if w != "all checks pass"]
-    for f in res["faults"]:
-        if any(f["panel"].lower().startswith(pic) for pic in want.get("faults_in", [])):
-            why.append(f"judge: {f['panel']}: {f['what']}")
-    return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"]}
+    try:
+        res = judge_views.votes(job / "build", request, want.get("faults_in", []))
+    except (judge_views.JudgeFailed, subprocess.TimeoutExpired, OSError) as e:
+        # a run the judge could not grade still fails, and still lands in log.json and scores.jsonl
+        (rdir / "judge.json").write_text(json.dumps({"score": None, "error": str(e)}, indent=1))
+        return {**grade, "pass": False, "why": why + [f"judge failed: {e}"], "judge": None}
+    (rdir / "judge.json").write_text(json.dumps(res, indent=1))
+    why += [f"judge: {f['panel']}: {f['what']}" for f in res["faults"]]
+    return {**grade, "pass": not why, "why": why or grade["why"], "judge": res["score"], "judge_votes": res["votes"]}
 
 
 # the held-out sets of LOG.md, 2026-11-19, and the random five of 2026-11-21 (research mode)
@@ -440,8 +448,8 @@ def traits_run(rdir: Path, job: Path, traits: list[str], grade: dict) -> dict:
 
 
 def craft_run(rdir: Path, job: Path, request: str) -> int | None:
-    """The blind craft judge (judge_views.py) on a mode run's pictures, saved as judge.json. Its
-    score never fails the run: the bar is the mean per mode (bar.py), and the ratchet's judge."""
+    """The blind craft judge (judge_views.py), the median of 3 runs, on a mode run's pictures, saved
+    as judge.json. Its score never fails the run: the bar is the mean per mode (bar.py), and the ratchet's judge."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_views
 
@@ -449,8 +457,8 @@ def craft_run(rdir: Path, job: Path, request: str) -> int | None:
     if not (build / "views.png").exists():
         return None
     try:
-        res = judge_views.judge(build, request)
-    except (Exception, SystemExit) as e:  # judge_views exits on a missing picture or a failed claude
+        res = judge_views.median_score(build, request)
+    except (Exception, SystemExit) as e:  # no verdict at all: the run is still logged
         res = {"score": None, "faults": [], "error": f"{type(e).__name__}: {e}"}
     (rdir / "judge.json").write_text(json.dumps(res, indent=1))
     return res["score"]
