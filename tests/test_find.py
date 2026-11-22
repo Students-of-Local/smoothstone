@@ -484,8 +484,8 @@ def test_an_artwork_of_the_person_is_left_out(monkeypatch, tmp_path):
     assert found["File:C215 - Michael Jordan (1).jpg"] and found["File:Michael Jordan in 2014.jpg"]
     assert not found["File:Michael Jordan 1984.jpg"] and not found["File:Michael Jordan.jpg"]
     got = [g["title"] for g in find.fetch("Michael Jordan", tmp_path)]  # faces off: still no artwork
-    # a person's newest photo first; Wikidata's main image has no year here, so it goes last
-    assert got == ["File:Michael Jordan 2006.jpg", "File:Michael Jordan 1984.jpg", "File:Michael Jordan.jpg"]
+    # faces off: nothing proves the newest is him, so the main image stays first
+    assert got == ["File:Michael Jordan.jpg", "File:Michael Jordan 1984.jpg", "File:Michael Jordan 2006.jpg"]
     left = json.loads((tmp_path / "found.json").read_text())["left_out"]
     assert {"title": "File:C215 - Michael Jordan (1).jpg", "why": "art"} in left
 
@@ -647,3 +647,20 @@ def test_the_eval_fails_a_person_whose_first_photo_is_old(tmp_path):
                                                                            {"title": "File:b", "year": 2026}]}))
     why = run.grade_found(tmp_path, {"first_year_at_least": 2025})
     assert len(why) == 2 and "2014" in why[0]
+
+
+def test_a_camera_number_or_an_upload_date_is_not_when_the_photo_was_taken():
+    assert find.photo_year({}, "File:Palmer Luckey DSC_2087.jpg") is None
+    assert find.photo_year({"DateTime": {"value": "2025-01-02"}}, "File:Old scan.jpg") is None
+    assert find.photo_year({"DateTimeOriginal": {"value": "1996:05:01"}}, "File:A 2024 upload.jpg") == 1996
+
+
+def test_someone_who_has_died_keeps_their_main_image_first(monkeypatch, tmp_path):
+    """Review of the newest-first rule: Muhammad Ali's newest photo is from his last years."""
+    ali = _ent("Q36107", "Muhammad Ali", ["Q5"], "Muhammad Ali NYWTS.jpg", sites=150)
+    ali["claims"]["P570"] = [{"mainsnak": {"datavalue": {"value": {"time": "+2016-06-03T00:00:00Z"}}}}]
+    pages = [_page("File:Muhammad Ali 2012.jpg", "CC BY 2.0", 1), _page("File:Muhammad Ali 1966.jpg", "CC BY 2.0", 2)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ali]))
+    _with_faces(monkeypatch, {})
+    got = find.fetch("Muhammad Ali", tmp_path)
+    assert got[0]["title"] == "File:Muhammad Ali NYWTS.jpg"

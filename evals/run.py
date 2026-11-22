@@ -508,7 +508,7 @@ def grade_found(job: Path, want: dict, checker=None) -> list[str]:
     if want.get("first_year_at_least") and (not years or years[0] < want["first_year_at_least"]):
         why.append(f"photo 1 is from {years[0] if years else 'nowhere'}; a person's first photo must be "
                    f"from {want['first_year_at_least']} or later, how they look now")
-    if years and years[0] < max(years):
+    if want.get("first_year_at_least") and years and years[0] < max(years):
         why.append(f"photo 1 is from {years[0]} but photo {years.index(max(years)) + 1} is from {max(years)}")
     why += [f"photo {t} is one it must never take" for t in titles if t in set(want.get("never", []))]
     if want.get("one_face"):

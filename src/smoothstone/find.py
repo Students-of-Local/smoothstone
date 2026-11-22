@@ -7,6 +7,7 @@ render or a post can name the source.
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import urllib.parse
@@ -148,7 +149,8 @@ def _pack(ent: dict, character_classes: set[str] = frozenset()) -> dict:
     p18 = (ent.get("claims") or {}).get("P18") or []
     image = ((p18[0].get("mainsnak") or {}).get("datavalue") or {}).get("value") if p18 else None
     return {"id": ent.get("id"), "label": _label(ent), "kind": _kind(ent, character_classes), "image": image,
-            "description": _in_english(ent.get("descriptions") or {})}
+            "description": _in_english(ent.get("descriptions") or {}),
+            "died": bool((ent.get("claims") or {}).get("P570"))}
 
 
 def _bare(s: str) -> str:
@@ -265,13 +267,14 @@ YEAR = re.compile(r"(?<!\d)(19[0-9]{2}|20[0-9]{2})(?!\d)")
 
 
 def photo_year(meta: dict, title: str) -> int | None:
-    """When a photo was taken: Commons' DateTimeOriginal, else a year in its title ("CES 2026"),
-    else the upload date (it can only be later than the photo)."""
-    for text in (_clean((meta.get("DateTimeOriginal") or {}).get("value", "")), title,
-                 _clean((meta.get("DateTime") or {}).get("value", ""))):
-        m = YEAR.search(text or "")
-        if m:
-            return int(m.group(1))
+    """When a photo was taken: Commons' DateTimeOriginal, else a year in its title ("CES 2026").
+    Never the upload date (a 1990s scan can be uploaded in 2025), and never a year still to come
+    ("DSC_2087" is a camera's file number). None when nothing says."""
+    now = datetime.date.today().year
+    for text in (_clean((meta.get("DateTimeOriginal") or {}).get("value", "")), title):
+        for m in YEAR.finditer(text or ""):
+            if int(m.group(1)) <= now:
+                return int(m.group(1))
     return None
 
 
@@ -524,7 +527,9 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
     if not picked:
         raise FindProblem(f"could not download photos of {query}")
     last = max(i for i, _, _ in picked) if len(picked) >= n else len(found)
-    if kind == "person":
+    if kind == "person" and chk is not None and not (ent or {}).get("died"):
+        # only when every photo was checked to be their face, and only for the living: someone who
+        # has died is best known by their main image, not their last years (Muhammad Ali)
         # a person changes: photo_1, the one the description and the likeness checks read, is the
         # newest. Palmer Luckey's Wikidata photo is from 2014, clean shaven; at CES 2026 he wore a
         # goatee, and the build threw out every true render as "added a beard" (2026-11-22)
