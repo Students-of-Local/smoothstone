@@ -396,3 +396,14 @@ board's four holes and the VESA 75 holes in the mesh; e07 and e10 need the part 
 3 of 4 quarters instead of a screw into the Mac (e07) or a slip gap under the bare PCB (e10, whose
 leads are unpublished); e09's shaft tip has its own gap band. The snap arm, screw holes and critical
 section are now measured in the mesh. The rerun's stops and top failures match the table above.
+
+Review round 2 closed the ways a part could pass the grade and fail in use: the strength arm is
+measured from where the product bears (and, with an attach, to the nearest screw), h_dir must lie
+along the load, and the layers come from the beam's axis; the snap arm's catch, its root and its
+sides at 5%, 50% and 95% of L are found in the mesh; e01's power button needs a Ø10 fingertip
+(MIL-STD-1472F Figure 12); e05 and e07 must screw to the wall or desk through ISO 273 M4 clearance
+holes; screw retention takes through holes (bolt and nut, or a bought standoff) at ISO 273 sizes, so
+a correct e08 plate passes; e08 keeps 2.5 mm under the board outside its holes' Ø6 pads for the
+through-hole leads; and each source must be one the spec cites for that number, a profile included.
+e10 has the same lead question as e08 under a flat floor and is left for its own change. The NEXT
+baseline rerun is still 0 of 10 with the same stops and top failures.
