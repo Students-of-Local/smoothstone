@@ -167,10 +167,11 @@ def votes(build: Path, request: str, faults_in: list[str] | None = None, n: int 
     need = n // 2 + 1
     runs: list[dict] = []
     errors: list[str] = []
+    one = one or judge  # looked up at call time, so a test's stand-in judge is the one asked
 
     def try_one(_=None):
         try:
-            return one(build, request, model)
+            return one(build, request, model=model)
         except JudgeFailed as e:
             errors.append(str(e))
             return None
@@ -196,15 +197,16 @@ def votes(build: Path, request: str, faults_in: list[str] | None = None, n: int 
             "errors": errors, "model": model, "request": request}
 
 
-def median_score(build: Path, request: str, n: int = 3, model: str = "opus", one=judge) -> dict:
+def median_score(build: Path, request: str, n: int = 3, model: str = "opus", one=None) -> dict:
     """The craft score as the median of n blind judge runs side by side: one run swings by a point
     (Sienna Miller's same render scored 6 and 8, random five round 6). A failed run is dropped;
     JudgeFailed when none is left. faults keeps what more than half the runs' panels share."""
     errors: list[str] = []
+    one = one or judge  # looked up at call time, so a test's stand-in judge is the one asked
 
     def try_one(_=None):
         try:
-            return one(build, request, model)
+            return one(build, request, model=model)
         except JudgeFailed as e:
             errors.append(str(e))
             return None

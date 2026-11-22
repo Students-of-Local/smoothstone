@@ -164,4 +164,4 @@ def test_the_craft_score_is_the_median_of_three_runs(tmp_path):
     assert res["score"] == 7 and res["scores"] == [6, 8] and res["errors"] == ["no JSON"]
     assert res["faults"] == []
     with pytest.raises(judge_views.JudgeFailed):
-        judge_views.median_score(tmp_path, "a figure", one=lambda *a: (_ for _ in ()).throw(judge_views.JudgeFailed("x")))
+        judge_views.median_score(tmp_path, "a figure", one=lambda *a, **k: (_ for _ in ()).throw(judge_views.JudgeFailed("x")))
