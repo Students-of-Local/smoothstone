@@ -15,9 +15,9 @@
     },
     "body_sources": {
       "w": "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf page 15, section 11 'Mounting Holes And Board Outline', drawing 'Mechanical View of Arduino UNO R4 Minima', '68.58 mm'",
-      "d": "same drawing, '53.34 mm'",
-      "h": "same drawing, side view: PCB '1 mm' plus header top '8.5 mm' above the PCB top = 9.5. The drawing shows no DC jack, though the datasheet lists 'J4 DC Jack', so a part may stand taller than 9.5; +z and -x are open for that reason",
-      "corner_r": "no radius published (the drawing gives '2x 3.6 mm x 45\u00b0' chamfers on the right corners and draws small unlabeled rounds on the left); 0 is the enclosing box"
+      "d": "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf: same drawing, '53.34 mm'",
+      "h": "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf: same drawing, side view: PCB '1 mm' plus header top '8.5 mm' above the PCB top = 9.5. The drawing shows no DC jack, though the datasheet lists 'J4 DC Jack', so a part may stand taller than 9.5; +z and -x are open for that reason",
+      "corner_r": "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf: no radius published (the drawing gives '2x 3.6 mm x 45\u00b0' chamfers on the right corners and draws small unlabeled rounds on the left); 0 is the enclosing box"
     },
     "features": []
   },

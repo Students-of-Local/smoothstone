@@ -17,6 +17,7 @@
       "w": "https://support.apple.com/en-us/111839 (Size and Weight, 'Width: 3.66 inches (93 mm)')",
       "d": "https://support.apple.com/en-us/111839 (Size and Weight, 'Depth: 3.66 inches (93 mm)')",
       "h": "https://support.apple.com/en-us/111839 (Size and Weight, 'Height: 1.2 inches (31 mm)')",
+      "weight": "https://support.apple.com/en-us/111839 (Size and Weight, 'Weight (Wi-Fi model): 7.3 ounces (208 g)', 'Weight (Wi-Fi + Ethernet model): 7.5 ounces (214 g)')",
       "corner_r": "no radius published on https://support.apple.com/en-us/111839; 0 is the enclosing box"
     },
     "features": []
@@ -26,6 +27,8 @@
     "material": "PLA",
     "fit": "slip",
     "retention": "any",
+    "load_n": 10,
+    "load_dir": "-z",
     "safety": 2,
     "covered": [
       "-z",
@@ -42,8 +45,8 @@
       "against": "the wall",
       "screw": "M4",
       "min": 2,
-      "source": "ISO 273 clearance hole for M4, fine 4.3, medium 4.5, coarse 4.8 mm (https://www.iso.org/standard/4183.html, sold; values as charted by https://mechcodex.com/reference/metric-clearance-hole-sizes). A 4 mm wood or machine screw into the wall; two at least, so the holder cannot turn about one (our number)"
+      "source": "ISO 273 clearance hole for M4, fine 4.3, medium 4.5, coarse 4.8 mm (https://www.iso.org/standard/4183.html, sold; values as charted by https://mechcodex.com/reference/metric-clearance-hole-sizes). A 4 mm wood or machine screw into the wall; two at least, so the holder cannot turn about one, spread at least a quarter of the part across that face (our numbers)"
     }
   },
-  "why": "Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page. The holder screws to the wall through its -x side (attach -x): the Apple TV sits on its bottom with its left side to the wall, so its back's ports and its front face along the wall and stay open."
+  "why": "Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page. The holder screws to the wall through its -x side (attach -x): the Apple TV sits on its bottom with its left side to the wall, so its back's ports and its front face along the wall and stay open. It weighs 208 g (Wi-Fi) or 214 g (Wi-Fi + Ethernet) on https://support.apple.com/en-us/111839, 2.1 N, so 10 N leaves margin for a bump or a cable pulled; the floor cantilevers out from the wall, so the strength check runs (load_dir -z, the floor it bears on)."
 }
