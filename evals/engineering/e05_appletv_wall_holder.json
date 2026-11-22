@@ -1,0 +1,42 @@
+{
+  "id": "e05_appletv_wall_holder",
+  "request": "a wall holder for my Apple TV 4K (3rd generation)",
+  "input": "text",
+  "product": {
+    "name": "Apple TV 4K (3rd generation)",
+    "sources": [
+      "https://support.apple.com/en-us/111839"
+    ],
+    "body": {
+      "w": 93.0,
+      "d": 93.0,
+      "h": 31.0,
+      "corner_r": 0.0
+    },
+    "body_sources": {
+      "w": "https://support.apple.com/en-us/111839 (Size and Weight, 'Width: 3.66 inches (93 mm)')",
+      "d": "https://support.apple.com/en-us/111839 (Size and Weight, 'Depth: 3.66 inches (93 mm)')",
+      "h": "https://support.apple.com/en-us/111839 (Size and Weight, 'Height: 1.2 inches (31 mm)')",
+      "corner_r": "no radius published on https://support.apple.com/en-us/111839; 0 is the enclosing box"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "holder",
+    "material": "PLA",
+    "fit": "slip",
+    "retention": "any",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+x",
+      "-x"
+    ],
+    "open": [
+      "+y",
+      "-y",
+      "+z"
+    ]
+  },
+  "why": "Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page."
+}

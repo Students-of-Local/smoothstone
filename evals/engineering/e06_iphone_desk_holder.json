@@ -1,0 +1,86 @@
+{
+  "id": "e06_iphone_desk_holder",
+  "request": "a desk stand that holds my iPhone 17 Pro upright in portrait so I can plug in USB-C",
+  "input": "text",
+  "product": {
+    "name": "iPhone 17 Pro",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf"
+    ],
+    "body": {
+      "w": 71.85,
+      "d": 8.75,
+      "h": 150.01,
+      "corner_r": 0.0
+    },
+    "body_sources": {
+      "w": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, sheet 1, front view overall width '71.85'; recipes/phone_case/devices.json phones.iphone_17_pro.body.width)",
+      "d": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, sheet 1, side view '8.75' PRODUCT THICKNESS, without the camera plateau; devices.json body.depth)",
+      "h": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, sheet 1, front view overall height '150.01'; devices.json body.height)",
+      "corner_r": "edges parallel to z are the side edge profile, which Detail B (p2) gives as a point list, not one radius; 0 is the enclosing box"
+    },
+    "features": [
+      {
+        "name": "usb_c",
+        "kind": "port",
+        "face": "-z",
+        "c": [
+          35.93,
+          4.375
+        ],
+        "size": [
+          9.0,
+          3.25
+        ],
+        "plug": [
+          12.45,
+          6.6
+        ],
+        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, Detail C: port opening '9.00' wide by '3.25' tall, centered '35.92' from the side edge, centerline '4.375' from the back ('12X 4.375' in the bottom view); 'RECOMMENDED CONNECTOR KEEPOUT' '12.45' by '6.60' with '2X R3.25', note 2 'MATING CONNECTOR KEEPOUT AREA FLUSH TO PRODUCT SURFACE REQUIRED OUTWARD 14.0 mm'; bottom view gives the opening from x 31.43 to 40.42)",
+        "depth": 14.0
+      },
+      {
+        "name": "speaker_and_mic_2",
+        "kind": "vent",
+        "face": "-z",
+        "c": [
+          51.94,
+          4.375
+        ],
+        "size": [
+          10.08,
+          1.06
+        ],
+        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, bottom view: '4X SPEAKER PORTS' and 'BOTTOM MIC 2', hole centers at x 15.40, 17.65, 19.91, 22.16, 24.42 from the left edge of the front view, '10X \u00d81.06 PORTS', centerline 4.375; size is 24.42 - 15.40 + 1.06 by 1.06; note 2 'DO NOT OBSTRUCT PORTS')"
+      },
+      {
+        "name": "mic_1_ports",
+        "kind": "vent",
+        "face": "-z",
+        "c": [
+          19.91,
+          4.375
+        ],
+        "size": [
+          10.08,
+          1.06
+        ],
+        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, bottom view: 'BOTTOM MIC 1' group, hole centers at x 47.43, 49.69, 51.94, 54.20, 56.45, '\u00d81.06', centerline 4.375; size 56.45 - 47.43 + 1.06 by 1.06)"
+      }
+    ]
+  },
+  "expect": {
+    "kind": "holder",
+    "material": "PLA",
+    "fit": "slip",
+    "retention": "none",
+    "safety": 2,
+    "covered": [
+      "-z"
+    ],
+    "open": [
+      "-y"
+    ]
+  },
+  "why": "Upright in portrait on its bottom edge (+z up, screen at -y, back at +y): the cradle wraps the bottom face but must pass a USB-C plug through Apple's 12.45 x 6.60 connector keepout and leave the speaker and mic holes clear. Frame: x from the left edge as seen facing the screen, so on -z u = 71.85 - x and v = y = 8.75 - 4.375."
+}

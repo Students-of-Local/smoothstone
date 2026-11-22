@@ -1,4 +1,10 @@
 {
+ "engineering/next": {
+  "judge": null,
+  "passing": [],
+  "rate": 0.0,
+  "total": 10
+ },
  "figure/S": {
   "judge": 9.0,
   "passing": [

@@ -1,0 +1,156 @@
+{
+  "id": "e04_airtag_case",
+  "request": "a case for an Apple AirTag (the 2021 one)",
+  "input": "text",
+  "product": {
+    "name": "Apple AirTag (2021)",
+    "sources": [
+      "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf"
+    ],
+    "body": {
+      "w": 31.87,
+      "d": 31.87,
+      "h": 7.98,
+      "corner_r": 15.935,
+      "profile": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          15.935,
+          0.0
+        ],
+        [
+          15.935,
+          4.98
+        ],
+        [
+          15.805,
+          5.67
+        ],
+        [
+          15.355,
+          6.18
+        ],
+        [
+          14.705,
+          6.55
+        ],
+        [
+          13.965,
+          6.82
+        ],
+        [
+          13.185,
+          7.03
+        ],
+        [
+          12.385,
+          7.2
+        ],
+        [
+          11.575,
+          7.33
+        ],
+        [
+          10.755,
+          7.44
+        ],
+        [
+          9.935,
+          7.54
+        ],
+        [
+          9.105,
+          7.62
+        ],
+        [
+          8.285,
+          7.69
+        ],
+        [
+          7.455,
+          7.75
+        ],
+        [
+          6.635,
+          7.81
+        ],
+        [
+          5.805,
+          7.85
+        ],
+        [
+          4.975,
+          7.89
+        ],
+        [
+          4.155,
+          7.92
+        ],
+        [
+          3.325,
+          7.95
+        ],
+        [
+          2.495,
+          7.95
+        ],
+        [
+          1.665,
+          7.96
+        ],
+        [
+          0.835,
+          7.97
+        ],
+        [
+          0.0,
+          7.98
+        ]
+      ]
+    },
+    "body_sources": {
+      "w": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, AirTag Dimensional Drawings sheet 1, outer ring '\u00d8 31.87')",
+      "d": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, same '\u00d8 31.87'; the tag is round)",
+      "h": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, side view, top of dome '7.98' above datum '0.00' at the back plate)",
+      "corner_r": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, half of '\u00d8 31.87': a round body)",
+      "profile": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, Detail A 'PROFILE ALL AROUND': the dome's widest point (\u00d8 31.87) at height 4.98, then inward distance from the edge and height pairs 0.13/5.67, 0.58/6.18, 1.23/6.55, 1.97/6.82, 2.75/7.03, 3.55/7.20, 4.36/7.33, 5.18/7.44, 6.00/7.54, 6.83/7.62, 7.65/7.69, 8.48/7.75, 9.30/7.81, 10.13/7.85, 10.96/7.89, 11.78/7.92, 12.61/7.95, 13.44/7.95, 14.27/7.96, 15.10/7.97, 15.93/7.98 (the center); r = 15.935 - distance. Below 4.98 the dome curves in to the steel back (side view 2.29, 1.89, 1.84, 0.94, 0.88, 0.00, \u00d8 23.11), drawn not to scale, so the profile keeps the enclosing \u00d8 31.87 cylinder there)"
+    },
+    "features": [
+      {
+        "name": "speaker_keepout",
+        "kind": "vent",
+        "face": "+z",
+        "c": [
+          15.935,
+          15.935
+        ],
+        "size": [
+          25.75,
+          25.75
+        ],
+        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf (p2, top view above the side view, third angle projection per title block: note 1 'SPEAKER KEEPOUT. DO NOT OBSTRUCT THIS AREA \u00d8 25.75', centered; note 1 'CASE SHOULD NOT OBSTRUCT ACOUSTIC AREA')",
+        "shape": "circle"
+      }
+    ]
+  },
+  "expect": {
+    "kind": "case",
+    "material": "PETG",
+    "fit": "snug",
+    "retention": "snap",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+z",
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": []
+  },
+  "why": "Dome up (+z), steel back plate down: the case wraps the whole tag but must leave Apple's \u00d825.75 speaker keepout on the dome open, a round keepout. The body is Apple's own dome profile (Detail A) revolved, so a lip that curls over the dome's edge to hold the tag is measured against the real dome; below the widest point the enclosing cylinder stands in for the unscaled back."
+}
