@@ -60,6 +60,15 @@ class Out:
             return self.raw
         body = [ln for ln in self.lines if ln is not None]
         room = MAX_LINES - 1
+        passes = [ln for ln in body if ln.startswith("PASS ")]
+        if len(body) > room and len(passes) > 1:
+            # a passing check asks for nothing; the lines after the checks (the STL, the views)
+            # are the ones a reader acts on, so the first passes (loads, watertight...) fold into
+            # one line before anything is cut, just enough of them to fit
+            fold = set(passes[: min(len(passes), len(body) - room + 1)])
+            at = body.index(passes[0])
+            body = [ln for ln in body if ln not in fold]
+            body.insert(at, f"PASS {len(fold)} checks: " + ", ".join(ln[5:].split(":")[0] for ln in passes if ln in fold))
         if len(body) > room:
             cut = len(body) - (room - 1)
             body = body[: room - 1] + [f"({cut} more lines in log.txt)"]
@@ -1047,6 +1056,33 @@ def cmd_check(args, job: Job) -> Out:
         out.next = "none, the file passes" if ok else f"stone check {f}"
     else:
         out.next = "stone done" if ok else (nxt or f"stone show {r.name}" if r else "stone status")
+    return out
+
+
+# slice
+
+
+def cmd_slice(args, job: Job) -> Out:
+    """Cut the part into layers the way a slicer does and name what would print wrong, with no
+    slicer installed: works the same for Creality Print, Orca, Prusa, Bambu or Cura users."""
+    from . import slicer
+
+    out = Out(owns_next=False)
+    f = Path(args.file).expanduser().resolve() if args.file else job.build_dir / "part.stl"
+    if not f.is_file():
+        out.fix(f"no file at {f}" if args.file else "no built part yet; build first or name an STL file")
+        out.next = "stone slice <file.stl>" if args.file else "stone build"
+        return out
+    rep = slicer.slice_stl(f, layer=args.layer, nozzle=args.nozzle, bed=config.bed(job.root))
+    out.code = 0 if rep.ok else 1
+    if args.json:  # machine output alone on stdout, like show --json
+        out.raw = json.dumps(rep.to_dict(), indent=1)
+        return out
+    out.add(f"File: {f}")
+    out.add(*slicer.summary(rep))
+    out.code = 0 if rep.ok else 1
+    out.result = "slices cleanly" if rep.ok else "a slicer prints this wrong"
+    out.next = "none, the file slices cleanly" if rep.ok else ("stone build" if not args.file else f"stone slice {f}")
     return out
 
 
@@ -2396,6 +2432,12 @@ def make_parser() -> Parser:
     s = sub.add_parser("check", parents=[common], help="print checks on an STL")
     s.add_argument("file", nargs="?")
 
+    s = sub.add_parser("slice", parents=[common], help="layer by layer, what a slicer would print wrong")
+    s.add_argument("file", nargs="?")
+    s.add_argument("--layer", type=float, default=0.2, help="layer height, mm")
+    s.add_argument("--nozzle", type=float, default=0.4, help="nozzle width, mm")
+    s.add_argument("--json", action="store_true", help="the full report as JSON")
+
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
 
@@ -2448,6 +2490,7 @@ COMMANDS = {
     "set": cmd_set,
     "build": cmd_build,
     "check": cmd_check,
+    "slice": cmd_slice,
     "image": cmd_image,
     "measure": cmd_measure,
     "find": cmd_find,
