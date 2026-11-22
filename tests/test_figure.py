@@ -234,9 +234,17 @@ def test_a_job_made_before_the_cache_key_folder_keeps_its_figure(tmp_path, monke
     monkeypatch.setattr(figure, "cache_key", lambda k: k)  # as before: the folder is the plain key
     old = figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
     monkeypatch.setattr(figure, "cache_key", lambda k: "v2" + k)
+    cache = tmp_path / "cache"
+    monkeypatch.setenv("STONE_FIGURE_CACHE", str(cache))
     new = figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
     assert calls == ["lift"], "the old job's figure was made again"
     assert new.parent.name == "v2" + old.parent.name and new.read_bytes() == old.read_bytes()
+    # made under settings no one recorded (a stand-in lift, say), it never enters the shared cache
+    # under this host's key (PR 8 review, first-F1)
+    (new.parent / "figure.stl").unlink()
+    figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
+    assert not (cache / new.parent.name).exists()
+    monkeypatch.setenv("STONE_FIGURE_CACHE", "0")
     monkeypatch.setenv("STONE_LIFT_OCTREE", "512")  # a finer grid than it was lifted on
     monkeypatch.setattr(figure, "cache_key", lambda k: "v3" + k)
     figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)

@@ -747,14 +747,19 @@ def _model_id(env: str | None) -> str:
     return str(p.resolve()) + ":" + ",".join(str(f.stat().st_size) for f in files)
 
 
+def _describe_on() -> bool:
+    """Whether a description is part of the figure here: a host with no style model can only reuse
+    a figure, so it asks for one made as its settings request."""
+    return os.environ.get("STONE_DESCRIBE", "1") != "0" and (_describe_model() is not None or not _can_style())
+
+
 def cache_key(key: str) -> str:
     """The folder key plus every setting outside it that changes the finished mesh. Describe counts
     as it will really run here; a host with no style model can only reuse a figure, so it asks
     for one made as its settings request. The job's figure folder is named by it."""
     e = os.environ.get
-    describe = e("STONE_DESCRIBE", "1") != "0" and (_describe_model() is not None or not _can_style())
     return _digest(key, e("STONE_STYLE_REFS", "1"), _model_id(e("STONE_STYLE_MODEL")), e("STONE_LIFT") or "",
-                   lift_octree(), e("STONE_LIFT_CHUNKS", "4000"), describe,
+                   lift_octree(), e("STONE_LIFT_CHUNKS", "4000"), _describe_on(),
                    e("STONE_HEAD_GRAFT", "1") != "0", REPAIR_VERSION)
 
 
@@ -772,9 +777,14 @@ def _from_cache(key: str, folder: Path) -> bool:
     return True
 
 
+NOT_CACHED = ".not-cached"  # this folder's figure is not the one its key names
+
+
 def _to_cache(key: str, folder: Path) -> None:
     c = cache_dir()
     key = folder.name
+    if (folder / NOT_CACHED).exists():
+        return  # carried from a job made before the key named the folder: its settings are unknown
     if c is None or (c / key / "figure.stl").exists():
         return
     try:
@@ -819,6 +829,7 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
         # a job made before the folder took the cache key keeps its figure instead of running the
         # models again (a Linux host cannot style one at all)
         shutil.copytree(legacy, folder, dirs_exist_ok=True)
+        (folder / NOT_CACHED).write_text(str(legacy) + "\n")
     if not fig.exists() and _from_cache(key, folder):
         say("Using the figure made before from these photos (shared cache).")
     if current(folder):
@@ -836,6 +847,10 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
             if not look.exists():
                 say("Describing the photo (LFM3-VL-2B, under a minute)...")
             desc = describe(photos[0], look, who)
+            if not desc and _describe_on():
+                # the key says described, but the model gave nothing: this figure is not the one
+                # that key names, so it stays out of the shared cache
+                (folder / NOT_CACHED).write_text("no description\n")
         refs = photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]
         # the face comes from whichever photo shows it biggest: a found lead photo is often a whole
         # person on a stage, and a few pixels of face come out a generic one (Shane Gillis, 2026-11-21)

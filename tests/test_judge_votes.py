@@ -165,3 +165,22 @@ def test_the_craft_score_is_the_median_of_three_runs(tmp_path):
     assert res["faults"] == []
     with pytest.raises(judge_views.JudgeFailed):
         judge_views.median_score(tmp_path, "a figure", one=lambda *a, **k: (_ for _ in ()).throw(judge_views.JudgeFailed("x")))
+
+
+def test_a_judge_run_that_times_out_is_one_lost_vote(tmp_path):
+    """A run that hits the 900 s timeout, or finds no claude on PATH, drops out of the median
+    instead of failing it (PR 8 review, first-F2)."""
+    import subprocess
+
+    import judge_views
+
+    got = iter([{"score": 6, "faults": []}, subprocess.TimeoutExpired("claude", 900), FileNotFoundError("claude")])
+
+    def one(build, request, model):
+        r = next(got)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    res = judge_views.median_score(tmp_path, "a figure", one=one)
+    assert res["score"] == 6 and len(res["errors"]) == 2

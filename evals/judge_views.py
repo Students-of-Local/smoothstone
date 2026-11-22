@@ -172,8 +172,8 @@ def votes(build: Path, request: str, faults_in: list[str] | None = None, n: int 
     def try_one(_=None):
         try:
             return one(build, request, model=model)
-        except JudgeFailed as e:
-            errors.append(str(e))
+        except Exception as e:  # a timeout or a missing claude is one lost vote, not the score
+            errors.append(str(e) if isinstance(e, JudgeFailed) else f"{type(e).__name__}: {e}")
             return None
 
     with ThreadPoolExecutor(need) as pool:
@@ -207,8 +207,8 @@ def median_score(build: Path, request: str, n: int = 3, model: str = "opus", one
     def try_one(_=None):
         try:
             return one(build, request, model=model)
-        except JudgeFailed as e:
-            errors.append(str(e))
+        except Exception as e:  # a timeout or a missing claude is one lost vote, not the score
+            errors.append(str(e) if isinstance(e, JudgeFailed) else f"{type(e).__name__}: {e}")
             return None
 
     with ThreadPoolExecutor(n) as pool:
