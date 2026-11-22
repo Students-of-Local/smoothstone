@@ -494,8 +494,8 @@ PART_OFF_MAX = 0.02  # share of a part's area that may take another color (0.0 m
 
 def grade_found(job: Path, want: dict, checker=None) -> list[str]:
     """What is wrong with the photos stone find took, by a spec's expect.found:
-    {"wikidata": the person's id, "never": file titles that must not be a photo, "one_face": every
-    photo shows one clear face (faces.py; a checker that cannot load fails the run, never passes it)}."""
+    {"wikidata": the person's id, "never": file titles that must not be a photo, "first_year_at_least":
+    the year photo 1 must be from or after (how they look now), "one_face": every photo shows one clear face (faces.py; a checker that cannot load fails the run, never passes it)}."""
     try:
         found = json.loads((job / "image" / "found" / "found.json").read_text())
     except (OSError, ValueError):
@@ -504,6 +504,12 @@ def grade_found(job: Path, want: dict, checker=None) -> list[str]:
     if want.get("wikidata") and found.get("wikidata") != want["wikidata"]:
         why.append(f"photos of wikidata {found.get('wikidata')} (want {want['wikidata']})")
     titles = [p.get("title", "").removeprefix("File:") for p in found.get("photos", [])]
+    years = [p.get("year") or 0 for p in found.get("photos", [])]
+    if want.get("first_year_at_least") and (not years or years[0] < want["first_year_at_least"]):
+        why.append(f"photo 1 is from {years[0] if years else 'nowhere'}; a person's first photo must be "
+                   f"from {want['first_year_at_least']} or later, how they look now")
+    if years and years[0] < max(years):
+        why.append(f"photo 1 is from {years[0]} but photo {years.index(max(years)) + 1} is from {max(years)}")
     why += [f"photo {t} is one it must never take" for t in titles if t in set(want.get("never", []))]
     if want.get("one_face"):
         from smoothstone import faces

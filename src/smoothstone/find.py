@@ -261,6 +261,20 @@ def main_image(query: str) -> str | None:
     return "File:" + ent["image"] if ent and ent.get("image") else None
 
 
+YEAR = re.compile(r"(?<!\d)(19[0-9]{2}|20[0-9]{2})(?!\d)")
+
+
+def photo_year(meta: dict, title: str) -> int | None:
+    """When a photo was taken: Commons' DateTimeOriginal, else a year in its title ("CES 2026"),
+    else the upload date (it can only be later than the photo)."""
+    for text in (_clean((meta.get("DateTimeOriginal") or {}).get("value", "")), title,
+                 _clean((meta.get("DateTime") or {}).get("value", ""))):
+        m = YEAR.search(text or "")
+        if m:
+            return int(m.group(1))
+    return None
+
+
 def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> list[dict]:
     """Candidate photos for query, best first. Wikidata's main image leads when there is one.
 
@@ -331,7 +345,7 @@ def search(query: str, limit: int = 20, entity: dict | None | bool = True) -> li
             "title": title, "url": info.get("thumburl") or info.get("url"),
             "page": info.get("descriptionurl", ""), "width": w, "height": h,
             "license": lic, "author": _clean((meta.get("Artist") or {}).get("value", ""))[:120],
-            "score": score, "lead": bool(p.get("lead")),
+            "score": score, "lead": bool(p.get("lead")), "year": photo_year(meta, title),
             "artwork": bool(ART_WORDS.search(about) or ART_CATS.search(cats) or depicted.get(title, {}).get("artwork")),
         })
     out.sort(key=lambda c: -c["score"])
@@ -509,6 +523,12 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
                 continue
     if not picked:
         raise FindProblem(f"could not download photos of {query}")
+    last = max(i for i, _, _ in picked) if len(picked) >= n else len(found)
+    if kind == "person":
+        # a person changes: photo_1, the one the description and the likeness checks read, is the
+        # newest. Palmer Luckey's Wikidata photo is from 2014, clean shaven; at CES 2026 he wore a
+        # goatee, and the build threw out every true render as "added a beard" (2026-11-22)
+        picked.sort(key=lambda t: -(t[1].get("year") or 0))
     dest.mkdir(parents=True, exist_ok=True)
     got = []
     for _, c, raw in picked:
@@ -517,7 +537,6 @@ def fetch(query: str, dest: Path, n: int = 3) -> list[dict]:
         f.write_bytes(raw)
         got.append({**c, "file": str(f)})
     # what would have been a photo but for a rule: ranked above the last one kept, or any when short
-    last = picked[-1][0] if len(picked) >= n else len(found)
     dropped = [{"title": found[i]["title"], "why": w} for i, w in sorted(left.items()) if i < last]
     lines = [f"{Path(g['file']).name}: {g['title'][5:]} by {g['author'] or 'unknown'}, "
              f"{g['license']}, {g['page']}" for g in got]
