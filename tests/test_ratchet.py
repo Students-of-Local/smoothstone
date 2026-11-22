@@ -124,3 +124,13 @@ def test_run_appends_a_score_line_and_never_rewrites(tmp_path, monkeypatch):
 def test_the_sealed_heldout_set_is_guarded():
     """Deleting a sealed held-out spec must trip --check-git like any tuning spec."""
     assert "evals/engineering_heldout" in ratchet.GUARDED
+def test_a_frontier_run_keeps_its_own_floor(tmp_path):
+    """A claude run must not land in LFM3's tuning/S group and raise its floor."""
+    d = tmp_path / "runs"
+    for name, drv, cond in [("a__s0", "lfm3", None), ("b__s1", "claude", "claude-haiku_cardS")]:
+        r = d / name
+        r.mkdir(parents=True)
+        (r / "log.json").write_text(json.dumps({"spec": name[0], "suite": "tuning", "card": "S", "driver": drv,
+                                                "condition": cond, "pass": True, "run_id": name}))
+    keys = {r["key"] for r in ratchet.load_runs([d])}
+    assert keys == {"tuning/S", "tuning/claude-haiku_cardS"}
