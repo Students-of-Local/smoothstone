@@ -442,8 +442,8 @@ def traits_run(rdir: Path, job: Path, traits: list[str], grade: dict) -> dict:
 
 
 def craft_run(rdir: Path, job: Path, request: str) -> int | None:
-    """The blind craft judge (judge_views.py) on a mode run's pictures, saved as judge.json. Its
-    score never fails the run: the bar is the mean per mode (bar.py), and the ratchet's judge."""
+    """The blind craft judge (judge_views.py), the median of 3 runs, on a mode run's pictures, saved
+    as judge.json. Its score never fails the run: the bar is the mean per mode (bar.py), and the ratchet's judge."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_views
 
@@ -451,8 +451,8 @@ def craft_run(rdir: Path, job: Path, request: str) -> int | None:
     if not (build / "views.png").exists():
         return None
     try:
-        res = judge_views.judge(build, request)
-    except (Exception, SystemExit) as e:  # judge_views exits on a missing picture or a failed claude
+        res = judge_views.median_score(build, request)
+    except (Exception, SystemExit) as e:  # no verdict at all: the run is still logged
         res = {"score": None, "faults": [], "error": f"{type(e).__name__}: {e}"}
     (rdir / "judge.json").write_text(json.dumps(res, indent=1))
     return res["score"]

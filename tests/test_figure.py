@@ -166,7 +166,7 @@ def test_a_setting_that_changes_the_mesh_misses_the_cache(tmp_path, monkeypatch)
     figure.make([photo], tmp_path / "job1" / "fig", say=lambda s: None)
     figure.make([photo], tmp_path / "job2" / "fig", say=lambda s: None)
     assert calls == ["lift"]
-    monkeypatch.setenv("STONE_LIFT_OCTREE", "384")
+    monkeypatch.setenv("STONE_LIFT_OCTREE", "256")  # not the default (LIFT_OCTREE)
     figure.make([photo], tmp_path / "job3" / "fig", say=lambda s: None)
     assert calls == ["lift", "lift"]
     monkeypatch.setenv("STONE_LIFT", "python standin.py")
@@ -208,6 +208,39 @@ def test_a_rerun_with_other_settings_never_caches_the_old_files(tmp_path, monkey
     monkeypatch.setattr(figure, "repair", real_repair)
     figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
     assert calls == ["lift", "lift"], "the stand-in lift.glb was reused for the real figure"
+
+
+def test_a_job_made_before_the_cache_key_folder_keeps_its_figure(tmp_path, monkeypatch):
+    """The figure folder took the cache key's name (PR 8 review r2); a job made before it, such as a
+    gold job, keeps its finished figure instead of running the models again, which a Linux host
+    cannot do at all. A figure lifted on another grid is still made again."""
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"jpeg")
+    calls = []
+
+    def fake_style(photos, out, *a, **k):
+        shutil.copyfile(photo, out)
+        return out
+
+    def fake_lift(render, out, seed):
+        calls.append("lift")
+        return standin(out)
+
+    monkeypatch.setenv("STONE_FIGURE_CACHE", "0")
+    monkeypatch.setenv("STONE_HEAD_GRAFT", "0")
+    monkeypatch.setattr(figure, "describe", lambda p, out, who: out.write_text("") and "")
+    monkeypatch.setattr(figure, "style", fake_style)
+    monkeypatch.setattr(figure, "lift", fake_lift)
+    monkeypatch.setattr(figure, "cache_key", lambda k: k)  # as before: the folder is the plain key
+    old = figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
+    monkeypatch.setattr(figure, "cache_key", lambda k: "v2" + k)
+    new = figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
+    assert calls == ["lift"], "the old job's figure was made again"
+    assert new.parent.name == "v2" + old.parent.name and new.read_bytes() == old.read_bytes()
+    monkeypatch.setenv("STONE_LIFT_OCTREE", "512")  # a finer grid than it was lifted on
+    monkeypatch.setattr(figure, "cache_key", lambda k: "v3" + k)
+    figure.make([photo], tmp_path / "job" / "fig", say=lambda s: None)
+    assert calls == ["lift", "lift"]
 
 
 def test_a_figure_made_without_a_description_is_not_one_made_with_it(tmp_path, monkeypatch):

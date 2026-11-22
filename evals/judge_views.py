@@ -196,6 +196,34 @@ def votes(build: Path, request: str, faults_in: list[str] | None = None, n: int 
             "errors": errors, "model": model, "request": request}
 
 
+def median_score(build: Path, request: str, n: int = 3, model: str = "opus", one=judge) -> dict:
+    """The craft score as the median of n blind judge runs side by side: one run swings by a point
+    (Sienna Miller's same render scored 6 and 8, random five round 6). A failed run is dropped;
+    JudgeFailed when none is left. faults keeps what more than half the runs' panels share."""
+    errors: list[str] = []
+
+    def try_one(_=None):
+        try:
+            return one(build, request, model)
+        except JudgeFailed as e:
+            errors.append(str(e))
+            return None
+
+    with ThreadPoolExecutor(n) as pool:
+        runs = [r for r in pool.map(try_one, range(n)) if r is not None]
+    if not runs:
+        raise JudgeFailed(f"no verdict from {n} tries: " + "; ".join(errors))
+    seen: dict[str, int] = {}
+    for r in runs:
+        for panel in {f.get("panel", "") for f in r.get("faults", [])}:
+            seen[panel] = seen.get(panel, 0) + 1
+    shared = {p for p, k in seen.items() if k * 2 > len(runs)}
+    return {"score": statistics.median(r["score"] for r in runs),
+            "faults": [f for r in runs for f in r.get("faults", []) if f.get("panel", "") in shared],
+            "scores": [r["score"] for r in runs], "runs": runs, "errors": errors, "model": model,
+            "request": request}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run", help="a run folder (with job/) or a job folder")

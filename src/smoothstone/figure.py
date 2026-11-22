@@ -750,8 +750,7 @@ def _model_id(env: str | None) -> str:
 def cache_key(key: str) -> str:
     """The folder key plus every setting outside it that changes the finished mesh. Describe counts
     as it will really run here; a host with no style model can only reuse a figure, so it asks
-    for one made as its settings request. The job's own folder keeps the plain key, so a job made
-    before keeps its figure; a lift on another grid is lifted again there (lift-octree.txt)."""
+    for one made as its settings request. The job's figure folder is named by it."""
     e = os.environ.get
     describe = e("STONE_DESCRIBE", "1") != "0" and (_describe_model() is not None or not _can_style())
     return _digest(key, e("STONE_STYLE_REFS", "1"), _model_id(e("STONE_STYLE_MODEL")), e("STONE_LIFT") or "",
@@ -761,7 +760,7 @@ def cache_key(key: str) -> str:
 
 def _from_cache(key: str, folder: Path) -> bool:
     c = cache_dir()
-    k = cache_key(key) if c is not None else ""
+    k = folder.name
     if c is None or not (c / k / "figure.stl").exists():
         return False
     for name in CACHED:
@@ -775,10 +774,8 @@ def _from_cache(key: str, folder: Path) -> bool:
 
 def _to_cache(key: str, folder: Path) -> None:
     c = cache_dir()
-    if c is None:
-        return
-    key = cache_key(key)
-    if (c / key / "figure.stl").exists():
+    key = folder.name
+    if c is None or (c / key / "figure.stl").exists():
         return
     try:
         tmp = c / f".{key}.tmp{os.getpid()}"
@@ -803,17 +800,28 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
     key = _digest(*photos, style_name, who, seed, extra,
                   prompt(style_name, who, extra, (want or {}).get("glasses"),
                          heavy=bool((want or {}).get("heavy"))))
-    folder = folder / key
+    head_on = (who == "person" and style_name in GRAFT_STYLES and os.environ.get("STONE_HEAD_GRAFT", "1") != "0")
+
+    def current(f: Path) -> bool:  # lifted on this grid, and grafted when the graft is on
+        grid = f / "lift-octree.txt"
+        return ((f / "figure.stl").exists()
+                and (grid.read_text().strip() if grid.exists() else "256") == lift_octree()
+                and (not head_on or (f / "graft.json").exists()))
+
+    # the folder is named by the cache key, so a change of mesh settings starts a fresh folder and
+    # the files in it always match the key they are cached under
+    legacy = folder / key
+    folder = folder / cache_key(key)
     folder.mkdir(parents=True, exist_ok=True)
     fig = folder / "figure.stl"
     latest = folder.parent / "latest.txt"
+    if not fig.exists() and current(legacy):
+        # a job made before the folder took the cache key keeps its figure instead of running the
+        # models again (a Linux host cannot style one at all)
+        shutil.copytree(legacy, folder, dirs_exist_ok=True)
     if not fig.exists() and _from_cache(key, folder):
         say("Using the figure made before from these photos (shared cache).")
-    head_on = (who == "person" and style_name in GRAFT_STYLES and os.environ.get("STONE_HEAD_GRAFT", "1") != "0")
-    grid = folder / "lift-octree.txt"
-    current = ((grid.read_text().strip() if grid.exists() else "256") == lift_octree()
-               and (not head_on or (folder / "graft.json").exists()))
-    if fig.exists() and current:
+    if current(folder):
         # a finished figure needs no model, even with the style and lift files gone; one lifted on a
         # coarser grid, or made before the head graft, goes on to be made again below
         if shown and (folder / "style.png").exists():

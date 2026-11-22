@@ -1,5 +1,6 @@
 """The judge vote: one noisy judge run must not flip a pass or a fail."""
 
+import pytest
 import sys
 from pathlib import Path
 
@@ -141,3 +142,26 @@ def test_a_judge_run_that_times_out_is_a_judge_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", slow)
     with pytest.raises(judge_views.JudgeFailed):
         judge_views.judge(tmp_path, "req")
+
+
+def test_the_craft_score_is_the_median_of_three_runs(tmp_path):
+    """One craft judge run swings by a point (Sienna Miller's same render: 6, then 8). The craft
+    score is the median of three, a run that fails is dropped, and a fault only one run names is
+    not reported."""
+    import judge_views
+
+    got = iter([{"score": 6, "faults": [{"panel": "closeup face 0 deg", "what": "flecks"}]},
+                {"score": 8, "faults": []},
+                judge_views.JudgeFailed("no JSON")])
+
+    def one(build, request, model):
+        r = next(got)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    res = judge_views.median_score(tmp_path, "a figure", one=one)
+    assert res["score"] == 7 and res["scores"] == [6, 8] and res["errors"] == ["no JSON"]
+    assert res["faults"] == []
+    with pytest.raises(judge_views.JudgeFailed):
+        judge_views.median_score(tmp_path, "a figure", one=lambda *a: (_ for _ in ()).throw(judge_views.JudgeFailed("x")))
