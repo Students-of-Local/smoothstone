@@ -33,7 +33,12 @@
           8.94,
           4.26
         ],
-        "source": "u: drawing https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf front edge '11.2' from the left board edge, plus 0.45 frame offset. v and size: STEP RP-010083 body centered at x 11.20, bbox z 0.336 to 4.596, width 8.94. Drawing side view '3.2' (connector top above PCB top) vs STEP 3.29"
+        "source": "u: drawing https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf front edge '11.2' from the left board edge, plus 0.45 frame offset. v and size: STEP RP-010083 body centered at x 11.20, bbox z 0.336 to 4.596, width 8.94. Drawing side view '3.2' (connector top above PCB top) vs STEP 3.29; plug: Apple's 'RECOMMENDED CONNECTOR KEEPOUT' for a mating USB-C plug, '12.45' by '6.60', reaching 'OUTWARD 14.0 mm' (https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf p2, Detail C and note 2), the one first-party USB-C plug envelope we found; the USB-IF overmold figure (Type-C R2.0 Figure 3-80) could not be read",
+        "plug": [
+          12.45,
+          6.6
+        ],
+        "depth": 14.0
       },
       {
         "name": "micro_hdmi_0",
@@ -47,7 +52,8 @@
           7.19,
           4.45
         ],
-        "source": "u: drawing front edge '25.8' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 25.80, bbox z 0.235 to 4.682, width 7.19. Drawing side view '3.4' (connector top above PCB top) vs STEP 3.376"
+        "source": "u: drawing front edge '25.8' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 25.80, bbox z 0.235 to 4.682, width 7.19. Drawing side view '3.4' (connector top above PCB top) vs STEP 3.376",
+        "plug_note": "no first-party micro HDMI (Type D) plug size found: the HDMI spec is licensed and Raspberry Pi's own cable page gives none, so only the receptacle is checked"
       },
       {
         "name": "micro_hdmi_1",
@@ -61,7 +67,8 @@
           7.19,
           4.45
         ],
-        "source": "u: drawing front edge '39.2' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 39.20, bbox z 0.235 to 4.682, width 7.19"
+        "source": "u: drawing front edge '39.2' from the left board edge, plus 0.45 offset. v and size: STEP RP-010083 shell centered at x 39.20, bbox z 0.235 to 4.682, width 7.19",
+        "plug_note": "no first-party micro HDMI (Type D) plug size found: the HDMI spec is licensed and Raspberry Pi's own cable page gives none, so only the receptacle is checked"
       },
       {
         "name": "ethernet",
@@ -75,7 +82,8 @@
           15.93,
           15.3
         ],
-        "source": "u: drawing right edge '10.2' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 jack bbox y 2.285 to 18.215 (center 10.25), z -0.664 to 14.636 (includes its through pins)"
+        "source": "u: drawing right edge '10.2' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 jack bbox y 2.285 to 18.215 (center 10.25), z -0.664 to 14.636 (includes its through pins)",
+        "plug_note": "no first-party RJ45 plug size found (IEC 60603-7 is paid; only distributor listings), so only the jack's opening is checked"
       },
       {
         "name": "usb_stack_a",
@@ -89,7 +97,8 @@
           14.5,
           17.69
         ],
-        "source": "u: drawing right edge '29.1' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 21.75 to 36.25 (center 29.0), z -0.164 to 17.526"
+        "source": "u: drawing right edge '29.1' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 21.75 to 36.25 (center 29.0), z -0.164 to 17.526",
+        "plug_note": "no first-party USB-A plug overmold size found (the USB 2.0 figure is typical, not normative, and was not read), so only the receptacle is checked"
       },
       {
         "name": "usb_stack_b",
@@ -103,7 +112,8 @@
           14.5,
           17.53
         ],
-        "source": "u: drawing right edge '47' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 39.75 to 54.25 (center 47.0), z -0.166 to 17.361"
+        "source": "u: drawing right edge '47' from the front board edge, plus 1.63 offset. v and size: STEP RP-010083 dual USB-A body bbox y 39.75 to 54.25 (center 47.0), z -0.166 to 17.361",
+        "plug_note": "no first-party USB-A plug overmold size found (the USB 2.0 figure is typical, not normative, and was not read), so only the receptacle is checked"
       },
       {
         "name": "power_button",

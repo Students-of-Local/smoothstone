@@ -312,8 +312,9 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         why = [] if not done and "?" in last else (["built a part with a made-up size"] if done else ["ended without asking"])
         return {"pass": not why, "why": why or ["asked for the size"], "recipe": recipe, "params": params,
                 "checks": [], "stl": None, "stl_sha256": None}
-    # an engineering spec (evals/engineering) names the product and the job, not the recipe
-    if "recipe" in exp and recipe != exp["recipe"]:
+    # an engineering spec (evals/engineering) names the product and the job, not the recipe; any
+    # other spec must name its recipe, so a typo there still raises
+    if not spec.get("product") and recipe != exp["recipe"]:
         why.append(f"recipe {recipe} (want {exp['recipe']})")
     for k, want in exp.get("params", {}).items():
         got = params.get(k)

@@ -36,7 +36,8 @@
           12.45,
           6.6
         ],
-        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, Detail C: port opening '9.00' wide by '3.25' tall, centered '35.92' from the side edge, centerline '4.375' from the back ('12X 4.375' in the bottom view); 'RECOMMENDED CONNECTOR KEEPOUT' '12.45' by '6.60' with '2X R3.25', note 2 'MATING CONNECTOR KEEPOUT AREA FLUSH TO PRODUCT SURFACE REQUIRED OUTWARD 14.0 mm'; bottom view gives the opening from x 31.43 to 40.42)"
+        "source": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, Detail C: port opening '9.00' wide by '3.25' tall, centered '35.92' from the side edge, centerline '4.375' from the back ('12X 4.375' in the bottom view); 'RECOMMENDED CONNECTOR KEEPOUT' '12.45' by '6.60' with '2X R3.25', note 2 'MATING CONNECTOR KEEPOUT AREA FLUSH TO PRODUCT SURFACE REQUIRED OUTWARD 14.0 mm'; bottom view gives the opening from x 31.43 to 40.42)",
+        "depth": 14.0
       },
       {
         "name": "speaker_and_mic_2",

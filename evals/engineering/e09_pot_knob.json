@@ -36,7 +36,13 @@
     ],
     "open": [
       "-z"
-    ]
+    ],
+    "face_gap": {
+      "+z": [
+        0.0,
+        1.0
+      ]
+    }
   },
-  "why": "z along the shaft, the body is the knurled 7 mm at the tip of the 20 mm S-Type shaft (A in the p2 S-Type table), -z where the knurl starts: a press fit knob on the 6.0 mm 18 teeth knurl, covering its sides and tip, open below where the plain shaft runs to the housing."
+  "why": "z along the shaft, the body is the knurled 7 mm at the tip of the 20 mm S-Type shaft (A in the p2 S-Type table), -z where the knurl starts: a press fit knob on the 6.0 mm 18 teeth knurl, covering its sides and tip, open below where the plain shaft runs to the housing. The press band applies to the knurl's sides; the tip (+z) is an end face that carries no fit, so its face_gap asks only that the bore floor not press on it and stay within 1 mm of it (our band)."
 }

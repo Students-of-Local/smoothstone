@@ -25,9 +25,10 @@
     "kind": "mount",
     "material": "PETG",
     "fit": "slip",
-    "retention": "screw",
+    "retention": "any",
     "load_n": 20,
     "load_dir": "-z",
+    "support": "-z",
     "safety": 2,
     "covered": [
       "+x",
@@ -39,5 +40,5 @@
       "+y"
     ]
   },
-  "why": "Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin; Apple lists the ports 'On front' and 'On back' with no positions and the power button on the bottom is not located, so front and back stay open, the bottom is unchecked, and the mount wraps the sides and top."
+  "why": "Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin. The Mac has no screw points, so nothing screws into it: the mount wraps the sides and top and must bear on the bottom (support -z) in three of its four quarters so the Mac cannot drop out. Apple lists the ports 'On front' and 'On back' with no positions and does not locate the power button on the bottom, so front and back stay open and the bottom is supported, not covered."
 }
