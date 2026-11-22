@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,6 +40,40 @@ jobs:
       - name: Tests
         run: xvfb-run -a uv run pytest -q
 
+  # The sheet and the evals build every recipe through stone's checks, which
+  # slice each part; together with the tests they ran past 60 minutes on one
+  # runner, so they run in their own job beside the tests.
+  sheet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends potrace xvfb libgl1 libegl1 libglu1-mesa libfontconfig1
+
+      - name: OpenSCAD nightly AppImage
+        run: |
+          name=$(curl -fsSL https://files.openscad.org/snapshots/ \
+            | grep -oE 'OpenSCAD-[0-9.]+-x86_64\.AppImage' | sort -uV | tail -1)
+          echo "Using $name"
+          curl -fsSL -o openscad.AppImage "https://files.openscad.org/snapshots/$name"
+          chmod +x openscad.AppImage
+          mkdir -p "$RUNNER_TEMP/openscad"
+          cd "$RUNNER_TEMP/openscad"
+          "$GITHUB_WORKSPACE/openscad.AppImage" --appimage-extract > /dev/null
+          echo "STONE_OPENSCAD=$RUNNER_TEMP/openscad/squashfs-root/AppRun" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/openscad/squashfs-root/AppRun" --version
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Sync
+        run: uv sync
+
       - name: Every recipe and example builds and passes the print checks
         run: xvfb-run -a uv run python tools/sheet.py all --out "$RUNNER_TEMP/sheet"
 
@@ -50,7 +84,7 @@ jobs:
             xvfb-run -a uv run python evals/run.py "$s" --seed 1 --driver next --out "$RUNNER_TEMP/next" | tail -1
           done
           uv run python evals/summary.py "$RUNNER_TEMP/next" | tee "$RUNNER_TEMP/next.txt"
-          ! grep -q "^t.* 0/1" "$RUNNER_TEMP/next.txt"
+          if grep -q "^t.* 0/1" "$RUNNER_TEMP/next.txt"; then echo "a tuning task failed"; exit 1; fi
           uv run python evals/ratchet.py "$RUNNER_TEMP/next"
 
       - name: The ratchet holds against main (no lowered floor or deleted spec without a LOG.md line)
