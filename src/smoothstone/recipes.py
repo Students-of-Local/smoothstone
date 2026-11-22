@@ -41,6 +41,7 @@ class Param:
     required_unless: str = ""
     fit_add: float = 0.0  # clearance added to a size read from the request ("5 mm cables" -> 5.3 mm slots)
     product: bool = False  # a choice that names the real thing the part fits (phone=iphone_17_pro), so it is a size
+    catalog: str = ""  # its choices are the product catalog's (catalog.py): "fitted_case" = the products a case holds
 
     def range_text(self) -> str:
         if self.type in ("number", "int"):
@@ -169,8 +170,19 @@ def _load_one(d: Path) -> Recipe:
                 required_unless=raw.get("required_unless", "") or "",
                 fit_add=float(raw.get("fit_add", 0) or 0),
                 product=bool(raw.get("product", False)),
+                catalog=str(raw.get("catalog", "") or ""),
             )
         )
+    phrases = dict(data.get("phrases") or {})
+    for p in params:
+        if p.catalog:
+            # the catalog's products are the choices, and each name or model number people type picks one
+            from . import catalog
+
+            p.choices = catalog.case_slugs()
+            for slug in p.choices:
+                for a in catalog.get(slug).get("aliases", []):
+                    phrases.setdefault(a.lower(), {p.name: slug})
     return Recipe(
         name=data.get("name") or d.name,
         title=data.get("title", d.name),
@@ -189,7 +201,7 @@ def _load_one(d: Path) -> Recipe:
         aliases=dict(data.get("aliases") or {}),
         counts=dict(data.get("counts") or {}),
         size_order=list(data.get("size_order") or []),
-        phrases=dict(data.get("phrases") or {}),
+        phrases=phrases,
         grow=dict(data.get("grow") or {}),
         skip=dict(data.get("skip") or {}),
         supports=bool(data.get("supports", False)),
@@ -282,7 +294,25 @@ def head(query: str) -> list[str]:
     return words
 
 
+def catalog_param(r: Recipe) -> Param | None:
+    """The recipe's parameter whose choices are the product catalog, if it has one."""
+    return next((p for p in r.params if p.catalog), None)
+
+
 def fit(r: Recipe, query: str) -> int:
+    """How well the request names what the recipe makes (_fit_words). A recipe whose product comes
+    from the catalog fits fully only when the request names one of its products; otherwise it fits
+    at most 1, behind any recipe that makes the thing by name (a phone case for an iPhone)."""
+    got = _fit_words(r, query)
+    cp = catalog_param(r)
+    if cp is not None and got:
+        from . import catalog
+
+        return got if catalog.find(query, list(cp.choices)) else min(got, 1)
+    return got
+
+
+def _fit_words(r: Recipe, query: str) -> int:
     """How well the request names what the recipe makes. 3 when a makes phrase ends in the noun the
     request starts with ("a guard for a PC fan" is a fan guard), 2 when a phrase is in the request
     word for word somewhere else ("a box" in "a guard ... inside a box"), 1 when all of a phrase's

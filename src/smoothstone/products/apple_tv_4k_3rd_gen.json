@@ -1,0 +1,36 @@
+{
+ "slug": "apple_tv_4k_3rd_gen",
+ "name": "Apple TV 4K (3rd generation)",
+ "aliases": [
+  "Apple TV 4K (3rd generation)",
+  "Apple TV 4K 3rd generation",
+  "Apple TV 4K 3rd gen"
+ ],
+ "set": "tuning",
+ "from_spec": "evals/engineering/e05_appletv_wall_holder.json",
+ "frame": "Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page. The holder screws to the wall through its -x side (attach -x): the Apple TV sits on its bottom with its left side to the wall, so its back's ports and its front face along the wall and stay open. It weighs 208 g (Wi-Fi) or 214 g (Wi-Fi + Ethernet) on https://support.apple.com/en-us/111839, 2.1 N, so 10 N leaves margin for a bump or a cable pulled; the floor cantilevers out from the wall, so the strength check runs (load_dir -z, the floor it bears on).",
+ "fitted_case": true,
+ "open_faces": [
+  "+y",
+  "-y",
+  "+z"
+ ],
+ "open_why": "faces whose features the maker does not locate, or that must stay clear, as the spec's why says: Lying flat as it sits on a shelf, back (ports) at +y: Apple lists HDMI 2.1, Gigabit Ethernet, power and an IR receiver but gives no positions, so the back, the front (IR line of sight) and the top (to drop it in) stay open; the holder cradles the bottom and sides. The live apple.com/apple-tv-4k/specs page now shows the 4th generation (93.24 x 93.24 x 31.00), so the 3rd generation size comes from Apple's support tech specs page. The holder screws to the wall through its -x side (attach -x): the Apple TV sits on its bottom with its left side to the wall, so its back's ports and its front face along the wall and stay open. It weighs 208 g (Wi-Fi) or 214 g (Wi-Fi + Ethernet) on https://support.apple.com/en-us/111839, 2.1 N, so 10 N leaves margin for a bump or a cable pulled; the floor cantilevers out from the wall, so the strength check runs (load_dir -z, the floor it bears on).",
+ "body": {
+  "w": 93.0,
+  "d": 93.0,
+  "h": 31.0,
+  "corner_r": 0.0
+ },
+ "body_sources": {
+  "w": "https://support.apple.com/en-us/111839 (Size and Weight, 'Width: 3.66 inches (93 mm)')",
+  "d": "https://support.apple.com/en-us/111839 (Size and Weight, 'Depth: 3.66 inches (93 mm)')",
+  "h": "https://support.apple.com/en-us/111839 (Size and Weight, 'Height: 1.2 inches (31 mm)')",
+  "weight": "https://support.apple.com/en-us/111839 (Size and Weight, 'Weight (Wi-Fi model): 7.3 ounces (208 g)', 'Weight (Wi-Fi + Ethernet model): 7.5 ounces (214 g)')",
+  "corner_r": "no radius published on https://support.apple.com/en-us/111839; 0 is the enclosing box"
+ },
+ "features": [],
+ "sources": [
+  "https://support.apple.com/en-us/111839"
+ ]
+}

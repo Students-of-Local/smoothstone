@@ -23,6 +23,8 @@ from . import image as imagetool
 from . import measure as measuretool
 from . import find as findtool
 from . import figure as figuretool
+from . import catalog
+from . import fitted
 from . import recipes as rc
 from . import printable
 from . import scad
@@ -413,6 +415,11 @@ def cmd_show(args, job: Job) -> Out:
     if sug:
         items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items()]
         out.add(f"From the request: {' '.join(items)}")
+    cp = rc.catalog_param(r)
+    if cp is not None and sug.get(cp.name):
+        prod = catalog.get(str(sug[cp.name]))
+        if prod:
+            out.add(f"Product: {prod['name']} (catalog, sourced: {', '.join(prod.get('sources', [])[:1])})")
     ms = measured_size(job, r) if job.exists() else None
     if ms and ms[0] not in sug:
         clamp = f", the measured {rc.fmt_num(ms[2])} mm is out of range" if ms[1] != ms[2] else ""
@@ -874,7 +881,8 @@ def cmd_build(args, job: Job) -> Out:
             return out
     bd = job.build_dir
     bd.mkdir(parents=True, exist_ok=True)
-    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad", "stamp.json", "figure-braced.stl"):
+    for f in ("part.stl", "part.off", "preview.png", "check.json", "openscad.log", "preview.scad", "stamp.json", "figure-braced.stl",
+              "engineering.json"):
         (bd / f).unlink(missing_ok=True)
     for f in [*job.root.glob("*.stl"), *job.root.glob("*.3mf")]:
         f.unlink()  # the finished part always matches the last build
@@ -973,6 +981,9 @@ def cmd_build(args, job: Job) -> Out:
         # a passing build is the finished part: no last step for a small model to forget
         final = job.root / f"{r.name}.stl"
         shutil.copyfile(stl, final)
+        eng = fitted.write(bd, r, params, run.log)
+        if eng:
+            out.add(f"Engineering: {eng} (where the product sits, what holds it, a source for every size)")
         views = views_step(job, stl)
         if views:
             out.add(f"Views: {views} (look at every panel before you call it done)")

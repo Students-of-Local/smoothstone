@@ -1,0 +1,38 @@
+{
+ "slug": "flipper_zero",
+ "name": "Flipper Zero",
+ "aliases": [
+  "Flipper Zero",
+  "Flipper"
+ ],
+ "set": "tuning",
+ "from_spec": "evals/engineering/e02_flipper_zero_case.json",
+ "frame": "Lying screen up (+z): Flipper publishes the size but no port, button, IR or microSD positions (drawing B9C6 dimensions only the GPIO pin row, not the header's outline), so every face with a feature stays open and the case wraps only the back.",
+ "fitted_case": true,
+ "open_faces": [
+  "+z",
+  "+x",
+  "-x",
+  "+y",
+  "-y"
+ ],
+ "open_why": "faces whose features the maker does not locate, or that must stay clear, as the spec's why says: Lying screen up (+z): Flipper publishes the size but no port, button, IR or microSD positions (drawing B9C6 dimensions only the GPIO pin row, not the header's outline), so every face with a feature stays open and the case wraps only the back.",
+ "body": {
+  "w": 100.3,
+  "d": 40.1,
+  "h": 25.6,
+  "corner_r": 0.0
+ },
+ "body_sources": {
+  "w": "https://docs.flipper.net/zero/development/hardware/tech-specs (Size and weight, 'Width: 100.3 mm (3.95 inches)'); same value as reference dim (100.3) on Flipper's drawing 'FLIPPER ZERO (B9C6)', https://cdn.flipperzero.one/Monosnap_flipper-zero-body-2d.pdf_2022-09-13_13-14-57.png",
+  "d": "https://docs.flipper.net/zero/development/hardware/tech-specs (Size and weight, 'Height: 40.1 mm (1.58 inches)', the short side of the face); reference dim (40.1) on the front view of drawing B9C6, https://cdn.flipperzero.one/Monosnap_flipper-zero-body-2d.pdf_2022-09-13_13-14-57.png",
+  "h": "https://docs.flipper.net/zero/development/hardware/tech-specs (Size and weight, 'Depth: 25.6 mm (1.01 inches)', the thickness); reference dim (25.6) on the top view of drawing B9C6, https://cdn.flipperzero.one/Monosnap_flipper-zero-body-2d.pdf_2022-09-13_13-14-57.png",
+  "corner_r": "https://cdn.flipperzero.one/Monosnap_flipper-zero-body-2d.pdf_2022-09-13_13-14-57.png: no radius published (drawing B9C6 gives only the three overall reference dims; the body has a pointed left end); 0 is the enclosing box"
+ },
+ "features": [],
+ "sources": [
+  "https://docs.flipper.net/zero/development/hardware/tech-specs",
+  "https://docs.flipper.net/zero/development/hardware/flipper-blueprints",
+  "https://cdn.flipperzero.one/Monosnap_flipper-zero-body-2d.pdf_2022-09-13_13-14-57.png"
+ ]
+}

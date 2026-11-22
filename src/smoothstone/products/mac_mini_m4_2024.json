@@ -1,0 +1,35 @@
+{
+ "slug": "mac_mini_m4_2024",
+ "name": "Mac mini (2024), M4",
+ "aliases": [
+  "Mac mini (2024)",
+  "Mac mini 2024",
+  "Mac mini M4",
+  "M4 Mac mini"
+ ],
+ "set": "tuning",
+ "from_spec": "evals/engineering/e07_mac_mini_mount.json",
+ "frame": "Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin. The Mac has no screw points, so nothing screws into it: the mount wraps the sides and top and must bear on the bottom (support -z) in three of its four quarters so the Mac cannot drop out. Apple lists the ports 'On front' and 'On back' with no positions and does not locate the power button on the bottom, so front and back stay open and the bottom is supported, not covered. The mount screws up into the desk through its top (attach +z), and the strength check's arm runs from where the Mac bears on the mount to the nearest of those screws.",
+ "fitted_case": true,
+ "open_faces": [
+  "-y",
+  "+y"
+ ],
+ "open_why": "faces whose features the maker does not locate, or that must stay clear, as the spec's why says: Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin. The Mac has no screw points, so nothing screws into it: the mount wraps the sides and top and must bear on the bottom (support -z) in three of its four quarters so the Mac cannot drop out. Apple lists the ports 'On front' and 'On back' with no positions and does not locate the power button on the bottom, so front and back stay open and the bottom is supported, not covered. The mount screws up into the desk through its top (attach +z), and the strength check's arm runs from where the Mac bears on the mount to the nearest of those screws.",
+ "body": {
+  "w": 127.0,
+  "d": 127.0,
+  "h": 50.0,
+  "corner_r": 0.0
+ },
+ "body_sources": {
+  "w": "https://support.apple.com/en-us/121555 (Size and Weight, 'Width: 5.0 inches (12.7 cm)')",
+  "d": "https://support.apple.com/en-us/121555 (Size and Weight, 'Depth: 5.0 inches (12.7 cm)')",
+  "h": "https://support.apple.com/en-us/121555 (Size and Weight, 'Height: 2.0 inches (5.0 cm)')",
+  "corner_r": "no radius published on https://support.apple.com/en-us/121555; 0 is the enclosing box"
+ },
+ "features": [],
+ "sources": [
+  "https://support.apple.com/en-us/121555"
+ ]
+}
