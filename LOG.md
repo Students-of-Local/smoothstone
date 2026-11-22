@@ -400,10 +400,23 @@ section are now measured in the mesh. The rerun's stops and top failures match t
 Review round 2 closed the ways a part could pass the grade and fail in use: the strength arm is
 measured from where the product bears (and, with an attach, to the nearest screw), h_dir must lie
 along the load, and the layers come from the beam's axis; the snap arm's catch, its root and its
-sides at 5%, 50% and 95% of L are found in the mesh; e01's power button needs a Ø10 fingertip
+sides, from 5% of its length every 0.5 mm to 0.25 mm short of its tip, are found in the mesh; e01's power button needs a Ø10 fingertip
 (MIL-STD-1472F Figure 12); e05 and e07 must screw to the wall or desk through ISO 273 M4 clearance
 holes; screw retention takes through holes (bolt and nut, or a bought standoff) at ISO 273 sizes, so
 a correct e08 plate passes; e08 keeps 2.5 mm under the board outside its holes' Ø6 pads for the
 through-hole leads; and each source must be one the spec cites for that number, a profile included.
 e10 has the same lead question as e08 under a flat floor and is left for its own change. The NEXT
 baseline rerun is still 0 of 10 with the same stops and top failures.
+
+Review round 2 of PR 64 closed two more ways through and two more failures. Strength shared the load
+by bearing area and graded only the declared section, so a 1.2 x 5 mm strap under one side of e07's
+Mac passed with a section declared in the thick wall beside it; the load is now shared by statics (a
+rigid body on equal springs), and the load path is swept: every cut from the declared section out to
+the bearing points and on to the screws is graded on its own cut face. A correct e08 plate on bought
+M2.5 standoffs failed check_holes, which looked for the seat only 1.45 mm under the board; a through
+hole is now found along its axis wherever the part is. A through bolt's ring is probed through its
+wall, not 2 d deep, so an M3 bolt in a 2.5 mm wall passes; a screw hole's mouth must lie on the
+part's surface. e01 gains the Pi 5's four mounting holes with Ø6 pads and a 1.05 mm min_gap under its
+body (2.5 mm under the PCB), so a flat floor flush with the PCB fails; product holes are graded as
+screw seats only when the part screws to them, and their pads count for support. e01's w and
+usb_c_power sources cite the STEP URL they come from. e10 is still left for its own change.
