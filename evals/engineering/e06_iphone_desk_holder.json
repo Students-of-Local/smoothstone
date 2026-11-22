@@ -17,7 +17,7 @@
       "w": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, sheet 1, front view overall width '71.85'; recipes/phone_case/devices.json phones.iphone_17_pro.body.width)",
       "d": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, sheet 1, side view '8.75' PRODUCT THICKNESS, without the camera plateau; devices.json body.depth)",
       "h": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf (p2, sheet 1, front view overall height '150.01'; devices.json body.height)",
-      "corner_r": "edges parallel to z are the side edge profile, which Detail B (p2) gives as a point list, not one radius; 0 is the enclosing box"
+      "corner_r": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf: edges parallel to z are the side edge profile, which Detail B (p2) gives as a point list, not one radius; 0 is the enclosing box"
     },
     "features": [
       {

@@ -31,7 +31,8 @@ BODY = {"w": 40.0, "d": 30.0, "h": 20.0, "corner_r": 3.0}
 PORT = {"name": "usb_c", "kind": "port", "face": "-y", "c": [20.0, 8.0], "size": [9.0, 3.2], "plug": [12.0, 6.5],
         "source": "https://example.com/drawing.pdf"}
 SPEC = {"id": "x01_box_case", "request": "A case for the box.", "input": "text",
-        "product": {"name": "a box", "sources": ["https://example.com/drawing.pdf"], "body": BODY, "features": [PORT]},
+        "product": {"name": "a box", "sources": ["https://example.com/drawing.pdf"], "body": BODY, "features": [PORT],
+                    "body_sources": {k: "https://example.com/drawing.pdf p1" for k in ("w", "d", "h", "corner_r")}},
         "expect": {"kind": "case", "material": "PLA", "fit": "slip", "retention": "snap", "safety": 2,
                    "covered": ["-z", "+x", "-x", "+y", "-y"], "open": ["+z"]}}
 WALL = 2.0
@@ -67,15 +68,18 @@ def _cyl(x, y, z0, z1, r):
 ARM_ROOT_Z = 10.35  # the snap tongue in the +x wall: slots from the rim down to z 10.3
 HOOK_TOP = 1.7  # the tongue runs this far past the rim, its catch from 0.3 to 1.7 mm over the product
 SNAP = {"type": "snap", "y": 0.6, "t": 2.0, "L": 11.95 + HOOK_TOP, "w": 6.0,
-        "at": [43.6, 17.3, ARM_ROOT_Z], "t_dir": [1, 0, 0], "L_dir": [0, 0, 1]}
+        "at": [43.6, 17.3, ARM_ROOT_Z], "t_dir": [-1, 0, 0], "L_dir": [0, 0, 1]}
 
 
 def build_case(clearance: float = 0.3, hole: bool = True, lid: bool = False,
-               tongue: bool = True, hook: float = 0.6) -> tuple[trimesh.Trimesh, np.ndarray]:
+               tongue: bool = True, hook: float = 0.6, hook_out: bool = False,
+               bridge: float = 0.0) -> tuple[trimesh.Trimesh, np.ndarray]:
     """An open-top case around BODY: walls and floor WALL thick, `clearance` on every side and under
     it, the port's plug cut through the -y wall, and a snap tongue cut in the +x wall (two slots 0.8
     wide from the rim down 12 mm, 6 mm apart) that runs HOOK_TOP past the rim with a catch `hook` mm
-    deep over the product's top edge (0 for none). Returns (mesh in part coordinates, frame)."""
+    deep over the product's top edge (0 for none; on the tongue's outer face with hook_out). With
+    `bridge`, the slots stop that far under the rim, so the wall above them ties the tongue's sides.
+    Returns (mesh in part coordinates, frame)."""
     import manifold3d as m3
 
     w, d, h, r = BODY["w"], BODY["d"], BODY["h"], BODY["corner_r"]
@@ -92,10 +96,13 @@ def build_case(clearance: float = 0.3, hole: bool = True, lid: bool = False,
     if tongue:
         top = lift + h
         for y0 in (d / 2 - 3.8, d / 2 + 3.0):
-            case = case - _box([w + clearance - 0.3, y0, top - 12.0], [w + clearance + WALL + 0.3, y0 + 0.8, top + 1])
+            case = case - _box([w + clearance - 0.3, y0, top - 12.0],
+                               [w + clearance + WALL + 0.3, y0 + 0.8, top - bridge if bridge else top + 1])
         x0, x1, y0, y1 = w + clearance, w + clearance + WALL, d / 2 - 3.0, d / 2 + 3.0
         case = case + _box([x0, y0, top], [x1, y1, top + HOOK_TOP])
-        if hook:
+        if hook and hook_out:
+            case = case + _box([x1 - 0.01, y0, top + 0.3], [x1 + hook, y1, top + HOOK_TOP])
+        elif hook:
             case = case + _box([x0 - hook, y0, top + 0.3], [x0 + 0.01, y1, top + HOOK_TOP])
     if lid:  # a plate over the open top, 0.3 mm above the product
         case = case + _rounded(w, d, r, clearance + WALL, WALL).translate([0, 0, lift + h + 0.3])
@@ -303,7 +310,15 @@ def test_every_engineering_spec_is_well_formed():
         assert bool(exp.get("attach")) == (p.stem in ("e05_appletv_wall_holder", "e07_mac_mini_mount")), p.name
         for ph in exp.get("part_holes", []):
             assert ph["axis"] in eg.FACES and ph["d"] > 0 and ph["pattern"] and ph["source"]
-        assert ("load_n" in exp) == (exp["kind"] == "mount"), p.name
+        # review r1 F5: a part hung from a wall or desk carries a load too
+        assert ("load_n" in exp) == (exp["kind"] == "mount" or bool(exp.get("attach"))), p.name
+        # review r1 F8: each number cites its own document, not only the product's list
+        own = dict(prod.get("body_sources") or {})
+        own.update({f["name"]: f.get("source", "") for f in prod.get("features", [])})
+        need = ["w", "d", "h", "corner_r"] + (["profile"] if "profile" in prod["body"] else []) + \
+            [f["name"] for f in prod.get("features", [])]
+        if s["input"] != "photo":
+            assert all(eg._cited(own.get(k, "")) for k in need), (p.name, [k for k in need if not eg._cited(own.get(k, ""))])
         if exp.get("load_dir"):  # F3: a load has a face to bear on
             assert exp.get("support", exp["load_dir"]) == exp["load_dir"], p.name
     e01 = json.loads((ROOT / "evals" / "engineering" / "e01_rpi5_case.json").read_text())
@@ -674,15 +689,15 @@ def test_snap_catch_is_measured():
     """r2 F3: the undercut y was never measured. A catch 0.6 deep declared as 0.2 read 1.7% strain where
     the real one is over 2%, and a tongue with no catch at all passed: it holds nothing."""
     mesh, frame = build_case()
-    assert eg._hook(mesh, np.array(SNAP["at"], float), np.array([1.0, 0, 0]), np.array([0, 0, 1.0]),
+    assert eg._hook(mesh, np.array(SNAP["at"], float), np.array([-1.0, 0, 0]), np.array([0, 0, 1.0]),
                     SNAP["L"]) == pytest.approx(0.6, abs=0.02)
     small = eng(frame, retention={**SNAP, "y": 0.2})
     assert eg.check_retention_mesh(mesh, small) == \
         ["retention: the snap arm's catch stands out 0.60 mm in the part (y says 0.2)"]
     bare, frame = build_case(hook=0)
     why = eg.check_retention_mesh(bare, eng(frame, retention={**SNAP, "y": 0.2}))
-    assert why == ["retention: the snap arm has no catch: it stands out 0.00 mm past its root faces in its outer half "
-                   "(y says 0.2)"], why
+    assert why == ["retention: the snap arm has no catch: it stands out 0.00 mm toward the product past its root "
+                   "face in its outer half (y says 0.2)"], why
 
 
 def test_snap_root_must_be_where_the_arm_joins_the_part():
@@ -707,22 +722,19 @@ def mount_spec():
 
 def test_the_arm_is_measured_from_where_the_product_bears():
     """r2 F2: engineering.json could declare arm 1 at a thick spot, or turn h_dir along the part's
-    longest side, and strength passed a part that would snap. Now the arm runs from where the product
-    bears to the section, h_dir must lie along the load, and the layers come from the beam's axis."""
-    sp = mount_spec()
-    mesh = tray("both")  # lips 8 mm wide under each side, 2 mm thick, at x -2.3 to 8 and 32 to 42.3
-    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PLA")
-    sec = {"at": [1.0, 15.0, -1.3], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}
-    load = {"n": 20, "dir": "-z", "arm": 1, "b": 34, "h": 2, "across_layers": False, "section": sec}
-    why, m = eg.check_strength({"material": "PLA", "load": load}, sp, 2, mesh, np.eye(4), fit)
-    assert 18 < m["arm_mm"] < 21, m
+    longest side, and strength passed a part that would snap. Now the arm is what the section carries
+    of the load, h_dir must lie along the load, and the layers come from the beam's axis."""
+    sp, mesh, _ = mac_mount(FLANGE_HOLES, flange=15.0)
+    sp = {**sp, "expect": {k: v for k, v in sp["expect"].items() if k != "attach"}}
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    sec = {"at": [0.0, 63.5, -1.8], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}  # the root of the -x lip
+    load = {"n": 20, "dir": "-z", "arm": 1, "b": 20, "h": 3, "across_layers": False, "section": sec}
+    why, m = eg.check_strength({"material": "PETG", "load": load}, sp, 2, mesh, np.eye(4), fit)
+    assert m["arm_mm"] == pytest.approx(3.75, abs=0.4), m
     assert [w for w in why if w.startswith("strength: the arm is ") and "where the product bears (arm says 1)" in w], why
-    # at the measured arm: 6 x 20 x 19.5 / (34 x 2^2) = 17 MPa, under PLA's 25
-    ok = {**load, "arm": m["arm_mm"]}
-    assert eg.check_strength({"material": "PLA", "load": ok}, sp, 2, mesh, np.eye(4), fit)[0] == []
-    # h_dir along the lip's 34 mm depth, not the load, is refused
-    side = {**ok, "h": 34, "b": 2, "section": {**sec, "b_dir": [0, 0, 1], "h_dir": [0, 1, 0]}}
-    why, _ = eg.check_strength({"material": "PLA", "load": side}, sp, 2, mesh, np.eye(4), fit)
+    # h_dir along the lip's 127 mm depth, not the load, is refused
+    side = {**load, "arm": 3.75, "h": 20, "b": 3, "section": {**sec, "b_dir": [0, 0, 1], "h_dir": [0, 1, 0]}}
+    why, _ = eg.check_strength({"material": "PETG", "load": side}, sp, 2, mesh, np.eye(4), fit)
     assert "strength: the section's h_dir is not along the load (-z): bending under it is across h" in why
     # a part printed on its side: the load runs along the bed, the beam's axis up z, so across the layers
     R = np.array([[0, 0, -1, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]], float)  # product -z to part +x
@@ -730,48 +742,117 @@ def test_the_arm_is_measured_from_where_the_product_bears():
     R[:3, 3] = [-24.0, -5.0, 25.0]  # the product's middle (part z 45) 40 mm up the beam from the section
     lo = {"n": 20, "dir": "-z", "arm": 40, "b": 20, "h": 8, "across_layers": False,
           "section": {"at": [-4, 10, 5], "b_dir": [0, 1, 0], "h_dir": [1, 0, 0]}}
-    why, m = eg.check_strength({"material": "PLA", "load": lo}, {**sp, "expect": {**sp["expect"], "support": None}},
+    tip = mount_spec()
+    why, m = eg.check_strength({"material": "PLA", "load": lo}, {**tip, "expect": {**tip["expect"], "support": None}},
                                2, beam, R, None)
     assert m["across_layers"] is True and m["allowed_mpa"] == 12.5 and m["arm_mm"] == pytest.approx(40, abs=0.5), m
 
 
-def mac_mount(holes: list[tuple[float, float]] | None = None):
-    """A PETG tray for e07's Mac mini, product frame = part frame: 3 mm walls at 0.3 mm on +x, -x and
-    +z, lips 15 mm wide under each side, open front and back, and M4 holes (Ø4.5) through the top at
-    `holes` (x, y)."""
+FLANGE_HOLES = [(-10.5, 30.0), (-10.5, 97.0), (137.5, 30.0), (137.5, 97.0)]  # on 15 mm flanges, off the Mac
+
+
+def mac_mount(holes: list[tuple[float, float]] | None = None, top: float = 3.0, flange: float = 0.0,
+              recess: str | None = None):
+    """A PETG tray for e07's Mac mini, product frame = part frame: 3 mm walls at 0.3 mm on +x and -x,
+    a `top` mm top 0.3 mm over the Mac, lips 15 mm wide under each side, open front and back, the top
+    run out `flange` mm past each side wall, and M4 holes (Ø4.5) through the top at `holes` (x, y),
+    with an Ø8.8 counterbore 3.4 deep ("cbore") or a 90 degree Ø8.8 countersink ("csink") on the
+    inside."""
+    import manifold3d as m3
+
     sp = spec("e07_mac_mini_mount")
     w, d, h = (sp["product"]["body"][k] for k in ("w", "d", "h"))
-    tray_ = _box([-3.3, 0, -3.3], [w + 3.3, d, h + 3.3]) - _box([-0.3, -1, -0.3], [w + 0.3, d + 1, h + 0.3])
+    roof = h + 0.3 + top
+    tray_ = _box([-3.3, 0, -3.3], [w + 3.3, d, roof]) - _box([-0.3, -1, -0.3], [w + 0.3, d + 1, h + 0.3])
     tray_ = tray_ - _box([15.0, -1, -4.0], [w - 15.0, d + 1, -0.2])
+    if flange:
+        tray_ = tray_ + _box([-3.3 - flange, 0, h + 0.3], [w + 3.3 + flange, d, roof])
     for x, y in holes or []:
-        tray_ = tray_ - _cyl(x, y, h - 1.0, h + 5.0, 4.5 / 2)
-    e = {"material": "PETG", "attach": {"holes": [{"at": [x, y, h + 3.3]} for x, y in holes or []]}}
+        tray_ = tray_ - _cyl(x, y, h - 1.0, roof + 2.0, 4.5 / 2)
+        if recess == "cbore":
+            tray_ = tray_ - _cyl(x, y, h - 1.0, h + 0.3 + 3.4, 8.8 / 2)
+        elif recess == "csink":
+            cone = m3.Manifold.cylinder(2.15 + 0.01, 4.4 + 0.01, 2.25 - 0.0, 96).translate([x, y, h + 0.3 - 0.01])
+            tray_ = tray_ - cone
+    e = {"material": "PETG", "attach": {"holes": [{"at": [x, y, roof]} for x, y in holes or []]}}
     return sp, _mesh(tray_), e
 
 
 def test_mac_mount_must_screw_to_the_desk():
     """r2 F6: e07's tray that sat on the floor, wrapped the Mac and had no way onto the desk passed. Now
-    it needs two M4 clearance holes through its +z side, and the strength arm runs to them."""
-    sp, mesh, e = mac_mount([(7.5, 30.0), (119.5, 97.0)])
+    it needs two M4 clearance holes through its +z side."""
+    sp, mesh, e = mac_mount(FLANGE_HOLES, flange=15.0)
     why, out, good = eg.attach_holes(mesh, sp, e, np.eye(4))
-    assert why == [] and len(good) == 2, (why, out)
-    sp0, bare, e0 = mac_mount([])
+    assert why == [] and len(good) == 4, (why, out)
+    sp0, bare, e0 = mac_mount([], flange=15.0)
     why, _, _ = eg.attach_holes(bare, sp0, e0, np.eye(4))
     assert why == ["attach: 0 good screw holes on the +z side for M4 (need 2, ISO 273 4.3 to 4.8 mm, through its wall), "
                    "so it cannot be screwed to the desk"]
     # a hole listed twice, a mouth inside the part, and a hole the part does not have, are not counted
-    e2 = {"attach": {"holes": [{"at": [7.5, 30.0, 53.3]}, {"at": [7.6, 30.0, 53.3]}, {"at": [60.0, 60.0, 51.0]},
-                               {"at": [40.0, 60.0, 53.3]}]}}
+    e2 = {"attach": {"holes": [{"at": [-10.5, 30.0, 53.3]}, {"at": [-10.4, 30.0, 53.3]}, {"at": [-10.5, 60.0, 51.0]},
+                               {"at": [-10.5, 75.0, 53.3]}]}}
     why, out, good = eg.attach_holes(mesh, sp, e2, np.eye(4))
     assert len(good) == 1 and len(why) == 4, why
-    # the arm of a section square to y in the middle runs to the nearest screw, not to the middle
-    sp1, mesh1, e1 = mac_mount([(63.5, 30.0), (63.5, 97.0)])
-    _, fit = eg.check_fit(mesh1, sp1, np.eye(4), "PETG")
-    _, _, good1 = eg.attach_holes(mesh1, sp1, e1, np.eye(4))
-    load = {"n": 20, "dir": "-z", "arm": 32, "b": 15, "h": 3, "across_layers": False,
-            "section": {"at": [7.5, 63.5, -1.8], "b_dir": [1, 0, 0], "h_dir": [0, 0, 1]}}
-    why, m = eg.check_strength({"material": "PETG", "load": load}, sp1, 2, mesh1, np.eye(4), fit, good1)
-    assert [w for w in why if "to the nearest screw hole (arm says 32)" in w], (why, m)
+
+
+def test_attach_screw_heads_need_room():
+    """Review r1 second-F6: Ø4.5 holes through a 3 mm top 0.3 mm over the Mac passed attach, but a pan
+    head (Ø8.2 x 3.1) under that top lands in the 0.3 mm gap: the Mac cannot slide in, or it bears on
+    the heads. Holes on flanges off the Mac, or holes over it with a counterbore or a countersink that
+    holds the head, pass."""
+    over = [(30.0, 30.0), (97.0, 97.0)]
+    sp, mesh, e = mac_mount(over)
+    why, out, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    assert len(good) == 0 and len([w for w in why if "has no room for its screw head" in w]) == 2, (why, out)
+    sp, mesh, e = mac_mount(over, top=6.5, recess="cbore")
+    why, out, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    assert why == [] and {r["head"] for r in out["holes"]} == {"pan"}, (why, out)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    assert not [w for w in eg.check_fit(mesh, sp, np.eye(4), "PETG")[0] if "inside the part" in w]
+    sp, mesh, e = mac_mount(over, recess="csink")
+    why, out, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    assert why == [] and {r["head"] for r in out["holes"]} == {"flat"}, (why, out)
+    # a counterbore too shallow for the pan head still leaves it in the gap
+    sp, mesh, e = mac_mount(over, top=3.6, recess="cbore")
+    why, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    assert len(good) == 0, why
+
+
+def test_attach_holes_must_spread_across_the_part():
+    """Review r1 second-F9: e07 asks two holes so the mount cannot turn about one, but two holes 6 mm
+    apart counted as two."""
+    sp, mesh, e = mac_mount([(-10.5, 30.0), (-10.5, 36.0)], flange=15.0)
+    why, out, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    assert len(good) == 2 and why == [f"attach: the good screw holes are 6.0 mm apart at most (need 40.9, 25% of the "
+                                      f"part's 164 mm across its +z side), so it can turn about them"], (why, out)
+
+
+def test_a_two_sided_cradle_loads_each_lip_with_its_own_side():
+    """Review r1 first-F1: on e07's cradle, lips 15 mm wide under both sides of the Mac and screws on
+    flanges off it, the section at one lip's root took the mean distance of every bearing point on
+    both lips (63.5 mm) and the full 20 N, so two correct 20 x 3 mm PETG straps read 42 MPa and failed.
+    The lip carries its own half of the load, 7.5 mm out on average: 6 x 20 x 3.75 / (20 x 3^2) =
+    2.5 MPa."""
+    sp, mesh, e = mac_mount(FLANGE_HOLES, flange=15.0)
+    _, fit = eg.check_fit(mesh, sp, np.eye(4), "PETG")
+    _, _, good = eg.attach_holes(mesh, sp, e, np.eye(4))
+    sec = {"at": [0.0, 63.5, -1.8], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}
+    load = {"n": 20, "dir": "-z", "arm": 3.75, "b": 20, "h": 3, "across_layers": False, "section": sec}
+    why, m = eg.check_strength({"material": "PETG", "load": load}, sp, 2, mesh, np.eye(4), fit, good)
+    assert why == [] and m["arm_mm"] == pytest.approx(3.75, abs=0.4) and m["sigma_mpa"] == pytest.approx(2.5, abs=0.1), \
+        (why, m)
+    # the far lip's root, mirrored, reads the same; the section between the near screws and the
+    # flange's tip carries nothing and is not the critical one
+    far = {**load, "section": {**sec, "at": [127.0, 63.5, -1.8], "b_dir": [0, -1, 0]}}
+    why, m = eg.check_strength({"material": "PETG", "load": far}, sp, 2, mesh, np.eye(4), fit, good)
+    assert why == [] and m["arm_mm"] == pytest.approx(3.75, abs=0.4), (why, m)
+    tip = {**load, "section": {"at": [-15.0, 63.5, 51.8], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}}
+    why, m = eg.check_strength({"material": "PETG", "load": tip}, sp, 2, mesh, np.eye(4), fit, good)
+    assert [w for w in why if w.startswith("strength: the critical section carries none of the load")], (why, m)
+    # at the flange's root, inside the near screws, the -x lip's half crosses it on its way to them
+    root = {**load, "arm": 7.0, "section": {"at": [-6.0, 63.5, 51.8], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}}
+    why, m = eg.check_strength({"material": "PETG", "load": root}, sp, 2, mesh, np.eye(4), fit, good)
+    assert why == [] and m["arm_mm"] == pytest.approx(6.75, abs=0.4), (why, m)
 
 
 def test_wall_and_desk_holders_name_their_attachment():
@@ -842,20 +923,88 @@ def test_pi4_plate_flat_under_the_board_fails():
 
 
 def test_sources_are_tied_to_their_number():
-    """r2 F9: any URL the spec cited counted for any number (Apple's iPhone drawing for the Pi 5's
-    width), and a profiled body's profile needed no source."""
+    """r2 F9 and review r1 second-F8: any URL the spec cited counted for any number (Apple's iPhone
+    drawing for the Pi 5's width, VESA's standard for the Pi 4's), and a profiled body's profile
+    needed no source. A number's source is a URL its own body or feature source cites."""
     e01 = spec("e01_rpi5_case")
     drawing = "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf"
+    step = e01["product"]["sources"][1]
     iphone = "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf"
-    src = {k: drawing for k in ["w", "d", "h", "corner_r"] + [f["name"] for f in e01["product"]["features"]]}
+    src = {k: drawing for k in ["w", "d", "corner_r"] + [f["name"] for f in e01["product"]["features"]]}
+    src.update(h=step, microsd_slot=step)
     assert eg.check_sources({"sources": src}, e01) == []
     src["usb_c_power"] = iphone  # its own source cites Apple's USB-C keepout
     assert eg.check_sources({"sources": src}, e01) == []
     src["w"] = iphone
     assert eg.check_sources({"sources": src}, e01) == ["sources: no source for w (a URL the spec cites for it)"]
+    src.update(w=drawing, h=drawing)  # the drawing gives no height; the STEP does
+    assert eg.check_sources({"sources": src}, e01) == ["sources: no source for h (a URL the spec cites for it)"]
+    e08 = spec("e08_rpi4_vesa_adapter")
+    pi4 = "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf"
+    src = {k: pi4 for k in ["w", "d", "h", "corner_r"] + [f["name"] for f in e08["product"]["features"]]}
+    assert eg.check_sources({"sources": src}, e08) == []
+    src["w"] = "https://vesa.org/mounting-standard/"  # in product.sources, but VESA gives no Pi width
+    assert eg.check_sources({"sources": src}, e08) == ["sources: no source for w (a URL the spec cites for it)"]
     e04 = spec("e04_airtag_case")
     tag = "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf"
     src = {k: tag for k in ("w", "d", "h", "corner_r", "speaker_keepout")}
     assert eg.check_sources({"sources": src}, e04) == ["sources: no source for profile (a URL the spec cites for it)"]
     src["profile"] = tag
     assert eg.check_sources({"sources": src}, e04) == []
+
+
+# --- review round 1 of PR 64 (review-r1), each on a part built by hand ------------------------------
+
+def test_snap_catch_must_face_the_product():
+    """Review r1 second-F7: the catch was read on either face of the arm, so the tongue's 0.6 mm block
+    moved to its outer face, hooking nothing, passed as "catch 0.60"."""
+    mesh, frame = build_case(hook_out=True)
+    why = eg.check_retention_mesh(mesh, eng(frame), spec=SPEC)
+    assert why == ["retention: the snap arm has no catch: it stands out 0.00 mm toward the product past its root "
+                   "face in its outer half (y says 0.6)"], why
+    # the product's side is found from the frame, whichever way t_dir is declared
+    mesh, frame = build_case()
+    assert eg.check_retention_mesh(mesh, eng(frame, retention={**SNAP, "t_dir": [1, 0, 0]}), spec=SPEC) == []
+    out, frame = build_case(hook_out=True)
+    assert eg.check_retention_mesh(out, eng(frame, retention={**SNAP, "t_dir": [1, 0, 0]}), spec=SPEC)
+
+
+def test_snap_arm_length_is_measured_both_ways():
+    """Review r1 first-F2: the README says L within 0.2 mm, but a declared L shorter than the arm in the
+    mesh passed, and the sides were probed only that far. Slots stopping 4 mm under the rim leave a
+    bridge that fixes the arm at both ends: declared at the slots' length, L fails; declared at the
+    full length, the sides are probed into the bridge and fail."""
+    mesh, frame = build_case(bridge=4.0)
+    short = eng(frame, retention={**SNAP, "L": 8.0})
+    why = eg.check_retention_mesh(mesh, short, spec=SPEC)
+    assert "retention: the snap arm runs 13.65 mm from its root in the part (L says 8)" in why, why
+    full = eg.check_retention_mesh(mesh, eng(frame), spec=SPEC)
+    assert [w for w in full if w.startswith("retention: the snap arm is not free at its sides")], full
+    assert eg.check_retention_mesh(build_case()[0], eng(frame), spec=SPEC) == []
+
+
+def test_through_hole_is_probed_through_its_wall_only():
+    """Review r1 first-F3: a through hole was probed the part's whole diagonal, so a closed Pi plate
+    with a cover over the board read "screw hole 0 is not in the part" through the cover."""
+    mesh, e = pi4_plate(pi_holes=False)
+    plate = eg._to_manifold(mesh)
+    holes = []
+    for x in (3.5, 61.5):
+        for y in (3.5, 52.5):
+            plate = plate - _cyl(x, y, -9.0, 1.0, 2.9 / 2)
+            holes.append({"at": [x, y, -8.0], "axis": [0, 0, 1]})
+    cover = _box([-5.0, -19.5, 20.0], [90.0, 75.5, 22.0]) + _box([-5.0, -19.5, -5.0], [-3.0, 75.5, 20.0])
+    e["retention"] = {"type": "screw", "size": "M2.5", "method": "through", "hole_d": 2.9, "holes": holes}
+    assert eg.check_retention_mesh(_mesh(plate + cover), e) == []
+    blind = _mesh(eg._to_manifold(pi4_plate(pi_holes=False)[0]) - _cyl(3.5, 3.5, -9.0, -2.0, 2.9 / 2) + cover)
+    e["retention"]["holes"] = holes[:1]
+    assert eg.check_retention_mesh(blind, e)[0].startswith("retention: screw hole 0 is not in the part")
+
+
+def test_wall_holder_carries_its_load():
+    """Review r1 first-F5: e05 screws to the wall and cantilevers its floor out from it, but the schema
+    allowed load_n only on a mount, so the strength check never ran on it."""
+    e05 = spec("e05_appletv_wall_holder")
+    assert e05["expect"]["load_n"] >= 10 and e05["expect"]["load_dir"] == "-z"
+    why, _ = eg.check_strength({"material": "PLA"}, e05, 2)
+    assert why == ["strength: no load in engineering.json (the spec asks 10 N)"]

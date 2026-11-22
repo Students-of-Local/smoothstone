@@ -86,6 +86,19 @@ SECTION_TOL = 0.2  # mm: a declared arm or section may differ from the mesh by t
 # from the fine size less HOLE_TOL to the coarse size plus HOLE_TOL.
 CLEARANCE = {"M2": (2.2, 2.4, 2.6), "M2.5": (2.7, 2.9, 3.1), "M3": (3.2, 3.4, 3.6), "M4": (4.3, 4.5, 4.8),
              "M5": (5.3, 5.5, 5.8), "M6": (6.4, 6.6, 7.0)}
+# An attach screw's head, mm, (head diameter dk, head height k), each the larger maximum of the pan
+# head tapping screw DIN 7981 ST4.2 (dk 8.2, k 3.05,
+# https://fullerfasteners.com/tech/din-7981-specifications-pan-head-tapping-screws/) and the pan head
+# machine screw ISO 7045 M4 (dk 8, k 3.1,
+# https://fullerfasteners.com/tech/iso-7045-specifications-pan-head-screws-with-cross-recess/); and
+# the countersunk head ISO 7046 M4 (actual dk 8.4, k 2.7,
+# https://fullerfasteners.com/tech/iso-7046-1-specifications-countersunk-flat-head-screws/), a 90
+# degree cone. A third party charts all three, since the standards are sold.
+PAN_HEAD = {"M4": (8.2, 3.1)}
+FLAT_HEAD = {"M4": (8.4, 2.7)}
+# The attach holes that count must spread at least this share of the part's largest extent across
+# the attach face, so the part cannot turn about them (our number).
+ATTACH_SPREAD = 0.25
 
 # --- retention ------------------------------------------------------------------------------------
 # Cantilever snap fit of constant rectangular section: y = 0.67 * eps * L^2 / t, so
@@ -98,10 +111,13 @@ CLEARANCE = {"M2": (2.2, 2.4, 2.6), "M2.5": (2.7, 2.9, 3.1), "M3": (3.2, 3.4, 3.
 #   https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf
 #   https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2025/05/80316f6d-tds-prusament_tpu_95a_en-1.pdf
 SNAP_STRAIN = {"PLA": 0.02, "PETG": 0.03, "TPU": 0.20}
-# Where the arm is found in the mesh: its sides are probed at these shares of its length, its root
-# ROOT_BEHIND mm behind `at` must be wider than the arm (there it joins the part), and its catch is
-# how far the arm stands out past its root faces along t_dir in its outer half. Our numbers.
-SNAP_STATIONS = (0.05, 0.5, 0.95)
+# Where the arm is found in the mesh: its sides are probed from SNAP_FIRST of its length every
+# SNAP_PITCH mm to SNAP_LAST mm short of its tip, its root ROOT_BEHIND mm behind `at` must be wider
+# than the arm (there it joins the part), and its catch is how far the arm stands out past its root
+# face toward the product in its outer half. Our numbers.
+SNAP_FIRST = 0.05
+SNAP_PITCH = 0.5
+SNAP_LAST = 0.25
 ROOT_BEHIND = 0.5
 HOOK_STEP = 0.2
 SCREW_D = {"M2": 2.0, "M2.5": 2.5, "M3": 3.0}
@@ -357,8 +373,8 @@ def closed_part(mesh):
     return part, ""
 
 
-def _cylinder(p0: np.ndarray, axis: np.ndarray, length: float, radius: float):
-    """A manifold cylinder from p0 along the unit vector axis, `length` long."""
+def _cylinder(p0: np.ndarray, axis: np.ndarray, length: float, radius: float, radius_end: float | None = None):
+    """A manifold cylinder from p0 along the unit vector axis, `length` long (a cone to radius_end)."""
     import manifold3d as m3
 
     a = np.asarray(axis, float) / np.linalg.norm(axis)
@@ -368,7 +384,24 @@ def _cylinder(p0: np.ndarray, axis: np.ndarray, length: float, radius: float):
     v = np.cross(a, u)
     A = np.eye(4)
     A[:3, 0], A[:3, 1], A[:3, 2], A[:3, 3] = u, v, a, p0
-    return m3.Manifold.cylinder(length, radius, radius, 64).transform(A[:3, :].tolist())
+    end = radius if radius_end is None else radius_end
+    return m3.Manifold.cylinder(length, radius, end, 64).transform(A[:3, :].tolist())
+
+
+def _trimesh(m):
+    """A manifold as a trimesh."""
+    import trimesh
+
+    g = m.to_mesh()
+    return trimesh.Trimesh(np.asarray(g.vert_properties)[:, :3], np.asarray(g.tri_verts), process=True)
+
+
+def product_box(spec: dict, M: np.ndarray):
+    """The product's enclosing box (w x d x h) in part coordinates, as a manifold."""
+    import manifold3d as m3
+
+    b = spec["product"]["body"]
+    return m3.Manifold.cube([float(b["w"]), float(b["d"]), float(b["h"])]).transform(M[:3, :].tolist())
 
 
 def probe_hole(part, p0: np.ndarray, axis: np.ndarray, bore_d: float, depth: float, ring_in: float,
@@ -715,11 +748,11 @@ def _through(mesh, p: np.ndarray, d: np.ndarray) -> float:
 
 
 def _hook(mesh, at: np.ndarray, td: np.ndarray, ld: np.ndarray, span: float) -> float:
-    """How far the arm stands out past its root faces along +t_dir or -t_dir in its outer half: the
-    catch. The root faces are where rays from `at` along +-t_dir leave the part; at each station from
-    half the arm's length to its tip the same rays from the arm's line read the arm's faces there."""
+    """How far the arm stands out past its root face along +td in its outer half: the catch, with td
+    pointing toward the product (a bump on the far face hooks nothing). The root face is where a ray
+    from `at` along td leaves the part; at each station from half the arm's length to its tip the
+    same ray from the arm's line reads the arm's face there."""
     r_plus = float(_first_hit(mesh, at[None], td[None])[0])
-    r_minus = float(_first_hit(mesh, at[None], -td[None])[0])
     s_ = np.arange(span / 2, span - 0.05, HOOK_STEP)
     if not len(s_):
         return 0.0
@@ -727,17 +760,29 @@ def _hook(mesh, at: np.ndarray, td: np.ndarray, ld: np.ndarray, span: float) -> 
     P = P[mesh.contains(P)]
     if not len(P):
         return 0.0
-    e_plus = _first_hit(mesh, P, np.tile(td, (len(P), 1))) - r_plus
-    e_minus = _first_hit(mesh, P, np.tile(-td, (len(P), 1))) - r_minus
-    over = np.maximum(e_plus, e_minus)
+    over = _first_hit(mesh, P, np.tile(td, (len(P), 1))) - r_plus
     over = over[np.isfinite(over)]
     return float(over.max()) if len(over) else 0.0
 
 
-def check_retention_mesh(mesh, eng: dict, part=None) -> list[str]:
+def _wall_along(mesh, p: np.ndarray, ax: np.ndarray, off: float) -> float | None:
+    """The part's thickness along ax from the plane through p, read by four rays `off` mm beside p
+    (past a hole and its ring), the median; None when none of them meets the part."""
+    e1 = np.cross(ax, [1.0, 0, 0] if abs(ax[0]) < 0.9 else [0, 1.0, 0])
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(ax, e1)
+    O = np.array([p + e * off + ax * 0.01 for e in (e1, e2, -e1, -e2)])
+    t = _first_hit(mesh, O, np.tile(ax, (4, 1)))
+    t = t[np.isfinite(t)]
+    return float(np.median(t)) + 0.01 if len(t) else None
+
+
+def check_retention_mesh(mesh, eng: dict, part=None, spec: dict | None = None) -> list[str]:
     """What engineering.json says holds the product, found in the mesh: a snap arm that joins the
     part at its root, is t thick there, runs L, is free at its sides along its length and has a catch
-    y high at its tip; screw holes of the declared size with the part around them."""
+    y high toward the product at its tip; screw holes of the declared size with the part around them.
+    With the spec and the frame, the catch is read on the side of the arm the product is on; without,
+    on +t_dir."""
     ret = eng.get("retention") or {}
     kind = ret.get("type")
     if kind == "snap":
@@ -756,16 +801,18 @@ def check_retention_mesh(mesh, eng: dict, part=None) -> list[str]:
         tm, Lm = _through(mesh, at, td), float(_first_hit(mesh, at[None], ld[None])[0])
         if abs(tm - t) > SECTION_TOL + 1e-9:
             why.append(f"retention: the snap arm is {tm:.2f} mm thick at its root in the part (t says {t:g})")
-        if not Lm >= L - SECTION_TOL - 1e-9:
+        if not abs(Lm - L) <= SECTION_TOL + 1e-9:
             why.append(f"retention: the snap arm runs {Lm:.2f} mm from its root in the part (L says {L:g})")
         back = at - ld * ROOT_BEHIND
         wb = _through(mesh, back, wd) if mesh.contains(back[None])[0] else 0.0
         if not wb > w + SECTION_TOL + 1e-9:
             why.append(f"retention: the snap arm's root is not where it joins the part: {ROOT_BEHIND:g} mm behind "
                        f"it the part is {wb:.1f} mm wide (w says {w:g}, so the part there must be wider)")
-        span = min(L, Lm if math.isfinite(Lm) else L)
-        for share in SNAP_STATIONS:
-            p = at + ld * span * share
+        span = Lm if math.isfinite(Lm) else L
+        for s_ in np.unique(np.append(np.arange(span * SNAP_FIRST, span - SNAP_LAST, SNAP_PITCH),
+                                      max(span - SNAP_LAST, span * SNAP_FIRST))):
+            share = s_ / span
+            p = at + ld * s_
             if not mesh.contains(p[None])[0]:
                 why.append(f"retention: the snap arm is not in the part {share:.0%} along it")
                 break
@@ -774,10 +821,16 @@ def check_retention_mesh(mesh, eng: dict, part=None) -> list[str]:
                 why.append(f"retention: the snap arm is not free at its sides: the part is {wm:.1f} mm wide "
                            f"{share:.0%} along it (w says {w:g})")
                 break
-        ym = _hook(mesh, at, td, ld, Lm if math.isfinite(Lm) else L)
+        M, _ = read_frame(eng.get("frame"))
+        if spec is not None and M is not None:  # the catch faces the product
+            b = spec["product"]["body"]
+            mid = M[:3, :3] @ np.array([b["w"] / 2, b["d"] / 2, b["h"] / 2], float) + M[:3, 3]
+            if float((mid - at) @ td) < 0:
+                td = -td
+        ym = _hook(mesh, at, td, ld, span)
         if ym < SECTION_TOL:
-            why.append(f"retention: the snap arm has no catch: it stands out {ym:.2f} mm past its root faces in "
-                       f"its outer half (y says {y:g})")
+            why.append(f"retention: the snap arm has no catch: it stands out {ym:.2f} mm toward the product past "
+                       f"its root face in its outer half (y says {y:g})")
         elif abs(ym - y) > SECTION_TOL + 1e-9:
             why.append(f"retention: the snap arm's catch stands out {ym:.2f} mm in the part (y says {y:g})")
         return why
@@ -795,13 +848,16 @@ def check_retention_mesh(mesh, eng: dict, part=None) -> list[str]:
         why = []
         depth = SCREW_DEPTH_K * SCREW_D[size]
         through = ret.get("method") == "through"
-        bore_len = float(np.linalg.norm(mesh.extents)) + 2.0 if through else depth
         for i, hl in enumerate(holes):
             at, ax = _point(hl.get("at")), _unit(hl.get("axis"))
             if at is None or ax is None:
                 why.append(f"retention: screw hole {i} has no at and axis")
                 continue
             bore_d = max(0.3, hole - 2 * HOLE_TOL)
+            bore_len = depth
+            if through:  # through the wall at the hole, read beside it, not on to whatever lies past it
+                wall = _wall_along(mesh, at, ax, hole / 2 + HOLE_TOL + MIN_WALL / 2)
+                bore_len = max(wall - 0.05, 0.1) if wall is not None else depth
             vol, seat = probe_hole(part, at, ax, bore_d, bore_len, hole / 2 + HOLE_TOL, depth, lead=0.5)
             if vol > BLOCKED_MM3:
                 what = "clear through the part" if through else f"{depth:.1f} mm deep"
@@ -814,27 +870,60 @@ def check_retention_mesh(mesh, eng: dict, part=None) -> list[str]:
     return []
 
 
+def _head_room(part, mesh, spec: dict, M: np.ndarray, p: np.ndarray, n: np.ndarray, size: str,
+               coarse: float) -> tuple[str | None, dict]:
+    """Where the attach screw's head goes: ("pan" or "flat", the numbers) when it fits, (None, the
+    numbers) when it does not. A pan head sits on the part under the wall, a cylinder PAN_HEAD long
+    from the seat (the part's face beside the hole, read past the clearance hole: the wall's inner
+    face, or a counterbore's floor) toward the product, and must not meet the product or the part.
+    A flat head sits flush in a countersink: its 90 degree cone, its top at the wall's inner face
+    beside the head, must be clear of the part."""
+    dk, k = PAN_HEAD[size]
+    seat = _wall_along(mesh, p - n * 0.01, -n, (coarse / 2 + HOLE_TOL + dk / 2) / 2)
+    out = {}
+    if seat is not None:
+        p0 = p - n * (seat + 0.02)
+        head = _cylinder(p0, -n, k, dk / 2)
+        into = float((head ^ product_box(spec, M)).volume())
+        hit = float((head ^ part).volume())
+        out.update(seat_mm=round(seat, 2), head_in_product_mm3=round(into, 2), head_in_part_mm3=round(hit, 2))
+        if into <= BLOCKED_MM3 and hit <= BLOCKED_MM3:
+            return "pan", out
+    fk_d, _ = FLAT_HEAD[size]
+    wall = _wall_along(mesh, p - n * 0.01, -n, fk_d / 2 + HOLE_TOL + MIN_WALL / 2)
+    cone_h = fk_d / 2 - coarse / 2
+    if wall is not None and wall >= cone_h:
+        top = p - n * (wall - 0.02)  # the head's flat top, flush with the wall's inner face
+        cone = _cylinder(top, n, cone_h, fk_d / 2 - HOLE_TOL, coarse / 2 - HOLE_TOL)
+        hit = float((cone ^ part).volume())
+        out.update(flat_in_part_mm3=round(hit, 2))
+        if hit <= BLOCKED_MM3:
+            return "flat", out
+    return None, out
+
+
 def attach_holes(mesh, spec: dict, eng: dict, M: np.ndarray, part=None) -> tuple[list[str], dict, list]:
     """The spec's attach: screw holes through the wall that goes against the desk or wall, at least
     `min` of them, each an ISO 273 clearance hole for `screw` (clear through that wall at the fine
     size less HOLE_TOL, the part around it from the coarse size plus HOLE_TOL), its mouth on the
-    part's outermost plane on that side. The wall's thickness is read beside the hole, past its
-    ring. Returns (why, measured, the mouths of the good holes)."""
+    part's outermost plane on that side, with room for the screw's head on the inside (_head_room).
+    The wall's thickness is read beside the hole, past its ring. The holes that count must spread
+    ATTACH_SPREAD of the part across that face. Returns (why, measured, the mouths of the good holes)."""
     att = spec["expect"].get("attach")
     if not att:
         return [], {}, []
     face, size, need = att["face"], att["screw"], int(att.get("min", 2))
     against = att.get("against", "the mounting surface")
+    if size not in PAN_HEAD:
+        return [f"attach: no screw head size for {size}"], {}, []
     if part is None:
         part, bad = closed_part(mesh)
         if part is None:
             return [bad], {}, []
     fine, _, coarse = CLEARANCE[size]
     n = M[:3, :3] @ np.array(NORMAL[face], float)  # out of the part toward the desk or wall
-    top = float(np.max(np.asarray(mesh.vertices) @ n))
-    e1 = np.cross(n, [1.0, 0, 0] if abs(n[0]) < 0.9 else [0, 1.0, 0])
-    e1 /= np.linalg.norm(e1)
-    beside = [e1, np.cross(n, e1), -e1, -np.cross(n, e1)]
+    V = np.asarray(mesh.vertices)
+    top = float(np.max(V @ n))
     why, res, good = [], [], []
     for i, hl in enumerate((eng.get("attach") or {}).get("holes") or []):
         p = _point(hl.get("at")) if isinstance(hl, dict) else None
@@ -850,59 +939,121 @@ def attach_holes(mesh, spec: dict, eng: dict, M: np.ndarray, part=None) -> tuple
         if any(float(np.linalg.norm(p - q)) < coarse for q in good):
             why.append(f"attach: hole {i} is a hole already counted")
             continue
-        off = coarse / 2 + HOLE_TOL + MIN_WALL / 2
-        O = np.array([p + e * off - n * 0.01 for e in beside])
-        tw = _first_hit(mesh, O, np.tile(-n, (len(O), 1)))
-        tw = tw[np.isfinite(tw)]
-        wall = float(np.median(tw)) + 0.01 if len(tw) else MIN_WALL
+        wall = _wall_along(mesh, p - n * 0.01, -n, coarse / 2 + HOLE_TOL + MIN_WALL / 2)
+        wall = MIN_WALL if wall is None else wall
         vol, seat = probe_hole(part, p, -n, fine - 2 * HOLE_TOL, max(wall - 0.05, 0.1), coarse / 2 + HOLE_TOL,
                                MIN_WALL, lead=1.0)
         r.update(wall_mm=round(wall, 2), bore_mm3=round(vol, 2), seat=round(seat, 3))
         if vol > BLOCKED_MM3:
             why.append(f"attach: hole {i} is not clear through its {wall:.1f} mm wall as a {fine - 2 * HOLE_TOL:.2f} "
                        f"mm bore ({vol:.1f} mm3 in it)")
-        elif seat < SEAT_MIN:
+            continue
+        if seat < SEAT_MIN:
             why.append(f"attach: hole {i} has no part around it ({seat:.0%} of a {MIN_WALL:g} mm ring past the "
                        f"{coarse:g} mm coarse hole; need {SEAT_MIN:.0%}), so the screw head has nothing to bear on")
-        else:
-            good.append(p)
+            continue
+        head, hm = _head_room(part, mesh, spec, M, p, n, size, coarse)
+        r.update(head=head, **hm)
+        if head is None:
+            dk, k = PAN_HEAD[size]
+            why.append(f"attach: hole {i} has no room for its screw head: a {size} pan head (Ø{dk:g} x {k:g} mm) on "
+                       f"the part {hm.get('seat_mm', wall):.1f} mm in meets the product or the part, and no "
+                       f"countersink holds a flat head (Ø{FLAT_HEAD[size][0]:g}), so the product cannot go in or "
+                       f"bears on the head")
+            continue
+        good.append(p)
+    out = {"face": face, "holes": res, "good": len(good)}
     if len(good) < need:
         why.append(f"attach: {len(good)} good screw holes on the {face} side for {size} (need {need}, ISO 273 "
                    f"{fine:g} to {coarse:g} mm, through its wall), so it cannot be screwed to {against}")
-    return why, {"face": face, "holes": res, "good": len(good)}, good
+    elif need >= 2:
+        e1 = np.cross(n, [1.0, 0, 0] if abs(n[0]) < 0.9 else [0, 1.0, 0])
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(n, e1)
+        across = float(max(np.ptp(V @ e1), np.ptp(V @ e2)))
+        G = np.asarray(good)
+        spread = float(np.max(np.linalg.norm(G[:, None] - G[None], axis=2)))
+        out.update(spread_mm=round(spread, 1), across_mm=round(across, 1))
+        if spread < ATTACH_SPREAD * across - 1e-9:
+            why.append(f"attach: the good screw holes are {spread:.1f} mm apart at most (need "
+                       f"{ATTACH_SPREAD * across:.1f}, {ATTACH_SPREAD:.0%} of the part's {across:.0f} mm across its "
+                       f"{face} side), so it can turn about them")
+    return why, out, good
+
+
+def _piece(part, at: np.ndarray, axis: np.ndarray):
+    """The piece of the part on the +axis side of the section's plane (through `at`, square to axis)
+    that the section itself belongs to, as a trimesh; None when it cannot be cut out."""
+    if part is None:
+        return None
+    above, _ = part.split_by_plane(tuple(float(x) for x in axis), float(at @ axis))
+    probe = (at + axis * 0.05)[None]
+    for piece in above.decompose():
+        tm = _trimesh(piece)
+        if len(tm.faces) and tm.contains(probe)[0]:
+            return tm
+    return None
 
 
 def _measured_arm(spec: dict, M: np.ndarray, fit: dict | None, at: np.ndarray, axis: np.ndarray,
-                  load: np.ndarray, holes: list) -> tuple[float, str]:
-    """The arm in the part, mm, and what it runs from. The load enters where the product bears on
-    the part (the support face's bearing samples; the product's middle without a support face). From
-    the section it is the mean distance of those points along the beam's axis; with an attach, it is
-    also the mean distance square to the load from each of them to the nearest screw hole (the load
-    path to the desk or wall). The larger counts."""
+                  load: np.ndarray, holes: list, part=None) -> tuple[float, str]:
+    """The moment the section carries over the load, mm: an arm, and what it runs from. The load
+    enters where the product bears on the part (the support face's bearing samples, each an equal
+    share of the load; the product's middle without a support face). On each side of the section's
+    plane only the piece of the part the section belongs to loads it (a lip on the far side of the
+    product loads its own root, not this one), so a share counts only where it bears on that piece,
+    at its distance along the beam's axis. With an attach each share goes to its nearest screw hole
+    (square to the load) and loads the section only when that screw is not on its own piece, and the
+    two sides add; without, the side that hangs is not known, and the larger counts."""
     bear = bearing(spec, fit) if fit is not None else None
     if bear is not None and bear.any():
-        pts, what = fit["_P"][bear], "where the product bears"
+        pts, g = fit["_P"][bear], fit["_g"][bear]
+        contact = pts + fit["_N"][bear] * (np.maximum(g, 0.0) + 0.05)[:, None]
+        what = "where the product bears"
     else:
         body = spec["product"]["body"]
         mid = np.array([body["w"] / 2, body["d"] / 2, body["h"] / 2], float)
-        pts, what = (M[:3, :3] @ mid + M[:3, 3])[None], "the product's middle"
-    arm = float(np.mean(np.abs((pts - at) @ axis)))
-    if holes:
-        H = np.asarray(holes, float)
+        pts, contact, what = (M[:3, :3] @ mid + M[:3, 3])[None], None, "the product's middle"
+    s = (pts - at) @ axis
+    H = np.asarray(holes, float).reshape(-1, 3)
+    if len(H):
         D = pts[:, None, :] - H[None, :, :]
         D = D - (D @ load)[..., None] * load
-        via = float(np.mean(np.min(np.linalg.norm(D, axis=2), axis=1)))
-        if via > arm:
-            arm, what = via, f"{what} to the nearest screw hole"
-    return arm, what
+        near = np.argmin(np.linalg.norm(D, axis=2), axis=1)
+        att = spec["expect"].get("attach") or {}
+        ring = None
+        if att.get("face") in NORMAL and att.get("screw") in CLEARANCE:  # the part around each hole's mouth
+            n = M[:3, :3] @ np.array(NORMAL[att["face"]], float)
+            e1 = np.cross(n, [1.0, 0, 0] if abs(n[0]) < 0.9 else [0, 1.0, 0])
+            e1 /= np.linalg.norm(e1)
+            E = np.array([e1, np.cross(n, e1), -e1, -np.cross(n, e1)])
+            r = CLEARANCE[att["screw"]][2] / 2 + HOLE_TOL + MIN_WALL / 2
+            ring = (H[:, None, :] - n * 0.3 + E[None] * r).reshape(-1, 3)
+    moments = []
+    for side in (1.0, -1.0):
+        sel = s * side > 0
+        piece = _piece(part, at, axis * side) if sel.any() else None
+        if piece is not None and contact is not None:
+            idx = np.flatnonzero(sel)
+            sel[idx[~piece.contains(contact[idx])]] = False
+        if len(H) and sel.any():
+            if piece is not None and ring is not None:
+                on_piece = piece.contains(ring).reshape(len(H), 4).any(axis=1)
+            else:
+                on_piece = (H - at) @ (axis * side) > 0
+            sel &= ~on_piece[near]
+        moments.append(float(np.sum(np.abs(s[sel]))) / len(pts))
+    if len(H):
+        return sum(moments), f"{what}, on its way to the nearest screw hole"
+    return max(moments), what
 
 
 def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarray | None = None,
-                   fit: dict | None = None, holes: list | None = None) -> tuple[list[str], dict]:
+                   fit: dict | None = None, holes: list | None = None, part=None) -> tuple[list[str], dict]:
     """Bending at the critical section. With the mesh, b and h are measured through the section's
     point; with the frame too, h_dir must lie along the load, b_dir square to it, the arm is measured
-    from where the load enters (and, with an attach, from the screw holes; _measured_arm), and the
-    layers are read from the beam's axis against the STL's z."""
+    from what the section carries of the load on its way to the support or the screw holes
+    (_measured_arm), and the layers are read from the beam's axis against the STL's z."""
     exp = spec["expect"]
     if not exp.get("load_n"):
         return [], {}
@@ -955,9 +1106,14 @@ def check_strength(eng: dict, spec: dict, safety: float, mesh=None, M: np.ndarra
                     out["axis_tilt_deg"] = round(math.degrees(math.asin(min(1.0, tilt))), 1)
                     if tilt > IN_LAYERS_TILT:
                         across = True
-                    am, what = _measured_arm(spec, M, fit, at, axis, load, holes or [])
+                    if part is None:
+                        part, _ = closed_part(mesh)
+                    am, what = _measured_arm(spec, M, fit, at, axis, load, holes or [], part)
                     out["arm_mm"] = round(am, 2)
-                    if arm < am - SECTION_TOL:
+                    if am <= 1e-9:
+                        why.append("strength: the critical section carries none of the load: no share of it "
+                                   "crosses the section, so it is not the critical one")
+                    elif arm < am - SECTION_TOL:
                         why.append(f"strength: the arm is {am:.1f} mm in the part, from the section to {what} "
                                    f"(arm says {arm:g})")
                     arm = max(arm, am)
@@ -975,7 +1131,7 @@ def _url(s: str) -> str | None:
     """The http(s) URL a source starts with, when it has a host; else None."""
     from urllib.parse import urlsplit
 
-    tok = s.split()[0].rstrip(".,;)") if s.split() else ""
+    tok = s.split()[0].rstrip(".,;:)'\"") if s.split() else ""
     try:
         u = urlsplit(tok)
     except ValueError:
@@ -992,8 +1148,9 @@ def _cited(text) -> set[str]:
 def check_sources(eng: dict, spec: dict) -> list[str]:
     """A source for every size, the profile of a profiled body, and every feature. From text or a
     model number the part cannot have measured the product, so each source must be a URL the spec
-    cites for that number (in its own body or feature source) or in product.sources; from a photo it
-    may also be "calipers" or "photo with <a reference>", or any URL with a host."""
+    cites for that number in its own body or feature source (product.sources lists every document,
+    so it ties a URL to no number); from a photo it may also be "calipers" or "photo with <a
+    reference>", or any URL with a host."""
     src = eng.get("sources") or {}
     prod = spec["product"]
     own = {k: v for k, v in (prod.get("body_sources") or {}).items()}
@@ -1001,14 +1158,13 @@ def check_sources(eng: dict, spec: dict) -> list[str]:
     need = ["w", "d", "h", "corner_r"] + (["profile"] if prod["body"].get("profile") else []) + \
         [f["name"] for f in prod.get("features", [])]
     photo = spec.get("input") == "photo"
-    common = set().union(*[_cited(t) for t in prod.get("sources", [])]) if prod.get("sources") else set()
 
     def good(k) -> bool:
         s = str(src.get(k) or "").strip()
         u = _url(s)
         if photo:
             return u is not None or s == "calipers" or (s.startswith("photo with ") and len(s) > len("photo with "))
-        return u is not None and u in (common | _cited(own.get(k, "")))
+        return u is not None and u in _cited(own.get(k, ""))
 
     bad = [k for k in need if not good(k)]
     if not bad:
@@ -1062,8 +1218,8 @@ def grade(job: Path, spec: dict, stl: Path | None) -> dict:
         aw, acc = check_access(mesh, spec, M, fit, part)
         hw, holes = check_holes(mesh, spec, eng, M, fit, part)
         tw, att, good = attach_holes(mesh, spec, eng, M, part)
-        why += aw + hw + tw + check_retention_mesh(mesh, eng, part)
-    sw, sm = check_strength(eng, spec, float(exp.get("safety", 2)), mesh, M, fit, good)
+        why += aw + hw + tw + check_retention_mesh(mesh, eng, part, spec)
+    sw, sm = check_strength(eng, spec, float(exp.get("safety", 2)), mesh, M, fit, good, part)
     why += sw
     measured["strength"] = sm
     measured["attach"] = att

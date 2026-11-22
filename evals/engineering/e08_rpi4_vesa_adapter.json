@@ -35,7 +35,7 @@
           2.7,
           2.7
         ],
-        "source": "drawing: hole center '3.5' from the left edge and '3.5' from the front edge, hole diameter '2.7' (callouts '6' and '2.7' at the hole by the micro HDMI ports); u = 85 - 3.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: hole center '3.5' from the left edge and '3.5' from the front edge, hole diameter '2.7' (callouts '6' and '2.7' at the hole by the micro HDMI ports); u = 85 - 3.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
         "shape": "circle",
         "pad": [
           6.0,
@@ -54,7 +54,7 @@
           2.7,
           2.7
         ],
-        "source": "drawing: '3.5' plus hole spacing '58' along x gives x 61.5, '3.5' from the front edge, diameter '2.7'; u = 85 - 61.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: '3.5' plus hole spacing '58' along x gives x 61.5, '3.5' from the front edge, diameter '2.7'; u = 85 - 61.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
         "shape": "circle",
         "pad": [
           6.0,
@@ -73,7 +73,7 @@
           2.7,
           2.7
         ],
-        "source": "drawing: '3.5' from the left edge, '3.5' plus hole spacing '49' along y gives y 52.5 (also '3.5' from the back edge), diameter '2.7'; u = 85 - 3.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: '3.5' from the left edge, '3.5' plus hole spacing '49' along y gives y 52.5 (also '3.5' from the back edge), diameter '2.7'; u = 85 - 3.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
         "shape": "circle",
         "pad": [
           6.0,
@@ -92,7 +92,7 @@
           2.7,
           2.7
         ],
-        "source": "drawing: x 3.5 + 58 = 61.5, y 3.5 + 49 = 52.5, diameter '2.7'; u = 85 - 61.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
+        "source": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf drawing: x 3.5 + 58 = 61.5, y 3.5 + 49 = 52.5, diameter '2.7'; u = 85 - 61.5; pad: the '6' callout at the hole, the Ø6 area around it a standoff may bear on",
         "shape": "circle",
         "pad": [
           6.0,
