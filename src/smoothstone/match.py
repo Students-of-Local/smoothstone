@@ -163,6 +163,26 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             if r.param(k) is not None and k not in out:
                 out[k] = v
         request = request[:m.start()] + " " * (m.end() - m.start()) + request[m.end():]
+    cp = rc.catalog_param(r)
+    if cp is not None and cp.name not in out:
+        # a catalog product named with punctuation the phrases do not read: "Mac mini (M4, 2024)"
+        from . import catalog
+
+        slug = catalog.find(request, list(cp.choices))
+        if slug:
+            out[cp.name] = slug
+    if cp is not None and out.get(cp.name):
+        # the product's name is used up: its model numbers ("M4, 2024", "4020S") are not sizes
+        from . import catalog
+
+        for a in sorted((catalog.get(str(out[cp.name])) or {}).get("aliases", []), key=len, reverse=True):
+            words = re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", a.lower())
+            if not words:
+                continue
+            pat = r"(?<![a-z0-9])" + r"[^a-z0-9]+".join(re.escape(w) for w in words) + r"(?![a-z0-9])"
+            m = re.search(pat, request, re.I)
+            if m:
+                request = request[:m.start()] + " " * (m.end() - m.start()) + request[m.end():]
     req_words = set(_words(request))
     own = set(_words(r.name.replace("_", " ") + " " + r.title))  # "box" names the recipe, not part=box
     for p in r.params:

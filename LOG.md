@@ -508,3 +508,63 @@ part inside the product (1.85 mm on e01), so it refused the pins that keep a Pi 
 snap catch. A hole is empty through the board: check_fit now leaves out samples inside a hole
 feature's own diameter (not its pad, no margin). A standoff pushed into the board around the hole
 still fails (test_pi5_standoffs_into_the_board_fail, test_a_pin_wider_than_the_hole_still_pushes_into_the_board).
+
+## 2026-11-22 climb 2: five product recipes from the Sol gold set
+
+The second step up the engineering suite, on the climb 1 catalog. Five new tier S recipes build a
+part for any catalog product of the right kind, each adapted from a reference design by GPT-6.1
+Sol, smoothstone gold set (copied as made into evals/gold/, each passing the grader:
+`uv run python evals/gold/grade.py`):
+
+- round_case (from e04): split shells for a round product, a flexure hinge at the back and a latch
+  at the front, open over every feature the maker locates on top. PETG.
+- product_holder (from e05 and e06): an open top cradle on a desk or, "on the wall", screwed up
+  with two countersunk screws through a side the maker does not need clear, the floor sized for the
+  load; an upright product gets low guides and a backrest, a port underneath raises it on a 45
+  degree shelf over a cable slot. PLA.
+- product_mount (from e07): an under desk channel, roof screws in counterbores, two rails under
+  the product, front snap tabs, rear stops, printed on its front end. PETG.
+- board_plate (from e08): a VESA 75 or 100 adapter plate for a board, countersunk clearance holes
+  for bought standoffs at the board's own holes (2.7 mm holes take M2.5), a vent under the board.
+  PETG, for the warmth behind a monitor.
+- knob (from e09): a press on knob, four fingers freed by a relief ring grip the shaft 0.06 mm
+  under its size; a D shaft gets a flat. PLA.
+
+The catalog says which products each recipe may take (catalog.KINDS) and writes
+recipes/lib/catalog.scad, the rows the recipes read. A recipe reports what it built through one
+echo, stone_eng, read into build/engineering.json. A product named with punctuation the phrases do
+not read ("Mac mini (M4, 2024)") is still found, and its model numbers are used up as the name, not
+offered as sizes. A variant word (Pro Max, mini, Plus) keeps catalog.find off the plain model.
+fitted_case no longer makes "holder", so holders go to product_holder.
+
+NEXT driver, seed 1, before (climb 1, c17e4a6) and after:
+
+| spec | before | after |
+| --- | --- | --- |
+| e01_rpi5_case | pass | pass (fitted_case) |
+| e02_flipper_zero_case | pass | pass (fitted_case) |
+| e03_power_bank_case | pass | pass (fitted_case) |
+| e04_airtag_case | asks, no finished part | pass (round_case) |
+| e05_appletv_wall_holder | fitted_case tray: no M4 holes to screw it to the wall | pass (product_holder, mount=wall) |
+| e06_iphone_desk_holder | phone_stand: no engineering.json | pass (product_holder) |
+| e07_mac_mini_mount | asks, no finished part | pass (product_mount) |
+| e08_rpi4_vesa_adapter | panel: no engineering.json | pass (board_plate, vesa=75) |
+| e09_pot_knob | asks, no finished part | pass (knob) |
+| e10_model_number_case | pass | pass (fitted_case) |
+
+10 of 10, all on the tuning set. The floor in evals/floor.json is left for the lead to raise.
+
+Every catalog product each recipe may take builds with stone's checks passing, but one:
+product_mount for the Anker A1388 (151 mm long, 16 mm low) tips standing on its front end. Open:
+a snap off brim, or printing it on its roof with supports, is the owner's call. Flipper Zero on a
+wall refuses with a reason: the catalog keeps every one of its sides clear.
+
+Where the grader passes something that would not hold in real life:
+- e04: the grader takes any snap arm; the round case's latch holds the two halves shut, not the
+  AirTag itself. That is right here, but the grader would pass an arm that held nothing.
+- e09: coverage sampled at 0.7 mm reads 100% though the finger slots are open; sampled finer it is
+  near 88 to 90%, still over the 80% floor.
+- e08: the grader does not check the standoffs or the screws' grip in them; the plate assumes
+  bought metal standoffs of the stated length.
+- e06: a desk holder declares no load, so nothing checks the backrest against a hand pressing the
+  phone's screen; a held out desk spec with a load would fail.

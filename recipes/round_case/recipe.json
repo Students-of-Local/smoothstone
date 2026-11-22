@@ -1,0 +1,27 @@
+{
+ "name": "round_case",
+ "title": "Round case for a product",
+ "summary": "Snap shut case for a round product in the catalog (an AirTag, a tracker tag, a puck), built from the maker's published profile: two half shells hinged by a flexure at the back and closed by a latch at the front, open over every feature the maker locates on the top.",
+ "tags": ["case", "round", "airtag", "tag", "tracker", "puck", "disc", "cover", "product", "fitted"],
+ "makes": ["case", "cover", "shell", "bumper"],
+ "tier": "S",
+ "params": [
+  {"name": "product", "type": "choice", "product": true, "catalog": "round_case", "default": "apple_airtag",
+   "help": "the exact product, from the catalog (stone show reads it from the request)"},
+  {"name": "material", "type": "choice", "default": "PETG", "choices": ["PETG", "PLA"],
+   "help": "PETG bends further before it yields, for the hinge and latch"},
+  {"name": "clearance", "type": "number", "default": 0.2, "min": 0.05, "max": 0.45, "unit": "mm",
+   "help": "room per side between the product and the case"},
+  {"name": "wall", "type": "number", "default": 1.6, "min": 1.2, "max": 3, "unit": "mm", "help": "shell and floor thickness"},
+  {"name": "lip", "type": "number", "default": 3, "min": 1, "max": 8, "unit": "mm",
+   "help": "how far the rim reaches over the top edge when nothing on the top must stay open"},
+  {"name": "quality", "type": "int", "default": 96, "min": 32, "max": 192, "help": "circle smoothness"}
+ ],
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "min_wall": 1.2,
+ "fix": {"min_wall": {"param": "wall", "dir": "up"}},
+ "examples": [
+  {"name": "airtag", "params": {"product": "apple_airtag"}}
+ ]
+}

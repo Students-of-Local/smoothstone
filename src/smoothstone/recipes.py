@@ -179,7 +179,7 @@ def _load_one(d: Path) -> Recipe:
             # the catalog's products are the choices, and each name or model number people type picks one
             from . import catalog
 
-            p.choices = catalog.case_slugs()
+            p.choices = catalog.slugs_for(p.catalog)
             for slug in p.choices:
                 for a in catalog.get(slug).get("aliases", []):
                     phrases.setdefault(a.lower(), {p.name: slug})
@@ -301,14 +301,16 @@ def catalog_param(r: Recipe) -> Param | None:
 
 def fit(r: Recipe, query: str) -> int:
     """How well the request names what the recipe makes (_fit_words). A recipe whose product comes
-    from the catalog fits fully only when the request names one of its products; otherwise it fits
-    at most 1, behind any recipe that makes the thing by name (a phone case for an iPhone)."""
+    from the catalog fits one more when the request names one of its products, so a part built to the
+    product's sourced sizes wins over one that only shares its noun (a desk stand for an iPhone 17
+    Pro is the product holder, not the generic phone stand); otherwise it fits at most 1, behind any
+    recipe that makes the thing by name (a phone case for an iPhone)."""
     got = _fit_words(r, query)
     cp = catalog_param(r)
     if cp is not None and got:
         from . import catalog
 
-        return got if catalog.find(query, list(cp.choices)) else min(got, 1)
+        return got + 1 if catalog.find(query, list(cp.choices)) else min(got, 1)
     return got
 
 

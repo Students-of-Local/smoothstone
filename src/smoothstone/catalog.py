@@ -3,7 +3,7 @@
 Each product is one file in src/smoothstone/products/<slug>.json: the maker's published sizes
 (body, body_sources, features, sources, in the product frame of evals/README.md "Engineering
 specs"), the names and model numbers people type (aliases), and how a case holds it (fitted_case,
-open_faces, board). A product's numbers are copied from documents the maker publishes, with the URL
+open_faces, board, shaft). A product's numbers are copied from documents the maker publishes, with the URL
 next to each; a product whose numbers are not published is left out, never estimated.
 
 The ten products here are the tuning set (from evals/engineering). Products for a held-out set come
@@ -44,15 +44,70 @@ def case_slugs() -> list[str]:
     return sorted(s for s, p in _all().items() if p.get("fitted_case"))
 
 
+def is_round(p: dict) -> bool:
+    """A round body: a revolved profile, or a disc (w = d and corner_r half of it)."""
+    b = p["body"]
+    return bool(b.get("profile")) or (abs(float(b["w"]) - float(b["d"])) < 1e-6
+                                      and float(b.get("corner_r") or 0) >= float(b["w"]) / 2 - 1e-6)
+
+
+def bottom_holes(p: dict) -> list[dict]:
+    """The mounting holes on the product's -z face (a board's)."""
+    return [f for f in p.get("features", []) if f["kind"] == "hole" and f["face"] == "-z"]
+
+
+# Which products each kind of part can be made for, from the shape of the product alone (no product
+# is named here): a recipe's catalog parameter ("catalog": "<kind>") offers these.
+KINDS = {
+    "fitted_case": lambda p: bool(p.get("fitted_case")),
+    "round_case": lambda p: is_round(p) and not p.get("shaft"),
+    "product_holder": lambda p: not is_round(p) and not p.get("shaft"),
+    "product_mount": lambda p: not is_round(p) and not p.get("shaft"),
+    "board_plate": lambda p: len(bottom_holes(p)) >= 2 and not p.get("shaft"),
+    "knob": lambda p: bool(p.get("shaft")),
+}
+
+
+def slugs_for(kind: str) -> list[str]:
+    """The catalog products a part of this kind can be made for, sorted."""
+    ok = KINDS.get(kind)
+    if ok is None:
+        raise KeyError(f"no catalog kind {kind!r}")
+    return sorted(s for s, p in _all().items() if ok(p))
+
+
+def kinds_for(slug: str) -> list[str]:
+    """The kinds of part the catalog can make for a product."""
+    p = get(slug)
+    return [k for k, ok in KINDS.items() if p is not None and ok(p)]
+
+
 def _plain(text: str) -> str:
     # a dot stays only inside a number (22.5W); a sentence's last dot is not part of a model number
     text = re.sub(r"(?<!\d)\.|\.(?!\d)", " ", text.lower())
     return " " + re.sub(r"[^a-z0-9.]+", " ", text).strip() + " "
 
 
+# A word right after a product's name that makes it another model: "iPhone 17 Pro Max" is not
+# the "iPhone 17 Pro", "Mac mini Pro" not the "Mac mini".
+VARIANT = {"max", "plus", "mini", "ultra", "pro", "air", "lite", "se", "xl", "xs", "fe", "neo"}
+
+
+def _named(alias: str, low: str) -> bool:
+    """The plain alias is in the plain text and no variant word follows it there."""
+    at = low.find(alias)
+    while at >= 0:
+        nxt = low[at + len(alias):].split(" ", 1)[0]
+        if nxt not in VARIANT:
+            return True
+        at = low.find(alias, at + 1)
+    return False
+
+
 def find(text: str, only: list[str] | None = None) -> str | None:
     """The slug of the catalog product the text names, by its longest alias (case does not matter,
-    model numbers included), or None. `only` limits the search to those slugs."""
+    model numbers included), or None. `only` limits the search to those slugs. An alias followed by
+    a variant word (VARIANT) names another model, so it does not count."""
     low = _plain(text)
     best, size = None, 0
     for slug, p in _all().items():
@@ -60,7 +115,7 @@ def find(text: str, only: list[str] | None = None) -> str | None:
             continue
         for a in p.get("aliases", []):
             pa = _plain(a)
-            if len(pa) > size and pa in low:
+            if len(pa) > size and _named(pa, low):
                 best, size = slug, len(pa)
     return best
 
@@ -258,4 +313,41 @@ def scad_table() -> str:
                                   pcb, standoffs(p), windows(p), arms]))
     lines.append(",\n".join(rows))
     lines.append("];")
+    return "\n".join(lines) + "\n"
+
+
+# --- every product as one OpenSCAD table (recipes/lib/catalog.scad) ----------------------------
+# The product recipes (round_case, product_holder, product_mount, board_plate, knob) read a product
+# from this table by its slug and build to its sizes; fitted_case keeps its own layout table above.
+FEATURE_ROW = "[name, kind, face, u, v, size w, size h, plug w, plug h, round, depth]"
+
+
+def _feature_row(f: dict) -> list:
+    sw, sh = f["size"]
+    pw, ph = f.get("plug") or f["size"]
+    return [f["name"], f["kind"], f["face"], float(f["c"][0]), float(f["c"][1]), float(sw), float(sh),
+            float(pw), float(ph), f.get("shape") == "circle", float(f.get("depth") or 0)]
+
+
+def catalog_table() -> str:
+    """recipes/lib/catalog.scad: one row per product in the catalog."""
+    lines = ["// GENERATED by tools/products_scad.py from src/smoothstone/products/*.json. Do not edit by hand.",
+             "// Row: [slug, [w, d, h], corner_r, profile [[r, z]] ([] for a box), open faces,",
+             "//       PCB underside z (-1: not a board), features " + FEATURE_ROW + ",",
+             "//       shaft [type, across flats] ([] for no shaft)]",
+             "// Product frame (evals/README.md): x width, y depth, z height, origin at the body's min corner.",
+             "CATALOG = ["]
+    rows = []
+    for slug, p in sorted(_all().items()):
+        b = p["body"]
+        board = p.get("board")
+        sh = p.get("shaft")
+        rows.append("  " + _scad([slug, [float(b["w"]), float(b["d"]), float(b["h"])], float(b.get("corner_r") or 0),
+                                  [[float(r), float(z)] for r, z in b.get("profile", [])], list(p.get("open_faces", [])),
+                                  float(board["pcb_underside_z"]) if board else -1.0,
+                                  [_feature_row(f) for f in p.get("features", [])],
+                                  [sh["type"], float(sh.get("flat") or 0)] if sh else []]))
+    lines.append(",\n".join(rows))
+    lines.append("];")
+    lines.append("function catalog_row(slug) = let(m = [for (r = CATALOG) if (r[0] == slug) r]) len(m) == 1 ? m[0] : [];")
     return "\n".join(lines) + "\n"

@@ -1,7 +1,9 @@
 {
  "slug": "iphone_17_pro_upright",
  "name": "iPhone 17 Pro",
- "aliases": [],
+ "aliases": [
+  "iPhone 17 Pro"
+ ],
  "set": "tuning",
  "from_spec": "evals/engineering/e06_iphone_desk_holder.json",
  "frame": "Upright in portrait on its bottom edge (+z up, screen at -y, back at +y): the cradle wraps the bottom face but must pass a USB-C plug through Apple's 12.45 x 6.60 connector keepout and leave the speaker and mic holes clear. Frame: x from the left edge as seen facing the screen, so on -z u = 71.85 - x and v = y = 8.75 - 4.375.",
@@ -70,5 +72,10 @@
  ],
  "sources": [
   "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf"
- ]
+ ],
+ "open_faces": [
+  "-y",
+  "+z"
+ ],
+ "open_why": "the screen faces -y and must stay clear; the top is where the phone is lifted out"
 }

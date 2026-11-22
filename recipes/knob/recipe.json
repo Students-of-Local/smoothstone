@@ -1,0 +1,24 @@
+{
+ "name": "knob",
+ "title": "Knob for a shaft",
+ "summary": "Push on knob for the shaft of a real part in the catalog (a potentiometer, a rotary encoder), built from the maker's published shaft size: a press fit bore held by four flexing fingers, a flat for a D shaft, and an index groove.",
+ "tags": ["knob", "dial", "potentiometer", "pot", "encoder", "shaft", "replacement", "product", "fitted"],
+ "makes": ["knob", "replacement knob", "control knob", "dial", "volume knob"],
+ "tier": "S",
+ "params": [
+  {"name": "product", "type": "choice", "product": true, "catalog": "knob", "default": "bourns_ptv09a_4020s_b103",
+   "help": "the exact part the knob goes on, from the catalog (stone show reads it from the request)"},
+  {"name": "material", "type": "choice", "default": "PLA", "choices": ["PLA", "PETG"],
+   "help": "PLA is stiffer, so a small press holds better"},
+  {"name": "diameter", "type": "number", "default": 18, "min": 12, "max": 50, "unit": "mm", "help": "knob outside diameter"},
+  {"name": "press", "type": "number", "default": 0.06, "min": 0.02, "max": 0.1, "unit": "mm",
+   "help": "how much smaller the bore is than the shaft, per side"},
+  {"name": "quality", "type": "int", "default": 144, "min": 48, "max": 192, "help": "circle smoothness"}
+ ],
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "min_wall": 1.2,
+ "examples": [
+  {"name": "ptv09", "params": {"product": "bourns_ptv09a_4020s_b103"}}
+ ]
+}
