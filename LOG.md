@@ -321,3 +321,39 @@ divergence, fixes the skill there, and reverts a version that scores worse.
 - For the steps: stone set on a figure with no photos now says NEXT: stone find "<who>",
   not stone build, which could only end in that FIX. One step less on the figure path. The S card's
   figure lines and example say so, so the S card's SHA changes here (a new version in the ledger).
+
+## 2026-11-21 the random five: flawless printable figures of five people picked at random
+
+Five popular people drawn at random (evals/figure-random): Lamine Yamal, Christopher Abbott, Inde
+Navarrette, Shane Gillis, Sienna Miller. Each run on the Mac (FLUX.2 klein style, Hunyuan3D-2mini
+lift at octree 384), then judged here: every stone print check, the likeness judge (pass 6) and
+the craft judge on the shape (judge_views). The craft judge moves about one point run to run.
+
+- Round 5, before this work: likeness 8 / 9 / 7 / 3 / 9, craft 5 / 8 / 7 / 8 / 8.
+- Lamine's hair lifted as loose worms half a mm thick, floating up to 3.1 mm off the head (craft 5).
+  printable.strands cuts every strand of a head that has many (STRAND_MANY 16) with one floating
+  STRAND_FAR 1.5 mm or more, fills the cut from the opened head, and smooths the join and the hair
+  by moving the mesh's own points onto a blurred surface. Rebuilt: craft 7. Christopher Abbott's
+  sculpted curls (24 strands, none past 1.3 mm) are left alone: cutting them took him from 8 to 6.
+  Inde's long hair (8 strands, three locks 1.7 to 3.2 mm off) is left alone too: cut, her locks
+  ended in flat slabs beside the cheek (6 cut, 7 kept).
+- Inde's head lift came with a neck far thinner than the body's, and the neck blend took it: a
+  3 mm2 neck. The body's own neck now stays in the blend, shrunk at most GRAFT_KEEP (1/160 of the
+  height), so hers keeps 75% of the body's; a joined neck under GRAFT_NECK (half) is refused and the
+  figure keeps its own head.
+- Points below the head grid read the nearest cut's distance at its edge and pulled Inde's feet;
+  off the grid they are now far from every cut.
+- Folds left by the smoothing (7250 faces on Inde's hair) made the slicer union split off two
+  0.01 mm slivers: three bodies. clean.for_slicer drops shells under 0.001 mm3. Easing the folds
+  back instead brought the worms back (craft 5 on both), so it was not kept.
+- Shane Gillis's likeness stays at 3 to 4. Both his free photos are stage shots under colored
+  light that show his ginger hair as brown, and with a 2025 mustache; the judge's reference is
+  another year's photo with stubble and a hoodie. Correcting the face crop's color cast by its
+  cheeks (hue 42 to 56) scored 3 and 3, and naming his age or dropping "full round face" scored
+  3 to 4 on two seeds each: none kept. The photo's hair measured no ginger to name.
+- Round 6, all of it on this code, fresh from find to slicer: likeness 8 / 9 / 6 / 4 / 8,
+  craft 7 / 8 / 7 / 7 / 6. Every figure passes every print check as one body. Sienna's 6 names
+  flecks at her outer eye corners and a few thin fins at her hair ends; her round 5 render rebuilt
+  on this code scored 8 with the same flecks named. Inde's 6 is
+  the judge's reference pick (7 on round 5 with the same render path); Shane's 4 is his photos.
+  Craft stops at 7 to 8 where the lift model leaves soft eyes and hands.

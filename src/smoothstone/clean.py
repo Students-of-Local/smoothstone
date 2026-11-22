@@ -11,6 +11,9 @@ from __future__ import annotations
 import numpy as np
 
 ZERO_AREA = 1e-9  # mm2: a face this small is dropped by a slicer's repair, opening its edges
+# mm3: a shell this small is a sliver the union split off a fold (two of 0.01 mm on Inde Navarrette's
+# hair read as three bodies); it cannot print, and a real loose piece is thousands of times larger
+SLIVER = 1e-3
 
 
 def slicer_view(vertices, faces) -> dict:
@@ -48,6 +51,9 @@ def for_slicer(mesh, tolerance: float = 0.01):
             raise ValueError(f"not a closed manifold: {man.status().name}")
         if tolerance:
             man = man.simplify(tolerance)
+        parts = man.decompose()
+        if len(parts) > 1:
+            man = m3.Manifold.compose([c for c in parts if c.volume() >= SLIVER] or parts)
         o = man.to_mesh()
         return np.asarray(o.vert_properties[:, :3], dtype=np.float64), np.asarray(o.tri_verts, dtype=np.int64)
 

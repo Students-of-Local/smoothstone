@@ -1,0 +1,12 @@
+{
+ "id": "x4_shane_gillis",
+ "request": "A mini figure of Shane Gillis, 90 mm tall, with \"SHANE\" on the base",
+ "expect": {
+  "recipe": "figure",
+  "params": {
+   "height": 90,
+   "name": "SHANE"
+  }
+ },
+ "why": "Random draw 2026-11-21 (seed 20261121) from en.wikipedia's top 400 articles of 2026-10, people with a photo. Donovan: 5/5 perfection from the random pulled people."
+}

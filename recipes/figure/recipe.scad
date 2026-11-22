@@ -42,8 +42,12 @@ module plinth() {
         [dr, bh - c], [dr - c, bh], [0, bh]]);
 }
 
-module name_text(t, size) soft_extrude(1.2, r = 0.3, steps = 2, bottom = 0)
+// letters stand 1.2 mm proud (0.3 mm into the plinth): at 0.9 mm a one-color print read faint
+module name_text(t, size) soft_extrude(1.5, r = 0.3, steps = 2, bottom = 0)
     text(t, size = size, font = F, halign = "center", valign = "center");
+
+function head(s, i) = i <= 0 ? "" : str(head(s, i - 1), s[i - 1]);   // the first i letters
+function adv(s, size) = s == "" ? 0 : textmetrics(s, size = size, font = F).advance[0];
 
 module plinth_name() {
     n = len(name);
@@ -56,14 +60,19 @@ module plinth_name() {
     lim = ts >= 10 ? "font" : ts >= by_h ? "base_h" : "base_d";
     echo(stone_text = [ts, font, lim, lim == "font" ? 0 : lim == "base_h" ? bh : bd]);
     if (base == "hex") {
-        // flat on the front face, 0.3 mm into it, 0.9 mm proud
+        // flat on the front face, 0.3 mm into it, 1.2 mm proud
         translate([0, -(dr * cos(30) - 0.3), zc]) rotate([90, 0, 0]) name_text(name, ts);
     } else {
-        // one letter at a time around the drum
-        step = min(160 / max(n, 1), ts * 0.86 / dr * 180 / PI);
+        // one letter at a time around the drum, each by its own width: the same arc for every
+        // letter crowded an M and left an I floating (LAMINE read as LAMENI), with a little extra
+        // room between letters so neighbors stay a nozzle line apart at the drum's front
+        gap = ts * 0.1;
+        total = adv(name, ts) + gap * (n - 1);
+        k = min(1, 160 * PI / 180 * dr / total);   // the name keeps to the front 160 degrees
         for (i = [0 : n - 1]) {
-            a = -90 - ((n - 1) / 2 - i) * step;
-            rotate([0, 0, a + 90]) translate([0, -(dr - 0.3), zc]) rotate([90, 0, 0]) name_text(name[i], ts);
+            x = (adv(head(name, i), ts) + gap * i + adv(name[i], ts) / 2 - total / 2) * k;
+            rotate([0, 0, x / dr * 180 / PI]) translate([0, -(dr - 0.3), zc]) rotate([90, 0, 0])
+                name_text(name[i], ts);
         }
     }
 }

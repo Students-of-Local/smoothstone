@@ -3,8 +3,8 @@
 Local models do the work, none of them the model that drives stone:
 - describe: LFM3-VL-2B (4 bit, about 3 GB) writes one sentence on how an animal or a thing looks,
   and answers yes or no on a face, glasses, a beard and a hat to check photos and renders.
-- face: tools/figure/face.py (on the lift venv's opencv) crops a person's face out of the lead
-  photo, for the style model to see first.
+- face: tools/figure/face.py (on the lift venv's opencv) crops a person's face out of whichever
+  photo shows it biggest, for the style model to see first.
 - style: FLUX.2 klein 4B edit through mflux (Apache 2.0, about 5 GB at 4 bit) turns the face crop
   and the photo into a clean front view of a collectible figure on white.
 - lift: tools/lift/lift.py turns that render into a mesh (single-image 3D).
@@ -61,8 +61,10 @@ PERSON_LOOK = {
 }
 # for a render that came back with lettering or logos on the clothes (DHH's race suit): a figure
 # cannot print or paint them, and they are other people's marks. Only then, as the first try it
-# turned Jensen's leather jacket into a sweater.
-PLAIN = ("the same clothes,", "the same kind of clothes in plain solid colors,")
+# turned Jensen's leather jacket into a sweater. "The same kind of clothes in plain solid colors"
+# turned Lamine Yamal's red Spain kit into a navy tee and trousers on both seeds; this kept the kit's
+# cut and colors without the crest on one of two (random five, 2026-11-21)
+PLAIN = ("the same clothes,", "the same clothes in the same colors and cut, in plain solid fabric,")
 LIKENESS = {
     "person": ("Keep the likeness from the first photo exactly: the same hair color, hairline and "
                "hairstyle, the same face shape, expression and skin tone. "),
@@ -75,6 +77,10 @@ LIKENESS = {
 # names, so "the same glasses if any" or "no glasses" both put glasses on a face without them
 GLASSES = ("The same glasses exactly: the same frame shape, the same thin frame thickness and color, "
            "never thicker or bolder than in the photo. ")
+# only for a person the photo check calls stocky or heavyset: the style model slims everyone to one
+# build otherwise. Shane Gillis's renders came out slim on every seed and the likeness judge named the
+# build each time; the check said yes on both his photos and on 1 of the other 12 (2026-11-21)
+HEAVY = "The same stocky, heavyset build, broad shoulders and full round face, never slimmed. "
 WEARS_GLASSES = re.compile(r"\b(?:glasses|spectacles|eyeglasses|sunglasses)\b", re.I)
 # from a denial to the end of its clause: "no glasses", "not wearing a hat", "without a tie"
 DENIAL = re.compile(r"\b(?:no|not|without|never|neither|nor)\b[^,.;]*|\b\w+n't\b[^,.;]*", re.I)
@@ -127,18 +133,22 @@ def missing_part(text: str) -> str | None:
 
 
 def prompt(style: str, who: str = "person", extra: str = "", glasses: bool | None = None,
-           plain: bool = False) -> str:
+           plain: bool = False, skin: str | None = None, heavy: bool = False) -> str:
     """The style prompt. For a person the photo carries the look and the description stays out:
     its "light brown hair" drew Elon's hair too light (judge 8 with it, 9 without). Glasses come
     from the photo check when it ran, else from the description."""
     extra = positive(extra)
     likeness = LIKENESS.get(who, "")
+    if skin:  # only on a retry after a render that drifted from the photo's skin
+        likeness = likeness.replace("and skin tone", f"and the same {skin} skin tone")
     look = (PERSON_LOOK if who == "person" else LOOK).get(style, LOOK[style])
     if plain:
         look = look.replace(*PLAIN)
     if who == "person":
         if glasses if glasses is not None else WEARS_GLASSES.search(extra):
             likeness += GLASSES
+        if heavy:
+            likeness += HEAVY
         extra = ""
     p = FRAME.format(look=look.format(who=who), likeness=likeness)
     return f"{p} {extra.strip()}".strip()
@@ -262,15 +272,18 @@ def screen(photos: list[Path], who: str, folder: Path, say=print) -> tuple[list[
 
 
 def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str,
-                  want: dict | None, say=print) -> Path:
+                  want: dict | None, say=print, skin_ita: float | None = None) -> Path:
     """style(), then the render checked against the photo: one that added or left out glasses,
-    a beard or a hat is styled again with the next seed, and the closest of STYLE_TRIES is kept."""
-    best, plain = None, False
+    a beard or a hat, or drifted SKIN_DRIFT from the photos' skin (skin_ita), is styled again with
+    the next seed, and the closest of STYLE_TRIES is kept."""
+    best, plain, named = None, False, None
     check = bool(want) and any(k in want for k in KEEP)  # nothing to hold a render to otherwise
     for i in range(STYLE_TRIES if check else 1):
         s = seed + i
         o = out.with_name(f"style-{s}.png") if check else out
-        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"), plain=plain)
+        style(photos, o, style_name, who, s, extra, glasses=(want or {}).get("glasses"), plain=plain,
+              heavy=bool((want or {}).get("heavy")),
+              **({"skin": named} if named else {}))
         if not check:
             return o
         got = (traits([o], who, out.with_name("check.log")) or [None])[0]
@@ -279,16 +292,27 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
             break
         miss = [k for k in KEEP if k in want and k in got and bool(got[k]) != bool(want[k])]
         miss += ["lettering"] if got.get("lettering") else []  # never wanted, whatever the photo has
+        drift = None
+        if skin_ita is not None:
+            r = skin([o])[0]
+            drift = None if r is None else r - skin_ita
+        if drift is not None and abs(drift) > SKIN_DRIFT:
+            miss.append("skin")
+            named = skin_word(skin_ita)
         if best is None or len(miss) < len(best[1]):
             best = (o, miss)
         if not miss:
             break
-        how = " and ".join(("added " if got[k] else "left out ") + KEEP[k] for k in miss if k in KEEP)
+        how = " and ".join([("added " if got[k] else "left out ") + KEEP[k] for k in miss if k in KEEP]
+                           + ([f"made the skin {'lighter' if drift > 0 else 'darker'} ({drift:+.0f} ITA from "
+                               f"the photos' {named})"] if "skin" in miss else []))
         if "lettering" in miss:
             plain = True
             how = " and ".join(x for x in (how, "put lettering or a logo on the clothes, which a figure cannot "
                                                 "print") if x)
-        again = " in plain colors" if plain else ""
+        again = " and ".join(x for x in ("in plain colors" if plain else "",
+                                         f"with {named} skin named" if "skin" in miss else "") if x)
+        again = f" {again}" if again else ""
         if i + 1 < STYLE_TRIES:
             say(f"The render {how}, unlike the photo; styling again{again} with seed {s + 1}.")
         else:
@@ -299,16 +323,46 @@ def style_checked(photos: list[Path], out: Path, style_name: str, who: str, seed
     return out
 
 
-def face_crop(photo: Path, out: Path) -> Path | None:
-    """The face and hair of the photo's biggest face (tools/figure/face.py), or None when there is
-    no face or the style venv is missing: the figure is then styled from the whole photo."""
+# a render whose cheeks drift this far in ITA from the photos' is styled again with the skin named:
+# Lamine Yamal's photos measured -20 and -8, both renders 32 and 41; the other four of the random
+# five drifted 2 to 21 (2026-11-21)
+SKIN_DRIFT = 30.0
+# Chardon's ITA bands, lightest first: the words the retry names
+SKIN_WORDS = ((55, "very light"), (41, "light"), (28, "light tan"), (10, "tan"), (-30, "brown"))
+
+
+def skin_word(ita: float) -> str:
+    return next((w for lo, w in SKIN_WORDS if ita > lo), "dark brown")
+
+
+def _face_py() -> list[str]:
+    # the lift venv pins opencv 4, whose Haar face finder opencv 5 (in the style venv) dropped
+    lift_py = config.REPO_ROOT / "tools" / "lift" / ".venv" / "bin" / "python"
+    py = lift_py if lift_py.exists() else _mflux_bin().parent / "python"
+    return [str(py), "-I", str(config.REPO_ROOT / "tools" / "figure" / "face.py")]
+
+
+def skin(images: list[Path]) -> list[float | None]:
+    """Each image's skin as an ITA angle from its biggest face's cheeks (tools/figure/face.py --skin),
+    None where no face is found or the face finder is missing."""
+    try:
+        r = subprocess.run([*_face_py(), "--skin", *map(str, images)], capture_output=True, text=True,
+                           timeout=120)
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+    except (FigureProblem, OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        return [None] * len(images)
+    return got if isinstance(got, list) and len(got) == len(images) else [None] * len(images)
+
+
+def face_crop(photo: Path | list[Path], out: Path) -> Path | None:
+    """The face and hair of the biggest face in the photos (tools/figure/face.py), or None when there
+    is no face or the style venv is missing: the figure is then styled from the whole photo."""
     if out.exists():
         return out
-    try:  # the lift venv pins opencv 4, whose Haar face finder opencv 5 (in the style venv) dropped
-        lift_py = config.REPO_ROOT / "tools" / "lift" / ".venv" / "bin" / "python"
-        py = lift_py if lift_py.exists() else _mflux_bin().parent / "python"
-        r = subprocess.run([str(py), "-I", str(config.REPO_ROOT / "tools" / "figure" / "face.py"),
-                            str(photo), str(out)], capture_output=True, text=True, timeout=120)
+    photos = [photo] if isinstance(photo, Path) else list(photo)
+    try:
+        r = subprocess.run([*_face_py(), *map(str, photos), str(out)], capture_output=True, text=True,
+                           timeout=120)
     except (FigureProblem, OSError, subprocess.TimeoutExpired):
         return None
     return out if r.returncode == 0 and out.exists() else None
@@ -366,12 +420,13 @@ def _run(cmd: list[str], log: Path, timeout: int) -> None:
 
 
 def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, extra: str = "",
-          glasses: bool | None = None, plain: bool = False) -> Path:
+          glasses: bool | None = None, plain: bool = False, skin: str | None = None,
+          heavy: bool = False) -> Path:
     if out.exists():
         return out
     cmd = [str(_mflux_bin()), *_style_model(),
            "--image-paths", *map(str, photos),
-           "--prompt", prompt(style_name, who, extra, glasses, plain),
+           "--prompt", prompt(style_name, who, extra, glasses, plain, skin, heavy),
            "--width", "768", "--height", "1024", "--steps", "4", "--seed", str(seed),
            "--low-ram",
            "--output"]
@@ -381,13 +436,22 @@ def style(photos: list[Path], out: Path, style_name: str, who: str, seed: int, e
     return out
 
 
+# marching cubes grid of the lift: 256 left a 90 mm figure's face soft, about 0.43 mm a cell (random
+# five, 2026-11-21); 384 is about 0.29 mm, finer than a 0.4 mm nozzle, and peaks near 12.4 GB
+LIFT_OCTREE = 384
+
+
+def lift_octree() -> str:
+    return os.environ.get("STONE_LIFT_OCTREE", str(LIFT_OCTREE))
+
+
 def lift(render: Path, out: Path, seed: int) -> Path:
     if out.exists():
         return out
     _landed(out, lambda tmp: _run(_lift_cmd() + [str(render), str(tmp), "--seed", str(seed),
-                                                 "--octree", os.environ.get("STONE_LIFT_OCTREE", "256"),
+                                                 "--octree", lift_octree(),
                                                  "--chunks", os.environ.get("STONE_LIFT_CHUNKS", "4000")],
-                                  out.with_name("lift.log"), timeout=3600))
+                                  out.with_suffix(".log"), timeout=3600))
     if not out.exists():
         raise FigureProblem("the lift model wrote no mesh")
     return out
@@ -432,6 +496,210 @@ def repair(src: Path, out: Path, max_faces: int = 250_000) -> dict:
     return info
 
 
+GRAFT_STYLES = ("chibi", "statue")  # whole figures: a bust is all head already, an object has none
+HEAD_PX = 768  # the head crop is lifted at the size of a whole render
+HEAD_BELOW = 1.75  # face heights from the top of the face box to the crop's bottom: chin, neck, shoulder tops
+HEAD_WIDE = 3.0  # face widths the crop spans at least, for hair worn wide
+GRAFT_FIT = 0.015  # of the figure's height: the median gap a head fit may leave, or the graft is not used
+GRAFT_OVERLAP = 0.006  # of the figure's height: the blend runs this far above the neck
+GRAFT_BAND = 0.06  # of the figure's height: the body's surface fades into the head's over this, up to the neck
+GRAFT_PITCH = 1 / 800  # of the figure's height: the blend's grid, 0.1 mm on an 80 mm figure
+GRAFT_KEEP = 1 / 160  # of the figure's height: the body's neck in the blend shrinks this much by its top
+GRAFT_NECK = 0.5  # the least share of the body's neck the joined figure keeps at any height near it
+
+
+def face_box(image: Path) -> list[int] | None:
+    """The biggest face in an image as [x, y, w, h] (tools/figure/face.py --box), or None."""
+    try:
+        r = subprocess.run([*_face_py(), "--box", str(image)], capture_output=True, text=True, timeout=120)
+        got = json.loads(r.stdout.strip().splitlines()[-1])[0]
+    except (FigureProblem, OSError, subprocess.TimeoutExpired, ValueError, IndexError, TypeError):
+        return None
+    return [int(v) for v in got] if isinstance(got, list) and len(got) == 4 else None
+
+
+def head_crop(render: Path, out: Path) -> dict | None:
+    """A square of the render from the top of the hair to the tops of the shoulders, around the face,
+    scaled up to HEAD_PX. Lifted alone, the head gets the lift model's whole grid: the face of a
+    whole-figure lift is a few cells across and comes out smeared (random five, round 4: every
+    craft judge called the faces soft). Returns where the crop sits in the render's figure, or None
+    when the render shows no face."""
+    import numpy as np
+    from PIL import Image
+
+    box = face_box(render)
+    if box is None:
+        return None
+    im = Image.open(render).convert("RGB")
+    a = np.asarray(im).astype(int)
+    rows = np.flatnonzero((np.abs(a - 255).sum(axis=2) > 40).any(axis=1))  # the figure on white
+    if len(rows) == 0:
+        return None
+    t, b = int(rows[0]), int(rows[-1])
+    x, y, w, h = box
+    side = int(max(y + HEAD_BELOW * h - t, HEAD_WIDE * w))
+    top = max(0, t - side // 25)
+    x0 = int(x + w / 2 - side / 2)
+    sq = Image.new("RGB", (side, side), (255, 255, 255))
+    sq.paste(im.crop((x0, top, x0 + side, top + side)), (0, 0))
+    sq.resize((HEAD_PX, HEAD_PX), Image.LANCZOS).save(out)
+    return {"fig_top": t, "fig_bottom": b, "cut": min(top + side, b), "face": box}
+
+
+def graft(body_path: Path, head_path: Path, crop: dict, out: Path) -> dict:
+    """Put the head lifted alone (head_path, from repair) on the whole-figure lift (body_path, unit
+    height) in place of its own head, above the neck. The crop says where the head sat in the render;
+    an ICP fit to the figure's own head finishes the placing. Writes out only when the fit is close.
+    Returns {"used", "fit", "why"}."""
+    import manifold3d as m3d
+    import numpy as np
+    import trimesh
+    from scipy.spatial import cKDTree
+
+    from . import printable
+
+    body = trimesh.load(body_path, force="mesh")
+    hd = trimesh.load(head_path, force="mesh")
+    mm = 80.0  # the grid finds the neck in mm
+    big = body.copy()
+    big.apply_scale(mm)
+    g = printable.occupancy(big)
+    h = printable.head(g) if g is not None else None
+    if h is None:
+        return {"used": False, "why": "no neck found on the figure"}
+    neck = h["neck"] / mm
+    # the crop's bottom row on the figure's unit height: the head mesh spans from there to the top
+    span = (crop["fig_bottom"] - crop["fig_top"]) or 1
+    z_cut = (crop["fig_bottom"] - crop["cut"]) / span
+    hd.apply_scale(1.0 - z_cut)
+    hd.apply_translation([0, 0, z_cut - hd.bounds[0][2]])
+    above_b = body.vertices[body.vertices[:, 2] > neck]
+    above_h = hd.vertices[hd.vertices[:, 2] > neck]
+    if len(above_h) < 100 or len(above_b) < 100:
+        return {"used": False, "why": "the head lift does not reach above the neck"}
+    c_b = (above_b.min(axis=0) + above_b.max(axis=0)) / 2
+    c_h = (above_h.min(axis=0) + above_h.max(axis=0)) / 2
+    hd.apply_translation([c_b[0] - c_h[0], c_b[1] - c_h[1], 0])
+    pb = body.sample(12000)
+    pb = pb[pb[:, 2] > neck]
+    ph = hd.sample(6000)
+    ph = ph[ph[:, 2] > neck + 0.01]
+    mat, _, _ = trimesh.registration.icp(ph, pb, max_iterations=40, scale=True, reflection=False)
+    hd.apply_transform(mat)
+    ph = hd.sample(6000)
+    ph = ph[ph[:, 2] > neck + 0.01]
+    fit = float(np.median(cKDTree(pb).query(ph)[0]))
+    if fit > GRAFT_FIT:
+        return {"used": False, "fit": fit, "why": f"the head lift does not fit the figure's head ({fit:.3f})"}
+    lo = min(body.bounds[0].min(), hd.bounds[0].min()) - 1
+    size = 2 * (max(body.bounds[1].max(), hd.bounds[1].max()) - lo) + 2
+
+    def solid(m):
+        got = m3d.Manifold(m3d.Mesh(vert_properties=np.asarray(m.vertices, np.float32),
+                                    tri_verts=np.asarray(m.faces, np.uint32)))
+        return got if got.status() == m3d.Error.NoError else None
+
+    b3, h3 = solid(body), solid(hd)
+    if b3 is None or h3 is None:
+        return {"used": False, "fit": fit, "why": "a mesh is not a closed solid"}
+    # A flat cut leaves a ledge wherever the two hair surfaces differ (Sienna Miller, round 5 trial:
+    # a step round the back of the hair). In a band at the neck the two are blended instead: each
+    # becomes a signed distance on a fine grid, faded from the body's to the head's going up.
+    bottom = max(z_cut + GRAFT_BAND / 3, neck - GRAFT_BAND)
+    top = neck + GRAFT_OVERLAP
+    band = _blend(b3, h3, bottom, top, lo, size)
+    if band is None:
+        return {"used": False, "fit": fit, "why": "the neck blend did not close"}
+    eps = 3 * GRAFT_PITCH
+    below = m3d.Manifold.cube([size, size, size]).translate([lo, lo, bottom + eps - size])
+    above = m3d.Manifold.cube([size, size, size]).translate([lo, lo, top - eps])
+    joined = (b3 ^ below) + band + (h3 ^ above)
+    parts = joined.decompose()
+    if not parts:
+        return {"used": False, "fit": fit, "why": "the joined figure came out empty"}
+    keep = max(parts, key=lambda c: c.volume())
+    o = keep.to_mesh()
+    m = trimesh.Trimesh(np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts), process=True)
+    thin = _thinnest(m, body, bottom, top + GRAFT_BAND / 3)
+    if thin < GRAFT_NECK:
+        return {"used": False, "fit": fit, "why": f"the joined neck keeps only {thin:.0%} of the figure's"}
+    lo3, hi3 = m.bounds
+    m.apply_translation([0, 0, -lo3[2]])
+    m.apply_scale(1.0 / (hi3[2] - lo3[2]))  # unit height again: the recipe scales by it
+    trimesh.repair.fix_normals(m)
+    _landed(out, lambda tmp: m.export(tmp))
+    return {"used": True, "fit": fit, "neck": neck, "top": top, "bottom": bottom, "why": ""}
+
+
+def _thinnest(m, body, z0: float, z1: float) -> float:
+    """The least share of body's cross-section m keeps at any height from z0 to z1."""
+    import numpy as np
+
+    from . import printable
+
+    p = GRAFT_PITCH
+    lo = np.minimum(m.bounds[0], body.bounds[0]) - p
+    hi = np.maximum(m.bounds[1], body.bounds[1]) + p
+    shape = (int((hi[0] - lo[0]) / p) + 1, int((hi[1] - lo[1]) / p) + 1, 1)
+    least = 1.0
+    for z in np.linspace(z0, z1, 12):
+        a = printable.solid_grid(body, lo[0], lo[1], z, shape, p).sum()
+        if a:
+            least = min(least, printable.solid_grid(m, lo[0], lo[1], z, shape, p).sum() / a)
+    return float(least)
+
+
+def _blend(b3, h3, bottom: float, top: float, lo: float, size: float):
+    """The solid between bottom and top whose surface fades from b3's (at bottom) to h3's (at top),
+    a little past both ends so it overlaps the plain pieces. None when it does not close."""
+    import manifold3d as m3d
+    import numpy as np
+    from scipy import ndimage
+    from skimage import measure
+    import trimesh
+
+    from . import printable
+
+    p = GRAFT_PITCH
+    z0, z1 = bottom - 4 * p, top + 4 * p
+    slab = m3d.Manifold.cube([size, size, z1 - z0 + 4 * p]).translate([lo, lo, z0 - 2 * p])
+    parts = [b3 ^ slab, h3 ^ slab]
+    boxes = [m.bounding_box() for m in parts]
+    x0 = min(b[0] for b in boxes) - 3 * p
+    y0 = min(b[1] for b in boxes) - 3 * p
+    xs = np.arange(x0, max(b[3] for b in boxes) + 3 * p, p)
+    ys = np.arange(y0, max(b[4] for b in boxes) + 3 * p, p)
+    zs = np.arange(z0, z1 + p / 2, p)
+    sd = []
+    for m in parts:
+        o = m.to_mesh()
+        tm = trimesh.Trimesh(np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts), process=False)
+        occ = printable.solid_grid(tm, x0, y0, z0, (len(xs), len(ys), len(zs)), p)
+        d = ndimage.distance_transform_edt(~occ) - ndimage.distance_transform_edt(occ)
+        sd.append(ndimage.gaussian_filter(d, 1.2))  # the grid's steps would show as rings
+    t = np.clip((zs - bottom) / (top - bottom), 0, 1)
+    w = t * t * (3 - 2 * t)  # smoothstep: no crease where the fade starts or ends
+    d = (1 - w) * sd[0] + w * sd[1]
+    # the body's own neck stays in, shrunk GRAFT_KEEP by the top: a head lifted alone can come with
+    # a neck a sixth as thick, and the fade pinched Inde Navarrette's to 3 mm2 (random five, round 5)
+    keep = sd[0] + w * (GRAFT_KEEP / p)
+    k = 3.0  # cells the two surfaces are rounded together over, so they meet with no crease
+    h = np.clip(k - np.abs(d - keep), 0, None) / k
+    d = np.minimum(d, keep) - h * h * k / 4
+    d[:, :, [0, -1]] = 1.0  # closed at both ends
+    d = np.pad(d, 1, constant_values=1.0)
+    try:
+        v, f, _, _ = measure.marching_cubes(d, 0.0)
+    except (ValueError, RuntimeError):
+        return None
+    v = (v - 1) * p + [x0, y0, z0]
+    for tri in (f, f[:, ::-1]):  # whichever winding faces out
+        got = m3d.Manifold(m3d.Mesh(vert_properties=np.asarray(v, np.float32), tri_verts=np.asarray(tri, np.uint32)))
+        if got.status() == m3d.Error.NoError and got.volume() > 0:
+            return got
+    return None
+
+
 def _remesh(m):
     """Voxel remesh for a mesh that will not close: solid fill, then marching cubes."""
     pitch = max(m.extents) / 220
@@ -449,7 +717,8 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
         raise FigureProblem("no photos, run stone find or stone image first")
     photos, want = screen(list(photos), who, folder, say)
     key = _digest(*photos, style_name, who, seed, extra,
-                  prompt(style_name, who, extra, (want or {}).get("glasses")))
+                  prompt(style_name, who, extra, (want or {}).get("glasses"),
+                         heavy=bool((want or {}).get("heavy"))))
     folder = folder / key
     folder.mkdir(parents=True, exist_ok=True)
     render = folder / "style.png"
@@ -461,21 +730,59 @@ def make(photos: list[Path], folder: Path, style_name: str = "chibi", who: str =
                 say("Describing the photo (LFM3-VL-2B, under a minute)...")
             desc = describe(photos[0], look, who)
         refs = photos[:int(os.environ.get("STONE_STYLE_REFS", "1"))]
-        face = face_crop(photos[0], folder / "face.png") if who == "person" else None
+        # the face comes from whichever photo shows it biggest: a found lead photo is often a whole
+        # person on a stage, and a few pixels of face come out a generic one (Shane Gillis, 2026-11-21)
+        face = face_crop(photos[:4], folder / "face.png") if who == "person" else None
+        tones = sorted(t for t in skin(photos[:4]) if t is not None) if who == "person" else []
+        skin_ita = tones[len(tones) // 2] if tones else None  # the median photo: one may be blown out
         if face:
             refs = [face, *refs]
+        elif who == "person":
+            say("No face crop (no clear face found, or tools/lift/.venv is missing): styling from the "
+                "whole photo, so the face may come out generic.")
         say("Styling the photo (FLUX.2 klein 4B, about 2 minutes)...")
         style_checked(refs, render, style_name, who, seed, " ".join(x for x in (desc, extra) if x),
-                      want, say)
+                      want, say, skin_ita=skin_ita)
     if shown:
         shown(render)
     mesh = folder / "lift.glb"
-    if not mesh.exists():
-        say("Lifting the render to 3D (Hunyuan3D-2mini, about 4 minutes)...")
-        lift(render, mesh, seed)
     fig = folder / "figure.stl"
+    grid = folder / "lift-octree.txt"  # a lift on a coarser grid is lifted again
+    if mesh.exists() and (grid.read_text().strip() if grid.exists() else "256") != lift_octree():
+        mesh.unlink()
+        for f in (fig, folder / "body.stl", folder / "graft.json"):
+            f.unlink(missing_ok=True)
+    if not mesh.exists():
+        say("Lifting the render to 3D (Hunyuan3D-2mini, about 5 minutes)...")
+        lift(render, mesh, seed)
+        grid.write_text(lift_octree() + "\n")
+    done = folder / "graft.json"  # what the head graft did, so a build does not try it again
+    head_on = (who == "person" and style_name in GRAFT_STYLES and os.environ.get("STONE_HEAD_GRAFT", "1") != "0")
+    if fig.exists() and head_on and not done.exists():
+        fig.unlink()  # made before the head graft: graft it now
     if not fig.exists():
-        repair(mesh, fig)
+        body = folder / "body.stl"
+        if not body.exists():
+            repair(mesh, body)
+        res = {"used": False, "why": "off"}
+        if head_on:
+            crop = head_crop(render, folder / "head.png")
+            if crop is None:
+                res = {"used": False, "why": "no face found in the render"}
+            else:
+                say("Lifting the head on its own, for a crisp face (Hunyuan3D-2mini, about 5 minutes)...")
+                try:
+                    lift(folder / "head.png", folder / "head.glb", seed)
+                    repair(folder / "head.glb", folder / "head.stl")
+                    res = graft(body, folder / "head.stl", crop, fig)
+                except FigureProblem as e:
+                    res = {"used": False, "why": f"the head lift failed: {e}"}
+            if not res["used"]:
+                say(f"The figure keeps its own head ({res['why']}).")
+        if not fig.exists():
+            shutil.copyfile(body, fig)
+        if head_on:
+            done.write_text(json.dumps(res, indent=1) + "\n")
     latest = folder.parent / "latest.txt"
     latest.write_text(str(fig) + "\n")
     return fig

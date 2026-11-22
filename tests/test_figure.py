@@ -134,6 +134,11 @@ def test_cached_steps_skip_models(tmp_path, monkeypatch):
     a = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     b = figure.make([photo], tmp_path / "fig", say=lambda s: None)
     assert a == b and a.exists() and calls == ["describe", "style", "lift"]
+    # random five: a lift on the old 256 grid left faces soft; one cached from before is lifted again
+    (a.parent / "lift-octree.txt").unlink()
+    figure.make([photo], tmp_path / "fig", say=lambda s: None)
+    assert calls == ["describe", "style", "lift", "lift"] and a.exists()
+    assert (a.parent / "lift-octree.txt").read_text().strip() == str(figure.LIFT_OCTREE) == "384"
 
 
 def test_find_leaves_other_plans_alone(jobenv, monkeypatch):
@@ -491,14 +496,17 @@ def test_the_positive_words_of_a_description():
     assert figure.positive("He is not wearing glasses. He has a black jacket.") == "He has a black jacket."
 
 
-def _models(tmp_path, monkeypatch, answers):
-    """Fake describe, style and lift; traits answers by file name. Returns the style calls."""
+def _models(tmp_path, monkeypatch, answers, tones=None):
+    """Fake describe, style and lift; traits answers by file name, skin ITA by file name (tones).
+    Returns the style calls."""
     calls = []
 
-    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False):
-        calls.append((photos[0].name, seed) + (("plain",) if plain else ()))
+    def fake_style(photos, out, style_name, who, seed, extra="", glasses=None, plain=False, skin=None, heavy=False):
+        calls.append((photos[0].name, seed) + (("plain",) if plain else ()) + ((f"skin {skin}",) if skin else ()))
         out.write_bytes(f"render {seed}".encode())
         return out
+
+    monkeypatch.setattr(figure, "skin", lambda images: [(tones or {}).get(Path(i).name) for i in images])
 
     def fake_traits(images, who, log):
         return [answers(Path(i).name) for i in images]
@@ -564,12 +572,45 @@ def test_a_render_with_lettering_on_the_clothes_is_styled_again_in_plain_colors(
     assert any("lettering" in x and "plain" in x and "seed 8" in x for x in said)
 
 
+def test_a_render_that_lightens_the_skin_is_styled_again_with_the_skin_named(tmp_path, monkeypatch):
+    """Random five, round 2: Lamine Yamal's photos measure ITA -20 and -8 at the cheeks and both
+    renders 32 and 41, and the likeness judge gave 4 with 'light beige skin' first. A render that
+    drifts more than SKIN_DRIFT is styled again with the photos' skin named."""
+    photos = [tmp_path / "p1.jpg", tmp_path / "p2.jpg"]
+    for p in photos:
+        p.write_bytes(p.name.encode())
+    said = []
+    calls = _models(tmp_path, monkeypatch, lambda n: BARE,
+                    tones={"p1.jpg": -20.4, "p2.jpg": -7.7, "style-7.png": 40.9, "style-8.png": -5.0})
+    figure.make(photos, tmp_path / "fig", seed=7, say=said.append)
+    assert calls == [("p1.jpg", 7), ("p1.jpg", 8, "skin brown")], calls
+    assert any("made the skin lighter (+49 ITA from the photos' brown)" in x and "brown skin named" in x
+               for x in said), said
+
+
+def test_a_render_close_to_the_photos_skin_is_kept():
+    """Chris Abbott's render drifted 10 from his photos and Shane Gillis's 2: neither is styled again,
+    and the prompt names a skin tone only on that retry."""
+    assert figure.skin_word(-14) == "brown" and figure.skin_word(34) == "light tan"
+    assert figure.skin_word(50) == "light" and figure.skin_word(-40) == "dark brown"
+    assert "skin tone" in figure.prompt("chibi", "person") and "brown skin" not in figure.prompt("chibi", "person")
+    assert "the same brown skin tone" in figure.prompt("chibi", "person", skin="brown")
+
+
+def test_a_skin_drift_under_the_limit_tries_once(tmp_path, monkeypatch):
+    photo = tmp_path / "p.jpg"
+    photo.write_bytes(b"p")
+    calls = _models(tmp_path, monkeypatch, lambda n: BARE, tones={"p.jpg": 33.5, "style-7.png": 42.9})
+    figure.make([photo], tmp_path / "fig", seed=7, say=lambda s: None)
+    assert calls == [("p.jpg", 7)], calls
+
+
 def test_a_render_with_plain_clothes_keeps_the_clothes_it_has():
     """The plain look is only for a render that came back with lettering: as the first try it
     turned Jensen's leather jacket into a sweater."""
     same, plain = figure.prompt("chibi", "person"), figure.prompt("chibi", "person", plain=True)
-    assert "the same clothes," in same and "plain solid colors" not in same
-    assert "plain solid colors" in plain and "the same clothes," not in plain
+    assert "the same clothes," in same and "plain solid" not in same
+    assert "the same colors and cut, in plain solid fabric," in plain and "the same clothes," not in plain
 
 
 def test_the_render_check_asks_about_lettering_on_the_clothes():
@@ -621,6 +662,22 @@ def test_no_face_crop_for_an_animal_or_when_it_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(figure, "face_crop", lambda src, out: None)
     figure.make([photo], tmp_path / "p", say=lambda s: None)
     assert refs == [["dog.jpg"], ["dog.jpg"]]
+
+
+def test_the_face_comes_from_every_photo_and_a_missing_crop_is_said(tmp_path, monkeypatch):
+    """Shane Gillis, 2026-11-21: the lead photo was a whole man on a stage and the figure came out a
+    generic one (likeness 3); his close-up was photo 2. And the crop had failed without a word."""
+    photos = []
+    for n in ("stage.jpg", "close.jpg", "side.jpg"):
+        (tmp_path / n).write_bytes(n.encode())
+        photos.append(tmp_path / n)
+    seen, said = [], []
+    _models(tmp_path, monkeypatch, lambda n: BARE)
+    monkeypatch.setattr(figure, "style", lambda photos, out, *a, **k: out.write_bytes(b"r") and out)
+    monkeypatch.setattr(figure, "face_crop", lambda src, out: seen.append([p.name for p in src]))
+    figure.make(photos, tmp_path / "fig", say=said.append)
+    assert seen == [["stage.jpg", "close.jpg", "side.jpg"]]
+    assert any(s.startswith("No face crop") for s in said)
 
 
 def test_face_crop_fails_open_without_a_face_or_a_venv(tmp_path, monkeypatch):
@@ -1141,6 +1198,36 @@ def test_hex_plinth_name_stands_proud_on_the_front_face(tmp_path, openscad, monk
     assert len(letters) == 6, letters
 
 
+def test_round_plinth_name_is_evenly_spaced_and_reads_at_arms_length(tmp_path, openscad, monkeypatch):
+    """Random five, round 1: the craft judge read LAMINE as LAMENI and SHANE as SHANI. Every letter
+    got the same arc, so an M crowded its neighbors and an I floated in a wide gap, and the letters
+    stood 0.9 mm proud, faint on a one-color print. Letters go by their own widths now."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    m, res = _plinth(tmp_path, openscad, name="LAMINE")
+    assert all(x.ok for x in res.values()), [x for x in res.values() if not x.ok]
+    v = m.vertices
+    rad = np.hypot(v[:, 0], v[:, 1])
+    dr = rad[v[:, 2] < 0.8].max() - 1.2  # the lip is the plinth's full radius; the drum is c = 1.2 in
+    tri = v[m.faces]
+    band = (tri[:, :, 2] > 2.5).all(axis=1) & (tri[:, :, 2] < 12 - 1.2).all(axis=1)  # above the lip
+    front = tri[band & (np.hypot(tri[:, :, 0], tri[:, :, 1]) > dr + 1.0).all(axis=1)]  # the letters' faces
+    assert len(front), "no letter stands 1 mm proud of the drum"
+    ang = np.degrees(np.arctan2(front[:, :, 0], -front[:, :, 1]))  # 0 at the front, -Y
+    spans = sorted((a.min(), a.max()) for a in ang)
+    letters = []
+    for lo, hi in spans:
+        if letters and lo <= letters[-1][1] + 0.05:
+            letters[-1][1] = max(letters[-1][1], hi)
+        else:
+            letters.append([lo, hi])
+    assert len(letters) == 6, letters
+    widths = [b - a for a, b in letters]  # left to right, seen from the front
+    assert widths.index(min(widths)) == 3, widths  # the I, fourth: the name reads left to right
+    gaps = [np.radians(b[0] - a[1]) * dr for a, b in zip(letters, letters[1:])]  # mm along the drum
+    assert min(gaps) >= 0.6, gaps  # a nozzle line apart, so neighbors do not merge
+    assert max(gaps) <= 1.6 * min(gaps), gaps
+
+
 def test_short_plinth_name_fix_is_base_h_12(jobenv, monkeypatch, openscad, tmp_path):
     """base_h 8 leaves 3.6 mm letters, strokes of 0.54 mm: too thin for a 0.4 mm nozzle."""
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
@@ -1206,7 +1293,8 @@ def test_struts_hold_up_every_fingertip(tmp_path):
 
     fig, _ = _armed_mm(tmp_path)
     out = tmp_path / "braced.stl"
-    struts, held, spots = printable.brace_figure(fig, out, {"height": 70, "name": "ADA"})
+    struts, held, spots, cut = printable.brace_figure(fig, out, {"height": 70, "name": "ADA"})
+    assert cut == 0  # a hand is not a loose end
     assert len(struts) >= 2 and spots == [], (held, spots)
     b = trimesh.load(out, force="mesh")
     assert b.is_watertight and len(b.split(only_watertight=False)) == 1
@@ -1225,12 +1313,59 @@ def test_build_braces_the_figure(jobenv, openscad, monkeypatch, tmp_path):
     fig.parent.mkdir()
     figure.repair(armed(tmp_path / "lift.glb"), fig)
     stone("new", 'A figure 70 mm tall with "ADA" on the base')
-    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA")
+    stone("set", "figure", f"figure={fig}", "height=70", "name=ADA", "spin=90")
     text, code, nxt = stone("build")
     assert code == 0 and "Part ready" in text, text
     assert "Built-in supports:" in text and "In the slicer" not in text, text
     assert "PASS islands: every layer stands on the one below" in text, text
     assert "PASS tipping" in text, text
+    # random five, round 1: the judge read the struts as drips and melted hands. views.png draws them
+    # blue, and the saved struts sit on the rods of the part as built, turned by spin
+    from PIL import Image
+    from smoothstone import printable
+
+    build = next(Path(jobenv).rglob("build/struts.json")).parent
+    struts = json.loads((build / "struts.json").read_text())
+    part = trimesh.load(build.parent / "figure.stl", force="mesh")
+    centers = part.triangles_center
+    for st in struts:
+        assert printable.strut_faces(centers, [st], margin=0.05).sum() >= 8, st
+    px = np.asarray(Image.open(build / "views.png").convert("RGB")).astype(int)
+    assert ((px[:, :, 2] > px[:, :, 0] + 40)).sum() > 50  # blue rods; the figure is clay
+    # random five, round 3: the face and name are too small to judge in views.png; closeup.png
+    # shows the name (and the face, when a neck is found) big and lit from the side
+    assert "Close-up:" in text, text
+    close = Image.open(build / "closeup.png")
+    assert close.height == 480 and close.width % 480 == 0, close.size
+
+
+def test_a_fringe_strand_is_cut_back_not_propped_on_the_face(tmp_path):
+    """Random five, round 3: Lamine Yamal's craft judge gave 5 for "blue support rods run from the
+    hair down across the eyes and face". Each was a strut under a hair tip less than a mm across
+    that hung 1 to 3 mm in front of the forehead. Such a tip is cut back to the hair it hangs from;
+    a hand that hangs from nothing held keeps its strut."""
+    from smoothstone import check, printable
+
+    head = trimesh.creation.box((10, 10, 70))
+    head.apply_translation((0, 0, 35))  # the face is its front, y = -5
+    fringe = trimesh.creation.box((8, 3, 3))
+    fringe.apply_translation((0, -6.5, 62.5))  # hair over the brow, held by the head beside it
+    strand = trimesh.creation.box((0.8, 0.8, 2.5))
+    strand.apply_translation((0, -7, 61 - 1.25 + 0.01))  # hangs 2.5 mm below the fringe
+    arm = trimesh.creation.box((3, 3, 20))
+    arm.apply_translation((12, 0, 55))
+    bar = trimesh.creation.box((10, 3, 3))
+    bar.apply_translation((7, 0, 66.5))  # a shoulder bar and an arm hanging from it
+    m = trimesh.boolean.union([head, fringe, strand, arm, bar], engine="manifold")
+    braced, struts, left, cut = printable.brace(m, floor=lambda x, y: 0.0)
+    assert cut == 1 and left == [], (cut, left)
+    assert all(s.top[2] < 50 for s in struts), [s.top for s in struts]  # only under the hand
+    assert len(struts) >= 1
+    assert not braced.contains([[0, -7, 59.5]])[0]  # the strand is gone
+    assert braced.contains([[0, -6.5, 62.5]])[0]  # the fringe stays
+    assert braced.is_watertight and len(braced.split(only_watertight=False)) == 1
+    res = {r.name: r for r in check.check_mesh(braced)}
+    assert res["islands"].ok, res["islands"]
 
 
 def test_no_plinth_no_strut_below_the_bed(tmp_path):
@@ -1250,10 +1385,214 @@ def test_no_plinth_no_strut_below_the_bed(tmp_path):
     fig = tmp_path / "figure.stl"
     m.export(fig)
     out = tmp_path / "braced.stl"
-    struts, _, spots = printable.brace_figure(fig, out, {"height": 70, "base": "none"})
+    struts, _, spots, _ = printable.brace_figure(fig, out, {"height": 70, "base": "none"})
     b = trimesh.load(out, force="mesh")
     assert b.bounds[0][2] > -1e-6, b.bounds  # nothing under the bed
     assert struts == [] and len(spots) == 1, (struts, spots)
     with_plinth = printable.brace_figure(fig, out, {"height": 70, "base_d": 80})
     assert len(with_plinth[0]) >= 1 and with_plinth[2] == []  # the plinth top holds it
     assert all(s.top[2] - s.foot[2] >= 2 * printable.PITCH for s in with_plinth[0])
+
+
+def test_a_stocky_person_is_named_stocky_and_nobody_else_is():
+    """Shane Gillis came out slim on every seed (random five, 2026-11-21): the photo check's yes
+    names the build; a no names nothing, so nobody is drawn heavier than they are."""
+    assert figure.HEAVY in figure.prompt("chibi", "person", "", heavy=True)
+    assert "heavyset" not in figure.prompt("chibi", "person", "")
+    assert "heavyset" not in figure.prompt("chibi", "animal", "", heavy=True)
+
+
+def _person(head_r=0.12, nose=False, hair=False, neck_r=0.05):
+    """A unit-height person along Z, facing -Y: a round-shouldered torso, a thin neck and a round
+    head; the head lift's version adds a nose and long hair down the back that the whole-figure lift
+    lost."""
+    parts = [trimesh.creation.capsule(height=0.42, radius=0.15, count=[48, 48]),
+             trimesh.creation.cylinder(radius=neck_r, height=0.14, sections=32),
+             trimesh.creation.icosphere(subdivisions=4, radius=head_r)]
+    parts[0].apply_translation([0, 0, 0.36])
+    parts[1].apply_translation([0, 0, 0.73])
+    parts[2].apply_translation([0, 0, 0.88])
+    if nose:
+        n = trimesh.creation.icosphere(subdivisions=2, radius=0.025)
+        n.apply_translation([0, -head_r, 0.88])
+        parts.append(n)
+    if hair:  # down past the crop's bottom, so its own end is not in the test
+        h = trimesh.creation.cylinder(radius=0.09, height=0.32, sections=48)
+        h.apply_translation([0, 0.03, 0.8])
+        parts.append(h)
+    m = trimesh.boolean.union(parts, engine="manifold")
+    m.apply_translation([0, 0, -m.bounds[0][2]])
+    m.apply_scale(1 / m.extents[2])
+    return m
+
+
+def test_the_head_lifted_alone_replaces_the_figure_s_head_with_no_ledge(tmp_path):
+    """The head lifted alone is put on the figure in place of its own head; where its hair and the
+    body's differ, the surface fades from one to the other with no step (Sienna Miller, round 5
+    trial: a flat cut at the neck left a ledge round the back of the hair)."""
+    _person().export(tmp_path / "body.stl")
+    head = trimesh.Trimesh(*_slab_above(_person(nose=True, hair=True), 0.6))  # the crop's bottom
+    head.apply_translation([0.01, 0.0, 0.0])  # the repair centered it a little off
+    head.apply_scale(1 / head.extents[2])
+    head.export(tmp_path / "head.stl")
+    got = figure.graft(tmp_path / "body.stl", tmp_path / "head.stl",
+                       {"fig_top": 0, "fig_bottom": 1000, "cut": 400}, tmp_path / "figure.stl")
+    assert got["used"], got
+    assert 0.7 < got["neck"] < 0.78, got  # the thin neck, not the shoulders
+    m = trimesh.load(tmp_path / "figure.stl", force="mesh")
+    assert m.body_count == 1 and abs(m.extents[2] - 1) < 1e-6
+    assert m.bounds[0][1] < -0.125  # the head lift's nose is on the figure
+    # the back of the hair, height by height: a flat cut steps it in by the hair's thickness at once
+    zs = np.arange(got["bottom"] - 0.02, got["top"] + 0.02, 0.002)
+    org = np.c_[np.zeros(len(zs)), np.full(len(zs), 1.0), zs]
+    loc, ri, _ = m.ray.intersects_location(org, np.tile([0.0, -1.0, 0.0], (len(zs), 1)))
+    back = np.full(len(zs), -1.0)
+    np.maximum.at(back, ri, loc[:, 1])
+    assert (back > 0).all() and back[-1] > 0.1  # the long hair is there above the blend
+    step = np.abs(np.diff(back))
+    assert step.max() < 0.012, f"the back steps {step.max():.3f} at z={zs[step.argmax()]:.3f}"
+
+
+def test_a_head_lifted_with_a_skinny_neck_is_not_put_on_a_pinched_neck(tmp_path):
+    """Inde Navarrette lost her head (random five, 2026-11-21): the head lifted alone came with a
+    neck far thinner than the body's, the blend took it, and the figure's neck pinched to 3 mm2. A
+    joined neck under GRAFT_NECK of the body's is refused, and the figure keeps its own head."""
+    _person().export(tmp_path / "body.stl")
+    head = trimesh.Trimesh(*_slab_above(_person(nose=True, neck_r=0.025), 0.6))  # a quarter the area
+    head.apply_scale(1 / head.extents[2])
+    head.export(tmp_path / "head.stl")
+    got = figure.graft(tmp_path / "body.stl", tmp_path / "head.stl",
+                       {"fig_top": 0, "fig_bottom": 1000, "cut": 400}, tmp_path / "figure.stl")
+    assert not got["used"] and "neck" in got["why"], got
+    assert not (tmp_path / "figure.stl").exists()
+
+def _slab_above(m, z):
+    import manifold3d as m3d
+
+    s = m3d.Manifold(m3d.Mesh(vert_properties=np.asarray(m.vertices, np.float32),
+                              tri_verts=np.asarray(m.faces, np.uint32)))
+    o = (s ^ m3d.Manifold.cube([4, 4, 4]).translate([-2, -2, z])).to_mesh()
+    return np.asarray(o.vert_properties)[:, :3], np.asarray(o.tri_verts)
+
+
+def test_the_head_crop_is_a_square_from_the_hair_to_the_shoulders(tmp_path, monkeypatch):
+    from PIL import Image
+
+    im = Image.new("RGB", (768, 1024), "white")
+    im.paste((120, 100, 90), (300, 40, 470, 1000))  # the figure, rows 40 to 999
+    im.save(tmp_path / "style.png")
+    monkeypatch.setattr(figure, "face_box", lambda p: [345, 90, 80, 100])
+    got = figure.head_crop(tmp_path / "style.png", tmp_path / "head.png")
+    assert got["fig_top"] == 40 and got["fig_bottom"] == 999
+    side = int(max(90 + figure.HEAD_BELOW * 100 - 40, figure.HEAD_WIDE * 80))  # 240
+    assert got["cut"] == 40 - side // 25 + side
+    assert Image.open(tmp_path / "head.png").size == (figure.HEAD_PX, figure.HEAD_PX)
+    monkeypatch.setattr(figure, "face_box", lambda p: None)
+    assert figure.head_crop(tmp_path / "style.png", tmp_path / "head2.png") is None
+
+
+def _head_with_loops(k):
+    """A torso, neck and round head (crown at z 36) with a nose, and k thin loops standing off the
+    crown like lifted worm hair, each rising about 2 mm off it."""
+    parts = [trimesh.creation.capsule(height=14, radius=5, count=[32, 32]),
+             trimesh.creation.cylinder(radius=2, height=4, sections=32),
+             trimesh.creation.icosphere(subdivisions=4, radius=6)]
+    parts[0].apply_translation([0, 0, 12])
+    parts[1].apply_translation([0, 0, 23.5])
+    parts[2].apply_translation([0, 0, 30])
+    nose = trimesh.creation.icosphere(subdivisions=2, radius=1.2)
+    nose.apply_translation([0, -6, 30])
+    parts.append(nose)
+    for i in range(k):
+        el, az = np.radians(55 if i % 2 else 70), 2 * np.pi * i / k
+        d = np.array([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az), np.sin(el)])
+        if d[1] < -0.3 and el < 1.0:  # not over the face
+            d[1] = -d[1]
+        t = np.cross([0, 0, 1], d)
+        loop = trimesh.creation.torus(major_radius=1.0, minor_radius=0.25, major_sections=32, minor_sections=10)
+        loop.apply_transform(trimesh.geometry.align_vectors([0, 0, 1], t / np.linalg.norm(t)))
+        loop.apply_translation(np.array([0, 0, 30]) + 6.9 * d)
+        parts.append(loop)
+    return trimesh.boolean.union(parts, engine="manifold")
+
+
+def test_hair_strands_too_thin_to_print_are_cut_off_the_head_and_the_nose_stays():
+    """A lifted curl comes out as loose worms of half a mm that float off the head; a 0.4 mm nozzle
+    prints them as blobs (Lamine Yamal, random five round 5: the craft judge's first fault). A head
+    of them has them cut off at the root; a nose, as thick as a strand is long, stays."""
+    from smoothstone import printable
+
+    m = _head_with_loops(24)  # 20 come out apart: a flipped one meets its neighbour
+    assert m.bounds[1][2] > 37
+    out, n = printable.strands(m)
+    assert n >= printable.STRAND_MANY
+    assert out.bounds[1][2] < 36.3  # the loops are gone, down to the crown
+    assert out.bounds[0][1] < -6.9  # the nose is still there
+    assert out.body_count == 1 and printable.to_manifold(out) is not None
+    assert abs(out.volume - m.volume) < 0.05 * m.volume
+
+
+def test_a_few_locks_floating_off_the_head_are_kept():
+    """Inde Navarrette's long hair had three locks floating 1.7 to 3.2 mm off her head (random five,
+    2026-11-21); cut, they ended in flat slabs beside her cheek. Only a head of many is cut."""
+    from smoothstone import printable
+
+    m = _head_with_loops(3)
+    out, n = printable.strands(m)
+    assert n == 0
+    assert out is m
+
+
+def test_a_thin_curl_lying_on_the_head_is_kept():
+    """Cutting every thin strand chopped Christopher Abbott's sculpted curls into stubs and took his
+    craft score from 8 to 6 (random five, round 5). Only a strand that floats off the head is cut."""
+    from smoothstone import printable
+
+    parts = [trimesh.creation.capsule(height=14, radius=5, count=[32, 32]),
+             trimesh.creation.cylinder(radius=2, height=4, sections=32),
+             trimesh.creation.icosphere(subdivisions=4, radius=6)]
+    parts[0].apply_translation([0, 0, 12])
+    parts[1].apply_translation([0, 0, 23.5])
+    parts[2].apply_translation([0, 0, 30])
+    curl = trimesh.creation.torus(major_radius=1.5, minor_radius=0.25, major_sections=48, minor_sections=12)
+    curl.apply_translation([0, 0, 36.1])  # flat on the crown
+    m = trimesh.boolean.union([*parts, curl], engine="manifold")
+    out, n = printable.strands(m)
+    assert n == 0 and abs(out.bounds[1][2] - m.bounds[1][2]) < 1e-6
+
+
+
+def test_a_figure_that_is_not_a_person_keeps_its_strands(tmp_path, monkeypatch):
+    """The worm-hair cut is for a person's hair: a hedgehog's spines or a lion's mane are the
+    figure (review of the random five, first-F2)."""
+    from smoothstone import printable
+
+    calls = []
+    real = printable.strands
+    monkeypatch.setattr(printable, "strands", lambda m: calls.append(1) or real(m))
+    fig, _ = _armed_mm(tmp_path)
+    printable.brace_figure(fig, tmp_path / "a.stl", {"height": 70}, hair=False)
+    assert calls == []
+    printable.brace_figure(fig, tmp_path / "b.stl", {"height": 70})
+    assert calls == [1]
+
+
+def test_cheeks_under_blue_light_have_no_skin_angle():
+    """Under blue or purple stage light the cheeks' b* goes below zero, and atan2 read them as
+    116 degrees, 'very light' (review of the random five, first-F3). No yellow, no reading."""
+    import importlib.util
+
+    import cv2
+
+    spec = importlib.util.spec_from_file_location("face_tool", Path(__file__).parents[1] / "tools" / "figure" / "face.py")
+    face = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(face)
+
+    def cheeks(bgr):
+        return np.full((100, 100, 3), bgr, np.uint8)
+
+    assert face.ita(cheeks((200, 140, 150)), (0, 0, 100, 100)) is None  # blue-violet light
+    warm = face.ita(cheeks((140, 170, 210)), (0, 0, 100, 100))  # light tan skin
+    assert warm is not None and 0 < warm < 90
+    lab = cv2.cvtColor(np.float32([[[140 / 255, 170 / 255, 210 / 255]]]), cv2.COLOR_BGR2Lab)[0, 0]
+    assert warm == round(float(np.degrees(np.arctan((lab[0] - 50) / lab[2]))), 1)

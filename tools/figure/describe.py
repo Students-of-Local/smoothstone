@@ -29,6 +29,8 @@ TRAITS = {
         "glasses": "Is the person wearing glasses? Answer yes or no.",
         "beard": "Does the person have a beard or a mustache? Answer yes or no.",
         "hat": "Is the person wearing a hat, a cap or a helmet? Answer yes or no.",
+        # named in the prompt, never checked on a render: it said yes to a slim render of Shane Gillis
+        "heavy": "Is this person stocky or heavyset? Answer yes or no.",
         # this wording was right on 13 of 13 renders; "words or brand logos" saw them on a plain jacket
         "lettering": "Is there any printed text, a logo or a badge on the person's clothes? Answer yes or no.",
     },
