@@ -563,7 +563,10 @@ def brace(mesh, floor=None, rounds: int = 3, figure: bool = False):
             break
         if face is not None:
             _, missed = plan_struts(grid, left, floor, face)
-            strands = tips(grid, missed, TRIM_FACE)
+            # only what the face alone keeps a strut from: a hand too far from anything to prop
+            # would lose its fingers to the cut (review of #52, first-F1); it goes to the slicer
+            _, anyway = plan_struts(grid, missed, floor)
+            strands = tips(grid, [i for i in missed if not any(i is j for j in anyway)], TRIM_FACE)
             if strands:
                 trim(strands)
                 if not left:
