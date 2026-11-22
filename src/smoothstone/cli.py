@@ -1074,8 +1074,10 @@ def cmd_slice(args, job: Job) -> Out:
         out.next = "stone slice <file.stl>" if args.file else "stone build"
         return out
     rep = slicer.slice_stl(f, layer=args.layer, nozzle=args.nozzle, bed=config.bed(job.root))
-    if args.json:
-        print(json.dumps(rep.to_dict(), indent=1))
+    out.code = 0 if rep.ok else 1
+    if args.json:  # machine output alone on stdout, like show --json
+        out.raw = json.dumps(rep.to_dict(), indent=1)
+        return out
     out.add(f"File: {f}")
     out.add(*slicer.summary(rep))
     out.code = 0 if rep.ok else 1

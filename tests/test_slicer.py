@@ -110,3 +110,24 @@ def test_a_lifted_figure_braced_slices_cleanly(tmp_path):
     braced.apply_scale(printable.plinth(params)[0])
     rep = slicer.slice_mesh(braced)
     assert rep.ok, slicer.summary(rep)
+
+
+def test_a_part_far_bigger_than_the_bed_stops_at_size():
+    """A figure exported in microns is 1000 times too big; slicing it would run out of memory."""
+    import time
+
+    t = time.perf_counter()
+    rep = slicer.slice_mesh(_box((90000, 40000, 90000), (0, 0, 0)))
+    assert time.perf_counter() - t < 1.0
+    assert not rep.ok and [p.kind for p in rep.problems] == ["size"] and rep.floating == []
+
+
+def test_slice_json_prints_only_json(tmp_path, capsys):
+    import json
+
+    from smoothstone import cli
+
+    f = tmp_path / "box.stl"
+    _box((10, 20, 5), (0, 0, 0)).export(f)
+    cli.main(["slice", str(f), "--json"])
+    assert json.loads(capsys.readouterr().out)["ok"] is True

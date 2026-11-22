@@ -197,6 +197,11 @@ def slice_mesh(mesh, name: str = "", layer: float = LAYER, nozzle: float = NOZZL
     problems: list[Problem] = []
     if any(size[i] > bed[i] + 1e-6 for i in range(3)):
         problems.append(Problem("size", 0.0, 0.0, note=f"{size} mm does not fit the {list(bed)} mm bed"))
+        # a part in the wrong units can be a thousand times too big; its layers would not fit in
+        # memory, and nothing else matters until it fits the bed
+        rep = Report(name, 0, layer, nozzle, size, 0.0, 0.0, problems)
+        rep.floating = []
+        return rep
 
     def spot(mask, rows_cols=None):
         ys, xs = np.nonzero(mask) if rows_cols is None else rows_cols
