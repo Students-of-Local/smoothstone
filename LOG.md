@@ -500,3 +500,9 @@ PR 67 review, round 2:
   0.15, but e01 then fails the grader's fit check: a pin rises 2.45 mm into the body box from its -z
   face, past the spec's -1.5 face_gap, and check_fit's interference test does not leave the
   product's mounting holes out. Waiting on a decision; the grader is not changed here.
+
+2026-11-22, PR 67 round 2: the grader's fit check read a locating pin inside a mounting hole as the
+part inside the product (1.85 mm on e01), so it refused the pins that keep a Pi from sliding off its
+snap catch. A hole is empty through the board: check_fit now leaves out samples inside a hole
+feature's own diameter (not its pad, no margin). A standoff pushed into the board around the hole
+still fails (test_pi5_standoffs_into_the_board_fail, test_a_pin_wider_than_the_hole_still_pushes_into_the_board).
