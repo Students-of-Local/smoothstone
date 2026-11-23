@@ -53,3 +53,5 @@ call stone: stone build
 reply: Your 150 mm ribbed vase is ready.
 
 Reply with text only to ask a question NEXT tells you to ask, or to say the part is ready.
+
+Start now: call the stone tool with the command stone status.
