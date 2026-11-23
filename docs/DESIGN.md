@@ -39,8 +39,8 @@ the NEXT line. Nothing the model needs lives only in its context.
 |---|---|---|
 | `stone status` | prints brief, plan, last result | NEXT |
 | `stone new "<request>" [--image PATH]` | makes the job, saves the request; with an image, runs `stone image` | NEXT: stone recipes |
-| `stone recipes [words]` | menu, ranked by the words or the brief: name, one line, sizes | NEXT: stone show <best> |
-| `stone show <recipe>` | every parameter: name, type, default, range, unit, one-line meaning; one example `stone set` line | NEXT: stone set ... |
+| `stone recipes [words]` | menu, ranked by the words or the brief: name, one line, sizes; when the brief names a catalog product, a first line says why the best recipe fits it | NEXT: stone show <best> |
+| `stone show <recipe> [--all]` | every parameter: name, type, default, range, unit, one-line meaning; one example `stone set` line. A product parameter shows no default. Tier S, when the request fills the part: the filled values, then the rest one short line each (`--all` gives the full list). A recipe that cannot take the catalog product the brief names, or makes nothing it names, sends the model to the one that does | NEXT: stone set ... |
 | `stone set <recipe> k=v ...` | writes plan.json; validates names, types, ranges; unknown name lists the valid ones | NEXT: stone build |
 | `stone build` | plan -> params file -> OpenSCAD -> STL -> checks -> preview PNG | when every check passes, copies the part to the job folder (Part ready); else the one parameter to change |
 | `stone check [file.stl]` | print checks on any STL | NEXT |

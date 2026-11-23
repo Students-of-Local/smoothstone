@@ -568,3 +568,93 @@ Where the grader passes something that would not hold in real life:
   bought metal standoffs of the stated length.
 - e06: a desk holder declares no load, so nothing checks the backrest against a hand pressing the
   phone's screen; a held out desk spec with a load would fail.
+
+## 2026-11-22 climb 3: stone's text for small and mid size models
+
+Stone's own NEXT path passed all 10 engineering specs after climb 2; real models did worse. The logs
+showed four faults in stone's text, not in the models' grasp of the job:
+
+- LFM3-1.7B, right after `stone show fitted_case` (e02, e10; t2 with cable_comb): it spent its whole
+  2048 token budget re-reading the parameter list (every choice and help line) and stopped with no
+  tool call. Its reasoning tripped on `product = raspberry_pi_5` printed as the default beside NEXT
+  product=flipper_zero, and on the example for another product.
+- LFM3-1.7B (e03, e06): `stone recipes` said NEXT: stone show fitted_case for a power bank sleeve and
+  product_holder for an iPhone desk stand; the model read the titles ("Fitted case for a product",
+  "Product holder"), judged the NEXT line a mistake and showed product_holder or phone_stand.
+- LFM2.5-24B-A2B (e03, e04, e06, e10): it skips `stone recipes` and guesses names (power_bank_case,
+  airtag_case, desk_stand). The unknown name went to the nearest name, phone_case, and phone_case took
+  a power bank, an AirTag and an Arduino ("ABX00080"), set phone=iphone_17_pro or asked "What phone
+  model...".
+- LFM2.5-24B-A2B (e04): show said "Not placed yet: 2021 one; one" for "an Apple AirTag (the 2021
+  one)", and the model spent four steps on size=2021.
+
+What changed (src/smoothstone/cli.py, match.py; tests in tests/test_fitted_case.py, each failing
+without its change):
+
+- Tier S `stone show`, when the request fills what the part needs (nothing left unplaced, the product
+  named, no photo to place): the filled values, then "The NEXT line below already holds every value
+  the request gives; run it as written.", then the other parameters one short line each with no help
+  text and no example. `stone show <recipe> --all`, tier M and L, and any request that leaves a size
+  unplaced keep the full list.
+- A product parameter (fitted_case product, phone_case phone, every catalog recipe) shows no default:
+  "(no default: the exact one the request names, else ask)". An example that sets another product is
+  left out.
+- When the request names a catalog product, `stone recipes` leads with why its pick fits: "For this
+  request: fitted_case makes the sleeve for the Anker Power Bank ... from its published sizes."
+- `stone show` and `stone set` of a recipe that cannot take the named catalog product, or makes
+  nothing the request names, while the request's recipe takes it and fits better, print FIX and send
+  the model to that recipe (phone_case for a Flipper Zero, phone_stand for an iPhone 17 Pro the catalog
+  holds, product_holder for a sleeve). An iPhone case still goes to phone_case.
+- A made up recipe name that is not a typo of a real one (power_bank_case is not phone_case) goes to
+  the request's recipe, not the nearest name.
+- A year or model number of 4 or more digits from the product's own name is used up, with a "one"
+  right after it, so "(the 2021 one)" is not offered as a size.
+
+Before: climb 2 (8a31f55, PR 70). After: 5c065bc. openai driver on Ollama, card S, seeds 1 to 3.
+Each run's log is kept outside the repo; two before tuning runs hit the shared /tmp disk quota inside
+stone and were rerun, and Ollama answered HTTP 400 once (24B, e02 s2, before), a crash with no log
+that its rerun passed.
+
+| model | suite | before | after |
+| --- | --- | --- | --- |
+| LFM3-1.7B | engineering | 26 of 30 | 30 of 30 |
+| LFM2.5-24B-A2B | engineering | 19 of 30 | 30 of 30 |
+| LFM3-1.7B | tuning | 20 of 21 | 21 of 21 |
+
+| spec | 1.7B before | 1.7B after | 24B before | 24B after |
+| --- | --- | --- | --- | --- |
+| e01_rpi5_case | 3 | 3 | 3 | 3 |
+| e02_flipper_zero_case | 2 | 3 | 3 | 3 |
+| e03_power_bank_case | 2 | 3 | 0 | 3 |
+| e04_airtag_case | 3 | 3 | 1 | 3 |
+| e05_appletv_wall_holder | 3 | 3 | 3 | 3 |
+| e06_iphone_desk_holder | 2 | 3 | 0 | 3 |
+| e07_mac_mini_mount | 3 | 3 | 2 | 3 |
+| e08_rpi4_vesa_adapter | 3 | 3 | 2 | 3 |
+| e09_pot_knob | 3 | 3 | 3 | 3 |
+| e10_model_number_case | 2 | 3 | 2 | 3 |
+
+Steps cut off at the 2048 token limit: 1.7B engineering 5 before, 0 after; 24B 4 before, 1 after;
+1.7B tuning 1 before, 0 after. Model minutes for the 30 engineering runs: 1.7B 37 to 28, 24B 47 to 34.
+
+Every 1.7B run after was made on 5c065bc. The 24B runs after for every spec but e04 were made on the
+first commit of this climb (979f7ab); the second commit changes stone's text only for e04's round_case
+(checked by diffing match.suggest_full on every engineering and tuning request against every recipe),
+so the 24B's e04 was rerun on 5c065bc (2 of 3 on 979f7ab, 3 of 3 on 5c065bc).
+
+`--driver next` on 5c065bc: 10 of 10 engineering specs pass.
+
+Open: e07 s2 on the 24B before set material=PLA on product_mount (PETG default); it passed after, but
+nothing stops a model from overriding a material the recipe picked for a reason. When the 1.7B's
+reasoning is cut at the token limit it then writes its tool call as text in its reasoning
+(`<function=stone>...`), which the openai driver does not read; climb 3 removed the cutoffs that led
+there, but the driver gap remains (a harness change, left out of this climb so before and after
+measure stone's text alone).
+
+Held-out, measured once on this climb's code and not tuned on (evals/engineering_heldout, x01 Steam
+Deck stand, x02 MX Master tray): 0 of 14. `--driver next` fails both, so the gap is stone's, not
+the models': neither product is in the catalog, and stone has no path for a product the person
+describes by its measured size with a source. Most runs ended with no engineering.json; LFM3-1.7B
+seed 1 on x01 and seed 3 on x02 died on Ollama HTTP 400. The scores stay out of evals/scores.jsonl.
+Next track: a holder, mount or case for any product given its size and source, climbed on tuning
+specs only, with these two sealed as the check.

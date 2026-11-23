@@ -183,6 +183,11 @@ def suggest_full(r: rc.Recipe, request: str) -> tuple[dict, list[str]]:
             m = re.search(pat, request, re.I)
             if m:
                 request = request[:m.start()] + " " * (m.end() - m.start()) + request[m.end():]
+        # a year or model number from the product's own name is not a size: "(the 2021 one)" is the Apple AirTag (2021)
+        prod = catalog.get(str(out[cp.name])) or {}
+        for n in set(re.findall(r"\d{4,}", " ".join([prod.get("name", "")] + prod.get("aliases", [])))):
+            request = re.sub(rf"(?<![\w.]){re.escape(n)}(?![\w.])(?:\s+one\b)?(?!\s*(?:mm|cm|in\b|inch))",
+                             lambda m: " " * len(m.group(0)), request, flags=re.I)
     req_words = set(_words(request))
     own = set(_words(r.name.replace("_", " ") + " " + r.title))  # "box" names the recipe, not part=box
     for p in r.params:
