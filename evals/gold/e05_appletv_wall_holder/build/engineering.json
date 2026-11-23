@@ -1,0 +1,22 @@
+{
+  "frame": [[1, 0, 0, 4.3], [0, 1, 0, 2.7], [0, 0, 1, 4.3], [0, 0, 0, 1]],
+  "material": "PLA",
+  "clearance": 0.3,
+  "retention": {"type": "none"},
+  "load": {
+    "n": 10,
+    "dir": "-z",
+    "arm": 46.3,
+    "b": 98.4,
+    "h": 4.0,
+    "across_layers": false,
+    "section": {"at": [4.5, 49.2, 2.0], "b_dir": [0, 1, 0], "h_dir": [0, 0, 1]}
+  },
+  "attach": {"holes": [{"at": [0, 21.2, 19.8]}, {"at": [0, 77.2, 19.8]}]},
+  "sources": {
+    "w": "https://support.apple.com/en-us/111839",
+    "d": "https://support.apple.com/en-us/111839",
+    "h": "https://support.apple.com/en-us/111839",
+    "corner_r": "https://support.apple.com/en-us/111839"
+  }
+}

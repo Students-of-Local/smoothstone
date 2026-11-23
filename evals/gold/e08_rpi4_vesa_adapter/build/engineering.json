@@ -1,0 +1,25 @@
+{
+  "frame": [[1,0,0,5],[0,1,0,18],[0,0,1,14],[0,0,0,1]],
+  "material": "PETG",
+  "clearance": {"-z": 10},
+  "retention": {
+    "type": "screw", "size": "M2.5", "method": "through", "hole_d": 2.9,
+    "holes": [
+      {"at": [8.5,21.5,4], "axis": [0,0,-1]},
+      {"at": [66.5,21.5,4], "axis": [0,0,-1]},
+      {"at": [8.5,70.5,4], "axis": [0,0,-1]},
+      {"at": [66.5,70.5,4], "axis": [0,0,-1]}
+    ]
+  },
+  "part_holes": {"vesa_75": {"c": [47.5,46,0], "u": [1,0,0]}},
+  "sources": {
+    "w": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "d": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "h": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "corner_r": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "mount_hole_front_left": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "mount_hole_front_right": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "mount_hole_back_left": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf",
+    "mount_hole_back_right": "https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-mechanical-drawing.pdf"
+  }
+}

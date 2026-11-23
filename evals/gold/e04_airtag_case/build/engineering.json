@@ -1,0 +1,17 @@
+{
+  "frame": [[1,0,0,-15.935],[0,1,0,-15.935],[0,0,1,1.75],[0,0,0,1]],
+  "material": "PETG",
+  "clearance": 0.15,
+  "retention": {
+    "type": "snap", "y": 0.8, "t": 1.4, "L": 14.0, "w": 6.8,
+    "at": [-7.0,18.9,3.4], "t_dir": [0,-1,0], "L_dir": [1,0,0]
+  },
+  "sources": {
+    "w": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf",
+    "d": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf",
+    "h": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf",
+    "corner_r": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf",
+    "profile": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf",
+    "speaker_keepout": "https://developer.apple.com/download/files/accessories/dimensional-drawings/airtag.pdf"
+  }
+}

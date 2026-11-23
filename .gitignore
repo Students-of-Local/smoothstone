@@ -8,3 +8,5 @@ build/
 *.egg-info/
 recipes/*/build/
 squashfs-root/
+!evals/gold/*/build/
+!evals/gold/*/build/engineering.json

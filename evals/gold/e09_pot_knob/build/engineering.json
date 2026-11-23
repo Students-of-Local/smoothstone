@@ -1,0 +1,46 @@
+{
+  "frame": [
+    [
+      1,
+      0,
+      0,
+      -3
+    ],
+    [
+      0,
+      -1,
+      0,
+      3
+    ],
+    [
+      0,
+      0,
+      -1,
+      10
+    ],
+    [
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "material": "PLA",
+  "clearance": {
+    "+x": -0.03,
+    "-x": -0.03,
+    "+y": -0.03,
+    "-y": -0.03,
+    "+z": 0.8
+  },
+  "retention": {
+    "type": "friction",
+    "gap": -0.06
+  },
+  "sources": {
+    "w": "https://www.bourns.com/data/global/pdfs/PTV09.pdf",
+    "d": "https://www.bourns.com/data/global/pdfs/PTV09.pdf",
+    "h": "https://www.bourns.com/data/global/pdfs/PTV09.pdf",
+    "corner_r": "https://www.bourns.com/data/global/pdfs/PTV09.pdf"
+  }
+}
