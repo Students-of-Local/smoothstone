@@ -1,0 +1,39 @@
+{
+  "id": "x02_mx_master_tray",
+  "request": "A tray to park my Logitech MX Master 3S on the desk. Logitech lists it at 124.9 mm long, 84.3 mm wide and 51 mm tall.",
+  "input": "text",
+  "product": {
+    "name": "Logitech MX Master 3S",
+    "sources": [
+      "https://hub.sync.logitech.com/mx-master-3s",
+      "https://support.logi.com/hc/en-us/articles/5218070669847-Specification-MX-Master-3S"
+    ],
+    "body": {
+      "w": 84.3,
+      "d": 124.9,
+      "h": 51.0,
+      "corner_r": 0.0
+    },
+    "body_sources": {
+      "w": "https://hub.sync.logitech.com/mx-master-3s Physical specs: 84.3 mm",
+      "d": "https://hub.sync.logitech.com/mx-master-3s Physical specs: 124.9 mm",
+      "h": "https://hub.sync.logitech.com/mx-master-3s Physical specs: 51 mm",
+      "corner_r": "no radius published, so 0"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "holder",
+    "material": "PLA",
+    "fit": "slip",
+    "retention": "none",
+    "safety": 2,
+    "covered": [
+      "-z"
+    ],
+    "open": [
+      "+z"
+    ],
+    "support": "-z"
+  }
+}
