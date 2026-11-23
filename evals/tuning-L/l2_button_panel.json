@@ -1,0 +1,30 @@
+{
+ "id": "l2_button_panel",
+ "request": "A faceplate 120 by 40 mm for three 16 mm pushbuttons in a row, 30 mm apart, with countersunk M3 screw holes at the left and right ends and the word POWER engraved on it.",
+ "sources": [
+  "https://www.schlegelusa.com/shop/pushbuttons/panel-cutout-o-16-2mm/page/3 (16 mm pushbuttons: panel cutout 16.2 mm)",
+  "ISO 273 clearance holes, M3: fine 3.2, medium 3.4, coarse 3.6 mm"
+ ],
+ "expect": {
+  "recipe": "panel",
+  "params": {
+   "w": 120,
+   "d": 40,
+   "cutouts": 3,
+   "cut_shape": "round",
+   "cut_w": [
+    16.0,
+    16.5
+   ],
+   "cut_pitch": 30,
+   "holes": "ends",
+   "hole_d": [
+    3.2,
+    3.6
+   ],
+   "countersink": true,
+   "label": "POWER",
+   "label_style": "engraved"
+  }
+ }
+}

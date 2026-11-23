@@ -31,6 +31,33 @@
   "rate": 0.5,
   "total": 2
  },
+ "tuning-L/claude-haiku_cardL": {
+  "judge": null,
+  "passing": [
+   "l1_mating_gear",
+   "l2_button_panel",
+   "l4_backpack_hook",
+   "l7_broom_cap",
+   "l8_drill_stand"
+  ],
+  "rate": 0.8125,
+  "total": 16
+ },
+ "tuning-L/claude-opus_cardL": {
+  "judge": null,
+  "passing": [
+   "l1_mating_gear",
+   "l2_button_panel",
+   "l3_card_box",
+   "l4_backpack_hook",
+   "l5_l_bracket",
+   "l6_usb_enclosure",
+   "l7_broom_cap",
+   "l8_drill_stand"
+  ],
+  "rate": 1.0,
+  "total": 16
+ },
  "tuning/S": {
   "judge": null,
   "passing": [
@@ -44,6 +71,34 @@
   ],
   "rate": 1.0,
   "total": 7
+ },
+ "tuning/claude-haiku_cardL": {
+  "judge": null,
+  "passing": [
+   "t1_fan_guard",
+   "t2_cable_comb",
+   "t3_faceplate",
+   "t4_name_tag",
+   "t5_lithophane",
+   "t6_planter",
+   "t7_phone_case"
+  ],
+  "rate": 1.0,
+  "total": 14
+ },
+ "tuning/claude-opus_cardL": {
+  "judge": null,
+  "passing": [
+   "t1_fan_guard",
+   "t2_cable_comb",
+   "t3_faceplate",
+   "t4_name_tag",
+   "t5_lithophane",
+   "t6_planter",
+   "t7_phone_case"
+  ],
+  "rate": 1.0,
+  "total": 14
  },
  "tuning/next": {
   "judge": null,

@@ -1,0 +1,21 @@
+{
+ "id": "l1_mating_gear",
+ "request": "A spur gear with 20 teeth for a 5 mm D shaft that meshes with my existing 40 tooth gear. Their shafts are 30 mm apart. Plain straight teeth.",
+ "sources": [
+  "KHK Gear Technical Reference, Calculation of Gear Dimensions: center distance a = m (z1 + z2) / 2 for standard spur gears"
+ ],
+ "note": "m = 2 x 30 / (20 + 40) = 1.0 mm. The bore is the shaft plus a printing clearance.",
+ "expect": {
+  "recipe": "spur_gear",
+  "params": {
+   "teeth": 20,
+   "module_mm": 1,
+   "style": "spur",
+   "bore": [
+    5.0,
+    5.4
+   ],
+   "d_flat": true
+  }
+ }
+}

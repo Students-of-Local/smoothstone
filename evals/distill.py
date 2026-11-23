@@ -14,6 +14,10 @@ says whose fault it is, because the fix goes in a different place:
   values   the model stayed on the path but set a number or name the spec does not want. Fix the card.
   steps    the model stayed on the path and ran out of steps. Shorten stone's path.
   tool     the model ran every NEXT line and stone still led it to a failing part. Fix stone, not the card.
+  recipe   tier L wrote a recipe (stone has no NEXT line for one, so the path ends there) and the part
+           still fails. Fix card L's recipe rules.
+
+Reading a file at tier L (views.png, a catalog recipe) does not leave the path.
 
 Then a ledger: the pass rate per card version (the card's SHA-256, which every log records; a run
 compacted after step K is its own row, +cK, compared only with compacted runs), counting only specs
@@ -41,7 +45,9 @@ FIX = {
     "values": "card: name that parameter and its meaning in an example",
     "steps": "stone: its path is longer than the harness allows; make fewer steps reach the part",
     "tool": "stone: its own NEXT path ends in a failing part; the card is not the problem",
+    "recipe": "card: tier L's recipe rules (skill/tiers/L.md); the model wrote a recipe and the part still fails",
 }
+FILE_TOOLS = ("Read", "Write", "Edit")  # tier L's file tools (evals/drivers.py claude_argv)
 SETUP = re.compile(r"not set up|setup\.sh|server is not running|could not reach", re.I)
 MIN_TRIALS = 2  # the bar runs 2 seeds per case
 
@@ -100,6 +106,13 @@ def walk(log: dict) -> dict:
                 return {"kind": "stopped", "step": st["step"], "what": f"stopped while NEXT was {nxt!r}"}
             continue
         for c in calls:
+            if c.get("name") in FILE_TOOLS:
+                path = str((c.get("args") or {}).get("file_path", ""))
+                if c["name"] != "Read" and "recipes/" in path:  # off stone's path on purpose
+                    if log.get("pass"):
+                        return {"kind": "pass", "step": None, "what": ""}
+                    return {"kind": "recipe", "step": st["step"], "what": "; ".join(log.get("why") or [])}
+                continue
             cmd = str((c.get("args") or {}).get("command", ""))
             res = c.get("result") or ""
             fx = fix_line(res)

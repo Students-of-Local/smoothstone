@@ -1,0 +1,22 @@
+{
+ "id": "l4_backpack_hook",
+ "request": "A wall hook for a backpack, held by two #8 wood screws, with 2 inches of room inside the hook for the strap.",
+ "sources": [
+  "ASME B18.6.1: #8 wood screw basic major diameter 0.164 in (4.17 mm)"
+ ],
+ "note": "2 in = 50.8 mm, inside the curve (the hook recipe's reach). The hole is the screw's major diameter plus a clearance, at most 0.7 mm over.",
+ "expect": {
+  "recipe": "hook",
+  "params": {
+   "holes": 2,
+   "screw_d": [
+    4.2,
+    4.9
+   ],
+   "reach": [
+    49.8,
+    51.8
+   ]
+  }
+ }
+}
