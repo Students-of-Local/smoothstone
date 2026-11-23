@@ -255,5 +255,21 @@
  "sources": [
   "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf",
   "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip"
+ ],
+ "port_faces": {
+  "-y": "located",
+  "+x": "located",
+  "-x": "located"
+ },
+ "port_faces_why": "from this record's frame text (the spec's why), which says where the maker puts its ports, buttons and slots and whether it locates them",
+ "snap_catch": [
+  {
+   "feature": "usb_stack_b",
+   "x": [
+    70.78,
+    88.265
+   ],
+   "source": "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip: the same STEP RP-010083 dual USB-A body as usb_stack_b (bbox y 39.75 to 54.25, z top 17.361) spans x 70.330 to 87.815, plus the 0.45 offset that puts the STEP's x -0.45 at the product's x 0. Its y span and top come from usb_stack_b itself (c and size). A snap catch bears on this shell's flat top."
+  }
  ]
 }

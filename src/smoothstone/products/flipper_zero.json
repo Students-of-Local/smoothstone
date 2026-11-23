@@ -34,5 +34,13 @@
   "https://docs.flipper.net/zero/development/hardware/tech-specs",
   "https://docs.flipper.net/zero/development/hardware/flipper-blueprints",
   "https://cdn.flipperzero.one/Monosnap_flipper-zero-body-2d.pdf_2022-09-13_13-14-57.png"
- ]
+ ],
+ "port_faces": {
+  "+z": "not located",
+  "+x": "not located",
+  "-x": "not located",
+  "+y": "not located",
+  "-y": "not located"
+ },
+ "port_faces_why": "from this record's frame text (the spec's why), which says where the maker puts its ports, buttons and slots and whether it locates them"
 }

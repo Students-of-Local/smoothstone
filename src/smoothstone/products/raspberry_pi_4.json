@@ -11,7 +11,7 @@
  "set": "tuning",
  "from_spec": "evals/engineering/e08_rpi4_vesa_adapter.json",
  "frame": "Pi 4 lying component side up on the plate (+z up, -z toward the plate and monitor): the plate must carry a hole that lines up with each of the board's four 2.7 mm holes (58 x 49 mm) with the plate around it to bear on, and the VESA MIS-D 75 pattern as its own four clear 4.5 mm holes, 75 x 75 mm +/- 0.25 mm for M4 x 0.7 screws (VESA FDMI v1.1 sections 5.2.1 and 5.2.3), with the top left clear.",
- "fitted_case": true,
+ "fitted_case": false,
  "open_faces": [
   "+z"
  ],
@@ -111,5 +111,6 @@
   "https://pip-assets.raspberrypi.com/categories/545-raspberry-pi-4-model-b/documents/RP-008341-DS-1-raspberry-pi-4-datasheet.pdf",
   "https://glenwing.github.io/docs/VESA-FDMI-1.1.pdf",
   "https://vesa.org/mounting-standard/"
- ]
+ ],
+ "fitted_case_why": "its ports are not in the catalog: the spec it comes from grades a VESA plate, so it locates only the four mounting holes, and a case would wall over every port"
 }

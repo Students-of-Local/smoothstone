@@ -10,7 +10,7 @@
  "set": "tuning",
  "from_spec": "evals/engineering/e07_mac_mini_mount.json",
  "frame": "Right side up under the desk, front at -y: weight 0.67 kg (M4) or 0.73 kg (M4 Pro) on https://support.apple.com/en-us/121555 gives 6.6 N or 7.2 N, so 20 N leaves margin. The Mac has no screw points, so nothing screws into it: the mount wraps the sides and top and must bear on the bottom (support -z) in three of its four quarters so the Mac cannot drop out. Apple lists the ports 'On front' and 'On back' with no positions and does not locate the power button on the bottom, so front and back stay open and the bottom is supported, not covered. The mount screws up into the desk through its top (attach +z), and the strength check's arm runs from where the Mac bears on the mount to the nearest of those screws.",
- "fitted_case": true,
+ "fitted_case": false,
  "open_faces": [
   "-y",
   "+y"
@@ -31,5 +31,12 @@
  "features": [],
  "sources": [
   "https://support.apple.com/en-us/121555"
- ]
+ ],
+ "port_faces": {
+  "-y": "not located",
+  "+y": "not located",
+  "-z": "not located"
+ },
+ "port_faces_why": "from this record's frame text (the spec's why), which says where the maker puts its ports, buttons and slots and whether it locates them",
+ "fitted_case_why": "Apple does not locate its bottom power button, so its bottom must stay open, and a tray's floor would cover it; it needs a mount that bears on its bottom in quarters"
 }

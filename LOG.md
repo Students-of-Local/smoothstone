@@ -471,8 +471,20 @@ NEXT driver, seed 1, before (origin/main 887ef71, and the 7e38f42 table above fo
 
 4 of 10. The floor in evals/floor.json is left for the lead to raise.
 
-Known gap: e01's snap arms sit on the -y and +y walls at x 64.5 and catch over the body box's top
-edge (18.98 mm, the USB stack's top). The grader measures the arms in the mesh and passes them, but
-on the real board nothing that tall stands near those edges: the catches hook air and the board can
-lift off its standoffs. A catch over the PCB's own edge needs the PCB's thickness, which the spec
-does not give, and would sit inside the body box, which the grader forbids.
+PR 67 review, round 1, fixed on the branch:
+
+- A case whose walls hide ports: raspberry_pi_4 (its spec grades a VESA plate and locates no ports)
+  and mac_mini_m4_2024 (Apple does not locate its bottom power button, and a tray's floor covers the
+  bottom) are no longer case products; stone names them and says why. Each case product now records
+  port_faces, and a test holds every port face open or located, never an unlocated bottom.
+- e01's snap catches hooked air over the body box's edge. The catch now bears on the rear USB stack's
+  shell, as GPT-6.1 Sol's gold e01 part does: one arm in the +y wall at x 77.09, catch underside 0.465
+  above the shell top (18.815), reaching 0.55 past its edge (0.25 after the 0.3 side shift), y 2.6,
+  L 23, strain 1.47% against PLA's 2%. The shell's x span (70.78 to 88.265) is new: the STEP body
+  whose y span and top match usb_stack_b's cited bbox, measured from the same STEP file. A product with
+  no located catch surface refuses retention=snap, and a test checks every catch over its surface.
+- Friction was claimed for a 0.3 mm slip gap. The grader checks only that a friction gap lies in the
+  fit's band, so it cannot catch that; the part now claims friction only at a gap at or below zero
+  (auto picks it there, and an explicit friction with a gap is refused).
+
+e01, e02, e03 and e10 still pass on --driver next.

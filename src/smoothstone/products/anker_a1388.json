@@ -34,5 +34,10 @@
  "sources": [
   "https://service.anker.com/product-description/a08J1000000YcHgIAK/anker-power-bank-10000mah-225w",
   "https://salesforce-knowledge-download.s3.us-west-2.amazonaws.com/000019000/en_US/000019000.pdf"
- ]
+ ],
+ "port_faces": {
+  "+y": "not located",
+  "+z": "not located"
+ },
+ "port_faces_why": "from this record's frame text (the spec's why), which says where the maker puts its ports, buttons and slots and whether it locates them"
 }

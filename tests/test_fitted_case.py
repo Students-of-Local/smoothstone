@@ -136,3 +136,112 @@ def test_a_catalog_product_a_tray_cannot_hold_is_named_not_measured_again():
     r = rc.load("fitted_case", REPO / "recipes")
     ask = match.missing_fit_size(r, "a case for an Apple AirTag (the 2021 one)")
     assert ask.startswith("I have the Apple AirTag (2021)'s sizes") and "round body" in ask
+
+
+# --- PR 67 review round 1 --------------------------------------------------------------------------
+
+SIDE_FACES = ("+x", "-x", "+y", "-y")
+
+
+def test_every_case_product_leaves_each_port_face_open_or_windowed():
+    """first-F1 and second-F6: a fitted case walls each side face and floors the bottom, so every face
+    the maker puts a port, button or slot on must be open (a side) or have its ports located (a window).
+    A bottom whose ports are not located cannot be left open by a tray, so that product is no case."""
+    for slug in catalog.case_slugs():
+        p = catalog.get(slug)
+        pf = p.get("port_faces")
+        assert pf is not None, f"{slug}: a case product must say which faces have ports (port_faces)"
+        open_faces = set(p.get("open_faces", []))
+        located = {f["face"] for f in p["features"] if f["kind"] != "hole"}
+        for face, state in pf.items():
+            if state == "located":
+                assert face in located, (slug, face, "says located but no feature is on it")
+            else:
+                assert face in open_faces and face != "-z", (slug, face, "ports not located, so the face must stay open")
+        for face in SIDE_FACES:
+            if face not in open_faces:
+                assert pf.get(face, "located") == "located", (slug, face)
+
+
+@pytest.mark.parametrize("text,slug", [("a case for a raspberry pi 4", "raspberry_pi_4"),
+                                       ("a case for my Mac mini M4", "mac_mini_m4_2024")])
+def test_a_product_with_unlocated_ports_a_tray_would_cover_is_refused(text, slug):
+    assert slug not in catalog.case_slugs()
+    assert _top(text) != "fitted_case" or match.missing_fit_size(rc.load("fitted_case", REPO / "recipes"), text)
+    ask = match.missing_fit_size(rc.load("fitted_case", REPO / "recipes"), text)
+    assert ask.startswith(f"I have the {catalog.get(slug)['name']}'s sizes"), ask
+
+
+def _echo(openscad, **params) -> tuple[dict, str]:
+    """Evaluate recipe.scad without rendering: its stone_* echoes, and the errors it raised."""
+    import subprocess
+    import tempfile
+    from smoothstone import config
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "t.echo"
+        cmd = [openscad, "-o", str(out)]
+        for k, v in params.items():
+            cmd += ["-D", f"{k}={json.dumps(v)}"]
+        res = subprocess.run(cmd + [str(REPO / "recipes" / "fitted_case" / "recipe.scad")], capture_output=True,
+                             text=True, env=config.openscad_env(), timeout=120)
+        text = out.read_text() if out.exists() else ""
+    echoes = {m[0]: json.loads(m[1]) for m in re.findall(r"ECHO: (stone_\w+) = (\[.*\])", text)}
+    return echoes, text + res.stderr  # in echo-only mode OpenSCAD writes its errors to the .echo file
+
+
+STRAIN = {"PLA": 0.02, "PETG": 0.03, "TPU": 0.2}
+
+
+@pytest.mark.parametrize("material,fit", [("PLA", "slip"), ("PETG", "snug"), ("TPU", "snug")])
+def test_every_snap_catch_bears_on_a_surface_the_catalog_locates(openscad, material, fit):
+    """first-F2: a snap catch over air holds nothing. Each catch's plan footprint must lie over a located
+    surface along the wall, reach past its edge by a real margin with the product pushed away by its
+    side clearance, and sit no more than 0.5 mm above that surface's top; a product with no such surface
+    is refused, not given a catch."""
+    snapping = 0
+    for slug in catalog.case_slugs():
+        p = catalog.get(slug)
+        e, err = _echo(openscad, product=slug, retention="snap", material=material, fit=fit)
+        if not catalog.snap_arms(p):
+            assert "a snap catch must bear on a part of the product the catalog locates" in err, (slug, err)
+            assert "stone_snap" not in e
+            continue
+        assert "Assertion" not in err, (slug, err)
+        snapping += 1
+        c = e["stone_fit"][3]
+        shift = max(c, 0)
+        surfaces = catalog.catch_surfaces(p)
+        for x0, x1, y0, y1, under in e["stone_catch"]:
+            def bears(s):
+                _, sx0, sx1, sy0, sy1, top = s
+                if not 0 <= under - top <= 0.5:
+                    return False
+                # the overlap in each plan axis, after the product shifts away by its clearance
+                ox = min(x1, sx1) - max(x0, sx0) - shift
+                oy = min(y1, sy1) - max(y0, sy0) - shift
+                return min(ox, oy) >= 0.2
+            assert any(bears(s) for s in surfaces), (slug, material, [x0, x1, y0, y1, under], surfaces)
+        s = e["stone_snap"]
+        y, t, L = s[7], s[8], s[9]
+        assert 1.5 * y * t / L ** 2 <= STRAIN[material], (slug, material, s)
+    assert snapping >= 1  # the Pi 5 snaps over its rear USB stack
+
+
+@pytest.mark.parametrize("material,fit,retention,want", [
+    ("PLA", "slip", "friction", None),    # 0.3 mm a side grips nothing: refused
+    ("PLA", "snug", "friction", None),    # 0.15 mm still a gap
+    ("PLA", "snug", "auto", "none"),      # auto no longer claims friction for a gap
+    ("PLA", "press", "auto", "friction"),
+    ("TPU", "snug", "auto", "friction"),
+    ("TPU", "slip", "auto", "none"),      # TPU slip leaves 0.05 mm
+])
+def test_friction_is_claimed_only_for_an_interference_fit(openscad, material, fit, retention, want):
+    """first-F5: the grader checks only that a friction gap lies in the fit's band, so a slip gap would
+    pass there; the part itself claims friction only where it is tighter than the product."""
+    e, err = _echo(openscad, product="anker_a1388", material=material, fit=fit, retention=retention)
+    if want is None:
+        assert "grips nothing" in err and "stone_fit" not in e, err
+    else:
+        assert e["stone_fit"][7] == want
+        if want == "friction":
+            assert e["stone_fit"][3] <= 0

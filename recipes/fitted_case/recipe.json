@@ -15,7 +15,7 @@
   {"name": "fit", "type": "choice", "default": "slip", "choices": ["slip", "snug", "press"],
    "help": "slip = 0.3 mm room per side; snug = 0.15 (TPU: 0.1 mm grip); press = a light press"},
   {"name": "retention", "type": "choice", "default": "auto", "choices": ["auto", "none", "friction", "snap"],
-   "help": "what holds the product in: auto = friction for a snug fit or TPU, else none; snap = two snap arms"},
+   "help": "what holds the product in: auto = friction where the fit is tighter than the product (press, or TPU snug or press), else none; snap = a snap arm whose catch bears on a part of the product the catalog locates (the Pi 5's rear USB stack)"},
   {"name": "wall", "type": "number", "default": 2, "min": 1.2, "max": 4, "unit": "mm", "help": "side wall thickness"},
   {"name": "floor", "type": "number", "default": 2, "min": 1.2, "max": 4, "unit": "mm", "help": "floor thickness"},
   {"name": "quality", "type": "int", "default": 48, "min": 16, "max": 128, "help": "circle smoothness"}

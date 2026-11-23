@@ -142,24 +142,74 @@ def _free(face: str, p: dict, u: float) -> float:
     return room
 
 
-def arm_spots(p: dict) -> dict[str, list[float]]:
-    """For a snap case: per pair of opposite faces ("y": -y and +y, "x": -x and +x), the arm centers
-    [u on the minus face, u on the plus face] at one place along the product, the one farthest from
-    every window and corner; no entry when the pair has no room."""
+CATCH_GAP = 0.3  # mm from the product's top (the envelope's) up to a catch's underside; recipe.scad uses the same
+CATCH_BELOW = 0.5  # mm: a catch bears on a surface whose top is at most this far below its underside
+CATCH_MARGIN = 0.5  # mm a catch's footprint keeps inside its surface along the wall
+MAX_REACH_GAP = 2.5  # mm from a catch surface's edge to the wall the arm stands in, at most
+
+
+def _feature(p: dict, name: str) -> dict:
+    return next(f for f in p.get("features", []) if f["name"] == name)
+
+
+def catch_surfaces(p: dict) -> list[list]:
+    """Where a snap catch can bear on the product: [feature, x0, x1, y0, y1, top z] in the product frame,
+    one per snap_catch entry. A side feature locates its span along its face (c and size) and its top
+    (c v + size h / 2); the entry adds its sourced span along the face's normal (x for a +x or -x
+    feature, y for a +y or -y one). A product with no snap_catch has nothing a catch can bear on."""
     b = p["body"]
-    out = {}
-    for key, (lo, hi), span in (("y", ("-y", "+y"), float(b["w"])), ("x", ("-x", "+x"), float(b["d"]))):
-        best, at = 0.0, None
-        n = int(span * 4)
-        for i in range(n + 1):
-            t = span * i / n  # x (or y) along the product; -y has u = x, +y has u = w - x; +x u = y, -x u = d - y
-            a = t if lo == "-y" else span - t
-            c = span - t if hi == "+y" else t
-            room = min(_free(lo, p, a), _free(hi, p, c))
-            if room > best + 1e-9:
-                best, at = room, (round(a, 2), round(c, 2))
-        if at is not None:
-            out[key] = list(at)
+    w, d = float(b["w"]), float(b["d"])
+    out = []
+    for e in p.get("snap_catch", []):
+        f = _feature(p, e["feature"])
+        u, v = float(f["c"][0]), float(f["c"][1])
+        sw, sh = float(f["size"][0]), float(f["size"][1])
+        top = v + sh / 2
+        if f["face"] in ("+x", "-x"):
+            y_mid = u if f["face"] == "+x" else d - u
+            x0, x1 = (float(t) for t in e["x"])
+            y0, y1 = y_mid - sw / 2, y_mid + sw / 2
+        else:
+            x_mid = u if f["face"] == "-y" else w - u
+            x0, x1 = x_mid - sw / 2, x_mid + sw / 2
+            y0, y1 = (float(t) for t in e["y"])
+        out.append([f["name"], round(x0, 4), round(x1, 4), round(y0, 4), round(y1, 4), round(top, 4)])
+    return out
+
+
+def snap_arms(p: dict) -> list[list]:
+    """For a snap case: [face, u, gap, top] per arm, one arm per catch surface, in the closed side wall
+    nearest the surface (not the surface's own face, where its port is): u is the arm's center along
+    the wall, gap how far the surface's edge is from the product's face there, top the surface's top z.
+    The arm's catch spans the arm's width, at least CATCH_MARGIN inside the surface and clear of every
+    window and corner, placed where the less of those two room figures is greatest. A surface whose top is too far below the catch, or too far from a wall, gets none."""
+    b = p["body"]
+    w, d, h = float(b["w"]), float(b["d"]), float(b["h"])
+    open_faces = set(p.get("open_faces", []))
+    out = []
+    for name, x0, x1, y0, y1, top in catch_surfaces(p):
+        if h + CATCH_GAP - top > CATCH_BELOW:
+            continue
+        own = _feature(p, name)["face"]
+        best = None
+        for face, gap in (("+y", d - y1), ("-y", y0), ("+x", w - x1), ("-x", x0)):
+            if face == own or face in open_faces or gap > MAX_REACH_GAP:
+                continue
+            lo, hi = (x0, x1) if face in ("+y", "-y") else (y0, y1)
+            lo, hi = lo + ARM_W / 2 + CATCH_MARGIN, hi - ARM_W / 2 - CATCH_MARGIN
+            L = face_len(face, b)
+            n = max(1, int((hi - lo) * 4))
+            for i in range(n + 1):
+                t = lo + (hi - lo) * i / n  # x along a y wall, y along an x wall
+                u = {"-y": t, "+y": w - t, "+x": t, "-x": d - t}[face]
+                if 0 <= u <= L:
+                    room = _free(face, p, u)
+                    inside = min(t - lo, hi - t) + CATCH_MARGIN  # how far the catch keeps inside the surface
+                    score = min(room, inside)
+                    if room >= 0 and (best is None or score > best[0] + 1e-9):
+                        best = (score, [face, round(u, 2), round(gap, 4), top])
+        if best:
+            out.append(best[1])
     return out
 
 
@@ -179,7 +229,8 @@ def scad_table() -> str:
     """recipes/fitted_case/products.scad: one row per product a fitted case can hold."""
     lines = ["// GENERATED by tools/products_scad.py from src/smoothstone/products/*.json. Do not edit by hand.",
              "// Row: [slug, [w, d, h], open faces, PCB underside z (-1: not a board), standoffs [[x, y, d]],",
-             "//       windows [[face, u, v, half w, half h, round]], arm spots [[\"y\", [u -y, u +y]], [\"x\", [u -x, u +x]]]]",
+             "//       windows [[face, u, v, half w, half h, round]],",
+             "//       snap arms [[face, u, gap from the catch surface to the product's face, the surface's top z]]]",
              "// Product frame (evals/README.md): x width, y depth, z height, origin at the body's min corner.",
              "PRODUCTS = ["]
     rows = []
@@ -188,7 +239,7 @@ def scad_table() -> str:
         b = p["body"]
         board = p.get("board")
         pcb = float(board["pcb_underside_z"]) if board else -1.0
-        arms = [[k, v] for k, v in sorted(arm_spots(p).items(), key=lambda kv: kv[0] != "y")]
+        arms = snap_arms(p)
         rows.append("  " + _scad([slug, [float(b["w"]), float(b["d"]), float(b["h"])], list(p.get("open_faces", [])),
                                   pcb, standoffs(p), windows(p), arms]))
     lines.append(",\n".join(rows))

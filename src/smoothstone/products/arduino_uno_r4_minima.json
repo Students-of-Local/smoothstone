@@ -35,5 +35,10 @@
  "features": [],
  "sources": [
   "https://docs.arduino.cc/resources/datasheets/ABX00080-datasheet.pdf"
- ]
+ ],
+ "port_faces": {
+  "-x": "not located",
+  "+z": "not located"
+ },
+ "port_faces_why": "from this record's frame text (the spec's why), which says where the maker puts its ports, buttons and slots and whether it locates them"
 }

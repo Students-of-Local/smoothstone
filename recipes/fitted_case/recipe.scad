@@ -3,8 +3,10 @@
 // on its floor, open on top, no supports. Every feature the maker locates on a walled side gets a
 // window its plug passes through; faces whose features the maker does not locate stay open. A
 // board stands on standoffs at its mounting holes (or on two edge ledges), clear of the leads
-// under it. Retention: none, friction (a snug or TPU fit), or two cantilever snap arms cut free
-// from opposite walls with a catch over the product's top edge.
+// under it. Retention: none, friction (only where the fit is an interference, a gap at or below
+// zero), or a cantilever snap arm cut free from a wall, its catch over a part of the product the
+// catalog locates (snap_catch: for the Pi 5, the rear USB stack's shell, as GPT-6.1 Sol's gold
+// e01 part does). A product with no such surface gets no snap.
 // The per-face center-and-size cutouts follow YAPP_Box's idea (https://github.com/mrWheel/YAPP_Box,
 // MIT, Willem Aandewiel); no YAPP code is copied.
 use <lib/stone.scad>
@@ -31,9 +33,10 @@ PCB = R[3];                 // the board's underside in the product frame; -1 fo
 BOARD = PCB >= 0;
 STANDOFFS = BOARD ? R[4] : [];
 WINDOWS = R[5];
-ARMS = R[6];
+ARMS = R[6];                // [face, u, gap from the catch surface to the product's face, surface top z]
 OPEN = concat(R[2], style == "sleeve" ? ["+y"] : []);
 function open_face(f) = len([for (o = OPEN) if (o == f) 1]) > 0;
+assert(!open_face("-z"), str(product, "'s bottom must stay open, and a tray's floor would cover it: this recipe cannot hold it"));
 SIDES = ["+x", "-x", "+y", "-y"];
 OPEN_SIDES = len([for (f = SIDES) if (open_face(f)) 1]);
 
@@ -41,7 +44,11 @@ OPEN_SIDES = len([for (f = SIDES) if (open_face(f)) 1]);
 // PLA and PETG slip 0.15..0.45, snug 0.05..0.25, press -0.10..0.05; TPU -0.30..0.10 for every fit.
 C = material == "TPU" ? (fit == "slip" ? 0.05 : fit == "snug" ? -0.1 : -0.2)
   : (fit == "slip" ? 0.3 : fit == "snug" ? 0.15 : -0.02);
-RET = retention != "auto" ? retention : (material == "TPU" || fit != "slip") ? "friction" : "none";
+// Friction holds only where the part is tighter than the product (a gap at or below zero); the
+// grader checks only that the gap is in the fit's band, so a slip gap would pass there and grip nothing.
+RET = retention != "auto" ? retention : C <= 0 ? "friction" : "none";
+assert(RET != "friction" || C <= 0, str("a ", material, " ", fit, " fit leaves ", C,
+    " mm per side, which grips nothing: set fit=press (or material=TPU and fit=snug) for friction, or retention=none"));
 // Leads under a board: up to 2.5 mm below the PCB (IPC-A-610 class 2 lead protrusion as quoted
 // by https://aptpcb.com/en/blog/visual-inspection-checklist; the standard itself is sold), plus 0.25.
 LEADS = 2.75;
@@ -53,20 +60,26 @@ OW = W + 2 * (wall + C);     // outside size
 OD = D + 2 * (wall + C);
 RIM = OPEN_SIDES >= 3 ? min(1.5, 0.08 * H) : 0;  // a low rim on open sides when most sides are open
 
-// Snap arm: strain 1.5 y t / L^2 (Bayer cantilever, shape A) at 75% of the grader's limit.
+// Snap arm: strain 1.5 y t / L^2 (Bayer cantilever, shape A) at 75% of the grader's limit. Its catch
+// sits CATCH_GAP over the product's top and reaches past the catch surface's edge by SNAP_OVERLAP
+// even with the product pushed away from the arm's wall by its side clearance.
 LIMIT = material == "PLA" ? 0.02 : material == "PETG" ? 0.03 : 0.2;
-SNAP_Y = 1.0;                // the catch's overhang toward the product, mm
 SNAP_T = wall;
-SNAP_L = ceil(sqrt(1.5 * SNAP_Y * SNAP_T / (0.75 * LIMIT)));
-ARM_W = 6;
-ARM_SLOT = 1;
-CATCH = H + max(C, 0.2);     // the catch's underside, product frame z: just over the product's top
-ARM_TOP = CATCH + 0.4 + SNAP_Y;
-ARM_ROOT = ARM_TOP - SNAP_L;
-PAIRS = [for (a = ARMS) if (!open_face(a[0] == "y" ? "-y" : "-x") && !open_face(a[0] == "y" ? "+y" : "+x")) a];
+SNAP_OVERLAP = 0.25;
+CATCH_GAP = 0.3;             // catalog.CATCH_GAP: catch underside over the product's top
+CATCH_TIP = 1.2;             // the catch's thickness at its tip, at least the 1.2 mm wall floor
+ARM_W = 6;                   // catalog.ARM_W
+ARM_SLOT = 1;                // catalog.ARM_SLOT
+CATCH = H + CATCH_GAP;       // the catch's underside, product frame z
+ARMS_OK = [for (a = ARMS) if (!open_face(a[0])) a];
+function arm_y(a) = a[2] + 2 * max(C, 0) + SNAP_OVERLAP;
+function arm_l(a) = ceil(sqrt(1.5 * arm_y(a) * SNAP_T / (0.75 * LIMIT)));
+function arm_top(a) = CATCH + CATCH_TIP + arm_y(a);
+function arm_root(a) = arm_top(a) - arm_l(a);
 if (RET == "snap") {
-    assert(len(PAIRS) > 0, "no two opposite walls have room for snap arms: set retention=friction or none");
-    assert(ARM_ROOT >= FLOOR_TOP + 1, "the product is too low for snap arms: set retention=friction or none");
+    assert(len(ARMS_OK) > 0, str("a snap catch must bear on a part of the product the catalog locates, and ", product,
+        " has none by a closed wall: set retention=friction or none"));
+    for (a = ARMS_OK) assert(arm_root(a) >= FLOOR_TOP + 1, "the product is too low for snap arms: set retention=friction or none");
 }
 
 // A side face's local frame: u along the face (README table), v up, n out of the product.
@@ -112,25 +125,21 @@ module supports() {
         translate([x0, 4, FLOOR_TOP - 0.01]) cube([2 + C + wall, D - 8, PCB - FLOOR_TOP + 0.01]);
 }
 
-function snap_pair() = PAIRS[0];
-function snap_faces() = snap_pair()[0] == "y" ? ["-y", "+y"] : ["-x", "+x"];
-
 module arm_slots() {
-    for (i = [0, 1]) on_face(snap_faces()[i]) for (s = [-1, 1]) {
-        ua = snap_pair()[1][i];
-        u0 = s < 0 ? ua - ARM_W / 2 - ARM_SLOT : ua + ARM_W / 2;
-        translate([u0, ARM_ROOT, min(C, 0) - 0.5]) cube([ARM_SLOT, H - ARM_ROOT + 1, wall + abs(C) + 2]);
+    for (a = ARMS_OK) on_face(a[0]) for (sd = [-1, 1]) {
+        u0 = sd < 0 ? a[1] - ARM_W / 2 - ARM_SLOT : a[1] + ARM_W / 2;
+        translate([u0, arm_root(a), min(C, 0) - 0.5]) cube([ARM_SLOT, H - arm_root(a) + 1, wall + abs(C) + 2]);
     }
 }
 
 // each arm above the wall's top, with its catch on the product side: (n, v) profile run along u
 module arm_tops() {
-    for (i = [0, 1]) on_face(snap_faces()[i]) {
-        ua = snap_pair()[1][i];
-        translate([ua - ARM_W / 2, H - 0.01, C]) cube([ARM_W, ARM_TOP - H + 0.01, wall]);
-        multmatrix([[0, 0, 1, ua - ARM_W / 2], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+    for (a = ARMS_OK) on_face(a[0]) {
+        y = arm_y(a);
+        translate([a[1] - ARM_W / 2, H - 0.01, C]) cube([ARM_W, arm_top(a) - H + 0.01, wall]);
+        multmatrix([[0, 0, 1, a[1] - ARM_W / 2], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
             linear_extrude(ARM_W)
-                polygon([[C + 0.01, CATCH], [C - SNAP_Y, CATCH], [C - SNAP_Y, CATCH + 0.4], [C + 0.01, ARM_TOP]]);
+                polygon([[C + 0.01, CATCH], [C - y, CATCH], [C - y, CATCH + CATCH_TIP], [C + 0.01, arm_top(a)]]);
     }
 }
 
@@ -155,8 +164,12 @@ case_part();
 // product frame's place in the part, the clearance, and the snap arm as built.
 echo(stone_fit = [OX, OY, OZ, C, BOARD ? 0 : max(C, 0), wall, floor, RET]);
 if (RET == "snap") {
-    f = snap_faces()[0];
-    p = face_pt(f, snap_pair()[1][0], ARM_ROOT, C + wall / 2);
-    t = -face_n(f);
-    echo(stone_snap = [p[0] + OX, p[1] + OY, p[2] + OZ, t[0], t[1], t[2], ARM_W, SNAP_Y, SNAP_T, ARM_TOP - ARM_ROOT]);
+    a = ARMS_OK[0];
+    p = face_pt(a[0], a[1], arm_root(a), C + wall / 2);
+    t = -face_n(a[0]);
+    echo(stone_snap = [p[0] + OX, p[1] + OY, p[2] + OZ, t[0], t[1], t[2], ARM_W, arm_y(a), SNAP_T, arm_top(a) - arm_root(a)]);
+    // each catch's plan footprint and underside, product frame: [x0, x1, y0, y1, underside z]
+    echo(stone_catch = [for (b = ARMS_OK) let(
+        p0 = face_pt(b[0], b[1] - ARM_W / 2, CATCH, C - arm_y(b)), p1 = face_pt(b[0], b[1] + ARM_W / 2, CATCH, C))
+        [min(p0[0], p1[0]), max(p0[0], p1[0]), min(p0[1], p1[1]), max(p0[1], p1[1]), CATCH]]);
 }
