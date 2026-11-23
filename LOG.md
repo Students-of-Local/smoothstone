@@ -708,3 +708,56 @@ Open:
   enclosing cylinder. Apple publishes no profile for the rounded HomePod mini and does not locate its
   power cable, which a closed floor and walls would trap. The grader sees neither.
 - The held-out x01 and x02 were not run or read.
+
+### Round 2: what the real model runs showed
+
+Before (round 1 code, card S, Ollama, seeds 1 to 3 on e11 and e12): LFM3-1.7B 1 pass, 3 fail, 2 crashed
+(e11 s1 and s3 left no log.json; the error itself was not kept); LFM2.5-24B-A2B 0 pass, 6 fail, 0 crashed.
+The logs showed models noting stone's question instead of asking it, a round product asked for a depth
+its maker does not give, sizes set on the recipe with nowhere to go, and a call written as text.
+
+Stone's text and rules:
+
+- At the ask, NEXT comes first and the note hint after it: "After the person answers (not before):
+  stone note ...". The output contract allows that one line below an ask's NEXT, and nothing else.
+- `stone note` refuses a note that is the question: the question itself, a restatement with no number
+  or URL of its own, or a note with no number or URL that asks for a size or speaks to the person
+  ("please provide", "where did you get them"). The person answers as "I"; stone's question says
+  "you". Before this, "your own ruler" in a noted question became the source "measured by the person".
+- While the job waits on an unknown product's size, `stone set` with sizes gives FIX and NEXT = the
+  exact `stone product add` line, sourced from what the person's answer already gave through
+  stone note, else a placeholder to fill.
+- A round product (round_case on top, or the request says round, cup, puck or disc) is asked its
+  diameter and height. stone note reads "97.9 x ? x 84.3", and a width and height with no depth, as
+  diameter and height; `stone product add --round --size D H` takes the two numbers.
+
+Harness change (evals/drivers.py, evals/run.py), apart from stone's text: when a reply has no
+tool_calls, the openai driver runs a `<function=stone><parameter=command>...` call written as text,
+logs the step with "text_call": true, and the score line counts them. No after run used it.
+
+Checks on d5d2f42: `--driver next` 12 of 12 (e01 to e12); the suite and timing test pass; ratchet holds.
+
+After (same models, card S, seeds 1 to 3; out under the climb4 scratchpad after/):
+
+| Model | e11 s1 | e11 s2 | e11 s3 | e12 s1 | e12 s2 | e12 s3 | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| LFM3-1.7B | fail | fail | pass | pass | fail | crash (HTTP 500) | 2 pass, 3 fail, 1 crash |
+| LFM2.5-24B-A2B | fail | fail | fail | fail | fail | fail | 0 pass, 6 fail |
+
+LFM3 ran on 8a38fce. 24B e11 s1 ran on 8a38fce; the rest ran on 31005b6. On 8a38fce, 24B e11 s2 failed
+sources (its noted question became the source); on 31005b6 the note was refused, and it failed fit.
+24B e12 s2's source leak is what d5d2f42 fixes; it was not rerun.
+
+Why they fail now: in 11 of 12 runs the model never ran stone note after the person answered. It ran
+`stone set <recipe> width=... depth=... height=...` with its own numbers, and the redirect turned them
+into the product add line. Every run that copied the maker's metric figures (197, 97.9) passed;
+every run that rounded or converted the inches (196, 195.58, 98) failed fit, 0.7 mm into the product.
+Other fails: LFM3 e12 s2 wrote `stone product add "X" size=97.9,97.9,84.3 round open z source=...`,
+which stone read as the name; 24B e12 s1 set `size=` on round_case, which no size key reads.
+
+Open:
+- A rule for the sizes a model sets itself: while the job waits on a product's size and stone note has
+  not read an answer, the set redirect could ask for `stone note "<the person's words>"` first, so
+  stone reads the maker's metric figure. That changes what the round 2 brief asked set to print,
+  so it is not made here.
+- `stone product add` could read the name=value words stone set takes (size=, source=, round, open).
