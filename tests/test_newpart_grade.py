@@ -106,3 +106,28 @@ def test_a_new_recipe_spec_wants_a_recipe_outside_the_catalog(tmp_path):
     g = run.grade_job(job, {"id": "x", "request": "r", "expect": BRACKET}, [])
     assert "recipe fan_guard is in the catalog (want a new one)" in g["why"]
     assert "new_recipe" not in g  # a catalog part is not measured as a new one
+
+
+def test_a_changed_shared_helper_fails_the_run(tmp_path):
+    job = tmp_path / "job"
+    shutil.copytree(ROOT / "recipes", job / "recipes")
+    lib = job / "recipes" / "lib" / "stone.scad"
+    lib.write_text(lib.read_text() + "\n// a model's edit\n")
+    g = run.grade_job(job, json.loads((ROOT / "evals" / "tuning" / "t1_fan_guard.json").read_text()), [])
+    assert "changed catalog recipes: lib" in g["why"]
+
+
+def test_a_new_recipe_may_not_loosen_its_own_print_checks(tmp_path):
+    p = tmp_path / "recipe.json"
+    p.write_text(json.dumps({"name": "cap", "max_overhang": 0.89, "min_wall": 0.4}))
+    assert npg.limits(p) == ["recipe.json sets max_overhang 0.89 (at most 0.06)",
+                             "recipe.json sets min_wall 0.4 (at least 1.2 mm)"]
+    p.write_text(json.dumps({"name": "cap", "max_overhang": 0.05, "min_wall": 1.2}))
+    assert npg.limits(p) == []
+
+
+def test_a_sheet_that_runs_too_long_fails(tmp_path, monkeypatch):
+    def slow(*a, **k):
+        raise npg.subprocess.TimeoutExpired(a[0], k["timeout"])
+    monkeypatch.setattr(npg.subprocess, "run", slow)
+    assert npg.sheet("cap", tmp_path, tmp_path / "out", tmp_path, timeout=5) == ["sheet: tools/sheet.py took over 5 s"]

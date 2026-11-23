@@ -13,6 +13,8 @@ expect: {"new_recipe": true,
   cuts counts once, sized by the median of its cuts. `count` is exact: the part has that many
   openings of that kind and size.
 - The new recipe passes tools/sheet.py: its defaults and every example build and pass the print checks.
+- Its recipe.json does not loosen the print checks past card L's rules (no overhang past 45 degrees,
+  walls of at least 1.2 mm), so a recipe cannot pass the sheet by setting its own limits.
 """
 from __future__ import annotations
 
@@ -28,6 +30,9 @@ STEP = 0.5  # mm between cuts
 ROUND = 0.85  # 4 pi A / P^2 at or above: a round opening (a 6 sided one is 0.91)
 RECT = 0.8  # area over its bounding box at or above: a rectangular opening (a rounded corner keeps it)
 SAME = 1.0  # mm: openings on one axis with centers this close are the same opening
+MAX_OVERHANG = 0.06  # the most any catalog part but a figure or lithophane allows
+MIN_WALL = 1.2  # mm, card L's least wall
+SHEET_TIMEOUT = 1800  # s for tools/sheet.py on one recipe
 
 # each axis turned onto z, so manifold3d's slice cuts square to it
 TURN = {"z": [0, 0, 0], "x": [0, -90, 0], "y": [90, 0, 0]}
@@ -115,11 +120,30 @@ def check(stl: Path, expect: dict) -> tuple[list[str], dict]:
     return why, measured
 
 
-def sheet(recipe: str, recipes: Path, out: Path, stone_bin: Path) -> list[str]:
+def limits(recipe_json: Path) -> list[str]:
+    """Each print limit the new recipe's recipe.json sets looser than card L allows."""
+    import json
+
+    try:
+        r = json.loads(recipe_json.read_text())
+    except (OSError, ValueError):
+        return []  # the recipe already failed to load, and that is reported
+    why = []
+    if isinstance(r.get("max_overhang"), (int, float)) and r["max_overhang"] > MAX_OVERHANG:
+        why.append(f"recipe.json sets max_overhang {r['max_overhang']} (at most {MAX_OVERHANG})")
+    if isinstance(r.get("min_wall"), (int, float)) and r["min_wall"] < MIN_WALL:
+        why.append(f"recipe.json sets min_wall {r['min_wall']} (at least {MIN_WALL} mm)")
+    return why
+
+
+def sheet(recipe: str, recipes: Path, out: Path, stone_bin: Path, timeout: int = SHEET_TIMEOUT) -> list[str]:
     """tools/sheet.py on the new recipe, from the run's recipes: each line that is not PASS."""
     env = {**os.environ, "STONE_RECIPES": str(recipes), "PATH": str(stone_bin) + os.pathsep + os.environ.get("PATH", "")}
-    p = subprocess.run([sys.executable, str(ROOT / "tools" / "sheet.py"), recipe, "--out", str(out)],
-                       capture_output=True, text=True, env=env, cwd=ROOT)
+    try:
+        p = subprocess.run([sys.executable, str(ROOT / "tools" / "sheet.py"), recipe, "--out", str(out)],
+                           capture_output=True, text=True, env=env, cwd=ROOT, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return [f"sheet: tools/sheet.py took over {timeout} s"]
     lines = [l for l in p.stdout.splitlines() if l.startswith(recipe)]
     bad = [" ".join(l.split()) for l in lines if " PASS " not in f" {l} "]
     if p.returncode and not bad:

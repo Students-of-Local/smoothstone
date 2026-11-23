@@ -397,7 +397,9 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
     elif not spec.get("product") and recipe != exp["recipe"]:
         why.append(f"recipe {recipe} (want {exp['recipe']})")
     if root is not None:
-        changed = [n for n in catalog if _tree_sha(root / n) != _tree_sha(ROOT / "recipes" / n)]
+        # every folder the catalog ships, lib/ (the shared helpers) included, stays as it was
+        shipped = sorted(d.name for d in (ROOT / "recipes").iterdir() if d.is_dir())
+        changed = [n for n in shipped if _tree_sha(root / n) != _tree_sha(ROOT / "recipes" / n)]
         if changed:
             why.append("changed catalog recipes: " + ", ".join(changed))
     for k, want in exp.get("params", {}).items():
@@ -436,7 +438,7 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         npg = newpart_grade()
         w, new = npg.check(final, exp)
         new["sheet"] = npg.sheet(recipe, root, job.parent / "sheet", Path(STONE).parent)
-        why += w + new["sheet"]
+        why += w + npg.limits(root / recipe / "recipe.json") + new["sheet"]
     eng = None
     if spec.get("product"):
         eng = engineering_grade().grade(job, spec, final if done else None)
