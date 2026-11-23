@@ -171,8 +171,14 @@ def main():
 
     # the environment, set up before the model starts: the job with the request (and pictures)
     setup, photos = setup_job(spec, spec_path, a.seed, env, rdir)
+    if a.card == "L":
+        # tier L may write a recipe: stone reads the run's own copy of the catalog, where it goes
+        shutil.copytree(ROOT / "recipes", job / "recipes")
+        env["STONE_RECIPES"] = str(job / "recipes")
 
     system = SYSTEM + ("\n" + drivers.CLI_NOTE if a.driver in ("claude", "codex") else "")
+    if a.card == "L" and a.driver in ("claude", "codex"):
+        system += " " + drivers.CLI_NOTE_L
     card_sha = None
     if a.card != "none":
         card = (ROOT / "skill" / "tiers" / f"{a.card}.md").read_text()
@@ -314,7 +320,7 @@ def cli_run(a, log: dict, messages: list, system: str, prompt: str, env: dict, j
     """One phase through claude or codex: its transcript joins the messages and steps, its call
     (the prompt and card left out), exit, time and error join log["cli"]. Returns the session."""
     got = drivers.cli_phase(a.driver, a.model, system, prompt, env, Path(STONE).parent, job, rdir, phase,
-                            session, a.cli_timeout)
+                            session, a.cli_timeout, write_recipes=a.card == "L")
     messages += got["messages"]
     log["steps"] += got["steps"]
     log["cli"].append({k: got[k] for k in ("argv", "exit", "seconds", "error", "usage", "session", "init", "stderr")})
@@ -374,6 +380,8 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
     if not done:
         why.append("no finished part")
     exp = spec["expect"]
+    # a tier L run's own recipes (a copy of the catalog, plus any recipe the model wrote)
+    root = job / "recipes" if (job / "recipes").is_dir() else None
     if exp.get("asks"):
         # a part that must fit something with no size given: the right move is a question, not a part
         last = next((m.get("content") or "" for m in reversed(messages or []) if m["role"] == "assistant"), "")
@@ -382,8 +390,16 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
                 "checks": [], "stl": None, "stl_sha256": None}
     # an engineering spec (evals/engineering) names the product and the job, not the recipe; any
     # other spec must name its recipe, so a typo there still raises
-    if not spec.get("product") and recipe != exp["recipe"]:
+    catalog = sorted(p.parent.name for p in (ROOT / "recipes").glob("*/recipe.json"))
+    if exp.get("new_recipe"):
+        if recipe in catalog:
+            why.append(f"recipe {recipe} is in the catalog (want a new one)")
+    elif not spec.get("product") and recipe != exp["recipe"]:
         why.append(f"recipe {recipe} (want {exp['recipe']})")
+    if root is not None:
+        changed = [n for n in catalog if _tree_sha(root / n) != _tree_sha(ROOT / "recipes" / n)]
+        if changed:
+            why.append("changed catalog recipes: " + ", ".join(changed))
     for k, want in exp.get("params", {}).items():
         got = params.get(k)
         ok = (isinstance(want, list) and isinstance(got, (int, float)) and want[0] <= got <= want[1]) or \
@@ -398,8 +414,12 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         why.append("the picture was not used")
     res = []
     if done and recipe:
-        r = rc.load(recipe)
-        res = [x.to_dict() for x in checks.check_stl(final, recipe=r, params=params)]  # the file that ships
+        try:
+            r = rc.load(recipe, root)
+        except (rc.RecipeError, KeyError, TypeError, ValueError) as e:  # a recipe.json the model wrote
+            r = None
+            why.append(f"the recipe does not load: {e}")
+        res = [x.to_dict() for x in checks.check_stl(final, recipe=r, params=params)] if r else []  # the file that ships
         bad = [x["name"] for x in res if not x["ok"]]
         if bad:
             why.append("print checks fail: " + ", ".join(bad))
@@ -411,6 +431,12 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
                 why.append(f"starts in the air at a slicer's resolution: {air['detail']}")
     if exp.get("found"):
         why += grade_found(job, exp["found"])
+    new = None
+    if exp.get("new_recipe") and done and root is not None and recipe not in catalog:
+        npg = newpart_grade()
+        w, new = npg.check(final, exp)
+        new["sheet"] = npg.sheet(recipe, root, job.parent / "sheet", Path(STONE).parent)
+        why += w + new["sheet"]
     eng = None
     if spec.get("product"):
         eng = engineering_grade().grade(job, spec, final if done else None)
@@ -426,7 +452,27 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
         out["colors"] = col
     if eng is not None:
         out["engineering"] = eng["measured"]
+    if new is not None:
+        out["new_recipe"] = new
     return out
+
+
+def _tree_sha(d: Path) -> str | None:
+    """One hash of every file under a folder, by relative path, or None when it is missing."""
+    if not d.is_dir():
+        return None
+    h = hashlib.sha256()
+    for f in sorted(p for p in d.rglob("*") if p.is_file()):
+        h.update(str(f.relative_to(d)).encode() + b"\0" + f.read_bytes())
+    return h.hexdigest()
+
+
+def newpart_grade():
+    """evals/newpart_grade.py, for a spec whose part needs a new recipe (tier L, off-catalog)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import newpart_grade as npg
+
+    return npg
 
 
 def engineering_grade():

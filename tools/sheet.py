@@ -5,6 +5,7 @@ uv run python tools/sheet.py <recipe> [<recipe> ...] [--out DIR]
 Prints one line per build (PASS or the FIX lines) and writes DIR/<recipe>.png.
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
+# the recipes stone reads: STONE_RECIPES when set (a run's own copy, with the recipe a model wrote)
+RECIPES = Path(os.environ["STONE_RECIPES"]).resolve() if os.environ.get("STONE_RECIPES") else ROOT / "recipes"
 
 
 def run(job, *args):
@@ -38,11 +41,11 @@ def main():
     out = Path(args[args.index("--out") + 1]) if "--out" in args else ROOT / "build" / "sheets"
     recipes = [a for i, a in enumerate(args) if a != "--out" and (i == 0 or args[i - 1] != "--out")]
     if recipes == ["all"]:
-        recipes = sorted(p.name for p in (ROOT / "recipes").iterdir() if (p / "recipe.json").exists() and not p.name.startswith("_"))
+        recipes = sorted(p.name for p in RECIPES.iterdir() if (p / "recipe.json").exists() and not p.name.startswith("_"))
     out.mkdir(parents=True, exist_ok=True)
     failed = 0
     for r in recipes:
-        meta = json.loads((ROOT / "recipes" / r / "recipe.json").read_text())
+        meta = json.loads((RECIPES / r / "recipe.json").read_text())
         needs_image = any(p.get("required") for p in meta["params"] if p["type"] == "image")
         shots = ([] if needs_image else [build(r, "defaults", {}, out)]) + [build(r, e["name"], {**e["params"], **({"_image": e["image"]} if e.get("image") else {})}, out)
                                               for e in meta.get("examples", [])]
