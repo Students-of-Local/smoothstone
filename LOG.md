@@ -792,3 +792,28 @@ person's words, which gave 197 and 97.9. Runs are under the climb4 scratchpad af
 
 Open: a model that writes its own conversion into the note ("7.7 inches (196 mm)", 24B on aaf74a3)
 still gets its numbers; stone cannot tell them from the person's.
+
+### Round 4: PR 76 review round 1
+
+- A `stone set` with sizes while no note has read an answer no longer offers a `stone note
+  "<...>"` line to fill in: a model that had not asked yet filled it with its own guess. NEXT is the
+  ask itself, FIX says the sizes were not set, and the note line comes after NEXT. stone go stops on
+  the question and tells the person to run stone note with their answer, then stone go.
+- NEXT lines quote the product name, the source, a figure's name and recipe text with shlex.quote
+  where a shell would act on them; first_url stops at shell characters. Tests run the lines through
+  a real shell.
+- With several W x D x H triples in an answer, the metric one wins over inches.
+
+Checks on 885eff1: suite 891 passed, timing passed, `--driver next` e01 to e12 12 of 12. The ratchet
+holds against the merge base f2d5fa0 and on climb4 merged with origin/main, but not against
+origin/main alone: main gained floor groups (#73 to #75) since climb4 branched.
+
+| Model (card S, e11 and e12, seeds 1 to 3, run one model at a time) | Pass | Fail | Crash | Text calls |
+| --- | --- | --- | --- | --- |
+| LFM3-1.7B, round 4 | 4 | 0 | 2 (Ollama HTTP 400 e11 s2, HTTP 500 e12 s3) | 1 |
+| LFM2.5-24B-A2B, round 4 | 4 | 2 | 0 | 0 |
+
+The 24B lost two runs (e11 s1 and s3) because NEXT now asks while the person had already answered:
+after the answer it set sizes, got "ask the person" back 7 and 8 times, never ran stone note, and ran
+out of steps. In round 3 the same move led to stone note and a pass. An HTTP 400 came with one model
+alone on Ollama, so the crashes are not only from two models at once.
