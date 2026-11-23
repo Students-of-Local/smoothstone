@@ -119,3 +119,8 @@ def test_run_appends_a_score_line_and_never_rewrites(tmp_path, monkeypatch):
     a, b = json.loads(lines[1]), json.loads(lines[2])
     assert (a["suite"], a["pass"], a["total"], a["judge"]) == ("tuning", 1, 1, None)
     assert b["pass"] == 0 and b["judge"] == 7 and b["sha"]
+
+
+def test_the_sealed_heldout_set_is_guarded():
+    """Deleting a sealed held-out spec must trip --check-git like any tuning spec."""
+    assert "evals/engineering_heldout" in ratchet.GUARDED
