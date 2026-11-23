@@ -212,8 +212,9 @@ def find(text: str, only: list[str] | None = None) -> str | None:
 
 
 def first_url(text: str) -> str | None:
-    """The first http(s) URL in a source text, without trailing punctuation."""
-    m = re.search(r"https?://\S+", str(text or ""))
+    """The first http(s) URL in a source text, without trailing punctuation. It stops at a character a
+    shell acts on, so a URL on a NEXT line never carries a command."""
+    m = re.search(r"https?://[^\s`$()\[\];|&<>\"'\\{}]+", str(text or ""))
     return m.group(0).rstrip(".,;:)'\"") if m else None
 
 

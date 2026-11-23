@@ -464,7 +464,9 @@ def size_answer(text: str, name: str | None = None) -> dict:
     if name:
         rest = re.sub(re.escape(name), " ", rest, flags=re.I)
     out["round"] = bool(re.search(r"\b(?:diameter|round|across|disc|circular)\b|Ø", rest, re.I))
-    m = BY3_RE.search(rest)
+    found = list(BY3_RE.finditer(rest))
+    # "3.7 x 7.7 x 7.7 in (9.5 x 19.7 x 19.7 cm)": the metric triple is the one the maker printed
+    m = next((t for t in found if t.group(4) and t.group(4).lower()[0] in "mc"), found[0] if found else None)
     if m:
         out.update(w=_mm(m.group(1), m.group(4)), h=_mm(m.group(3), m.group(4)))
         if m.group(2) != "?":

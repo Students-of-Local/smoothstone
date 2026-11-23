@@ -9,6 +9,7 @@ import json
 import math
 import os
 import re
+import shlex
 import shutil
 import sys
 import time
@@ -633,13 +634,13 @@ def product_add_line(x: str, got: dict, round_: bool, open_faces: list[str]) -> 
     """The stone product add command for the size the person gave."""
     w, h = got["w"], got["h"]
     d = w if round_ else got["d"]
-    line = f'stone product add "{x.replace(chr(34), "")}" --size {rc.fmt_num(w)} {rc.fmt_num(d)} {rc.fmt_num(h)}'
+    line = f"stone product add {shlex.quote(x)} --size {rc.fmt_num(w)} {rc.fmt_num(d)} {rc.fmt_num(h)}"
     if round_:
         line += " --round"
     if open_faces:
         faces = ",".join(open_faces)
         line += f" --open={faces}" if faces.startswith("-") else f" --open {faces}"
-    return line + f' --source "{got["source"]}"'
+    return line + f" --source {shlex.quote(str(got['source']))}"
 
 
 def note_product(out: Out, job: Job, st: dict, text: str) -> Out:
@@ -834,7 +835,7 @@ def cmd_set(args, job: Job) -> Out:
         shown = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items() if r.param(k) is not None]
         from_request = " ".join(shown) or None
         # fmt_value quotes text with a space for a command line; here no shell takes the quotes off
-        items = [k + "=" + (json.loads(v) if v.startswith('"') else v)
+        items = [k + "=" + (json.loads(v) if v.startswith('"') else shlex.split(v)[0] if v.startswith("'") else v)
                  for k, v in (it.split("=", 1) for it in shown)]
     given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
     x = product_ask(job, r, t, named=any(p is not None and p.catalog for _, _, p in given))
@@ -850,10 +851,12 @@ def cmd_set(args, job: Job) -> Out:
             out.stage = "ask"
             noted = noted_answer(st, bool(rnd))
             if noted is None:
-                out.fix(f"these are {x}'s sizes, not the part's; stone reads them from the person's own words "
-                        "(the maker's metric figure when a page gives inches too), never from numbers you converted")
-                out.add(f"If the person has not answered yet, ask them: {match.product_size_question(x, bool(rnd))}")
-                out.next = 'stone note "<the person\'s words, copied exactly>"'
+                # never a placeholder to fill: a model that has not asked yet would fill it with its own guess
+                out.fix(f"the sizes were not set: stone takes {x}'s size only from the person's own words, "
+                        "never from numbers you converted or guessed")
+                out.next = f"ask the person: {match.product_size_question(x, bool(rnd))}"
+                out.after.append('After the person answers (not before): stone note "<their answer>", '
+                                 "then run the NEXT line it prints.")
                 out.result = "set refused: product sizes come from the person's noted words"
                 return out
             names = {"w": "diameter" if rnd else "width", "d": "depth", "h": "height"}
@@ -962,7 +965,7 @@ def cmd_set(args, job: Job) -> Out:
     who = photos_from(job) if r.name == "figure" and not job.photos() else None
     if who:
         out.add(f"Next the figure needs photos of {who}.")
-        out.next = f'stone find "{who}"'
+        out.next = f"stone find {shlex.quote(who)}"
     out.result = "plan " + (" ".join(changed_params(r, merged)) or "defaults")
     if args.reset:
         job.update(failed_builds=0)
@@ -1588,7 +1591,7 @@ def figure_step(job: Job, r: rc.Recipe, params: dict, out: Out) -> Path | None:
         who = photos_from(job)
         out.add(f"Recipe: {r.name}")
         out.fix("the figure needs photos" + (f" of {who}" if who else "") + " first")
-        out.next = f'stone find "{who}"' if who else "stone image <path to photo>"
+        out.next = f"stone find {shlex.quote(who)}" if who else "stone image <path to photo>"
         out.stage = "needs_image"
         out.result = "needs photos"
         return None
@@ -1944,14 +1947,14 @@ def canonical_add_line(args) -> str:
     size = list(args.size)
     if args.round and len(size) == 2:
         size = [size[0], size[0], size[1]]  # written as stone writes a round one: the diameter twice
-    line = f'stone product add "{str(args.name).replace(chr(34), "")}" --size {" ".join(rc.fmt_num(v) for v in size)}'
+    line = f"stone product add {shlex.quote(str(args.name))} --size {' '.join(rc.fmt_num(v) for v in size)}"
     if args.round:
         line += " --round"
     if args.corner_r is not None:
         line += f" --corner-r {rc.fmt_num(args.corner_r)}"
     if args.open:
         line += f" --open={args.open}" if args.open.startswith("-") else f" --open {args.open}"
-    return line + f' --source "{args.source}"'
+    return line + f" --source {shlex.quote(str(args.source))}"
 
 
 def cmd_product(args, job: Job) -> Out:
@@ -1974,12 +1977,14 @@ def cmd_product(args, job: Job) -> Out:
         if name and args.source and (len(args.size or []) == 3 or (args.round and len(args.size or []) == 2)):
             out.next = canonical_add_line(args)
         else:
-            out.next = f'stone product add "{name or "<name>"}" --size W D H --source "<URL or measured by the person>"'
+            out.next = (f"stone product add {shlex.quote(name) if name else chr(34) + '<name>' + chr(34)} "
+                        '--size W D H --source "<URL or measured by the person>"')
         out.result = "product refused: words it could not read"
         return out
     again = job.status().get("next") or "stone recipes"
     size = list(args.size or [])
-    usage = f'stone product add "{name or "<name>"}" --size W D H --source "<URL or measured by the person>"'
+    usage = (f"stone product add {shlex.quote(name) if name else chr(34) + '<name>' + chr(34)} "
+             '--size W D H --source "<URL or measured by the person>"')
     if not args.source or not str(args.source).strip():
         out.fix("give --source: the maker's spec page URL, or \"measured by the person\"; "
                 "stone never estimates a size, so a size with no source is not used")
