@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import json
 import math
@@ -328,26 +329,105 @@ def cmd_recipes(args, job: Job) -> Out:
     if len(ranked) > 12:
         out.add(f"({len(ranked) - 12} more: add words to narrow the list)")
     top = ranked[0][1].name
+    if query and not words:
+        why = product_reason(ranked[0][1], query)
+        if why:
+            out.lines.insert(0, why)
     out.next = f"stone show {top}"
     out.result = f"listed recipes, top {top}"
     return out
 
 
+def product_reason(r: rc.Recipe, request: str) -> str | None:
+    """Why the first recipe is the one, when the request names a catalog product it takes: its title
+    ("Fitted case for a product") does not say sleeve or stand, and a small model doubts a NEXT line
+    whose recipe does not echo the request's words."""
+    slug = catalog.find(request)
+    prod = catalog.get(slug) if slug else None
+    if prod is None or not takes(r, slug) or rc.fit(r, request) <= 0:
+        return None
+    h = rc.head(request)
+    noun = h[-1] if h and h[-1].isalpha() and h[-1] not in rc.STOPWORDS else "part"
+    return f"For this request: {r.name} makes the {noun} for the {prod['name']} from its published sizes."
+
+
 # show
 
 
-def unknown_recipe(name: str, out: Out, t: str) -> Out:
+def request_recipe(request: str, t: str) -> rc.Recipe | None:
+    """The recipe stone recipes puts first for the request when it makes what the request names
+    (fit above 0), else None."""
+    if not request:
+        return None
+    ranked = rc.rank(rc.visible(rc.load_all(), t), request)
+    if not ranked:
+        return None
+    fits = {r.name: rc.fit(r, request) for _, r in ranked}
+    ranked.sort(key=lambda sr: -fits[sr[1].name])
+    top = ranked[0][1]
+    return top if fits[top.name] > 0 else None
+
+
+def unknown_recipe(name: str, out: Out, t: str, job: Job | None = None) -> Out:
     allr = rc.load_all()
     # hidden recipes (names starting with _) only when the model typed a _ name
     names = [r.name for r in rc.visible(allr, t, show_all=name.startswith("_"))] or list(allr)
     near = rc.closest(name, names)
+    # a made up name ("power_bank_case") is not a typo of the nearest name (phone_case): the recipe
+    # that makes what the request names comes first, so a guessed name never sends a power bank to a phone case
+    best = request_recipe(job.request() if job is not None and job.exists() else "", t)
+    typo = bool(near) and difflib.SequenceMatcher(None, name.lower(), near[0]).ratio() >= 0.85
     if near:
         out.fix(f'no recipe "{name}"; closest: {", ".join(near)}')
         out.next = f"stone show {near[0]}"
     else:
         out.fix(f'no recipe "{name}"; pick one from stone recipes')
         out.next = "stone recipes"
+    if best is not None and not typo and (not near or best.name != near[0]):
+        out.add(f"For this request: {best.name} ({best.title})")
+        out.next = f"stone show {best.name}"
     out.result = f"unknown recipe {name}"
+    return out
+
+
+def product_param(r: rc.Recipe) -> rc.Param | None:
+    """The parameter that names the real product the part fits (phone, product), if the recipe has one."""
+    return next((p for p in r.params if p.product or p.catalog), None)
+
+
+def takes(r: rc.Recipe, slug: str) -> bool:
+    """The recipe's product parameter can be set to this catalog product."""
+    pp = product_param(r)
+    return pp is not None and slug in [str(c) for c in pp.choices]
+
+
+def other_product_recipe(job: Job, r: rc.Recipe, t: str) -> tuple[rc.Recipe, dict, bool] | None:
+    """When the request names a catalog product and the recipe stone recipes puts first takes it and
+    fits the request better than this one, which either makes nothing the request names (phone_case
+    for a Flipper Zero) or cannot take the product (a phone stand sized by guess for an iPhone 17 Pro
+    the catalog holds): that recipe, the product, and whether this one could take it."""
+    request = job.request() if job.exists() else ""
+    if not request:
+        return None
+    slug = catalog.find(request)
+    prod = catalog.get(slug) if slug else None
+    if prod is None:
+        return None
+    best = request_recipe(request, t)
+    if best is None or best.name == r.name or not takes(best, slug):
+        return None
+    own = rc.fit(r, request)
+    if own >= rc.fit(best, request) or (own > 0 and takes(r, slug)):
+        return None
+    return best, prod, takes(r, slug)
+
+
+def steer(out: Out, r: rc.Recipe, alt: tuple[rc.Recipe, dict, bool]) -> Out:
+    best, prod, could = alt
+    why = "does not make what the request names" if could else f"does not fit the {prod['name']} the request names"
+    out.fix(f"{r.name} {why}; {best.name} ({best.title}) makes it to its published sizes")
+    out.next = f"stone show {best.name}"
+    out.result = f"{r.name} is not for this request, use {best.name}"
     return out
 
 
@@ -397,6 +477,19 @@ def show_json(r: rc.Recipe | None, name: str, job: Job, t: str) -> Out:
     return out
 
 
+def param_line(p: rc.Param, short: bool = False) -> str:
+    """One parameter for stone show. A product the request or the person must name has no default
+    shown: a default product (raspberry_pi_5) beside a request for a Flipper Zero reads as a contradiction."""
+    rng = " | ".join(str(c) for c in p.choices) if short and p.type == "choice" else p.range_text()
+    if p.product or p.catalog:
+        line = f"{p.name} = (no default: the exact one the request names, else ask)  ({rng})"
+    else:
+        line = f"{p.name} = {rc.fmt_value(p, p.default)}  ({rng})"
+    if p.help and not short:
+        line += f" {p.help}"
+    return line
+
+
 def cmd_show(args, job: Job) -> Out:
     out = Out(owns_next=False, stage="show")
     t = config.tier(job.root)
@@ -404,43 +497,60 @@ def cmd_show(args, job: Job) -> Out:
     if getattr(args, "json", False):
         return show_json(r, args.recipe, job, t)
     if r is None:
-        return unknown_recipe(args.recipe, out, t)
+        return unknown_recipe(args.recipe, out, t, job)
+    alt = other_product_recipe(job, r, t)
+    if alt is not None:
+        return steer(out, r, alt)
+    request = job.request() if job.exists() else ""
+    sug, left = match.suggest_full(r, request) if request else ({}, [])
+    ms = measured_size(job, r) if job.exists() else None
+    # tier S, and the request gives every value the part needs: what the request filled and the NEXT
+    # line come first, the rest one short line each, so a small model is not made to re-read a long list
+    pp = product_param(r)
+    short = (bool(request) and not left and t == "S" and not getattr(args, "all", False)
+             and not (ms and ms[0] not in sug) and (pp is None or pp.name in sug)
+             and not (job.photos() and any(p.type == "image" for p in r.params)))
     out.add(f"{r.name}: {r.title}")
     if r.summary:
         out.add(r.summary)
     size = default_size(r)
-    out.add(f"Tier {r.tier}." + (f" Default size {size}." if size else ""))
-    request = job.request() if job.exists() else ""
-    sug, left = match.suggest_full(r, request) if request else ({}, [])
+    if not short:
+        out.add(f"Tier {r.tier}." + (f" Default size {size}." if size else ""))
+    items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items()]
     if sug:
-        items = [f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items()]
         out.add(f"From the request: {' '.join(items)}")
     cp = rc.catalog_param(r)
     if cp is not None and sug.get(cp.name):
         prod = catalog.get(str(sug[cp.name]))
         if prod:
             out.add(f"Product: {prod['name']} (catalog, sourced: {', '.join(prod.get('sources', [])[:1])})")
-    ms = measured_size(job, r) if job.exists() else None
     if ms and ms[0] not in sug:
         clamp = f", the measured {rc.fmt_num(ms[2])} mm is out of range" if ms[1] != ms[2] else ""
         out.add(f"From the picture: {ms[0]}={rc.fmt_num(ms[1])} (object long side in mm{clamp})")
     if left:
         out.add(f"Not placed yet: {'; '.join(left[:4])}. If one is a size of this part, add it with its parameter name.")
+    elif short:
+        out.add("The NEXT line below already holds " + ("every value the request gives" if sug else "the defaults, which make a good part")
+                + "; run it as written.")
     elif request and not sug:
         out.add("Nothing in the request names a parameter; the defaults make a good part.")
     out.add(*reference_block(job, r, {p.name: p.default for p in r.params} | sug, request))
-    out.add("Parameters (name = default):")
+    rest = [p for p in r.params if p.name not in sug] if short else list(r.params)
+    if short:
+        out.add(f"Parameters left at their defaults (stone show {r.name} --all explains each):")
+    else:
+        out.add("Parameters (name = default):")
     room = MAX_LINES - len(out.lines) - 3
-    for i, p in enumerate(r.params):
+    for i, p in enumerate(rest):
         if i >= room:
-            out.add(f"({len(r.params) - room} more parameters not shown)")
+            out.add(f"({len(rest) - room} more parameters not shown)")
             break
-        line = f"{p.name} = {rc.fmt_value(p, p.default)}  ({p.range_text()})"
-        if p.help:
-            line += f" {p.help}"
-        out.add(line)
+        out.add(param_line(p, short))
     ex = example_items(r)
-    if ex:
+    if pp is not None and pp.name in sug:
+        # an example for another product (product=raspberry_pi_5) beside a Flipper Zero request misleads
+        ex = [e for e in ex if e.split("=", 1)[0] != pp.name]
+    if ex and not short:
         out.add(f"Example: stone set {r.name} {' '.join(ex)}")
     if request:
         out.next = f"stone set {r.name} {' '.join(items) if sug else ''}".rstrip()
@@ -522,7 +632,10 @@ def cmd_set(args, job: Job) -> Out:
             items.insert(0, name)
             r = rc.load(plan["recipe"])
         else:
-            return unknown_recipe(name, out, t)
+            return unknown_recipe(name, out, t, job)
+    alt = other_product_recipe(job, r, t)
+    if alt is not None:
+        return steer(out, r, alt)
     from_request = None
     if not items and not args.reset and not (plan and plan["recipe"] == r.name) and job.request():
         # a bare "stone set <recipe>" means the request's values, the ones stone show offers
@@ -2433,6 +2546,7 @@ def make_parser() -> Parser:
     s = sub.add_parser("show", parents=[common], help="show a recipe's parameters")
     s.add_argument("recipe")
     s.add_argument("--json", action="store_true", help="print the recipe and the job's values as one JSON object")
+    s.add_argument("--all", action="store_true", help="every parameter with its meaning, even when the request fills the part")
 
     s = sub.add_parser("set", parents=[common], help="set recipe parameters")
     s.add_argument("items", nargs="*")

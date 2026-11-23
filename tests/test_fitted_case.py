@@ -321,3 +321,97 @@ def test_pins_hold_the_board_so_it_slides_no_farther_than_the_pin_play(openscad,
         slide = hole / 2 - min(radii)
         assert 0 <= slide <= catalog.PIN_PLAY / 2 + 0.02, (x, y, slide)
         assert slide <= travel + 0.02
+
+
+def _stone(*argv):
+    text, code = cli.run(list(argv))
+    found = re.findall(r"^NEXT: (.+)$", text, re.M)
+    return text, code, found[-1].strip() if found else None
+
+
+def test_show_for_a_filled_request_is_short_and_leads_with_next(jobenv, monkeypatch):
+    """Climb 3, LFM3-1.7B on e02: after stone show fitted_case it spent its whole 2048 token budget
+    re-reading the parameter list (every choice and help line) and stopped with no tool call. When
+    the request fills what the part needs, tier S show says the NEXT line is ready first and lists the
+    rest one short line each; --all and tier M keep the full list."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _stone("new", "a case for my Flipper Zero")
+    text, code, nxt = _stone("show", "fitted_case")
+    assert code == 0 and nxt == "stone set fitted_case product=flipper_zero", text
+    lines = text.splitlines()
+    ready = next(i for i, ln in enumerate(lines) if "NEXT line below already holds" in ln)
+    params = next(i for i, ln in enumerate(lines) if ln.startswith("Parameters"))
+    assert ready < params and lines.index("From the request: product=flipper_zero") < ready, text
+    assert len(lines) <= 16, text
+    assert "the snap arm" not in text and "Example:" not in text and "Tier S." not in text, text
+    assert "style = tray  (tray | sleeve)" in text and "product =" not in text, text
+    full, _, nxt2 = _stone("show", "fitted_case", "--all")
+    assert nxt2 == nxt and "snap arm" in full and len(full.splitlines()) > len(lines), full
+    monkeypatch.setenv("STONE_TIER", "M")
+    full_m, _, _ = _stone("show", "fitted_case")
+    assert "snap arm" in full_m, full_m
+
+
+def test_a_product_the_request_must_name_shows_no_wrong_default(jobenv, monkeypatch):
+    """Climb 3, LFM3-1.7B on e02: show printed product = raspberry_pi_5 as the default beside NEXT
+    product=flipper_zero, and the model reasoned over which one was right. A product parameter shows
+    no default, and an example for another product is left out."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _stone("new", "a case for my Flipper Zero")
+    text, _, nxt = _stone("show", "fitted_case", "--all")
+    assert nxt == "stone set fitted_case product=flipper_zero"
+    assert "raspberry_pi_5" not in text.replace("| raspberry_pi_5", ""), text
+    assert "product = (no default" in text, text
+    _stone("new", "a phone case", "--force")
+    text, _, _ = _stone("show", "phone_case")
+    assert "phone = (no default" in text and "phone = iphone_17_pro " not in text, text
+
+
+@pytest.mark.parametrize("request_, want", [
+    ("A case for an ABX00080.", "fitted_case"),
+    ("a snug TPU sleeve for my Anker Power Bank (10000mAh, 22.5W)", "fitted_case"),
+    ("a case for my Flipper Zero", "fitted_case"),
+    ("a desk stand that holds my iPhone 17 Pro upright in portrait so I can plug in USB-C", "product_holder"),
+])
+def test_phone_case_sends_a_product_it_does_not_fit_to_the_recipe_that_does(request_, want, jobenv, monkeypatch):
+    """Climb 3, LFM2.5-24B-A2B on e03 and e10: it skipped stone recipes, ran stone show phone_case for a
+    power bank and an Arduino ("ABX00080"), set phone=iphone_17_pro and asked "What phone model...".
+    show and set of a recipe that cannot take the catalog product the request names point to the one
+    that can, and a made up recipe name goes to the request's recipe, not the nearest name."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _stone("new", request_)
+    text, code, nxt = _stone("show", "phone_case")
+    assert code == 1 and nxt == f"stone show {want}", text
+    text, code, nxt = _stone("set", "phone_case", "phone=iphone_17_pro")
+    assert code == 1 and nxt == f"stone show {want}" and not (jobenv / "stone-job" / "plan.json").exists(), text
+    text, code, nxt = _stone("show", "power_bank_case")
+    assert code == 1 and nxt == f"stone show {want}", text
+
+
+def test_an_iphone_case_still_goes_to_phone_case(jobenv, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _stone("new", "A case for my iPhone 17 Pro Max in TPU.")
+    text, code, nxt = _stone("show", "phone_case")
+    assert code == 0 and nxt == "stone set phone_case phone=iphone_17_pro_max material=tpu", text
+    text, code, nxt = _stone("show", "phone_cse")  # a typo still goes to the nearest name
+    assert nxt == "stone show phone_case", text
+
+
+@pytest.mark.parametrize("request_, shown, want, noun", [
+    ("a desk stand that holds my iPhone 17 Pro upright in portrait so I can plug in USB-C", "phone_stand",
+     "product_holder", "stand"),
+    ("a snug TPU sleeve for my Anker Power Bank (10000mAh, 22.5W)", "product_holder", "fitted_case", "sleeve"),
+])
+def test_a_near_recipe_for_a_catalog_product_points_to_the_one_stone_picked(request_, shown, want, noun, jobenv,
+                                                                           monkeypatch):
+    """Climb 3, LFM3-1.7B before: stone recipes said NEXT: stone show product_holder for an iPhone desk
+    stand and fitted_case for a power bank sleeve; the model read the titles ("Product holder", "Fitted
+    case for a product"), judged the NEXT line a mistake and showed phone_stand (guessed sizes, no
+    finished part) or product_holder (a PLA cradle for a TPU sleeve). stone recipes now says why its
+    pick fits, and show of the near recipe sends the model back to it."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    _stone("new", request_)
+    text, _, nxt = _stone("recipes")
+    assert nxt == f"stone show {want}" and text.startswith(f"For this request: {want} makes the {noun} for the "), text
+    text, code, nxt = _stone("show", shown)
+    assert code == 1 and nxt == f"stone show {want}", text
