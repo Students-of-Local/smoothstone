@@ -36,13 +36,14 @@
   "passing": [
    "l1_mating_gear",
    "l2_button_panel",
+   "l3_card_box",
    "l4_backpack_hook",
    "l5_l_bracket",
    "l6_usb_enclosure",
    "l7_broom_cap",
    "l8_drill_stand"
   ],
-  "rate": 0.9375,
+  "rate": 1.0,
   "total": 16
  },
  "tuning-L/claude-opus_cardL": {
