@@ -26,5 +26,11 @@
  "features": [],
  "sources": [
   "https://www.bourns.com/data/global/pdfs/PTV09.pdf"
- ]
+ ],
+ "shaft": {
+  "type": "knurled",
+  "flat": 0,
+  "why": "the S-type shaft is round over its 18 teeth knurl (no flat): a knob grips its 6.0 mm outside diameter along the 7 mm knurl",
+  "source": "https://www.bourns.com/data/global/pdfs/PTV09.pdf (p2, Shaft Styles, S-Type)"
+ }
 }

@@ -1,0 +1,35 @@
+{
+ "name": "board_plate",
+ "title": "Adapter plate for a board",
+ "summary": "Flat adapter plate that screws a circuit board from the catalog (a Raspberry Pi, a microcontroller board) to the back of a monitor through its VESA 75 or 100 holes, built from the maker's published hole positions: countersunk screw holes for bought standoffs under the board, the VESA pattern centered, a vent under the board.",
+ "tags": ["adapter", "plate", "vesa", "monitor", "board", "raspberry", "pi", "mount", "product", "fitted"],
+ "makes": ["adapter plate", "mounting plate", "vesa adapter", "vesa mount", "adapter", "base plate"],
+ "tier": "S",
+ "params": [
+  {"name": "product", "type": "choice", "product": true, "catalog": "board_plate", "default": "raspberry_pi_4",
+   "help": "the exact board, from the catalog (stone show reads it from the request)"},
+  {"name": "vesa", "type": "choice", "default": "75", "choices": ["75", "100"],
+   "help": "the monitor's VESA pattern, mm square"},
+  {"name": "material", "type": "choice", "default": "PETG", "choices": ["PETG", "PLA"],
+   "help": "PETG holds its shape behind a warm monitor; PLA softens near 55 C"},
+  {"name": "standoff", "type": "number", "default": 10, "min": 3, "max": 30, "unit": "mm",
+   "help": "length of the bought metal standoffs the board sits on"},
+  {"name": "thickness", "type": "number", "default": 4, "min": 3, "max": 8, "unit": "mm", "help": "plate thickness"},
+  {"name": "vent", "type": "bool", "default": true, "help": "an opening under the board for its heat"},
+  {"name": "quality", "type": "int", "default": 96, "min": 24, "max": 128, "help": "circle smoothness"}
+ ],
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "min_wall": 1.2,
+ "phrases": {
+  "vesa 75": {"vesa": "75"},
+  "vesa 100": {"vesa": "100"},
+  "75 x 75": {"vesa": "75"},
+  "100 x 100": {"vesa": "100"},
+  "75 by 75": {"vesa": "75"},
+  "100 by 100": {"vesa": "100"}
+ },
+ "examples": [
+  {"name": "pi4_vesa75", "params": {"product": "raspberry_pi_4", "vesa": "75"}}
+ ]
+}

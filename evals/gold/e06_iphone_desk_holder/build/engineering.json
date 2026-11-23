@@ -1,0 +1,15 @@
+{
+  "frame": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 32], [0, 0, 0, 1]],
+  "material": "PLA",
+  "clearance": 0.3,
+  "retention": {"type": "none"},
+  "sources": {
+    "w": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf",
+    "d": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf",
+    "h": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf",
+    "corner_r": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf",
+    "usb_c": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf",
+    "speaker_and_mic_2": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf",
+    "mic_1_ports": "https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf"
+  }
+}

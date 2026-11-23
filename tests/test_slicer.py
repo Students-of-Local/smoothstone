@@ -116,9 +116,9 @@ def test_a_part_far_bigger_than_the_bed_stops_at_size():
     """A figure exported in microns is 1000 times too big; slicing it would run out of memory."""
     import time
 
-    t = time.perf_counter()
+    t = time.process_time()
     rep = slicer.slice_mesh(_box((90000, 40000, 90000), (0, 0, 0)))
-    assert time.perf_counter() - t < 1.0
+    assert time.process_time() - t < 1.0
     assert not rep.ok and [p.kind for p in rep.problems] == ["size"] and rep.floating == []
 
 

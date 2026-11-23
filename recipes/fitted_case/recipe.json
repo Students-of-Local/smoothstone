@@ -2,8 +2,8 @@
  "name": "fitted_case",
  "title": "Fitted case for a product",
  "summary": "Tray case for a real product in the catalog (a board, a power bank, a gadget), built from the maker's published sizes: a window for every port it locates, open where its ports are not located, standoffs under a board, and an optional snap or friction hold.",
- "tags": ["case", "sleeve", "tray", "holder", "enclosure", "board", "raspberry", "pi", "arduino", "flipper", "anker", "power", "bank", "product", "fitted"],
- "makes": ["case", "sleeve", "tray", "holder", "enclosure", "cover"],
+ "tags": ["case", "sleeve", "tray", "enclosure", "board", "raspberry", "pi", "arduino", "flipper", "anker", "power", "bank", "product", "fitted"],
+ "makes": ["case", "sleeve", "tray", "enclosure", "cover"],
  "tier": "S",
  "params": [
   {"name": "product", "type": "choice", "product": true, "catalog": "fitted_case", "default": "raspberry_pi_5",

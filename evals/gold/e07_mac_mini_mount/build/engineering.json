@@ -1,0 +1,24 @@
+{
+  "frame": [[1,0,0,3.5],[0,0,-1,56.7],[0,1,0,7.5],[0,0,0,1]],
+  "material": "PETG",
+  "clearance": 0.3,
+  "retention": {
+    "type": "snap", "y": 3.2, "t": 2.4, "L": 28.2, "w": 7.2,
+    "at": [3.3,58.2,3.6], "t_dir": [0,-1,0], "L_dir": [1,0,0]
+  },
+  "load": {
+    "n": 20, "dir": "-z", "arm": 6.0, "b": 138.0, "h": 6.4,
+    "across_layers": false,
+    "section": {"at": [21.5,3.2,71.0], "b_dir": [0,0,1], "h_dir": [0,-1,0]}
+  },
+  "attach": {"holes": [
+    {"at": [27.5,0,39.5]}, {"at": [27.5,0,102.5]},
+    {"at": [106.5,0,39.5]}, {"at": [106.5,0,102.5]}
+  ]},
+  "sources": {
+    "w": "https://support.apple.com/en-us/121555",
+    "d": "https://support.apple.com/en-us/121555",
+    "h": "https://support.apple.com/en-us/121555",
+    "corner_r": "https://support.apple.com/en-us/121555"
+  }
+}

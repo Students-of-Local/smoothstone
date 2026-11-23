@@ -1,0 +1,31 @@
+{
+ "name": "product_mount",
+ "title": "Under desk mount for a product",
+ "summary": "Mount that hangs a real product from the catalog (a small computer, a streaming box, a hub) under a desk or shelf, built from the maker's published sizes: screws up into the desk through its roof, wraps the sides, carries the product on two rails, front and back open for ports, with snap tabs so it cannot slide out; sized for the load.",
+ "tags": ["mount", "bracket", "under", "desk", "shelf", "table", "hanger", "product", "fitted", "computer"],
+ "makes": ["mount", "under desk mount", "bracket", "hanger", "under shelf mount", "under table mount"],
+ "tier": "S",
+ "params": [
+  {"name": "product", "type": "choice", "product": true, "catalog": "product_mount", "default": "mac_mini_m4_2024",
+   "help": "the exact product, from the catalog (stone show reads it from the request)"},
+  {"name": "material", "type": "choice", "default": "PETG", "choices": ["PETG", "PLA"],
+   "help": "PETG creeps less under a hanging load in a warm room than PLA"},
+  {"name": "clearance", "type": "number", "default": 0.3, "min": 0.15, "max": 0.45, "unit": "mm",
+   "help": "room per side between the product and the mount"},
+  {"name": "wall", "type": "number", "default": 3.2, "min": 2, "max": 6, "unit": "mm", "help": "side wall thickness"},
+  {"name": "load", "type": "number", "default": 20, "min": 1, "max": 200, "unit": "N",
+   "help": "the force the mount is designed to carry, in newtons"},
+  {"name": "screw", "type": "number", "default": 4, "min": 3, "max": 5, "unit": "",
+   "help": "desk screw size, M (4 = M4), pan head"},
+  {"name": "tabs", "type": "bool", "default": true, "help": "snap tabs at the front so the product cannot slide out"},
+  {"name": "quality", "type": "int", "default": 64, "min": 24, "max": 128, "help": "circle smoothness"}
+ ],
+ "max_bodies": 1,
+ "max_overhang": 0.05,
+ "min_wall": 1.2,
+ "fix": {"min_wall": {"param": "wall", "dir": "up"}},
+ "aliases": {"load": ["n", "newton", "newtons", "force", "load"]},
+ "examples": [
+  {"name": "mac_mini", "params": {"product": "mac_mini_m4_2024", "load": 20}}
+ ]
+}

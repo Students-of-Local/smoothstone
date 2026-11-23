@@ -3,8 +3,11 @@
 The recipe's OpenSCAD echoes what it built (recipes/fitted_case/recipe.scad):
   echo(stone_fit = [frame x, y, z, clearance per side, gap under, wall, floor, retention]);
   echo(stone_snap = [root x, y, z, t_dir x, y, z, w, y, t, L]);   (snap retention only)
-so the file says what the mesh has, in the part's STL coordinates. The sources are the URLs the
-catalog cites for each number (evals/README.md, "Engineering specs").
+so the file says what the mesh has, in the part's STL coordinates. The other product recipes
+(round_case, product_holder, product_mount, board_plate, knob) echo the whole record instead:
+  echo(stone_eng = [["frame", 4x4], ["clearance", ...], ["retention", [["type", "snap"], ...]], ...]);
+an object written as a list of [key, value] pairs (OpenSCAD has no objects). The sources are the
+URLs the catalog cites for each number (evals/README.md, "Engineering specs").
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from . import recipes as rc
 
 FIT_ECHO = re.compile(r"ECHO: stone_fit = (\[.*\])")
 SNAP_ECHO = re.compile(r"ECHO: stone_snap = (\[.*\])")
+ENG_ECHO = re.compile(r"ECHO: stone_eng = (\[.*\])")
 SIDES = ("+x", "-x", "+y", "-y")
 
 
@@ -31,6 +35,16 @@ def _echo(rx: re.Pattern, log: str) -> list | None:
         return None
 
 
+def _pairs(v):
+    """An OpenSCAD value with objects written as [key, value] pairs, as plain JSON: a list whose
+    items are all [string, value] pairs is an object."""
+    if isinstance(v, list):
+        if v and all(isinstance(x, list) and len(x) == 2 and isinstance(x[0], str) for x in v):
+            return {x[0]: _pairs(x[1]) for x in v}
+        return [_pairs(x) for x in v]
+    return v
+
+
 def engineering(r: rc.Recipe, params: dict, log: str) -> dict | None:
     """engineering.json's content for a build of a recipe with a catalog product, or None when the
     recipe has none or the build log does not say where the product sits."""
@@ -38,6 +52,15 @@ def engineering(r: rc.Recipe, params: dict, log: str) -> dict | None:
     if cp is None:
         return None
     p = catalog.get(str(params.get(cp.name)))
+    if p is None:
+        return None
+    rec = _echo(ENG_ECHO, log)
+    if rec is not None:
+        eng = _pairs(rec)
+        if not isinstance(eng, dict) or "frame" not in eng:
+            return None
+        return {"product": p["slug"], "material": str(params.get("material", eng.get("material", "PLA"))),
+                **{k: v for k, v in eng.items() if k != "material"}, "sources": catalog.sources(p)}
     fit = _echo(FIT_ECHO, log)
     if p is None or not fit or len(fit) < 8:
         return None

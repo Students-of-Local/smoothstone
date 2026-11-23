@@ -6,9 +6,11 @@ on:
   pull_request:
 
 jobs:
+  # The tests run on every core (pytest-xdist): one after another they passed 35 minutes
+  # once the product recipes built every catalog product.
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +40,10 @@ jobs:
         run: uv sync
 
       - name: Tests
-        run: xvfb-run -a uv run pytest -q
+        run: xvfb-run -a uv run pytest -q -n auto -m "not timing"
+
+      - name: Timing tests, alone
+        run: xvfb-run -a uv run pytest -q -m timing
 
   # The sheet and the evals build every recipe through stone's checks, which
   # slice each part; together with the tests they ran past 60 minutes on one
