@@ -26,6 +26,13 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   (tools/lift), repair. Every step is cached in the job's images/figure folder.
 - You may pass your own mesh: stone set figure figure=path/to/unit_height.stl.
 
+## Found models
+- stone models "<landmark>" searches Printables, Wikimedia Commons, and Sketchfab only with the
+  person's own key in STONE_SKETCHFAB_TOKEN. --take <n> downloads, repairs (src/smoothstone/models.py)
+  and makes it the job's part; stone build scales, measures thin features, cuts it to the bed with
+  pins and checks each part (src/smoothstone/modelprint.py). build/model/parts.json has every cut,
+  pin and check. Never pass a found model off as stone's own: credits.txt goes with it.
+
 ## Recipe format
 - recipe.scad: one assignment per parameter at the top, with a comment that gives the unit, then
   the geometry. Base on z = 0, centered in X and Y, millimeters. stone passes values with -D.

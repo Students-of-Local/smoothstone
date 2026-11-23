@@ -1,0 +1,1601 @@
+{
+"names": {
+"label": "Eiffel Tower",
+"wikidata": "Q243",
+"kind": "thing",
+"description": "tower in Paris",
+"names": [
+"Eiffel Tower",
+"Tour Eiffel",
+"Eiffelturm"
+]
+},
+"replies": {
+"https://api.printables.com/graphql/ {\"query\": \"query S($q: String!, $n: Int) { searchPrints2(query: $q, limit: $n) { items { id name summary premium price likesCount downloadCount makesCount license { name abbreviation } user { publicUsername } category { path { name } } } } }\", \"variables\": {\"n\": 20, \"q\": \"Eiffel Tower\"}}": {
+"data": {
+"searchPrints2": {
+"items": [
+{
+"id": "572",
+"name": "Eiffel Tower",
+"summary": "The Eiffel Tower with a little wider rod rails to print in small size on SLA printers.",
+"premium": false,
+"price": null,
+"likesCount": 2586,
+"downloadCount": 54211,
+"makesCount": 230,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "Michal Fanta"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "122954",
+"name": "Eiffel Tower FDM printable",
+"summary": "No Supports required, prints on Ender and Prusa",
+"premium": false,
+"price": null,
+"likesCount": 1735,
+"downloadCount": 15402,
+"makesCount": 180,
+"license": {
+"name": "Creative Commons \u2014 Attribution",
+"abbreviation": "CC-BY"
+},
+"user": {
+"publicUsername": "Yell"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "257407",
+"name": "Eiffel Tower - Paris , France",
+"summary": "\ud83c\uddeb\ud83c\uddf7 Easy-to-print version of the world-famous architectural symbol of Paris, of France, and all of Europe!",
+"premium": false,
+"price": null,
+"likesCount": 566,
+"downloadCount": 5611,
+"makesCount": 57,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "MiniWorld3D"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "132397",
+"name": "Eiffel tower 30 cm (two parts)",
+"summary": "Eiffel tower from https://www.thingiverse.com/thing:912478 by Newcandle scaled to 30 cm and simply divided in two parts.",
+"premium": false,
+"price": null,
+"likesCount": 417,
+"downloadCount": 5613,
+"makesCount": 26,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "Maris Kalejs - Orient.lv"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "439182",
+"name": "Tour Eiffel (quatre pi\u00e8ces)/ Eiffel tower 30 cm (four parts)",
+"summary": "Eiffel tower scaled to 30 cm and simply divided in four parts.\nprint with layer 0.2mm in plan colorfabb gold",
+"premium": false,
+"price": null,
+"likesCount": 215,
+"downloadCount": 2091,
+"makesCount": 24,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "Tiques77"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "232809",
+"name": "Eiffel Tower Gravitrax scene",
+"summary": "Tour through paris with your Gravitrax marbles!",
+"premium": false,
+"price": null,
+"likesCount": 208,
+"downloadCount": 1889,
+"makesCount": 31,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "Dennis M"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Building Toys"
+}
+]
+}
+},
+{
+"id": "571918",
+"name": "UFS-138 Eiffel Tower - More Realistic Improved for Printing",
+"summary": "Eiffel Tower Challenge to make a more realistic 3D model of the famous the Eiffel Tower.",
+"premium": false,
+"price": null,
+"likesCount": 87,
+"downloadCount": 2397,
+"makesCount": 5,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "UncleFrankSays"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Other Art & Designs"
+}
+]
+}
+},
+{
+"id": "287027",
+"name": "Eiffel tower keychain",
+"summary": "A detailed small model of the Eiffel Tower with a ring for connecting to a key ring.",
+"premium": false,
+"price": null,
+"likesCount": 182,
+"downloadCount": 2533,
+"makesCount": 11,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "miXal"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Other Toys & Games"
+}
+]
+}
+},
+{
+"id": "907687",
+"name": "Eiffel Tower | Eiffel Tower",
+"summary": "A super detailed Eiffel Tower",
+"premium": false,
+"price": null,
+"likesCount": 46,
+"downloadCount": 1671,
+"makesCount": 8,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial",
+"abbreviation": "CC-BY-NC"
+},
+"user": {
+"publicUsername": "KingTut"
+},
+"category": {
+"path": [
+{
+"name": "Hobby & Makers"
+},
+{
+"name": "Other Ideas"
+}
+]
+}
+},
+{
+"id": "467309",
+"name": "Eiffel Tower \u2359 Vase Mode",
+"summary": "Found this simple model and converted/repaired it for vase mode printing. Scalable. World Landmark, fast print, & easy.",
+"premium": false,
+"price": null,
+"likesCount": 99,
+"downloadCount": 797,
+"makesCount": 17,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial",
+"abbreviation": "CC-BY-NC"
+},
+"user": {
+"publicUsername": "Triple G Workshop"
+},
+"category": {
+"path": [
+{
+"name": "Learning"
+},
+{
+"name": "Other 3D Objects for Learning"
+}
+]
+}
+},
+{
+"id": "166868",
+"name": "The Impossible Eiffel Tower - fully 3D printed tensegrity structure in a gift card format",
+"summary": "The Eiffel Tower as an impossible (tensegrity) structure. Easy to print in card format and a perfect gift for hobbyists.",
+"premium": false,
+"price": null,
+"likesCount": 86,
+"downloadCount": 256,
+"makesCount": 4,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "Maty"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Building Toys"
+}
+]
+}
+},
+{
+"id": "607420",
+"name": "Eiffel tower 30 cm (four parts) - with lighting",
+"summary": "It really is, with lighting and that's not a joke.",
+"premium": false,
+"price": null,
+"likesCount": 64,
+"downloadCount": 537,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "4D"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "105091",
+"name": "Eiffel Tower",
+"summary": "Eiffel Tower made out of ice cream bars.",
+"premium": false,
+"price": null,
+"likesCount": 62,
+"downloadCount": 180,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "peaklin"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Other Toys & Games"
+}
+]
+}
+},
+{
+"id": "525205",
+"name": "eiffel tower",
+"summary": "eiffel tower",
+"premium": false,
+"price": null,
+"likesCount": 26,
+"downloadCount": 702,
+"makesCount": 15,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "Gaming- King"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Action Figures & Statues"
+}
+]
+}
+},
+{
+"id": "801915",
+"name": "Eiffel Tower Kit Card",
+"summary": "This is a model of Eiffel Tower you can assemble!",
+"premium": false,
+"price": null,
+"likesCount": 151,
+"downloadCount": 739,
+"makesCount": 5,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "Vojt\u011bch Gryga"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "979063",
+"name": "Eiffel Tower | best fdm friendly but accurate version",
+"summary": "improved eiffel tower.",
+"premium": false,
+"price": null,
+"likesCount": 77,
+"downloadCount": 999,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "Haktan Alt\u0131n"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Other Art & Designs"
+}
+]
+}
+},
+{
+"id": "1384739",
+"name": "Eiffel Tower & Paris City Circular Topographic Map",
+"summary": "Circular relief map of the Eiffel Tower area in Paris with accurate terrain and city layout details.",
+"premium": false,
+"price": null,
+"likesCount": 144,
+"downloadCount": 711,
+"makesCount": 1,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  Share Alike",
+"abbreviation": "CC-BY-NC-SA"
+},
+"user": {
+"publicUsername": "Jos\u00e9 Pedro"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1790267",
+"name": "Tiny Eiffel Tower \u2013 Mini Architecture Series",
+"summary": "A miniature interpretation of the Eiffel Tower, reduced to its essential structure while preserving its iconic shape.",
+"premium": false,
+"price": null,
+"likesCount": 157,
+"downloadCount": 880,
+"makesCount": 4,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "Bazzar701"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "12412",
+"name": "Eiffel Tower K-Cup Holder",
+"summary": "A k-cup holder perfect for storing your French roast!",
+"premium": false,
+"price": null,
+"likesCount": 30,
+"downloadCount": 146,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial",
+"abbreviation": "CC-BY-NC"
+},
+"user": {
+"publicUsername": "John S"
+},
+"category": {
+"path": [
+{
+"name": "Household"
+},
+{
+"name": "Kitchen"
+}
+]
+}
+},
+{
+"id": "352045",
+"name": "Eiffel Tower - easy to print!",
+"summary": "This version of the Eiffel Tower is very easy to print because the sides are closed. Please leave a like if you like it.",
+"premium": false,
+"price": null,
+"likesCount": 37,
+"downloadCount": 910,
+"makesCount": 2,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial",
+"abbreviation": "CC-BY-NC"
+},
+"user": {
+"publicUsername": "RobertB"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Sculptures"
+}
+]
+}
+}
+]
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query S($q: String!, $n: Int) { searchPrints2(query: $q, limit: $n) { items { id name summary premium price likesCount downloadCount makesCount license { name abbreviation } user { publicUsername } category { path { name } } } } }\", \"variables\": {\"n\": 20, \"q\": \"Tour Eiffel\"}}": {
+"data": {
+"searchPrints2": {
+"items": [
+{
+"id": "439182",
+"name": "Tour Eiffel (quatre pi\u00e8ces)/ Eiffel tower 30 cm (four parts)",
+"summary": "Eiffel tower scaled to 30 cm and simply divided in four parts.\nprint with layer 0.2mm in plan colorfabb gold",
+"premium": false,
+"price": null,
+"likesCount": 215,
+"downloadCount": 2091,
+"makesCount": 24,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "Tiques77"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "620495",
+"name": "Tour Eiffel",
+"summary": "Tour Eiffel",
+"premium": false,
+"price": null,
+"likesCount": 16,
+"downloadCount": 639,
+"makesCount": 4,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "Mat Cr\u00e9ation"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Sculptures"
+}
+]
+}
+},
+{
+"id": "1092428",
+"name": "Tour Eiffel MINI-ature",
+"summary": "Tour Eiffel Miniature in 2 parts to fit the Prusa MINI bed! A full model is provided for any other larger bed printer",
+"premium": false,
+"price": null,
+"likesCount": 25,
+"downloadCount": 470,
+"makesCount": 1,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "eap6rda"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "287790",
+"name": "Paris Tour Eiffel",
+"summary": "Impression \u00e0 plat\n2 \u00e0 4 millim\u00e8tres de haut suffisent",
+"premium": false,
+"price": null,
+"likesCount": 32,
+"downloadCount": 200,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  Share Alike",
+"abbreviation": "CC-BY-NC-SA"
+},
+"user": {
+"publicUsername": "GC 3D"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Wall-mounted"
+}
+]
+}
+},
+{
+"id": "329628",
+"name": "TOUR EIFFEL FRANCE",
+"summary": "Tour Eiffel France",
+"premium": false,
+"price": null,
+"likesCount": 9,
+"downloadCount": 35,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "MakeSimple"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Other Art & Designs"
+}
+]
+}
+},
+{
+"id": "1488633",
+"name": "Tour Eiffel",
+"summary": "une tour de deco",
+"premium": false,
+"price": null,
+"likesCount": 1,
+"downloadCount": 36,
+"makesCount": 0,
+"license": {
+"name": "Standard Digital File License",
+"abbreviation": "Standard Digital File"
+},
+"user": {
+"publicUsername": "m.o.i."
+},
+"category": {
+"path": [
+{
+"name": "3D Printers"
+},
+{
+"name": "Other Printer Parts & Upgrades"
+}
+]
+}
+},
+{
+"id": "1356379",
+"name": "Articulated Tour Eiffel",
+"summary": "Articulated Tour Eiffel",
+"premium": false,
+"price": null,
+"likesCount": 11,
+"downloadCount": 35,
+"makesCount": 0,
+"license": {
+"name": "Standard Digital File License",
+"abbreviation": "Standard Digital File"
+},
+"user": {
+"publicUsername": "Faffi"
+},
+"category": {
+"path": [
+{
+"name": "Household"
+},
+{
+"name": "Home Decor"
+}
+]
+}
+},
+{
+"id": "607420",
+"name": "Eiffel tower 30 cm (four parts) - with lighting",
+"summary": "It really is, with lighting and that's not a joke.",
+"premium": false,
+"price": null,
+"likesCount": 64,
+"downloadCount": 537,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "4D"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "719030",
+"name": "Paris Tour Effeil - Eiffel Tower Paris",
+"summary": "D\u00e9coration \u00e0 poser de la Tour Effeil \u00e0 Paris\n\nDecoration to pose of the Eiffel Tower in Paris",
+"premium": false,
+"price": null,
+"likesCount": 7,
+"downloadCount": 118,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"user": {
+"publicUsername": "JerNovalium"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Other Art & Designs"
+}
+]
+}
+}
+]
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query S($q: String!, $n: Int) { searchPrints2(query: $q, limit: $n) { items { id name summary premium price likesCount downloadCount makesCount license { name abbreviation } user { publicUsername } category { path { name } } } } }\", \"variables\": {\"n\": 20, \"q\": \"Eiffelturm\"}}": {
+"data": {
+"searchPrints2": {
+"items": [
+{
+"id": "1772368",
+"name": "Crocs Charm Eiffelturm",
+"summary": "zum Thema Charms habe ich meinen kleinen Eiffelturm an die Crocs gebracht",
+"premium": false,
+"price": null,
+"likesCount": 5,
+"downloadCount": 8,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  Share Alike",
+"abbreviation": "CC-BY-NC-SA"
+},
+"user": {
+"publicUsername": "das_aj"
+},
+"category": {
+"path": [
+{
+"name": "Fashion"
+},
+{
+"name": "Other Fashion Accessories"
+}
+]
+}
+},
+{
+"id": "979063",
+"name": "Eiffel Tower | best fdm friendly but accurate version",
+"summary": "improved eiffel tower.",
+"premium": false,
+"price": null,
+"likesCount": 77,
+"downloadCount": 999,
+"makesCount": 3,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"user": {
+"publicUsername": "Haktan Alt\u0131n"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Other Art & Designs"
+}
+]
+}
+},
+{
+"id": "1370820",
+"name": "Eiffel Tower - 50 cm - P3/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 26,
+"downloadCount": 265,
+"makesCount": 2,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1604513",
+"name": "Eiffelturm / Eiffel Tower",
+"summary": "Detailed Eiffel Tower Replica / Mini Paris Landmark",
+"premium": false,
+"price": null,
+"likesCount": 51,
+"downloadCount": 662,
+"makesCount": 1,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial",
+"abbreviation": "CC-BY-NC"
+},
+"user": {
+"publicUsername": "Gabriel Schneider"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Sculptures"
+}
+]
+}
+},
+{
+"id": "352045",
+"name": "Eiffel Tower - easy to print!",
+"summary": "This version of the Eiffel Tower is very easy to print because the sides are closed. Please leave a like if you like it.",
+"premium": false,
+"price": null,
+"likesCount": 37,
+"downloadCount": 910,
+"makesCount": 2,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial",
+"abbreviation": "CC-BY-NC"
+},
+"user": {
+"publicUsername": "RobertB"
+},
+"category": {
+"path": [
+{
+"name": "Art & Design"
+},
+{
+"name": "Sculptures"
+}
+]
+}
+},
+{
+"id": "1370877",
+"name": "Eiffel Tower - 50 cm - P1/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 18,
+"downloadCount": 185,
+"makesCount": 2,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1370875",
+"name": "Eiffel Tower - 50 cm - P2/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 17,
+"downloadCount": 204,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1370852",
+"name": "Eiffel Tower - 50 cm - P4/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 19,
+"downloadCount": 184,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1370864",
+"name": "Eiffel Tower - 50 cm - P5/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 23,
+"downloadCount": 170,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1370867",
+"name": "Eiffel Tower - 50 cm - P6/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 20,
+"downloadCount": 156,
+"makesCount": 1,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1370870",
+"name": "Eiffel Tower - 50 cm - P7/7",
+"summary": "Modular Eiffel Tower (50\u202fcm) \u2013 highly detailed.",
+"premium": false,
+"price": null,
+"likesCount": 18,
+"downloadCount": 155,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "World & Scans"
+},
+{
+"name": "Architecture & Urbanism"
+}
+]
+}
+},
+{
+"id": "1635960",
+"name": "Montessori Stackable Eiffel Tower \u2013 Kids Building Toy (12 Blocks)",
+"summary": "A stacking toy inspired by the Eiffel Tower.\n12 blocks must be stacked to recreate the famous landmark.",
+"premium": false,
+"price": null,
+"likesCount": 18,
+"downloadCount": 21,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"user": {
+"publicUsername": "vmLOGIC"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Building Toys"
+}
+]
+}
+},
+{
+"id": "1164398",
+"name": "Game of Life Replacement Part (Eifelturm)",
+"summary": "A spare part for the game of life to personalise it a little.",
+"premium": false,
+"price": null,
+"likesCount": 7,
+"downloadCount": 164,
+"makesCount": 0,
+"license": {
+"name": "Creative Commons \u2014 Attribution",
+"abbreviation": "CC-BY"
+},
+"user": {
+"publicUsername": "Beet-Ho-Ven"
+},
+"category": {
+"path": [
+{
+"name": "Toys & Games"
+},
+{
+"name": "Board Games"
+}
+]
+}
+}
+]
+}
+}
+},
+"https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrsearch=%22Eiffel+Tower%22+filetype%3A3d&gsrlimit=10&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata null": {
+"batchcomplete": "",
+"query": {
+"pages": {
+"73543423": {
+"pageid": 73543423,
+"ns": 6,
+"title": "File:Eiffel.stl",
+"index": 2,
+"imagerepository": "local",
+"imageinfo": [
+{
+"size": 4381284,
+"width": 5120,
+"height": 2880,
+"url": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Eiffel.stl?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+"descriptionurl": "https://commons.wikimedia.org/wiki/File:Eiffel.stl",
+"descriptionshorturl": "https://commons.wikimedia.org/wiki/Special:Redirect/page/73543423",
+"extmetadata": {
+"DateTime": {
+"value": "2018-10-11 14:28:17",
+"source": "mediawiki-metadata",
+"hidden": ""
+},
+"ObjectName": {
+"value": "Eiffel",
+"source": "mediawiki-metadata"
+},
+"CommonsMetadataExtension": {
+"value": 1.2,
+"source": "extension",
+"hidden": ""
+},
+"Categories": {
+"value": "CC-Zero|Files from external sources with reviewed licenses|Models of the Eiffel Tower|STL files from Blend Swap",
+"source": "commons-categories",
+"hidden": ""
+},
+"Assessments": {
+"value": "",
+"source": "commons-categories",
+"hidden": ""
+},
+"ImageDescription": {
+"value": "Eiffel Tower LOW POLY cycles",
+"source": "commons-desc-page"
+},
+"DateTimeOriginal": {
+"value": "2013-05-05",
+"source": "commons-desc-page"
+},
+"Credit": {
+"value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://www.blendswap.com/blends/view/67944\">https://www.blendswap.com/blends/view/67944</a>",
+"source": "commons-desc-page"
+},
+"Artist": {
+"value": "ingoenius",
+"source": "commons-desc-page"
+},
+"LicenseShortName": {
+"value": "CC0",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"UsageTerms": {
+"value": "Creative Commons Zero, Public Domain Dedication",
+"source": "commons-desc-page"
+},
+"AttributionRequired": {
+"value": "false",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"LicenseUrl": {
+"value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+"source": "commons-desc-page"
+},
+"Copyrighted": {
+"value": "True",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"Restrictions": {
+"value": "",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"License": {
+"value": "cc0",
+"source": "commons-templates",
+"hidden": ""
+}
+},
+"mime": "application/sla"
+}
+]
+},
+"66776506": {
+"pageid": 66776506,
+"ns": 6,
+"title": "File:EiffelTower fixed.stl",
+"index": 1,
+"imagerepository": "local",
+"imageinfo": [
+{
+"size": 7380284,
+"width": 5120,
+"height": 2880,
+"url": "https://upload.wikimedia.org/wikipedia/commons/4/41/EiffelTower_fixed.stl?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+"descriptionurl": "https://commons.wikimedia.org/wiki/File:EiffelTower_fixed.stl",
+"descriptionshorturl": "https://commons.wikimedia.org/wiki/Special:Redirect/page/66776506",
+"extmetadata": {
+"DateTime": {
+"value": "2018-02-25 00:39:31",
+"source": "mediawiki-metadata",
+"hidden": ""
+},
+"ObjectName": {
+"value": "EiffelTower fixed",
+"source": "mediawiki-metadata"
+},
+"CommonsMetadataExtension": {
+"value": 1.2,
+"source": "extension",
+"hidden": ""
+},
+"Categories": {
+"value": "3D printed objects|Models of the Eiffel Tower|STL files of buildings|STL files from Thingiverse",
+"source": "commons-categories",
+"hidden": ""
+},
+"Assessments": {
+"value": "",
+"source": "commons-categories",
+"hidden": ""
+},
+"ImageDescription": {
+"value": "Eiffel Tower 3D simplfied printable model from Thingiverse",
+"source": "commons-desc-page"
+},
+"DateTimeOriginal": {
+"value": "2018-02-25",
+"source": "commons-desc-page"
+},
+"Credit": {
+"value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://www.thingiverse.com/thing:912478\">https://www.thingiverse.com/thing:912478</a>",
+"source": "commons-desc-page"
+},
+"Artist": {
+"value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.thingiverse.com/Newcandle/about\">Newcandle</a> from Thingiverse",
+"source": "commons-desc-page"
+},
+"LicenseShortName": {
+"value": "CC BY-SA 3.0",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"UsageTerms": {
+"value": "Creative Commons Attribution-Share Alike 3.0",
+"source": "commons-desc-page"
+},
+"AttributionRequired": {
+"value": "true",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"LicenseUrl": {
+"value": "https://creativecommons.org/licenses/by-sa/3.0",
+"source": "commons-desc-page"
+},
+"Copyrighted": {
+"value": "True",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"Restrictions": {
+"value": "",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"License": {
+"value": "cc-by-sa-3.0",
+"source": "commons-templates",
+"hidden": ""
+}
+},
+"mime": "application/sla"
+}
+]
+}
+}
+}
+},
+"https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrsearch=%22Tour+Eiffel%22+filetype%3A3d&gsrlimit=10&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata null": {
+"batchcomplete": "",
+"query": {
+"pages": {
+"66776506": {
+"pageid": 66776506,
+"ns": 6,
+"title": "File:EiffelTower fixed.stl",
+"index": 1,
+"imagerepository": "local",
+"imageinfo": [
+{
+"size": 7380284,
+"width": 5120,
+"height": 2880,
+"url": "https://upload.wikimedia.org/wikipedia/commons/4/41/EiffelTower_fixed.stl?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+"descriptionurl": "https://commons.wikimedia.org/wiki/File:EiffelTower_fixed.stl",
+"descriptionshorturl": "https://commons.wikimedia.org/wiki/Special:Redirect/page/66776506",
+"extmetadata": {
+"DateTime": {
+"value": "2018-02-25 00:39:31",
+"source": "mediawiki-metadata",
+"hidden": ""
+},
+"ObjectName": {
+"value": "EiffelTower fixed",
+"source": "mediawiki-metadata"
+},
+"CommonsMetadataExtension": {
+"value": 1.2,
+"source": "extension",
+"hidden": ""
+},
+"Categories": {
+"value": "3D printed objects|Models of the Eiffel Tower|STL files of buildings|STL files from Thingiverse",
+"source": "commons-categories",
+"hidden": ""
+},
+"Assessments": {
+"value": "",
+"source": "commons-categories",
+"hidden": ""
+},
+"ImageDescription": {
+"value": "Eiffel Tower 3D simplfied printable model from Thingiverse",
+"source": "commons-desc-page"
+},
+"DateTimeOriginal": {
+"value": "2018-02-25",
+"source": "commons-desc-page"
+},
+"Credit": {
+"value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://www.thingiverse.com/thing:912478\">https://www.thingiverse.com/thing:912478</a>",
+"source": "commons-desc-page"
+},
+"Artist": {
+"value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.thingiverse.com/Newcandle/about\">Newcandle</a> from Thingiverse",
+"source": "commons-desc-page"
+},
+"LicenseShortName": {
+"value": "CC BY-SA 3.0",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"UsageTerms": {
+"value": "Creative Commons Attribution-Share Alike 3.0",
+"source": "commons-desc-page"
+},
+"AttributionRequired": {
+"value": "true",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"LicenseUrl": {
+"value": "https://creativecommons.org/licenses/by-sa/3.0",
+"source": "commons-desc-page"
+},
+"Copyrighted": {
+"value": "True",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"Restrictions": {
+"value": "",
+"source": "commons-desc-page",
+"hidden": ""
+},
+"License": {
+"value": "cc-by-sa-3.0",
+"source": "commons-templates",
+"hidden": ""
+}
+},
+"mime": "application/sla"
+}
+]
+}
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query P($id: ID!) { print(id: $id) { id name license { name abbreviation } stls { id name fileSize } user { publicUsername } } }\", \"variables\": {\"id\": \"122954\"}}": {
+"data": {
+"print": {
+"id": "122954",
+"name": "Eiffel Tower FDM printable",
+"license": {
+"name": "Creative Commons \u2014 Attribution",
+"abbreviation": "CC-BY"
+},
+"stls": [
+{
+"id": "505323",
+"name": "FDM_Eiffel_Tower.stl",
+"fileSize": 11641984
+}
+],
+"user": {
+"publicUsername": "Yell"
+}
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query P($id: ID!) { print(id: $id) { id name license { name abbreviation } stls { id name fileSize } user { publicUsername } } }\", \"variables\": {\"id\": \"572\"}}": {
+"data": {
+"print": {
+"id": "572",
+"name": "Eiffel Tower",
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"stls": [
+{
+"id": "2591",
+"name": "eiffel_final.stl",
+"fileSize": 8125184
+}
+],
+"user": {
+"publicUsername": "Michal Fanta"
+}
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query P($id: ID!) { print(id: $id) { id name license { name abbreviation } stls { id name fileSize } user { publicUsername } } }\", \"variables\": {\"id\": \"257407\"}}": {
+"data": {
+"print": {
+"id": "257407",
+"name": "Eiffel Tower - Paris , France",
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Noncommercial  \u2014  NoDerivatives",
+"abbreviation": "CC-BY-NC-ND"
+},
+"stls": [
+{
+"id": "1177909",
+"name": "2014-eiffel-tower-miniworld3d.stl",
+"fileSize": 511384
+},
+{
+"id": "1177910",
+"name": "2022-eiffel-tower-miniworld3d.stl",
+"fileSize": 5120484
+}
+],
+"user": {
+"publicUsername": "MiniWorld3D"
+}
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query P($id: ID!) { print(id: $id) { id name license { name abbreviation } stls { id name fileSize } user { publicUsername } } }\", \"variables\": {\"id\": \"132397\"}}": {
+"data": {
+"print": {
+"id": "132397",
+"name": "Eiffel tower 30 cm (two parts)",
+"license": {
+"name": "Creative Commons \u2014 Attribution  \u2014 Share Alike",
+"abbreviation": "CC-BY-SA"
+},
+"stls": [
+{
+"id": "546738",
+"name": "Eiffel_b_180mm.stl",
+"fileSize": 2134684
+},
+{
+"id": "546739",
+"name": "Eiffel_a_119mm.stl",
+"fileSize": 31329584
+}
+],
+"user": {
+"publicUsername": "Maris Kalejs - Orient.lv"
+}
+}
+}
+},
+"https://api.printables.com/graphql/ {\"query\": \"query P($id: ID!) { print(id: $id) { id name license { name abbreviation } stls { id name fileSize } user { publicUsername } } }\", \"variables\": {\"id\": \"439182\"}}": {
+"data": {
+"print": {
+"id": "439182",
+"name": "Tour Eiffel (quatre pi\u00e8ces)/ Eiffel tower 30 cm (four parts)",
+"license": {
+"name": "Creative Commons \u2014 Public Domain",
+"abbreviation": "CC0"
+},
+"stls": [
+{
+"id": "1913191",
+"name": "Eiffel_Tower_Milieu_bas.3mf",
+"fileSize": 340746
+},
+{
+"id": "1913192",
+"name": "Eiffel_Tower_Haut.3mf",
+"fileSize": 512961
+},
+{
+"id": "1913193",
+"name": "Eiffel_Tower_Milieu_Haut.3mf",
+"fileSize": 674864
+},
+{
+"id": "1913194",
+"name": "Eiffel_Tower_Bas.3mf",
+"fileSize": 1160508
+}
+],
+"user": {
+"publicUsername": "Tiques77"
+}
+}
+}
+}
+}
+}

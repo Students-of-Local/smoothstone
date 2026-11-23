@@ -51,6 +51,17 @@ left out. With your own photo, run `stone image <photo>` instead.
 Then stone build runs three local models (describe, style, lift) and the print checks. Run
 tools/figure/setup.sh once first.
 
+## Landmarks: found models
+
+No recipe makes a cathedral, so `stone recipes` sends a landmark request to
+`stone models "<landmark>"`. It looks the landmark up on Wikidata for its names, searches
+Printables and Wikimedia Commons (and Sketchfab when STONE_SKETCHFAB_TOKEN holds your own key),
+leaves out what is not a model of it (keychains, lamps, maps, paid models, closed licenses) and
+lists the best five with author, license and popularity. `stone models --take <n>` downloads one,
+writes credits.txt, and repairs and stands it up. `stone build` scales it to the size asked (or the
+largest that fits the bed), names its thin features, cuts it into numbered parts that fit the bed
+with square pin holes, and runs the print checks on every part, with grams and hours each.
+
 ## Colors
 
 After a passing build of a figure, `stone colors` splits it into color regions from the colors
