@@ -12,8 +12,9 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - Every recipe prints without supports: flat base, no overhang past 45 degrees, walls of at
   least 1.2 mm, top edges rounded or chamfered, holes sized for real screws.
 - Sizes: work out the room inside first, then add every wall and floor, and anything that reaches
-  inside, such as a lid's lip (a box's lip_h takes that much of its inside height). An opening the
-  request sizes keeps that size and shape; a flat top up to 15 mm wide prints as a bridge.
+  inside, such as a lid's lip (a box's lip_h takes that much of its inside height: a 30 mm stack on
+  a 2 mm floor under a 5 mm lip needs h of at least 37). An opening the request sizes keeps that
+  size and shape; a flat top up to 15 mm wide prints as a bridge.
 - Check every new recipe: stone show <name>, stone set <name> with the request's sizes, stone build.
   Its defaults and every example must build and pass too (the grader runs tools/sheet.py on it).
 - A refused command refuses only that command: stone commands still run, so go on and build with stone.
