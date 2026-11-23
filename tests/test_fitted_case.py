@@ -7,10 +7,13 @@ taking iPhone cases from phone_case. Stone's own NEXT lines, run one after anoth
 """
 import importlib.util
 import json
+import math
 import re
 from pathlib import Path
 
 import pytest
+
+import numpy as np
 
 from smoothstone import catalog, cli, fitted, match
 from smoothstone import recipes as rc
@@ -208,8 +211,11 @@ def test_every_snap_catch_bears_on_a_surface_the_catalog_locates(openscad, mater
             continue
         assert "Assertion" not in err, (slug, err)
         snapping += 1
-        c = e["stone_fit"][3]
-        shift = max(c, 0)
+        # the travel the pins allow: each echoed pin in its catalog hole; with no pins nothing bounds it
+        holes = {(round(s_[0], 2), round(s_[1], 2)): s_[3] for s_ in catalog.standoffs(p)}
+        pins = e.get("stone_locate", [None, []])[1]
+        shift = max(((holes[(round(x, 2), round(y, 2))] - pin) / 2 for x, y, _, pin in pins), default=math.inf)
+        assert shift <= catalog.PIN_PLAY / 2 + 1e-9, (slug, shift)
         surfaces = catalog.catch_surfaces(p)
         for x0, x1, y0, y1, under in e["stone_catch"]:
             def bears(s):
@@ -284,3 +290,34 @@ def test_an_uncatalogued_product_on_the_next_path_ends_at_a_clear_answer(jobenv,
     assert all(x.startswith("ask the person: fitted_case builds only for products") and "stone show box" in x
                for x in seen[1:]), seen
 
+
+def test_pins_hold_the_board_so_it_slides_no_farther_than_the_pin_play(openscad, tmp_path):
+    """first-F1 (round 2): the Pi 5 must sit on pins in its mounting holes, measured in the built part,
+    so it slides at most half the pin play, the travel the snap catch is sized for. Without pins its
+    port shells slide on into their windows, 1.93 mm toward -y, and the catch misses the USB shell."""
+    import trimesh
+
+    from smoothstone import scad
+    r = rc.load("fitted_case", REPO / "recipes")
+    params = {**r.defaults(), "product": "raspberry_pi_5", "retention": "snap"}
+    run = scad.build_stl(openscad, r, params, tmp_path / "pi5.stl")
+    assert run.ok, run.log[-500:]
+    mesh = trimesh.load(tmp_path / "pi5.stl", force="mesh")
+    ox, oy, oz = json.loads(re.findall(r"ECHO: stone_fit = (\[.*\])", run.log)[-1])[:3]
+    travel = json.loads(re.findall(r"ECHO: stone_locate = (\[.*\])", run.log)[-1])[0]
+    pcb = catalog.get("raspberry_pi_5")["board"]["pcb_underside_z"]
+    for x, y, _, hole, _pin in catalog.standoffs(catalog.get("raspberry_pi_5")):
+        z = oz + pcb + 0.3  # inside the hole, under the pin's chamfer
+        c = np.array([x + ox, y + oy, z])
+        assert mesh.contains(c[None])[0], ("no pin in the hole", x, y)
+        radii = []
+        for a in np.linspace(0, 2 * np.pi, 16, endpoint=False):
+            d = np.array([np.cos(a), np.sin(a), 0.0])
+            lo, hi = 0.0, hole / 2 + 0.5
+            for _ in range(20):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if mesh.contains((c + d * mid)[None])[0] else (lo, mid)
+            radii.append(lo)
+        slide = hole / 2 - min(radii)
+        assert 0 <= slide <= catalog.PIN_PLAY / 2 + 0.02, (x, y, slide)
+        assert slide <= travel + 0.02

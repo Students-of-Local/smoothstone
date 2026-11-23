@@ -31,7 +31,13 @@ D = R[1][1];
 H = R[1][2];
 PCB = R[3];                 // the board's underside in the product frame; -1 for a product that is not a board
 BOARD = PCB >= 0;
-STANDOFFS = BOARD ? R[4] : [];
+STANDOFFS = BOARD ? R[4] : [];  // [x, y, standoff d, hole d, pin d]
+PIN_H = 1.0;                // a locating pin's height over the PCB's underside (supports() says why)
+PIN_CHAMFER = 0.4;
+PINNED = len(STANDOFFS) > 0;
+// how far the product can slide in the part: half the pin play when it sits on pins; otherwise
+// nothing here bounds it (a board's port shells can slide on into their windows)
+TRAVEL = PINNED ? max([for (s = STANDOFFS) (s[3] - s[4]) / 2]) : -1;
 WINDOWS = R[5];
 ARMS = R[6];                // [face, u, gap from the catch surface to the product's face, surface top z]
 OPEN = concat(R[2], style == "sleeve" ? ["+y"] : []);
@@ -62,7 +68,7 @@ RIM = OPEN_SIDES >= 3 ? min(1.5, 0.08 * H) : 0;  // a low rim on open sides when
 
 // Snap arm: strain 1.5 y t / L^2 (Bayer cantilever, shape A) at 75% of the grader's limit. Its catch
 // sits CATCH_GAP over the product's top and reaches past the catch surface's edge by SNAP_OVERLAP
-// even with the product pushed away from the arm's wall by its side clearance.
+// with the product slid as far from the arm's wall as its locating pins let it (TRAVEL).
 LIMIT = material == "PLA" ? 0.02 : material == "PETG" ? 0.03 : 0.2;
 SNAP_T = wall;
 SNAP_OVERLAP = 0.25;
@@ -72,13 +78,15 @@ ARM_W = 6;                   // catalog.ARM_W
 ARM_SLOT = 1;                // catalog.ARM_SLOT
 CATCH = H + CATCH_GAP;       // the catch's underside, product frame z
 ARMS_OK = [for (a = ARMS) if (!open_face(a[0])) a];
-function arm_y(a) = a[2] + 2 * max(C, 0) + SNAP_OVERLAP;
+function arm_y(a) = a[2] + C + TRAVEL + SNAP_OVERLAP;
 function arm_l(a) = ceil(sqrt(1.5 * arm_y(a) * SNAP_T / (0.75 * LIMIT)));
 function arm_top(a) = CATCH + CATCH_TIP + arm_y(a);
 function arm_root(a) = arm_top(a) - arm_l(a);
 if (RET == "snap") {
     assert(len(ARMS_OK) > 0, str("a snap catch must bear on a part of the product the catalog locates, and ", product,
         " has none by a closed wall: set retention=friction or none"));
+    assert(PINNED, str("a snap catch needs ", product, " held in place on locating pins in its mounting holes, ",
+        "and the catalog locates none: set retention=friction or none"));
     for (a = ARMS_OK) assert(arm_root(a) >= FLOOR_TOP + 1, "the product is too low for snap arms: set retention=friction or none");
 }
 
@@ -117,10 +125,19 @@ module windows() {
     }
 }
 
-// a board's supports: standoffs on its hole pads, or two ledges under its short ends
+// a board's supports: standoffs on its hole pads, each with a locating pin up into its hole (pin
+// PIN_PLAY under the hole, YAPP_Box's 2.4 in 2.7; catalog.standoffs), or two ledges under its short ends.
+// The pin rises PIN_H over the PCB's underside: no PCB thickness is sourced in the catalog, so 1.0 mm,
+// which engages any board at least 1 mm thick for its full height, 0.6 mm at full diameter under a
+// 0.4 mm chamfer that lets the board drop on and prints without support.
 module supports() {
-    if (BOARD && len(STANDOFFS) > 0) for (s = STANDOFFS)
+    if (BOARD && len(STANDOFFS) > 0) for (s = STANDOFFS) {
         translate([s[0], s[1], FLOOR_TOP - 0.01]) cylinder(d = s[2], h = PCB - FLOOR_TOP + 0.01);
+        translate([s[0], s[1], PCB - 0.01]) {
+            cylinder(d = s[4], h = PIN_H - PIN_CHAMFER + 0.01);
+            translate([0, 0, PIN_H - PIN_CHAMFER]) cylinder(d1 = s[4], d2 = s[4] - 2 * PIN_CHAMFER, h = PIN_CHAMFER + 0.01);
+        }
+    }
     if (BOARD && len(STANDOFFS) == 0) for (x0 = [-C - wall, W - 2])
         translate([x0, 4, FLOOR_TOP - 0.01]) cube([2 + C + wall, D - 8, PCB - FLOOR_TOP + 0.01]);
 }
@@ -167,6 +184,7 @@ if (RET == "snap") {
     a = ARMS_OK[0];
     p = face_pt(a[0], a[1], arm_root(a), C + wall / 2);
     t = -face_n(a[0]);
+    echo(stone_locate = [TRAVEL, [for (s = STANDOFFS) [s[0], s[1], s[3], s[4]]]]);
     echo(stone_snap = [p[0] + OX, p[1] + OY, p[2] + OZ, t[0], t[1], t[2], ARM_W, arm_y(a), SNAP_T, arm_top(a) - arm_root(a)]);
     // each catch's plan footprint and underside, product frame: [x0, x1, y0, y1, underside z]
     echo(stone_catch = [for (b = ARMS_OK) let(

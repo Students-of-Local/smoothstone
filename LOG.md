@@ -494,12 +494,14 @@ PR 67 review, round 2:
 - second-S1 fixed: for a product not in the catalog, fitted_case asks only which product it is (maker
   and model). An answer that names none ends the ask: it says fitted_case builds only for products
   with sourced sizes, names some, and points to box for a custom size, instead of asking again.
-- first-F1 open: with the catch sized for the side clearance, the Pi 5 can slide 1.93 mm toward -y
-  (its PCB edge stops on the -y wall, its HDMI shells slide into their windows) and the catch then
-  misses the USB shell. Locating pins in the 2.7 mm holes (2.4, YAPP_Box's size) would hold it to
-  0.15, but e01 then fails the grader's fit check: a pin rises 2.45 mm into the body box from its -z
-  face, past the spec's -1.5 face_gap, and check_fit's interference test does not leave the
-  product's mounting holes out. Waiting on a decision; the grader is not changed here.
+- first-F1 fixed: with the catch sized for the side clearance, the Pi 5 could slide 1.93 mm toward
+  -y (its PCB edge stops on the -y wall, its HDMI shells slide into their windows) and the catch then
+  missed the USB shell. Each standoff now carries a 2.4 mm locating pin in the 2.7 mm hole (YAPP_Box's
+  size; pin = hole - 0.3), 1.0 mm over the PCB's underside with a 0.4 mm chamfer (no PCB thickness is
+  sourced, so 1.0 mm is a stated minimum). The board slides at most 0.15 mm, and the catch reach is
+  sized from that: y 2.3 for PLA slip, catch 0.4 past the shell's edge, 0.25 after the worst slide.
+  Snap needs pins. This needed the grader change in the commit before it (a pin inside a product's
+  mounting hole is not inside the product); e01 fails without it.
 
 2026-11-22, PR 67 round 2: the grader's fit check read a locating pin inside a mounting hole as the
 part inside the product (1.85 mm on e01), so it refused the pins that keep a Pi from sliding off its
