@@ -16,7 +16,10 @@ REPO = Path(__file__).resolve().parent.parent
 def stone(*argv):
     text, code = cli.run(list(argv))
     lines = text.splitlines()
-    # contract: short output, one NEXT line, at the end, no tracebacks
+    # contract: short output, one NEXT line, at the end, no tracebacks; after an ask, only the line
+    # that says what to do once the person answers may follow it (climb 4: models noted the question)
+    if lines[-1].startswith("After the person answers (not before): ") and lines[-2].startswith("NEXT: ask the person"):
+        lines = lines[:-1]
     assert len(lines) <= cli.MAX_LINES, text
     assert lines[-1].startswith("NEXT: "), text
     assert sum(ln.startswith("NEXT:") for ln in lines) == 1, text
