@@ -131,3 +131,14 @@ def test_a_sheet_that_runs_too_long_fails(tmp_path, monkeypatch):
         raise npg.subprocess.TimeoutExpired(a[0], k["timeout"])
     monkeypatch.setattr(npg.subprocess, "run", slow)
     assert npg.sheet("cap", tmp_path, tmp_path / "out", tmp_path, timeout=5) == ["sheet: tools/sheet.py took over 5 s"]
+
+
+def test_a_box_is_graded_by_the_room_its_lid_leaves(tmp_path):
+    spec = json.loads((ROOT / "evals" / "tuning-L" / "l3_card_box.json").read_text())
+    box = {"w": 91.6, "d": 60.0, "h": 21.2, "wall": 2.0, "floor": 2.0}
+    for lip_h, short in ((2.0, False), (3.0, False), (5.0, True)):  # room 17.2, 16.2, 14.2 for a 15.2 stack
+        job = tmp_path / f"lip{lip_h}"
+        (job / "build").mkdir(parents=True)
+        (job / "build" / "params.json").write_text(json.dumps({"recipe": "box", "params": {**box, "lip_h": lip_h}}))
+        why = run.grade_job(job, spec, [])["why"]
+        assert any(w.startswith("h-floor-lip_h=") for w in why) == short, (lip_h, why)
