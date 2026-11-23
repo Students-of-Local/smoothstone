@@ -650,3 +650,11 @@ reasoning is cut at the token limit it then writes its tool call as text in its 
 (`<function=stone>...`), which the openai driver does not read; climb 3 removed the cutoffs that led
 there, but the driver gap remains (a harness change, left out of this climb so before and after
 measure stone's text alone).
+
+Held-out, measured once on this climb's code and not tuned on (evals/engineering_heldout, x01 Steam
+Deck stand, x02 MX Master tray): 0 of 14. `--driver next` fails both, so the gap is stone's, not
+the models': neither product is in the catalog, and stone has no path for a product the person
+describes by its measured size with a source. Most runs ended with no engineering.json; LFM3-1.7B
+seed 1 on x01 and seed 3 on x02 died on Ollama HTTP 400. The scores stay out of evals/scores.jsonl.
+Next track: a holder, mount or case for any product given its size and source, climbed on tuning
+specs only, with these two sealed as the check.
