@@ -408,10 +408,11 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
              (not isinstance(want, list) and (got == want or (isinstance(want, (int, float)) and isinstance(got, (int, float)) and abs(got - want) < 1e-6)))
         if not ok:
             why.append(f"{k}={got!r} (want {want})")
-    for s in exp.get("sum", []):
-        tot = sum(params.get(k, 0) or 0 for k in s["params"])
-        if tot != s["eq"]:
-            why.append(f"{'+'.join(s['params'])}={tot} (want {s['eq']})")
+    for s in exp.get("sum", []):  # params added, less any in "minus": equal to "eq" or within "range"
+        tot = sum(params.get(k, 0) or 0 for k in s["params"]) - sum(params.get(k, 0) or 0 for k in s.get("minus", []))
+        if ("eq" in s and tot != s["eq"]) or ("range" in s and not s["range"][0] <= tot <= s["range"][1]):
+            name = "+".join(s["params"]) + "".join(f"-{k}" for k in s.get("minus", []))
+            why.append(f"{name}={round(tot, 2)} (want {s.get('eq', s.get('range'))})")
     if exp.get("image_used") and not params.get(exp["image_used"]):
         why.append("the picture was not used")
     res = []
