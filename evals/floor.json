@@ -37,10 +37,12 @@
    "l1_mating_gear",
    "l2_button_panel",
    "l4_backpack_hook",
+   "l5_l_bracket",
+   "l6_usb_enclosure",
    "l7_broom_cap",
    "l8_drill_stand"
   ],
-  "rate": 0.8125,
+  "rate": 0.9375,
   "total": 16
  },
  "tuning-L/claude-opus_cardL": {
@@ -62,6 +64,7 @@
   "judge": null,
   "passing": [
    "m1_comb_inches",
+   "m2_aa_box",
    "m3_workshop_sign",
    "m4_noctua_guard",
    "m5_gridfinity",
@@ -69,13 +72,14 @@
    "m7_star_keychain",
    "m8_heart_cutter"
   ],
-  "rate": 0.875,
+  "rate": 1.0,
   "total": 16
  },
  "tuning-M/claude-opus_cardL": {
   "judge": null,
   "passing": [
    "m1_comb_inches",
+   "m2_aa_box",
    "m3_workshop_sign",
    "m4_noctua_guard",
    "m5_gridfinity",
@@ -83,7 +87,7 @@
    "m7_star_keychain",
    "m8_heart_cutter"
   ],
-  "rate": 0.9375,
+  "rate": 1.0,
   "total": 16
  },
  "tuning/S": {
