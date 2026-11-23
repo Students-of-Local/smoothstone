@@ -36,7 +36,7 @@ FAILS_BEFORE_RESET = 4
 DONE_NEXT = "none, the part is ready"
 NEW_NEXT = 'stone new "<what to make>"'
 # stages before a plan exists; read-only commands may move NEXT only here
-EARLY_STAGES = {"new", "image", "recipes", "show", "no_recipe"}  # no plan yet: the last step says what is next
+EARLY_STAGES = {"new", "image", "recipes", "show", "no_recipe", "ask", "product"}  # no plan yet: the last step says what is next
 
 
 @dataclass
@@ -161,8 +161,12 @@ def build_stamp(job: Job, r: rc.Recipe, given: dict) -> dict:
     params = build_params(job, r, given)
     files = {k: _file_sig(v) for k, v in sorted(params.items())
              if v and r.param(k) is not None and r.param(k).type == "image"}
-    return {"recipe": r.name, "params": params, "files": files, "source": _file_sig(r.scad),
-            "photos": [_file_sig(p) for p in job.photos()], "print": printable.VERSION}
+    stamp = {"recipe": r.name, "params": params, "files": files, "source": _file_sig(r.scad),
+             "photos": [_file_sig(p) for p in job.photos()], "print": printable.VERSION}
+    own = catalog.job_products(job.root)
+    if own and rc.catalog_param(r) is not None:
+        stamp["products"] = {s: _file_sig(job.root / "products" / f"{s}.json") for s in sorted(own)}
+    return stamp
 
 
 def build_params(job: Job | None, r: rc.Recipe, given: dict) -> dict:
@@ -348,7 +352,8 @@ def product_reason(r: rc.Recipe, request: str) -> str | None:
         return None
     h = rc.head(request)
     noun = h[-1] if h and h[-1].isalpha() and h[-1] not in rc.STOPWORDS else "part"
-    return f"For this request: {r.name} makes the {noun} for the {prod['name']} from its published sizes."
+    whose = "the sizes the person gave" if prod.get("set") == "job" else "its published sizes"
+    return f"For this request: {r.name} makes the {noun} for the {prod['name']} from {whose}."
 
 
 # show
@@ -490,6 +495,88 @@ def param_line(p: rc.Param, short: bool = False) -> str:
     return line
 
 
+OPEN_TOP = {"cup", "tray", "cradle", "holder", "stand", "dock", "nest", "base"}  # parts a product sits down into
+
+
+def product_ask(job: Job, r: rc.Recipe, t: str, named: bool = False) -> str | None:
+    """The product the request names a part for ("a mount for my Mac Studio (2025)"), when this recipe
+    and the one stone recipes puts first both build from the catalog and the catalog (the job's own
+    products included) has no such product: its size must come from the person. None otherwise, or
+    when the set line names a product (named)."""
+    request = job.request() if job.exists() else ""
+    if not request or named or rc.catalog_param(r) is None:
+        return None
+    x = match.product_named(request)
+    if x is None or catalog.find(" ".join([request, *job.notes()])):
+        return None
+    top = request_recipe(request, t)
+    return x if top is not None and rc.catalog_param(top) is not None else None
+
+
+def ask_product_size(out: Out, job: Job, x: str, t: str) -> Out:
+    """NEXT asks the person for the product's size and where it comes from; their answer, through
+    stone note, becomes the stone product add line."""
+    top = request_recipe(job.request(), t)
+    out.add(f"The catalog has no sourced sizes for {x}, and stone never guesses a product's size.")
+    out.add('When the person answers, run: stone note "<their answer>"')
+    if t != "S":
+        out.add('Their answer becomes: stone product add "<name>" --size W D H --source "<URL or measured by the person>"')
+    out.next = f"ask the person: {match.product_size_question(x)}"
+    out.owns_next = True
+    out.stage = "ask"
+    out.result = f"asked the person for the size of {x}"
+    job.update(ask_recipe=top.name if top is not None else None, ask_product=x, ask_got=None)
+    return out
+
+
+def product_add_line(x: str, got: dict, round_: bool, open_faces: list[str]) -> str:
+    """The stone product add command for the size the person gave."""
+    w, h = got["w"], got["h"]
+    d = w if round_ else got["d"]
+    line = f'stone product add "{x.replace(chr(34), "")}" --size {rc.fmt_num(w)} {rc.fmt_num(d)} {rc.fmt_num(h)}'
+    if round_:
+        line += " --round"
+    if open_faces:
+        faces = ",".join(open_faces)
+        line += f" --open={faces}" if faces.startswith("-") else f" --open {faces}"
+    return line + f' --source "{got["source"]}"'
+
+
+def note_product(out: Out, job: Job, st: dict, text: str) -> Out:
+    """The person's answer to the product size question: once it gives every size and a source,
+    NEXT is the stone product add line with their numbers; else NEXT asks for what is missing."""
+    x = st["ask_product"]
+    prev = st.get("ask_got") or {}
+    new = match.size_answer(text)
+    got = {**prev, **{k: v for k, v in new.items() if v}}
+    got["round"] = bool(prev.get("round") or new.get("round"))
+    ar = rc.load(st["ask_recipe"]) if st.get("ask_recipe") else None
+    cp = rc.catalog_param(ar) if ar is not None else None
+    round_ = got["round"] or (cp is not None and cp.catalog == "round_case")
+    names = {"w": "diameter" if round_ else "width", "d": "depth", "h": "height"}
+    missing = [names[k] for k in (("w", "h") if round_ else ("w", "d", "h")) if not got.get(k)]
+    out.owns_next = True
+    if missing or not got.get("source"):
+        job.update(ask_got=got)
+        what = f"{x}'s {' and '.join(missing)} in mm" if missing else f"where {x}'s numbers come from"
+        if missing and not got.get("source"):
+            what += ", and where the numbers come from"
+        out.add(f"Still needed: {what}.")
+        out.next = f"ask the person: {what} (the maker's spec page, or their own ruler)"
+        out.result = "answer read: a size or its source is missing"
+        return out
+    m = match.PRODUCT_RE.search(job.request())
+    noun = m.group(0).split()[0].lower().rstrip("s") if m else ""
+    line = product_add_line(x, got, round_, ["+z"] if noun in OPEN_TOP else [])
+    d = got["w"] if round_ else got["d"]
+    out.add(f"From the answer: {x}, {short_size([got['w'], d, got['h']])}" + (", round" if round_ else "")
+            + f", source {got['source']}")
+    job.update(ask_got=None)
+    out.next = line
+    out.result = "answer read: the product's size and source"
+    return out
+
+
 def cmd_show(args, job: Job) -> Out:
     out = Out(owns_next=False, stage="show")
     t = config.tier(job.root)
@@ -501,6 +588,10 @@ def cmd_show(args, job: Job) -> Out:
     alt = other_product_recipe(job, r, t)
     if alt is not None:
         return steer(out, r, alt)
+    x = product_ask(job, r, t)
+    if x is not None:
+        out.add(f"{r.name}: {r.title}")
+        return ask_product_size(out, job, x, t)
     request = job.request() if job.exists() else ""
     sug, left = match.suggest_full(r, request) if request else ({}, [])
     ms = measured_size(job, r) if job.exists() else None
@@ -523,7 +614,9 @@ def cmd_show(args, job: Job) -> Out:
     if cp is not None and sug.get(cp.name):
         prod = catalog.get(str(sug[cp.name]))
         if prod:
-            out.add(f"Product: {prod['name']} (catalog, sourced: {', '.join(prod.get('sources', [])[:1])})")
+            src = ", ".join(prod.get("sources", [])[:1]) or "measured by the person"
+            kind = "given by the person for this job" if prod.get("set") == "job" else "catalog"
+            out.add(f"Product: {prod['name']} ({kind}, sourced: {src})")
     if ms and ms[0] not in sug:
         clamp = f", the measured {rc.fmt_num(ms[2])} mm is out of range" if ms[1] != ms[2] else ""
         out.add(f"From the picture: {ms[0]}={rc.fmt_num(ms[1])} (object long side in mm{clamp})")
@@ -646,6 +739,11 @@ def cmd_set(args, job: Job) -> Out:
         items = [k + "=" + (json.loads(v) if v.startswith('"') else v)
                  for k, v in (it.split("=", 1) for it in shown)]
     given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
+    x = product_ask(job, r, t, named=any(p is not None and p.catalog for _, _, p in given))
+    if x is not None:
+        # never build for a catalog product the person did not name: the default one is not theirs
+        out.fix(f"the catalog has no sourced sizes for {x}; never guess them")
+        return ask_product_size(out, job, x, t)
     # the set line answers the question when it names the product (phone=iphone_17_pro) or gives a length
     # (hole_d=60); so does a size measured from a photo
     named = [f"{k} {v.replace('_', ' ')}" for k, v, p in given if p is not None and p.product]
@@ -1015,7 +1113,13 @@ def cmd_build(args, job: Job) -> Out:
     made = params
     if fig is not None and params.get(fig.name) and Path(params[fig.name]).is_file():
         made = {**params, fig.name: str(brace_step(job, Path(params[fig.name]), params, out))}
-    run = scad.build_stl(binary, r, made, stl)
+    defines = None
+    if catalog.job_products(job.root) and rc.catalog_param(r) is not None:
+        # the job's own products join the tables the recipe reads (lib/catalog.scad, products.scad)
+        defines = {"CATALOG": catalog.catalog_value()}
+        if "PRODUCTS" in Path(r.scad).read_text():
+            defines["PRODUCTS"] = catalog.products_value()
+    run = scad.build_stl(binary, r, made, stl, defines)
     (bd / "openscad.log").write_text(run.log)
     job.log(f"openscad build ({'ok' if run.ok else 'failed'}):\n{run.log}")
     if not run.ok:
@@ -1596,6 +1700,9 @@ def cmd_note(args, job: Job) -> Out:
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
     st = job.status()
+    if str(st.get("next", "")).startswith("ask the person") and st.get("ask_product"):
+        # the answer is the product's size: it is kept as a note, never read into the request as a part size
+        return note_product(out, job, st, text)
     if str(st.get("next", "")).startswith("ask the person") and st.get("ask_recipe"):
         # the answer to stone's question is part of the request now, so show places its size
         with job.brief_file.open("a") as f:
@@ -1604,6 +1711,95 @@ def cmd_note(args, job: Job) -> Out:
         out.next = f"stone show {st['ask_recipe']}"
         return out
     out.next = st.get("next") or "stone recipes"
+    return out
+
+
+FACE_WORDS = {"top": "+z", "bottom": "-z", "front": "-y", "back": "+y", "rear": "+y", "right": "+x", "left": "-x"}
+
+
+def cmd_product(args, job: Job) -> Out:
+    """stone product add: a product the catalog does not have, from the size the person gave and
+    where it comes from, written to job/products/<slug>.json. stone never estimates a size, so a
+    product with no source is refused."""
+    out = Out(stage="product")
+    if not need_job(job, out):
+        return out
+    name = " ".join(args.name).strip().strip('"')
+    st = job.status()
+    again = job.status().get("next") or "stone recipes"
+    size = list(args.size or [])
+    usage = f'stone product add "{name or "<name>"}" --size W D H --source "<URL or measured by the person>"'
+    if not args.source or not str(args.source).strip():
+        out.fix("give --source: the maker's spec page URL, or \"measured by the person\"; "
+                "stone never estimates a size, so a size with no source is not used")
+        out.next = (f"ask the person: where do {name or 'the product'}'s numbers come from "
+                    f"(the maker's spec page, or their own ruler)?")
+        out.result = "product refused: no source"
+        return out
+    if args.round and len(size) == 2:
+        size = [size[0], size[0], size[1]]  # a disc: diameter and height
+    if len(size) != 3 or not name:
+        out.fix(("name the product and " if not name else "") + "give --size with width, depth and height in mm"
+                + " (a round one: --round with its diameter and height)")
+        out.next = usage
+        out.result = "product refused: no size"
+        return out
+    w, d, h = size
+    if min(size) <= 0 or max(size) > 2000:
+        out.fix("each size is in mm, above 0 and at most 2000")
+        out.next = usage
+        out.result = "product refused: size out of range"
+        return out
+    if args.round and abs(d - w) > 0.01:
+        out.fix(f"a round product's depth is its diameter: give --size {rc.fmt_num(w)} {rc.fmt_num(w)} {rc.fmt_num(h)}")
+        out.next = usage.replace("W D H", f"{rc.fmt_num(w)} {rc.fmt_num(w)} {rc.fmt_num(h)} --round")
+        out.result = "product refused: round with two widths"
+        return out
+    faces = []
+    for f in re.split(r"[,\s]+", (args.open or "").strip().lower()):
+        f = FACE_WORDS.get(f, f)
+        if f and f not in catalog.FACES:
+            out.fix(f"--open takes faces like +z or -y,+y (or top, front, back), not {f}")
+            out.next = usage
+            out.result = "product refused: bad face"
+            return out
+        if f:
+            faces.append(f)
+    have = catalog.find(name, list(catalog.shipped()))
+    if have is not None or catalog.slug_of(name) in catalog.shipped():
+        prod = catalog.get(have or catalog.slug_of(name))
+        out.fix(f"the catalog already has the {prod['name']} with its published sizes ({prod['slug']}); use it")
+        out.next = again if not again.startswith("stone product") else "stone recipes"
+        out.result = "product refused: already in the catalog"
+        return out
+    if catalog.slug_of(name) == "":
+        out.fix("name the product with letters or numbers")
+        out.next = usage
+        return out
+    rec = catalog.make_product(name, w, d, h, str(args.source).strip(), args.corner_r, args.round, faces)
+    path = job.root / "products" / f"{rec['slug']}.json"
+    write_json(path, rec)
+    b = rec["body"]
+    out.add(f"Product: {rec['name']}, slug {rec['slug']} (written to {path})")
+    out.add(f"Size: {short_size([b['w'], b['d'], b['h']])}" + (", round" if args.round else f", corner_r {rc.fmt_num(b['corner_r'])}")
+            + (f", open {' '.join(faces)}" if faces else "") + f"; source: {args.source}")
+    kinds = catalog.kinds_for(rec["slug"])
+    takers = [r for r in rc.load_all().values() if rc.catalog_param(r) is not None and rc.catalog_param(r).catalog in kinds]
+    out.add("Parts that take it: " + (", ".join(r.name for r in takers) or "none yet"))
+    plan = job.plan()
+    pick = (plan or {}).get("recipe") or st.get("ask_recipe")
+    r = rc.load(pick) if pick else None
+    job.update(ask_product=None, ask_got=None)
+    out.result = f"product {rec['slug']} added"
+    if r is None or not takes(r, rec["slug"]):
+        if r is not None:
+            out.add(f"{r.name} cannot take it ({'a round body' if args.round else 'a box'}); pick one that does.")
+        out.next = "stone recipes"
+        return out
+    cp = rc.catalog_param(r)
+    sug = match.suggest_full(r, job.request())[0] if job.request() else {}
+    sug[cp.name] = rec["slug"]
+    out.next = f"stone set {r.name} " + " ".join(f"{k}={rc.fmt_value(r.param(k), v)}" for k, v in sug.items() if r.param(k))
     return out
 
 
@@ -2578,6 +2774,15 @@ def make_parser() -> Parser:
     s = sub.add_parser("note", parents=[common], help="keep a researched fact and its source in the job")
     s.add_argument("text", nargs="*")
 
+    s = sub.add_parser("product", parents=[common], help='a product the catalog lacks: stone product add "<name>" --size W D H --source "<URL>"')
+    s.add_argument("action", choices=["add"])
+    s.add_argument("name", nargs="+")
+    s.add_argument("--size", nargs="+", type=float, help="width, depth and height in mm (a round one: diameter and height)")
+    s.add_argument("--corner-r", type=float, help="the corner radius in mm, when the source gives one")
+    s.add_argument("--round", action="store_true", help="a disc: the width is its diameter")
+    s.add_argument("--source", help="the maker's spec page URL, or 'measured by the person'")
+    s.add_argument("--open", default="", help="faces that stay clear, like +z or -y,+y")
+
     s = sub.add_parser("refs", parents=[common], help="sourced facts: filaments, standards, design (stone refs PETG)")
     s.add_argument("topic", nargs="*")
 
@@ -2620,6 +2825,7 @@ COMMANDS = {
     "measure": cmd_measure,
     "find": cmd_find,
     "note": cmd_note,
+    "product": cmd_product,
     "refs": cmd_refs,
     "done": cmd_done,
     "colors": cmd_colors,
@@ -2693,6 +2899,7 @@ def run(argv: list[str]) -> tuple[str, int]:
     argv = _tidy(argv)
     parser = make_parser()
     job = Job(_guess_job(argv))
+    catalog.use_job(job.root)
     cmdline = "stone " + " ".join(argv)
     try:
         args = parser.parse_args(argv)
@@ -2700,6 +2907,7 @@ def run(argv: list[str]) -> tuple[str, int]:
             args = parser.parse_args(argv + ["status"])
         cmd = args.cmd
         job = Job(config.job_dir(getattr(args, "job", None) or args.job_top))
+        catalog.use_job(job.root)
         out = COMMANDS[cmd](args, job)
     except UsageError as e:
         out = Out()

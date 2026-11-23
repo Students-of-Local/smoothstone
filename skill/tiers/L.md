@@ -18,6 +18,11 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   fit-critical number, clearances, a fit-test slice, a look list for likeness, and a real
   museum scan before generating any famous artwork. Save every fact with stone note.
 
+- A product the catalog lacks: its size comes from the maker's spec page or the person's ruler,
+  never a guess. Ask when you cannot cite one, then stone product add "<name>" --size W D H
+  --source "<URL or measured by the person>" (--round, --corner-r, --open as the source says);
+  every product recipe takes it like a catalog product.
+
 ## Figures and image models
 - The figure recipe takes a unit-height mesh (image_kind "figure"). stone builds it from photos
   with src/smoothstone/figure.py: describe (LFM3-VL-2B), style (FLUX.2 klein 4B), lift

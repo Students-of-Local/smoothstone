@@ -27,9 +27,13 @@ _g.loader.exec_module(grade)
 
 
 def test_catalog_holds_every_engineering_product_word_for_word():
+    # a spec whose person gives the product's size in a follow-up (e11, e12) is for a product the
+    # catalog does not have: stone asks for it and the job holds it (tests/test_job_products.py)
+    shipped = {sid: s for sid, s in SPECS.items() if not s.get("followups")}
     by_spec = {p["from_spec"]: p for p in catalog.all_products().values()}
-    assert len(by_spec) == len(SPECS) == 10
-    for sid, spec in SPECS.items():
+    assert len(by_spec) == len(shipped) == 10 and len(SPECS) == 12
+    assert all(catalog.find(s["request"]) is None for s in SPECS.values() if s.get("followups"))
+    for sid, spec in shipped.items():
         p = by_spec[f"evals/engineering/{sid}.json"]
         for k in ("name", "body", "body_sources", "features", "sources"):
             assert p[k] == spec["product"].get(k, [] if k == "features" else {}), (sid, k)
@@ -281,14 +285,17 @@ def test_an_uncatalogued_product_on_the_next_path_ends_at_a_clear_answer(jobenv,
     """second-S1 on stone's own path: ask, note, show, set must end at a plain answer, not the same ask."""
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
     cli.run(["new", "a case for my Garmin watch"])
+    # climb 4: the product the catalog lacks is asked for by its size and where the numbers come from;
+    # an answer with no source asks for the source, never a guess and never the same question
     first = _follow_from("stone status")
-    assert first == "ask the person: Which product is it, exactly (its maker and model number)?", first
+    assert first == ("ask the person: Garmin watch's width, depth and height in mm, and where the numbers come "
+                     "from (the maker's spec page, or their own ruler)"), first
     seen = [first]
     for answer in ("Garmin Venu 3, 45 x 45 x 12 mm", "it is about 45 mm square"):
         text, _ = cli.run(["note", answer])
         seen.append(_follow_from(re.findall(r"^NEXT: (.+)$", text, re.M)[-1].strip()))
-    assert all(x.startswith("ask the person: fitted_case builds only for products") and "stone show box" in x
-               for x in seen[1:]), seen
+    assert all(x.startswith("ask the person: where Garmin watch's numbers come from") for x in seen[1:]), seen
+    assert not (jobenv / "stone-job" / "plan.json").exists()
 
 
 def test_pins_hold_the_board_so_it_slides_no_farther_than_the_pin_play(openscad, tmp_path):

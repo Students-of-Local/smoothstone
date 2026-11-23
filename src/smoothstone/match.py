@@ -397,3 +397,77 @@ def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None)
     thing = re.sub(r"\bmy\b", "your", re.sub(r"\bour\b", "your", thing, flags=re.I), flags=re.I)
     return (f"What are the measurements of {thing}, in mm? A photo with a ruler in it works too, "
             f"or the exact product name and model.")
+
+
+# --- a product the catalog does not have: its size comes from the person ------------------------
+# "a mount for my Mac Studio (2025)", "a cup that holds my HomePod mini on a shelf": a part named for
+# a product. The product's name runs to a word that says where the part goes or a punctuation mark.
+PART_WORDS = (r"case|sleeve|holder|stand|mount|cradle|tray|dock|cover|bracket|cup|hanger|enclosure|"
+              r"shell|bumper|nest|base|rack|shelf|clip|adapter|plate|box")
+PRODUCT_RE = re.compile(
+    rf"\b(?:{PART_WORDS})(?:es|s)?\b(?:\s+(?:that|which|to|will))?\s+"
+    r"(?:for|holds?|holding|fits?|fitting|takes?)\s+(?:my|our|his|her|their|a|an|the)\s+"
+    r"(?P<x>(?:\([^)]*\)|[^,;:!?()])+?)"
+    r"(?=\s+(?:on|in|into|onto|under|over|at|to|with|so|that|which|from|by|inside|near|and|design|designed|"
+    r"using|made|printed|for)\b|\s*[,;:!?]|\.(?!\d)|\s*$)", re.I)
+
+
+def product_named(request: str) -> str | None:
+    """The product the request names a part for ("Mac Studio (2025)" in "an under desk mount for my
+    Mac Studio (2025)"), or None when it names none."""
+    m = PRODUCT_RE.search(request or "")
+    if not m:
+        return None
+    x = re.sub(r"\s+", " ", m.group("x")).strip(" .")
+    return x if re.search(r"[A-Za-z]", x) else None
+
+
+def product_size_question(name: str) -> str:
+    """What stone asks the person for a product the catalog does not have: never a guessed size."""
+    return (f"{name}'s width, depth and height in mm, and where the numbers come from "
+            f"(the maker's spec page, or their own ruler)")
+
+
+SIZE_KEYS = {"w": r"width|wide|across|diameter|dia", "d": r"depth|deep|length|long",
+             "h": r"height|high|tall|thick|thickness"}
+QTY_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(mm|millimet(?:er|re)s?|cm|centimet(?:er|re)s?|inches|inch|in\b|\")?",
+                    re.I)
+BY3_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*"
+                    r"(\d+(?:\.\d+)?)\s*(mm|cm|inches|inch|in\b|\")?", re.I)
+MEASURED_RE = re.compile(r"\b(?:ruler|measured|measure|calipers?|caliper|tape)\b", re.I)
+
+
+def _mm(v: str, unit: str | None) -> float:
+    u = (unit or "mm").lower()
+    k = 10.0 if u.startswith("c") else 25.4 if u.startswith("in") or u == '"' else 1.0
+    return round(float(v) * k, 2)
+
+
+def size_answer(text: str) -> dict:
+    """The person's answer to product_size_question, read: {"w", "d", "h" in mm (those given),
+    "source" (the first URL, or "measured by the person" when they say they measured it), "round"
+    (they gave a diameter or said round)}. A size given in more than one unit ("7.7 inches (19.7 cm)")
+    is read in the metric one, as the maker printed it; a number with no unit is mm."""
+    from .catalog import first_url
+
+    out: dict = {}
+    url = first_url(text)
+    if url:
+        out["source"] = url
+    elif MEASURED_RE.search(text or ""):
+        out["source"] = "measured by the person"
+    rest = re.sub(r"https?://\S+", " ", text or "")
+    out["round"] = bool(re.search(r"\b(?:diameter|round|across|disc|circular)\b|Ø", rest, re.I))
+    m = BY3_RE.search(rest)
+    if m:
+        out.update(w=_mm(m.group(1), m.group(4)), d=_mm(m.group(2), m.group(4)), h=_mm(m.group(3), m.group(4)))
+        return out
+    for part in re.split(r"[,;\n]|\band\b", rest):
+        keys = [k for k, pat in SIZE_KEYS.items() if re.search(rf"\b(?:{pat})\b", part, re.I)]
+        qty = [(v, u) for v, u in QTY_RE.findall(part)]
+        if len(keys) != 1 or not qty:
+            continue
+        metric = [(v, u) for v, u in qty if u and u.lower()[0] in "mc"]
+        v, u = (metric or qty)[0]
+        out.setdefault(keys[0], _mm(v, u))
+    return out

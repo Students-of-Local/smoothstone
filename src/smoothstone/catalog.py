@@ -8,6 +8,10 @@ next to each; a product whose numbers are not published is left out, never estim
 
 The ten products here are the tuning set (from evals/engineering). Products for a held-out set come
 later and must not be tuned on.
+
+A product the catalog does not have comes from the person: `stone product add` writes it to the job
+(job/products/<slug>.json, the same schema, "set": "job") with the size they gave and where it came
+from, and while that job is the current one (use_job) every function here sees it like a shipped one.
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ FACES = ("+x", "-x", "+y", "-y", "+z", "-z")
 
 
 @lru_cache(maxsize=1)
-def _all() -> dict[str, dict]:
+def _shipped() -> dict[str, dict]:
     out = {}
     for f in sorted(DIR.glob("*.json")):
         p = json.loads(f.read_text())
@@ -30,9 +34,45 @@ def _all() -> dict[str, dict]:
     return out
 
 
+# The job whose own products (job/products/<slug>.json, written by stone product add) count as part
+# of the catalog while it is the current one. stone sets it for every command (cli.run).
+JOB: Path | None = None
+
+
+def use_job(root: Path | None) -> None:
+    """Make root the current job, so its products are in the catalog; None leaves only the shipped ones."""
+    global JOB
+    JOB = Path(root) if root is not None else None
+
+
+def job_products(root: Path | None = None) -> dict[str, dict]:
+    """slug -> product record, the products the person gave this job (none for no job)."""
+    root = root if root is not None else JOB
+    out = {}
+    if root is None:
+        return out
+    for f in sorted((Path(root) / "products").glob("*.json")):
+        try:
+            p = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(p, dict) and p.get("slug") and p["slug"] not in _shipped():
+            out[p["slug"]] = p
+    return out
+
+
+def _all() -> dict[str, dict]:
+    return {**_shipped(), **job_products()}
+
+
 def all_products() -> dict[str, dict]:
-    """slug -> product record, every product in the catalog."""
+    """slug -> product record, every product in the catalog, the current job's included."""
     return dict(_all())
+
+
+def shipped() -> dict[str, dict]:
+    """slug -> product record, the products that ship with stone (src/smoothstone/products)."""
+    return dict(_shipped())
 
 
 def get(slug: str) -> dict | None:
@@ -80,6 +120,57 @@ def kinds_for(slug: str) -> list[str]:
     """The kinds of part the catalog can make for a product."""
     p = get(slug)
     return [k for k, ok in KINDS.items() if p is not None and ok(p)]
+
+
+def slug_of(name: str) -> str:
+    """A product name as a slug: "Mac Studio (2025)" is mac_studio_2025."""
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def model_numbers(name: str) -> list[str]:
+    """The model numbers in a product's name: words of 4 or more characters with letters and digits
+    both ("A1388", "ABX00080"); a year or a chip name such as M4 is not one."""
+    return [w for w in re.findall(r"[A-Za-z0-9-]+", name)
+            if len(w) >= 4 and re.search(r"[A-Za-z]", w) and re.search(r"\d", w)]
+
+
+def make_product(name: str, w: float, d: float, h: float, source: str, corner_r: float | None = None,
+                 round_: bool = False, open_faces: list[str] | None = None) -> dict:
+    """A product record from the size the person gave and where it comes from (a URL, or "measured by
+    the person"), in the catalog's schema. A round one is a disc: w is its diameter, d = w and the
+    corner radius half of it. A box is one a fitted case can hold. Nothing here is estimated: a corner
+    radius not given is 0, the enclosing box."""
+    w, d, h = float(w), float(d), float(h)
+    url = first_url(source)
+    if round_:
+        d, r = w, w / 2
+        r_src = f"{source} (half the {w:g} mm diameter: a round body)"
+    elif corner_r:
+        r = float(corner_r)
+        r_src = f"{source} (corner radius {r:g} mm, as the person gave it)"
+    else:
+        r = 0.0
+        r_src = f"no radius given with {source}; 0 is the enclosing box"
+    aliases = [name] + [m for m in model_numbers(name) if m != name]
+    return {
+        "slug": slug_of(name),
+        "name": name,
+        "aliases": aliases,
+        "set": "job",
+        "frame": ("x width, y depth (front at -y), z height, as the person gave them; no feature is located, "
+                  "so the faces named in open_faces stay clear"),
+        "fitted_case": not round_,
+        "open_faces": [f for f in FACES if f in (open_faces or [])],
+        "body": {"w": w, "d": d, "h": h, "corner_r": round(r, 4)},
+        "body_sources": {
+            "w": f"{source} ({'diameter' if round_ else 'width'} {w:g} mm, as the person gave it)",
+            "d": f"{source} ({'the same diameter: the body is round' if round_ else f'depth {d:g} mm, as the person gave it'})",
+            "h": f"{source} (height {h:g} mm, as the person gave it)",
+            "corner_r": r_src,
+        },
+        "features": [],
+        "sources": [url] if url else [],
+    }
 
 
 def _plain(text: str) -> str:
@@ -294,24 +385,34 @@ def _scad(v) -> str:
     return str(round(v, 4) if isinstance(v, float) else v)
 
 
+def _case_rows(products: dict[str, dict]) -> list[str]:
+    rows = []
+    for slug in sorted(s for s, p in products.items() if p.get("fitted_case")):
+        p = products[slug]
+        b = p["body"]
+        board = p.get("board")
+        pcb = float(board["pcb_underside_z"]) if board else -1.0
+        arms = snap_arms(p)
+        rows.append(_scad([slug, [float(b["w"]), float(b["d"]), float(b["h"])], list(p.get("open_faces", [])),
+                           pcb, standoffs(p), windows(p), arms]))
+    return rows
+
+
+def products_value() -> str:
+    """The fitted case's PRODUCTS table as one OpenSCAD value, the current job's products included:
+    a build for a job product passes it with -D, so the shipped products.scad stays as generated."""
+    return "[" + ", ".join(_case_rows(_all())) + "]"
+
+
 def scad_table() -> str:
-    """recipes/fitted_case/products.scad: one row per product a fitted case can hold."""
+    """recipes/fitted_case/products.scad: one row per shipped product a fitted case can hold."""
     lines = ["// GENERATED by tools/products_scad.py from src/smoothstone/products/*.json. Do not edit by hand.",
              "// Row: [slug, [w, d, h], open faces, PCB underside z (-1: not a board), standoffs [[x, y, d, hole, pin]],",
              "//       windows [[face, u, v, half w, half h, round]],",
              "//       snap arms [[face, u, gap from the catch surface to the product's face, the surface's top z]]]",
              "// Product frame (evals/README.md): x width, y depth, z height, origin at the body's min corner.",
              "PRODUCTS = ["]
-    rows = []
-    for slug in case_slugs():
-        p = get(slug)
-        b = p["body"]
-        board = p.get("board")
-        pcb = float(board["pcb_underside_z"]) if board else -1.0
-        arms = snap_arms(p)
-        rows.append("  " + _scad([slug, [float(b["w"]), float(b["d"]), float(b["h"])], list(p.get("open_faces", [])),
-                                  pcb, standoffs(p), windows(p), arms]))
-    lines.append(",\n".join(rows))
+    lines.append(",\n".join("  " + r for r in _case_rows(_shipped())))
     lines.append("];")
     return "\n".join(lines) + "\n"
 
@@ -329,25 +430,35 @@ def _feature_row(f: dict) -> list:
             float(pw), float(ph), f.get("shape") == "circle", float(f.get("depth") or 0)]
 
 
+def _catalog_rows(products: dict[str, dict]) -> list[str]:
+    rows = []
+    for slug, p in sorted(products.items()):
+        b = p["body"]
+        board = p.get("board")
+        sh = p.get("shaft")
+        rows.append(_scad([slug, [float(b["w"]), float(b["d"]), float(b["h"])], float(b.get("corner_r") or 0),
+                           [[float(r), float(z)] for r, z in b.get("profile", [])], list(p.get("open_faces", [])),
+                           float(board["pcb_underside_z"]) if board else -1.0,
+                           [_feature_row(f) for f in p.get("features", [])],
+                           [sh["type"], float(sh.get("flat") or 0)] if sh else []]))
+    return rows
+
+
+def catalog_value() -> str:
+    """The CATALOG table as one OpenSCAD value, the current job's products included: a build for a
+    job product passes it with -D, so catalog_row(slug) finds it and lib/catalog.scad stays as generated."""
+    return "[" + ", ".join(_catalog_rows(_all())) + "]"
+
+
 def catalog_table() -> str:
-    """recipes/lib/catalog.scad: one row per product in the catalog."""
+    """recipes/lib/catalog.scad: one row per shipped product."""
     lines = ["// GENERATED by tools/products_scad.py from src/smoothstone/products/*.json. Do not edit by hand.",
              "// Row: [slug, [w, d, h], corner_r, profile [[r, z]] ([] for a box), open faces,",
              "//       PCB underside z (-1: not a board), features " + FEATURE_ROW + ",",
              "//       shaft [type, across flats] ([] for no shaft)]",
              "// Product frame (evals/README.md): x width, y depth, z height, origin at the body's min corner.",
              "CATALOG = ["]
-    rows = []
-    for slug, p in sorted(_all().items()):
-        b = p["body"]
-        board = p.get("board")
-        sh = p.get("shaft")
-        rows.append("  " + _scad([slug, [float(b["w"]), float(b["d"]), float(b["h"])], float(b.get("corner_r") or 0),
-                                  [[float(r), float(z)] for r, z in b.get("profile", [])], list(p.get("open_faces", [])),
-                                  float(board["pcb_underside_z"]) if board else -1.0,
-                                  [_feature_row(f) for f in p.get("features", [])],
-                                  [sh["type"], float(sh.get("flat") or 0)] if sh else []]))
-    lines.append(",\n".join(rows))
+    lines.append(",\n".join("  " + r for r in _catalog_rows(_shipped())))
     lines.append("];")
     lines.append("function catalog_row(slug) = let(m = [for (r = CATALOG) if (r[0] == slug) r]) len(m) == 1 ? m[0] : [];")
     return "\n".join(lines) + "\n"
