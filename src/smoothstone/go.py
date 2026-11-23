@@ -39,8 +39,11 @@ def _open(path: str) -> bool:
 
 def _split(text: str) -> tuple[list[str], str]:
     lines = text.splitlines()
-    nxt = lines[-1][len("NEXT: "):] if lines and lines[-1].startswith("NEXT: ") else ""
-    return lines[:-1] if nxt else lines, nxt
+    # NEXT is the last line, or comes before a line meant for later (after an ask)
+    at = max((i for i, ln in enumerate(lines) if ln.startswith("NEXT: ")), default=None)
+    if at is None:
+        return lines, ""
+    return lines[:at] + lines[at + 1:], lines[at][len("NEXT: "):]
 
 
 def _value(lines: list[str], head: str) -> str | None:

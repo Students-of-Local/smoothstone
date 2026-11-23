@@ -48,6 +48,7 @@ class Out:
     stage: str | None = None  # new stage for status.json, None keeps it
     owns_next: bool = True  # False: do not overwrite status next after a plan exists
     raw: str | None = None  # machine output (show --json): printed as is, no NEXT line, no job update
+    after: list[str] = field(default_factory=list)  # lines printed after NEXT: what to do later, not now
 
     def add(self, *lines: str) -> "Out":
         self.lines.extend(lines)
@@ -75,7 +76,7 @@ class Out:
         if len(body) > room:
             cut = len(body) - (room - 1)
             body = body[: room - 1] + [f"({cut} more lines in log.txt)"]
-        return "\n".join(body + [f"NEXT: {self.next}"])
+        return "\n".join(body + [f"NEXT: {self.next}"] + self.after)
 
 
 class UsageError(Exception):
@@ -517,16 +518,75 @@ def ask_product_size(out: Out, job: Job, x: str, t: str) -> Out:
     """NEXT asks the person for the product's size and where it comes from; their answer, through
     stone note, becomes the stone product add line."""
     top = request_recipe(job.request(), t)
+    rnd = asks_round(job.request(), top)
     out.add(f"The catalog has no sourced sizes for {x}, and stone never guesses a product's size.")
-    out.add('When the person answers, run: stone note "<their answer>"')
+    out.next = f"ask the person: {match.product_size_question(x, rnd)}"
+    # NEXT comes first; what to do with the answer is for later, after the person has replied
+    out.after.append('After the person answers (not before): stone note "<their answer>", then run the NEXT line it prints.')
     if t != "S":
-        out.add('Their answer becomes: stone product add "<name>" --size W D H --source "<URL or measured by the person>"')
-    out.next = f"ask the person: {match.product_size_question(x)}"
+        out.after.append('Their answer becomes: stone product add "<name>" --size W D H --source "<URL or measured by the person>"'
+                         + " (--round with diameter and height for a round one)")
     out.owns_next = True
     out.stage = "ask"
     out.result = f"asked the person for the size of {x}"
-    job.update(ask_recipe=top.name if top is not None else None, ask_product=x, ask_got=None)
+    job.update(ask_recipe=top.name if top is not None else None, ask_product=x, ask_got=None, ask_round=rnd)
     return out
+
+
+ROUND_WORDS = re.compile(r"\b(?:round|cup|puck|disc|disk|cylinder|cylindrical)\b", re.I)
+
+
+def asks_round(request: str, top: rc.Recipe | None) -> bool:
+    """A round product: the recipe stone ranks first is for round products, or the request says
+    round, cup, puck or disc. Its size is a diameter and a height."""
+    cp = rc.catalog_param(top) if top is not None else None
+    return (cp is not None and cp.catalog == "round_case") or bool(ROUND_WORDS.search(request or ""))
+
+
+SIZE_KEYS = {"w": ("width", "w", "wide", "x", "diameter", "dia", "d_mm"), "d": ("depth", "d", "deep", "y", "length", "long"),
+             "h": ("height", "h", "high", "tall", "z", "thickness")}
+
+
+def set_sizes(items: list[str]) -> dict:
+    """Product sizes in a stone set line (width=197 depth=197 height=95, size=197x197x95, diameter=97.9),
+    in mm: {"w", "d", "h"} for those given, "round" when a diameter is given."""
+    got: dict = {}
+    for it in items:
+        if "=" not in it and ":" not in it:
+            continue
+        k, v = re.split(r"[=:]", it, maxsplit=1)
+        k = k.strip().lower()
+        nums = [float(n) for n in re.findall(r"\d+(?:\.\d+)?", v)]
+        if not nums:
+            continue
+        if k in ("size", "dims", "dimensions") and len(nums) in (2, 3):
+            got.update(dict(zip(("w", "d", "h"), nums)) if len(nums) == 3 else {"w": nums[0], "h": nums[1]})
+            continue
+        for key, names in SIZE_KEYS.items():
+            if k in names:
+                got.setdefault(key, nums[0])
+                if k in ("diameter", "dia"):
+                    got["round"] = True
+    return got
+
+
+def open_for(request: str) -> list[str]:
+    """The faces a part named in the request leaves clear: +z for one a product sits down into."""
+    m = match.PRODUCT_RE.search(request or "")
+    noun = m.group(0).split()[0].lower().rstrip("s") if m else ""
+    return ["+z"] if noun in OPEN_TOP else []
+
+
+def is_the_question(text: str, asked: str) -> bool:
+    """A note that is stone's own question, or restates it with no number of its own: a model noting
+    the question instead of asking it."""
+    q = asked[len("ask the person"):].lstrip(": ")
+    words = lambda s: {w for w in re.findall(r"[a-z]+", s.lower()) if len(w) > 2} - rc.STOPWORDS  # noqa: E731
+    nums = lambda s: set(re.findall(r"\d+(?:\.\d+)?", s))  # noqa: E731
+    tw, qw = words(text), words(q)
+    if not tw or not nums(text) <= nums(q) or catalog.first_url(text):
+        return False
+    return len(tw) >= 4 and len(tw & qw) / len(tw) >= 0.7
 
 
 def product_add_line(x: str, got: dict, round_: bool, open_faces: list[str]) -> str:
@@ -547,12 +607,12 @@ def note_product(out: Out, job: Job, st: dict, text: str) -> Out:
     NEXT is the stone product add line with their numbers; else NEXT asks for what is missing."""
     x = st["ask_product"]
     prev = st.get("ask_got") or {}
-    new = match.size_answer(text)
+    new = match.size_answer(text, x)
     got = {**prev, **{k: v for k, v in new.items() if v}}
     got["round"] = bool(prev.get("round") or new.get("round"))
     ar = rc.load(st["ask_recipe"]) if st.get("ask_recipe") else None
     cp = rc.catalog_param(ar) if ar is not None else None
-    round_ = got["round"] or (cp is not None and cp.catalog == "round_case")
+    round_ = got["round"] or bool(st.get("ask_round")) or (cp is not None and cp.catalog == "round_case")
     names = {"w": "diameter" if round_ else "width", "d": "depth", "h": "height"}
     missing = [names[k] for k in (("w", "h") if round_ else ("w", "d", "h")) if not got.get(k)]
     out.owns_next = True
@@ -565,9 +625,7 @@ def note_product(out: Out, job: Job, st: dict, text: str) -> Out:
         out.next = f"ask the person: {what} (the maker's spec page, or their own ruler)"
         out.result = "answer read: a size or its source is missing"
         return out
-    m = match.PRODUCT_RE.search(job.request())
-    noun = m.group(0).split()[0].lower().rstrip("s") if m else ""
-    line = product_add_line(x, got, round_, ["+z"] if noun in OPEN_TOP else [])
+    line = product_add_line(x, got, round_, open_for(job.request()))
     d = got["w"] if round_ else got["d"]
     out.add(f"From the answer: {x}, {short_size([got['w'], d, got['h']])}" + (", round" if round_ else "")
             + f", source {got['source']}")
@@ -741,6 +799,22 @@ def cmd_set(args, job: Job) -> Out:
     given = [(k, v, r.param(k)) for k, v in (it.split("=", 1) for it in items if "=" in it)]
     x = product_ask(job, r, t, named=any(p is not None and p.catalog for _, _, p in given))
     if x is not None:
+        sizes = set_sizes(list(args.items))
+        st = job.status()
+        rnd = bool(st.get("ask_round")) or asks_round(job.request(), request_recipe(job.request(), t)) or sizes.get("round")
+        if sizes.get("w") and sizes.get("h") and (rnd or sizes.get("d")):
+            # the sizes are the product's, not the part's: they go to stone product add with their source
+            src = (st.get("ask_got") or {}).get("source") or next(
+                (u for u in (catalog.first_url(n) for n in job.notes()) if u), None)
+            got = {**sizes, "source": src or "<where the person said the numbers come from>"}
+            line = product_add_line(x, got, bool(rnd), open_for(job.request()))
+            out.fix(f"these are {x}'s sizes, not the part's: a product the catalog lacks goes in with stone product add")
+            out.add(f"Run: {line}")
+            out.next = line
+            out.owns_next = True
+            out.stage = "ask"
+            out.result = "set refused: product sizes go to stone product add"
+            return out
         # never build for a catalog product the person did not name: the default one is not theirs
         out.fix(f"the catalog has no sourced sizes for {x}; never guess them")
         return ask_product_size(out, job, x, t)
@@ -753,7 +827,7 @@ def cmd_set(args, job: Job) -> Out:
     if ask:
         # never invent the size of the thing a part must fit: a small model would, so the tool stops it
         out.fix("this part must fit something real and the request gives no size for it; never guess one")
-        out.add('When the person answers, run: stone note "<their answer>"')
+        out.after.append('After the person answers (not before): stone note "<their answer>", then run the NEXT line it prints.')
         out.next = f"ask the person: {ask}"
         out.result = "set refused: no size for the fit"
         job.update(ask_recipe=r.name)
@@ -1697,9 +1771,17 @@ def cmd_note(args, job: Job) -> Out:
         out.code = 1
         out.next = job.status().get("next") or "stone status"
         return out
+    st = job.status()
+    asked = str(st.get("next", ""))
+    if asked.startswith("ask the person") and is_the_question(text, asked):
+        out.fix("that is your question, not the person's answer; write the question as your reply and stop")
+        out.add("Note only what the person says back.")
+        out.next = asked
+        out.owns_next = True
+        out.result = "note refused: it was the question"
+        return out
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
-    st = job.status()
     if str(st.get("next", "")).startswith("ask the person") and st.get("ask_product"):
         # the answer is the product's size: it is kept as a note, never read into the request as a part size
         return note_product(out, job, st, text)
@@ -2930,7 +3012,8 @@ def run(argv: list[str]) -> tuple[str, int]:
     if tries:
         fail = _fail_key(cmdline, out)
         prev = job.status().get("last_fail")
-        if fail and fail == prev and not out.next.startswith("ask the person"):
+        # a set that carried a product's sizes is sent to stone product add: repeating it is no new failure
+        if fail and fail == prev and not out.next.startswith(("ask the person", "stone product add")):
             # the same failure twice in a row: a third try fails the same way, so stop and ask
             first = next(ln for ln in out.lines if ln and ln.startswith("FIX: "))[5:]
             out.add(f"FIX: stone {cmd} failed this same way twice in a row; do not run it again")

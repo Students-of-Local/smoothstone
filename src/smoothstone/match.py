@@ -422,9 +422,11 @@ def product_named(request: str) -> str | None:
     return x if re.search(r"[A-Za-z]", x) else None
 
 
-def product_size_question(name: str) -> str:
-    """What stone asks the person for a product the catalog does not have: never a guessed size."""
-    return (f"{name}'s width, depth and height in mm, and where the numbers come from "
+def product_size_question(name: str, round_: bool = False) -> str:
+    """What stone asks the person for a product the catalog does not have: never a guessed size. A
+    round one has a diameter and a height, no depth."""
+    what = "diameter and height" if round_ else "width, depth and height"
+    return (f"{name}'s {what} in mm, and where the numbers come from "
             f"(the maker's spec page, or their own ruler)")
 
 
@@ -432,7 +434,8 @@ SIZE_KEYS = {"w": r"width|wide|across|diameter|dia", "d": r"depth|deep|length|lo
              "h": r"height|high|tall|thick|thickness"}
 QTY_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(mm|millimet(?:er|re)s?|cm|centimet(?:er|re)s?|inches|inch|in\b|\")?",
                     re.I)
-BY3_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*"
+# W x D x H; a "?" in the middle is a depth not known (a round product's)
+BY3_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*(\d+(?:\.\d+)?|\?)\s*(?:by|x|×)\s*"
                     r"(\d+(?:\.\d+)?)\s*(mm|cm|inches|inch|in\b|\")?", re.I)
 MEASURED_RE = re.compile(r"\b(?:ruler|measured|measure|calipers?|caliper|tape)\b", re.I)
 
@@ -443,11 +446,12 @@ def _mm(v: str, unit: str | None) -> float:
     return round(float(v) * k, 2)
 
 
-def size_answer(text: str) -> dict:
+def size_answer(text: str, name: str | None = None) -> dict:
     """The person's answer to product_size_question, read: {"w", "d", "h" in mm (those given),
     "source" (the first URL, or "measured by the person" when they say they measured it), "round"
     (they gave a diameter or said round)}. A size given in more than one unit ("7.7 inches (19.7 cm)")
-    is read in the metric one, as the maker printed it; a number with no unit is mm."""
+    is read in the metric one, as the maker printed it; a number with no unit is mm. The product's
+    own name (name) holds no size: "Mac Studio (2025)" is not 2025 mm wide."""
     from .catalog import first_url
 
     out: dict = {}
@@ -457,10 +461,14 @@ def size_answer(text: str) -> dict:
     elif MEASURED_RE.search(text or ""):
         out["source"] = "measured by the person"
     rest = re.sub(r"https?://\S+", " ", text or "")
+    if name:
+        rest = re.sub(re.escape(name), " ", rest, flags=re.I)
     out["round"] = bool(re.search(r"\b(?:diameter|round|across|disc|circular)\b|Ø", rest, re.I))
     m = BY3_RE.search(rest)
     if m:
-        out.update(w=_mm(m.group(1), m.group(4)), d=_mm(m.group(2), m.group(4)), h=_mm(m.group(3), m.group(4)))
+        out.update(w=_mm(m.group(1), m.group(4)), h=_mm(m.group(3), m.group(4)))
+        if m.group(2) != "?":
+            out["d"] = _mm(m.group(2), m.group(4))
         return out
     for part in re.split(r"[,;\n]|\band\b", rest):
         keys = [k for k, pat in SIZE_KEYS.items() if re.search(rf"\b(?:{pat})\b", part, re.I)]

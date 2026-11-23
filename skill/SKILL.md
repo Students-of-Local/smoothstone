@@ -29,8 +29,8 @@ source with `stone note "<fact>, <source>"`; stone status shows the notes again 
 compaction. Never make up a size a part has to fit.
 
 A part for a product stone's catalog does not have (a mount for a Mac Studio, a cup for a HomePod
-mini): stone asks the person for its width, depth and height and where the numbers come from (the
-maker's spec page, or their own ruler). `stone note` keeps the answer, and NEXT is the
+mini): stone asks the person for its width, depth and height (a round one: its diameter and height)
+and where the numbers come from (the maker's spec page, or their own ruler). `stone note` keeps the answer, and NEXT is the
 `stone product add "<name>" --size W D H --source "<URL>"` line that writes the product to the job,
 where every product recipe takes it like a catalog one. Never guess a product's size.
 

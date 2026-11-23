@@ -102,11 +102,67 @@ def test_next_asks_the_person_for_an_unknown_products_size_and_names_no_catalog_
 
 
 def test_tier_s_asks_with_that_line_alone(job, monkeypatch):
+    cli.run(["new", STUDIO])
+    text, _ = cli.run(["show", "product_mount"])
+    assert _next(text) == ASK
+    assert len(text.splitlines()) == 4, text
+
+
+def test_the_ask_comes_before_the_note_hint(job):
+    """24B e11 s1, s2 (climb 4): with "When the person answers, run: stone note" above NEXT, the model
+    noted stone's own question. NEXT comes first; the hint after it is plainly for later."""
+    cli.run(["new", STUDIO])
+    lines = cli.run(["show", "product_mount"])[0].splitlines()
+    at = next(i for i, ln in enumerate(lines) if ln.startswith("NEXT: "))
+    assert lines[at] == "NEXT: " + ASK
+    assert not any("stone note" in ln for ln in lines[:at])
+    assert lines[at + 1].startswith("After the person answers (not before): stone note")
+
+
+@pytest.mark.parametrize("note", [ASK[len("ask the person: "):],
+                                  "Ask for the Mac Studio (2025) width, depth and height in mm and where they come from"])
+def test_note_refuses_stones_own_question(job, note):
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    text, code = cli.run(["note", note])
+    assert code == 1 and "that is your question, not the person's answer" in text
+    assert _next(text) == ASK and json.loads((job / "notes.json").read_text() if (job / "notes.json").exists() else "[]") == []
+
+
+def test_a_round_product_is_asked_its_diameter_and_height(job):
+    """LFM3 e12 s1 (climb 4): asked a depth Apple does not give, it noted "97.9 x ? x 84.3 mm" and stalled."""
     cli.run(["new", "a snug cup that holds my HomePod mini on a shelf"])
     text, _ = cli.run(["show", "round_case"])
-    assert _next(text) == ("ask the person: HomePod mini's width, depth and height in mm, and where the numbers "
+    assert _next(text) == ("ask the person: HomePod mini's diameter and height in mm, and where the numbers "
                            "come from (the maker's spec page, or their own ruler)")
-    assert len(text.splitlines()) == 4, text
+    text, _ = cli.run(["note", "HomePod mini: 97.9 x ? x 84.3 mm, https://support.apple.com/en-us/111914"])
+    assert _next(text) == ('stone product add "HomePod mini" --size 97.9 97.9 84.3 --round --open +z '
+                           '--source "https://support.apple.com/en-us/111914"')
+
+
+def test_the_products_own_name_is_no_size(job):
+    """24B e11 (climb 4): "Mac Studio (2025)'s width" read as a width of 2025 mm."""
+    assert "w" not in match.size_answer("Mac Studio (2025)'s width is on the spec page", "Mac Studio (2025)")
+
+
+@pytest.mark.parametrize("items,line", [
+    (["product_mount", "width=197", "depth=197", "height=95"], "--size 197 197 95"),
+    (["product_mount", "height=95mm", "w=197", "d=197"], "--size 197 197 95"),
+    (["product_mount", "size=197x197x95"], "--size 197 197 95"),
+])
+def test_sizes_set_on_the_recipe_become_the_product_add_line(job, items, line):
+    """24B e11 phase 1, every seed (climb 4): it set width=197 depth=197 height=95 on product_mount and
+    stone asked the question again, a loop. The sizes go to stone product add, with the source the
+    person gave when stone has it."""
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    text, code = cli.run(["set", *items])
+    assert code == 1 and _next(text) == (f'stone product add "Mac Studio (2025)" {line} '
+                                         '--source "<where the person said the numbers come from>"')
+    cli.run(["note", STUDIO_SAYS])
+    text, _ = cli.run(["set", *items])
+    assert _next(text) == f'stone product add "Mac Studio (2025)" {line} --source "https://support.apple.com/en-us/122211"'
+    assert not (job / "plan.json").exists()
 
 
 def test_after_the_answer_next_is_the_product_add_line(job):
