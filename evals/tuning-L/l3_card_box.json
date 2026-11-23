@@ -1,0 +1,41 @@
+{
+ "id": "l3_card_box",
+ "request": "A box with a lid for a stack of 20 credit cards lying flat, with 1 mm of room on each side and 2 mm walls.",
+ "sources": [
+  "ISO/IEC 7810 ID-1: 85.60 x 53.98 x 0.76 mm"
+ ],
+ "note": "Inside 85.6 + 2 by 53.98 + 2, so outside w = 87.6 + 4 = 91.6 and d = 55.98 + 4 = 59.98 (to 1 mm more). The stack is 20 x 0.76 = 15.2 mm, and the lid's lip reaches lip_h into the box, so the room is h - floor - lip_h >= 15.2.",
+ "expect": {
+  "recipe": "box",
+  "params": {
+   "w": [
+    91.5,
+    92.6
+   ],
+   "d": [
+    59.9,
+    61.0
+   ],
+   "h": [
+    15.2,
+    35
+   ],
+   "wall": 2
+  },
+  "sum": [
+   {
+    "params": [
+     "h"
+    ],
+    "minus": [
+     "floor",
+     "lip_h"
+    ],
+    "range": [
+     15.2,
+     28
+    ]
+   }
+  ]
+ }
+}

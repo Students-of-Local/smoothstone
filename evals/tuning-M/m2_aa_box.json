@@ -1,0 +1,42 @@
+{
+ "id": "m2_aa_box",
+ "request": "A box with a lid that holds 8 AA batteries standing up, in two rows of four across its width, with 2 mm walls.",
+ "sources": [
+  "https://data.energizer.com/pdfs/E91_Max_NA.pdf (Energizer E91 AA: diameter 13.50 to 14.50 mm, height 49.50 to 50.50 mm)",
+  "https://en.wikipedia.org/wiki/AA_battery (IEC 60086 LR6: diameter 14.5 mm max, height 50.5 mm max)"
+ ],
+ "note": "Inside at least 4 x 14.5 by 2 x 14.5 mm, so outside w >= 58 + 2 x 2 and d >= 29 + 2 x 2. The lid's lip reaches lip_h into the box, so the room is h - floor - lip_h >= 50.5.",
+ "expect": {
+  "recipe": "box",
+  "params": {
+   "w": [
+    62,
+    80
+   ],
+   "d": [
+    33,
+    50
+   ],
+   "h": [
+    50.5,
+    80
+   ],
+   "wall": 2
+  },
+  "sum": [
+   {
+    "params": [
+     "h"
+    ],
+    "minus": [
+     "floor",
+     "lip_h"
+    ],
+    "range": [
+     50.5,
+     73
+    ]
+   }
+  ]
+ }
+}

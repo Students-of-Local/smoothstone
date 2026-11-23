@@ -35,6 +35,9 @@ OPENAI_SAMPLING = {"temperature": 0.1}  # the lfm3 temperature; top_k and repeat
 # a CLI has its own shell tool, not one named stone; this goes after the harness's system line
 CLI_NOTE = ("The stone tool is the stone command: run it with your shell tool, one stone command per call, "
             "for example: stone status. No other command is allowed.")
+# tier L may write a recipe (skill/tiers/L.md): the run's recipes are a copy in the job folder
+CLI_NOTE_L = ("You may also read any file in the job folder (views.png, the recipes) and write a new recipe "
+              "in recipes/<name>/ with your file tools. The recipes folder is the run's own copy of the catalog.")
 
 
 def slug(model: str) -> str:
@@ -115,12 +118,21 @@ def cli_env(driver: str, env: dict, stone_bin: Path) -> dict:
     return out
 
 
-def claude_argv(model: str, system: str, prompt: str, resume: str | None = None) -> list[str]:
+def claude_argv(model: str, system: str, prompt: str, resume: str | None = None,
+                job: Path | None = None) -> list[str]:
     """claude -p with Bash as its only tool, only stone commands allowed, nothing else asked: a
     command outside stone is denied, not prompted. --safe-mode leaves out the person's CLAUDE.md,
-    skills, hooks and MCP servers, so the card is the only instruction it gets."""
+    skills, hooks and MCP servers, so the card is the only instruction it gets. job (tier L) adds
+    reading files in that job folder and writing under its recipes/ folder, nothing else. The rules
+    name the folder's absolute path (//...): a ./ rule follows the session's working directory, so
+    after a cd into recipes/ it no longer matched and the write was denied."""
+    tools, allowed = "Bash", ["Bash(stone:*)"]
+    if job is not None:
+        j = "/" + str(Path(job).resolve())
+        tools, allowed = "Bash,Read,Write,Edit", allowed + [f"Read({j}/**)", f"Write({j}/recipes/**)",
+                                                             f"Edit({j}/recipes/**)"]
     argv = ["claude", "-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose",
-            "--tools", "Bash", "--allowedTools", "Bash(stone:*)", "--permission-mode", "dontAsk",
+            "--tools", tools, "--allowedTools", *allowed, "--permission-mode", "dontAsk",
             "--append-system-prompt", system, "--safe-mode", "--strict-mcp-config"]
     if resume:
         argv += ["--resume", resume]
@@ -278,13 +290,13 @@ def parse_codex(stream: str, phase: int = 0) -> dict:
 
 
 def cli_phase(driver: str, model: str, system: str, user: str, env: dict, stone_bin: Path, job: Path, rdir: Path,
-              phase: int, resume: str | None, timeout: int) -> dict:
+              phase: int, resume: str | None, timeout: int, write_recipes: bool = False) -> dict:
     """Run one phase (the request, or a follow-up) through a CLI. Returns the parse plus "argv"
     (the prompt left out), "exit", "seconds" and "stderr"."""
     cenv = cli_env(driver, env, stone_bin)
     prompt = user if (resume or driver == "claude") else codex_prompt(system, user)
     if driver == "claude":
-        argv = claude_argv(model, system, user, resume)
+        argv = claude_argv(model, system, user, resume, job if write_recipes else None)
         out, err, code, secs = run_cli(argv, cenv, job, timeout)
         got = parse_claude(out, phase)
     else:

@@ -1,0 +1,36 @@
+{
+ "id": "l5_l_bracket",
+ "request": "An L bracket with legs 40 mm and 30 mm long, 20 mm wide and 4 mm thick, a gusset between the legs, and one M4 clearance hole through each leg.",
+ "sources": [
+  "ISO 273 clearance holes, M4: fine 4.3, medium 4.5, coarse 4.8 mm"
+ ],
+ "note": "Off the catalog: a new recipe. Its box is 40 x 30 x 20 mm whichever way it lies.",
+ "expect": {
+  "new_recipe": true,
+  "dims": [
+   [
+    39.5,
+    41
+   ],
+   [
+    29.5,
+    31
+   ],
+   [
+    19.5,
+    20.5
+   ]
+  ],
+  "features": [
+   {
+    "name": "m4_holes",
+    "kind": "hole",
+    "d": [
+     4.3,
+     4.8
+    ],
+    "count": 2
+   }
+  ]
+ }
+}

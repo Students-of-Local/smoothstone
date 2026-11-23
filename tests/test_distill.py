@@ -118,3 +118,21 @@ def test_no_card_runs_are_left_out_and_compacted_runs_are_their_own_row(tmp_path
     runs = distill.load([str(tmp_path)])
     assert sorted(r["card"] for r in runs) == ["aaaaaaaa", "aaaaaaaa+c3"]
     assert all("vs" not in row for row in distill.ledger(runs))  # +c3 is not compared with the full card
+
+
+def test_tier_l_reading_a_file_stays_on_the_path():
+    look = {"name": "Read", "args": {"file_path": "/job/build/views.png"}, "result": "(image)"}
+    lg = log(START + [[call("stone set bin x=2 div=3", "NEXT: stone build")],
+                      [call("stone build", "Part ready\nNEXT: none, the part is ready")], [look], {"tool_calls": []}],
+             ok=True)
+    assert distill.walk(lg)["kind"] == "pass"
+
+
+def test_tier_l_writing_a_recipe_that_fails_is_the_recipe_rules():
+    write = {"name": "Write", "args": {"file_path": "/job/recipes/bracket/recipe.scad", "content": "cube(1);"},
+             "result": "File created"}
+    lg = log(START[:2] + [[write], [call("stone set bracket", "NEXT: stone build")]],
+             why=["m4_holes: 0 holes of Ø4.3 to 4.8 mm (want 2)"])
+    d = distill.walk(lg)
+    assert d["kind"] == "recipe" and d["step"] == 3 and "m4_holes" in d["what"]
+    assert distill.FIX["recipe"].startswith("card:")

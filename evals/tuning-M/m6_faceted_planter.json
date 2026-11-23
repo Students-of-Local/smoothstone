@@ -1,0 +1,24 @@
+{
+ "id": "m6_faceted_planter",
+ "request": "A faceted planter 5 inches across the top and 4 inches tall, with a drain hole and a matching saucer printed with it.",
+ "note": "5 in = 127 mm, 4 in = 101.6 mm.",
+ "expect": {
+  "recipe": "planter",
+  "params": {
+   "top_d": [
+    125,
+    129
+   ],
+   "height": [
+    100,
+    103.2
+   ],
+   "style": "faceted",
+   "drain_d": [
+    1,
+    60
+   ],
+   "part": "both"
+  }
+ }
+}

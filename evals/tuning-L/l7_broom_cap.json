@@ -1,0 +1,33 @@
+{
+ "id": "l7_broom_cap",
+ "request": "A cap that slides over the end of a 25 mm round broom handle: 20 mm deep inside, 0.3 mm of clearance, 2.5 mm walls and a flat closed top 2.5 mm thick with its outer edge rounded.",
+ "note": "Off the catalog: a new recipe. The bore is 25.6 mm; outside about 30.6 mm across and 22.5 mm tall (20 deep plus the 2.5 mm top). 'A closed, rounded top' read as a dome made it 35 mm tall, so the top is named flat.",
+ "expect": {
+  "new_recipe": true,
+  "dims": [
+   [
+    30,
+    32
+   ],
+   [
+    30,
+    32
+   ],
+   [
+    21.5,
+    27
+   ]
+  ],
+  "features": [
+   {
+    "name": "bore",
+    "kind": "hole",
+    "d": [
+     25.3,
+     25.9
+    ],
+    "count": 1
+   }
+  ]
+ }
+}

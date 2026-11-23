@@ -1,0 +1,46 @@
+{
+ "id": "l6_usb_enclosure",
+ "request": "An open-top enclosure 56 by 36 mm inside and 20 mm deep, with 2 mm walls and floor, a screw post in each inside corner with a 2.5 mm pilot hole for an M3 lid screw, and a 12 by 7 mm window in one end wall for a USB connector.",
+ "note": "Off the catalog: a new recipe. Outside 60 x 40 x 22 mm. The window is closed on all sides, so it shows as an opening in a cut through the end wall.",
+ "expect": {
+  "new_recipe": true,
+  "dims": [
+   [
+    59.5,
+    61
+   ],
+   [
+    39.5,
+    41
+   ],
+   [
+    21.5,
+    23
+   ]
+  ],
+  "features": [
+   {
+    "name": "pilot_holes",
+    "kind": "hole",
+    "d": [
+     2.3,
+     2.8
+    ],
+    "count": 4
+   },
+   {
+    "name": "usb_window",
+    "kind": "cutout",
+    "w": [
+     12,
+     13
+    ],
+    "h": [
+     7,
+     8
+    ],
+    "count": 1
+   }
+  ]
+ }
+}

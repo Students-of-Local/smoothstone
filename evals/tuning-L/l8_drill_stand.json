@@ -1,0 +1,78 @@
+{
+ "id": "l8_drill_stand",
+ "request": "A drill bit stand: one block with a row of holes for 3, 4, 5, 6, 8 and 10 mm drill bits, each hole 0.3 mm over size and 25 mm deep, with 4 mm of material between the holes and around them.",
+ "note": "Off the catalog: a new recipe. Holes 3.3 to 10.3 mm; length 37.8 + 7 x 4 = 65.8 mm, height 25 mm plus a floor, depth 10.3 + 8 = 18.3 mm.",
+ "expect": {
+  "new_recipe": true,
+  "dims": [
+   [
+    64,
+    72
+   ],
+   [
+    26,
+    35
+   ],
+   [
+    18,
+    22
+   ]
+  ],
+  "features": [
+   {
+    "name": "hole_3",
+    "kind": "hole",
+    "d": [
+     3.15,
+     3.5
+    ],
+    "count": 1
+   },
+   {
+    "name": "hole_4",
+    "kind": "hole",
+    "d": [
+     4.15,
+     4.5
+    ],
+    "count": 1
+   },
+   {
+    "name": "hole_5",
+    "kind": "hole",
+    "d": [
+     5.15,
+     5.5
+    ],
+    "count": 1
+   },
+   {
+    "name": "hole_6",
+    "kind": "hole",
+    "d": [
+     6.15,
+     6.5
+    ],
+    "count": 1
+   },
+   {
+    "name": "hole_8",
+    "kind": "hole",
+    "d": [
+     8.15,
+     8.5
+    ],
+    "count": 1
+   },
+   {
+    "name": "hole_10",
+    "kind": "hole",
+    "d": [
+     10.15,
+     10.5
+    ],
+    "count": 1
+   }
+  ]
+ }
+}
