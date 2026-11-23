@@ -298,3 +298,53 @@ def test_no_route_to_api_billing_reaches_claude():
                               "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")}
     env = drivers.cli_env("claude", {**bad, "PATH": "/usr/bin", "HOME": "/h"}, Path("/v/bin"))
     assert not set(bad) & set(env)
+
+
+# --- a tool call written as text (climb 4 round 2) ---------------------------------------------
+TEXT = "<function=stone>\n<parameter=command>\nshow round_case\n</parameter>\n</function>\n</tool_call>"
+
+
+def test_text_call_reads_a_call_the_model_wrote_as_text():
+    """LFM3 e12 s1 step 4 (climb 4): the call is the end of its reasoning, and no tool_calls came back."""
+    c = drivers.text_call("", "Let me run it.\n" + TEXT, "")
+    assert c["function"]["name"] == "stone" and json.loads(c["function"]["arguments"]) == {"command": "show round_case"}
+    # split by a token cut across two turns
+    c = drivers.text_call("thinking <function=stone>\n<parameter=command>\nstone st", "atus\n</parameter>\n</function>")
+    assert json.loads(c["function"]["arguments"]) == {"command": "stone status"}
+    assert drivers.text_call("I will call <function=stone> later, then say more.") is None
+    assert drivers.text_call("<|tool_call_end|>") is None
+
+
+class TextChat(BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if not any(m["role"] == "tool" for m in body["messages"]):
+            msg = {"role": "assistant", "content": "", "reasoning_content": "First the status.\n" +
+                   TEXT.replace("show round_case", "stone status")}
+        else:
+            msg = {"role": "assistant", "content": "Stopping here."}
+        out = json.dumps({"choices": [{"index": 0, "message": msg, "finish_reason": "stop"}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+    def log_message(self, *a):
+        pass
+
+
+@pytest.mark.skipif(not HAS_STONE, reason="no stone in .venv")
+def test_the_openai_driver_runs_a_call_written_as_text_and_logs_it(monkeypatch, tmp_path):
+    srv = HTTPServer(("127.0.0.1", 0), TextChat)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        log, _ = _main(monkeypatch, tmp_path, "--driver", "openai", "--model", "fake-model", "--base-url",
+                       f"http://127.0.0.1:{srv.server_port}/v1")
+    finally:
+        srv.shutdown()
+    first = log["steps"][0]
+    assert first["text_call"] is True and first["tool_calls"][0]["args"] == {"command": "stone status"}
+    assert "NEXT: stone recipes" in first["tool_calls"][0]["result"]
+    assert not log["steps"][1].get("text_call")
+    assert json.loads((tmp_path / "scores.jsonl").read_text())["text_calls"] == 1

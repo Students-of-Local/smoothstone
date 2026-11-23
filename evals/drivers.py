@@ -84,6 +84,28 @@ def openai_step(base_url: str, model: str, messages: list, tools: list, seed: in
             "tool_calls": calls, "finish_reason": ch.get("finish_reason"), "usage": resp.get("usage")}
 
 
+# A tool call written as text: LFM3 and LFM2.5 write it this way, in their reasoning or their
+# reply, after a turn cut at the token limit, and the server returns no tool_calls for it.
+TEXT_CALL = re.compile(r"<function=(?P<name>[\w.-]+)>\s*<parameter=command>\s*(?P<command>.*?)\s*</parameter>\s*</function>"
+                       r"(?:\s*</tool_call>|\s*<\|tool_call_end\|>)*\s*$", re.S)
+
+
+def text_call(*texts: str) -> dict | None:
+    """The tool call a turn ends with when the model wrote it as text, or None: the texts (the cut
+    turn before, the reasoning, the reply) are read in order and the call must close them."""
+    for t in reversed([x for x in texts if x and x.strip()]):
+        m = TEXT_CALL.search(t)
+        if m:
+            return {"id": "text0", "type": "function",
+                    "function": {"name": m.group("name"), "arguments": json.dumps({"command": m.group("command").strip()})}}
+    joined = "".join(x for x in texts if x)
+    m = TEXT_CALL.search(joined)  # a call that a token cut split across two turns
+    if m:
+        return {"id": "text0", "type": "function",
+                "function": {"name": m.group("name"), "arguments": json.dumps({"command": m.group("command").strip()})}}
+    return None
+
+
 # --- claude and codex: a CLI on the person's sign-in -------------------------------------------
 def cli_env(driver: str, env: dict, stone_bin: Path) -> dict:
     """The CLI's environment: the run's, with stone's folder first on PATH and every billing key
