@@ -658,3 +658,53 @@ describes by its measured size with a source. Most runs ended with no engineerin
 seed 1 on x01 and seed 3 on x02 died on Ollama HTTP 400. The scores stay out of evals/scores.jsonl.
 Next track: a holder, mount or case for any product given its size and source, climbed on tuning
 specs only, with these two sealed as the check.
+
+## 2026-11-23 climb 4: a part for a product stone does not know
+
+After climb 3, a request naming a product the catalog lacks ("a mount for my Mac Studio") ended with
+no engineering.json: stone asked "Which product is it, exactly?", then had nowhere to go. Now the
+size comes from the person, with its source, and every product recipe takes it.
+
+What changed:
+
+- `stone product add "<name>" --size W D H [--corner-r R] [--round] --source "<URL or measured by the
+  person>" [--open FACES]` writes job/products/<slug>.json in the catalog's schema ("set": "job", the
+  name and any model number as aliases, each size naming its source, fitted_case true for a box).
+  --round is a disc: W is the diameter. With no --source it refuses: stone never estimates a size.
+- catalog.py sees the current job's products (catalog.use_job, set by every stone command), so
+  slugs_for, kinds_for, find and get include them, and fitted_case, round_case, product_holder and
+  product_mount offer them. A build for a job product passes the CATALOG and PRODUCTS tables with -D,
+  so recipes/lib/catalog.scad and recipes/fitted_case/products.scad stay as generated.
+- When the request names a part for a product ("a mount for my X", "a cup that holds my X"), the
+  recipe stone ranks first builds from the catalog and the catalog has no X, `stone show` and
+  `stone set` stop with NEXT: ask the person: X's width, depth and height in mm, and where the
+  numbers come from (the maker's spec page, or their own ruler). stone never sets a default product.
+  `stone note "<answer>"` reads the sizes (the metric one when the maker prints two units, so
+  "7.7 inches (19.7 cm)" is 197) and the URL, keeps the answer out of the request, and NEXT is the
+  exact `stone product add` line; a missing size or source is asked for again.
+- round_case leaves the top open, with no rim, for a product whose open faces hold +z (a cup).
+- evals/run.py: after the person speaks, the next driver runs `stone note '<their words>'`, as the
+  cards tell a model to, instead of stone status. Grading is unchanged.
+- Cards S, M, L and SKILL.md: an unknown product means ask for its size and source, then
+  stone product add; never guess a size.
+
+New tuning specs, each with a follow-up where the person gives the maker's numbers and the URL:
+e11_mac_studio_mount (product_mount, 197 x 197 x 95, https://support.apple.com/en-us/122211) and
+e12_homepod_mini_cup (round_case, 97.9 across, 84.3 high, https://support.apple.com/en-us/111914).
+evals/engineering now holds 12 specs; the catalog still holds the first 10.
+
+`--driver next`, seed 1: e11 pass (status, recipes, show, ask; note, product add, set, build, 1100 s
+with the grader), e12 pass (296 s), e01 to e10 10 of 10. The new specs were not run on the code
+before this climb. The scores stay out of evals/scores.jsonl. Tests: tests/test_job_products.py, each
+failing without the change; the Garmin watch test in tests/test_fitted_case.py now expects the size
+question and, for an answer with no source, a question for the source.
+
+Open:
+- e11 holds load_n 20 (stone's default; the request names no load). Apple lists 2.74 kg (M4 Max) and
+  3.64 kg (M3 Ultra), 26.9 N and 35.7 N. The built mount reads 1.44 MPa at its weakest section under
+  20 N against 23.5 MPa allowed, so its geometry carries the real weight, but nothing makes stone
+  design for it: stone takes no weight yet.
+- e12's cup is round_case's clamshell (two half shells, a flexure loop, a 6.8 mm latch) on the
+  enclosing cylinder. Apple publishes no profile for the rounded HomePod mini and does not locate its
+  power cable, which a closed floor and walls would trap. The grader sees neither.
+- The held-out x01 and x02 were not run or read.

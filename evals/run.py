@@ -11,7 +11,8 @@ the card and the compaction change.
 Drivers:
   lfm3  a llama.cpp server (raw chat template through /apply-template, then /completion)
   next  no model: runs stone status, then every NEXT line stone prints, until it stops. This
-        is the baseline that shows what the tool does without any model.
+        is the baseline that shows what the tool does without any model. When the person speaks
+        (a follow-up), it runs stone note with their words, as the cards tell a model to.
   openai, claude, codex  any OpenAI-compatible server, Claude Code and Codex on the person's own
         sign-in (evals/drivers.py). Their condition is <driver>-<model>_card<card>.
 
@@ -209,7 +210,8 @@ def main():
             first = grade_job(job, spec, messages)
         if say:
             messages.append({"role": "user", "content": say})
-            nxt = "stone status"
+            # the next driver does what the card says to do with the person's answer: stone note it
+            nxt = f"stone note {shlex.quote(say)}" if a.driver == "next" else "stone status"
             print(f"   person: {say}", flush=True)
         if a.driver in ("claude", "codex"):
             session = cli_run(a, log, messages, system, say or user, env, job, rdir, phase, session)

@@ -1,0 +1,82 @@
+{
+  "id": "e11_mac_studio_mount",
+  "request": "an under desk mount for my Mac Studio (2025)",
+  "input": "text",
+  "product": {
+    "name": "Mac Studio (2025)",
+    "sources": [
+      "https://support.apple.com/en-us/122211"
+    ],
+    "body": {
+      "w": 197.0,
+      "d": 197.0,
+      "h": 95.0,
+      "corner_r": 0.0
+    },
+    "body_sources": {
+      "w": "https://support.apple.com/en-us/122211 (Size and Weight, 'Width: 7.7 inches (19.7 cm)')",
+      "d": "https://support.apple.com/en-us/122211 (Size and Weight, 'Depth: 7.7 inches (19.7 cm)')",
+      "h": "https://support.apple.com/en-us/122211 (Size and Weight, 'Height: 3.7 inches (9.5 cm)')",
+      "corner_r": "no radius published on https://support.apple.com/en-us/122211; 0 is the enclosing box"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "mount",
+    "material": "PETG",
+    "fit": "slip",
+    "retention": "any",
+    "load_n": 20,
+    "load_dir": "-z",
+    "support": "-z",
+    "safety": 2,
+    "covered": [
+      "+x",
+      "-x",
+      "+z"
+    ],
+    "open": [
+      "-y",
+      "+y"
+    ],
+    "attach": {
+      "face": "+z",
+      "against": "the desk",
+      "screw": "M4",
+      "min": 2,
+      "source": "ISO 273 clearance hole for M4, fine 4.3, medium 4.5, coarse 4.8 mm (https://www.iso.org/standard/4183.html, sold; values as charted by https://mechcodex.com/reference/metric-clearance-hole-sizes). A 4 mm wood screw up into the desk; two at least, so the mount cannot turn about one, spread at least a quarter of the part across that face (our numbers)"
+    }
+  },
+  "followups": [
+    {
+      "say": "Apple's tech specs page says Height: 3.7 inches (9.5 cm), Width: 7.7 inches (19.7 cm), Depth: 7.7 inches (19.7 cm). It is https://support.apple.com/en-us/122211",
+      "expect": {
+        "kind": "mount",
+        "material": "PETG",
+        "fit": "slip",
+        "retention": "any",
+        "load_n": 20,
+        "load_dir": "-z",
+        "support": "-z",
+        "safety": 2,
+        "covered": [
+          "+x",
+          "-x",
+          "+z"
+        ],
+        "open": [
+          "-y",
+          "+y"
+        ],
+        "attach": {
+          "face": "+z",
+          "against": "the desk",
+          "screw": "M4",
+          "min": 2,
+          "source": "ISO 273 clearance hole for M4, fine 4.3, medium 4.5, coarse 4.8 mm (https://www.iso.org/standard/4183.html, sold; values as charted by https://mechcodex.com/reference/metric-clearance-hole-sizes). A 4 mm wood screw up into the desk; two at least, so the mount cannot turn about one, spread at least a quarter of the part across that face (our numbers)"
+        }
+      }
+    }
+  ],
+  "why": "The Mac Studio is not in stone's catalog, so stone must ask the person for its size and where the numbers come from, never guess them; the person answers with Apple's own rows from https://support.apple.com/en-us/122211. Right side up under the desk, front at -y. Apple lists 'On front (M4 Max): Two USB-C ports, SDXC card slot' (the M3 Ultra: two Thunderbolt 5 ports and the slot) with no positions, so the front stays open; the rear ports are listed with no location, so the rear stays open too, and the bottom is supported, not covered. The Mac has no screw points: the mount wraps the sides and top, bears on the bottom in three of its four quarters, and screws up into the desk through its top (attach +z). Load: the request names none, so the spec holds stone's 20 N default, as e07 does. Apple lists 6.1 pounds (2.74 kg, M4 Max) and 8.0 pounds (3.64 kg, M3 Ultra) on https://support.apple.com/en-us/122211, 26.9 N and 35.7 N, both above 20 N: this spec checks the path for a product given by the person, not the load a real Mac Studio puts on the mount (open: stone takes no weight yet)."
+}

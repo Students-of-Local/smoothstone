@@ -1,0 +1,64 @@
+{
+  "id": "e12_homepod_mini_cup",
+  "request": "a snug cup that holds my HomePod mini on a shelf",
+  "input": "text",
+  "product": {
+    "name": "HomePod mini",
+    "sources": [
+      "https://support.apple.com/en-us/111914"
+    ],
+    "body": {
+      "w": 97.9,
+      "d": 97.9,
+      "h": 84.3,
+      "corner_r": 48.95
+    },
+    "body_sources": {
+      "w": "https://support.apple.com/en-us/111914 (Size and Weight, '3.9 inches wide (97.9 mm)')",
+      "d": "https://support.apple.com/en-us/111914 (the same '3.9 inches wide (97.9 mm)'; the HomePod mini is round)",
+      "h": "https://support.apple.com/en-us/111914 (Size and Weight, '3.3 inches high (84.3 mm)')",
+      "corner_r": "https://support.apple.com/en-us/111914 (half of '3.9 inches wide (97.9 mm)': a round body)"
+    },
+    "features": []
+  },
+  "expect": {
+    "kind": "holder",
+    "material": "PETG",
+    "fit": "snug",
+    "retention": "any",
+    "safety": 2,
+    "covered": [
+      "-z",
+      "+x",
+      "-x",
+      "+y",
+      "-y"
+    ],
+    "open": [
+      "+z"
+    ]
+  },
+  "followups": [
+    {
+      "say": "Apple says it is 3.3 inches high (84.3 mm) and 3.9 inches wide (97.9 mm), on https://support.apple.com/en-us/111914",
+      "expect": {
+        "kind": "holder",
+        "material": "PETG",
+        "fit": "snug",
+        "retention": "any",
+        "safety": 2,
+        "covered": [
+          "-z",
+          "+x",
+          "-x",
+          "+y",
+          "-y"
+        ],
+        "open": [
+          "+z"
+        ]
+      }
+    }
+  ],
+  "why": "The HomePod mini is not in stone's catalog, so stone must ask the person for its size and where the numbers come from, never guess them; the person answers with Apple's own rows from https://support.apple.com/en-us/111914. Apple gives a width and a height for a round speaker, so the body is the enclosing cylinder, 97.9 across and 84.3 high, standing on its base. A cup it sits down into on a shelf: snug around its sides and under it, its top (the touch surface) open. Nothing hangs from it, so no load; nothing has to hold it in but its own weight, so any retention. Apple publishes no profile and does not locate the power cable, so the grader checks the cylinder alone (open: the real body is rounded, and the cable must leave the cup)."
+}
