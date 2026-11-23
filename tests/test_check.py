@@ -105,6 +105,7 @@ def test_check_stl_bad_file(tmp_path):
     assert not res[0].ok and res[0].name == "loads"
 
 
+@pytest.mark.timing
 def test_fast_on_200k_faces():
     m = trimesh.creation.icosphere(subdivisions=7, radius=20)  # 327,680 faces
     m = on_bed(trimesh.Trimesh(m.vertices, m.faces))

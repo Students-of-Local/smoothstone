@@ -31,7 +31,12 @@ build-backend = "hatchling.build"
 packages = ["src/smoothstone"]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "pytest-xdist>=3.8.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# timing: a wall-clock budget; CI runs these alone, after the parallel run
+markers = ["timing: wall-clock budget, run without other workers"]
