@@ -488,3 +488,15 @@ PR 67 review, round 1, fixed on the branch:
   (auto picks it there, and an explicit friction with a gap is refused).
 
 e01, e02, e03 and e10 still pass on --driver next.
+
+PR 67 review, round 2:
+
+- second-S1 fixed: for a product not in the catalog, fitted_case asks only which product it is (maker
+  and model). An answer that names none ends the ask: it says fitted_case builds only for products
+  with sourced sizes, names some, and points to box for a custom size, instead of asking again.
+- first-F1 open: with the catch sized for the side clearance, the Pi 5 can slide 1.93 mm toward -y
+  (its PCB edge stops on the -y wall, its HDMI shells slide into their windows) and the catch then
+  misses the USB shell. Locating pins in the 2.7 mm holes (2.4, YAPP_Box's size) would hold it to
+  0.15, but e01 then fails the grader's fit check: a pin rises 2.45 mm into the body box from its -z
+  face, past the spec's -1.5 face_gap, and check_fit's interference test does not leave the
+  product's mounting holes out. Waiting on a decision; the grader is not changed here.

@@ -77,10 +77,10 @@ def test_a_named_product_ranks_fitted_case_first_but_iphones_stay_phone_case(que
     assert _top(query) == want
 
 
-def test_a_product_not_in_the_catalog_asks_for_its_size_and_ports():
+def test_a_product_not_in_the_catalog_is_asked_for_by_maker_and_model_only():
     r = rc.load("fitted_case", REPO / "recipes")
     ask = match.missing_fit_size(r, "a case for my Garmin watch")
-    assert ask and "width, depth and height in mm" in ask and "ports" in ask
+    assert ask == "Which product is it, exactly (its maker and model number)?"  # no sizes: it takes none
     assert match.missing_fit_size(r, "a case for my Flipper Zero") is None
     assert match.missing_fit_size(r, "a case for it", ["product arduino uno r4 minima"]) is None
     assert match.missing_fit_size(r, "fitted_case defaults") is None  # no fit asked: the default product builds
@@ -245,3 +245,42 @@ def test_friction_is_claimed_only_for_an_interference_fit(openscad, material, fi
         assert e["stone_fit"][7] == want
         if want == "friction":
             assert e["stone_fit"][3] <= 0
+
+
+# --- PR 67 review round 2 --------------------------------------------------------------------------
+
+def test_an_answer_naming_no_catalog_product_ends_the_ask():
+    """second-S1: fitted_case takes no sizes, so after the person answers it must not ask again; it says
+    what it builds for and points to box."""
+    r = rc.load("fitted_case", REPO / "recipes")
+    first = match.missing_fit_size(r, "an enclosure for my Garmin watch")
+    again = match.missing_fit_size(r, "an enclosure for my Garmin watch", ["45 x 45 x 12 mm"])
+    assert again and again != first
+    assert "builds only for products whose sizes it has sourced" in again and "stone show box" in again
+    assert "Raspberry Pi 5" in again or "Flipper Zero" in again
+
+
+def _follow_from(nxt: str, steps: int = 10) -> str:
+    import shlex
+    for _ in range(steps):
+        if not nxt.startswith("stone "):
+            break
+        text, _ = cli.run(shlex.split(nxt)[1:])
+        found = re.findall(r"^NEXT: (.+)$", text, re.M)
+        nxt = found[-1].strip() if found else ""
+    return nxt
+
+
+def test_an_uncatalogued_product_on_the_next_path_ends_at_a_clear_answer(jobenv, monkeypatch):
+    """second-S1 on stone's own path: ask, note, show, set must end at a plain answer, not the same ask."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    cli.run(["new", "a case for my Garmin watch"])
+    first = _follow_from("stone status")
+    assert first == "ask the person: Which product is it, exactly (its maker and model number)?", first
+    seen = [first]
+    for answer in ("Garmin Venu 3, 45 x 45 x 12 mm", "it is about 45 mm square"):
+        text, _ = cli.run(["note", answer])
+        seen.append(_follow_from(re.findall(r"^NEXT: (.+)$", text, re.M)[-1].strip()))
+    assert all(x.startswith("ask the person: fitted_case builds only for products") and "stone show box" in x
+               for x in seen[1:]), seen
+
