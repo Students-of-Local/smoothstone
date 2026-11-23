@@ -137,6 +137,17 @@ def test_note_refuses_stones_own_question(job, note):
     assert _next(text) == ASK and json.loads((job / "notes.json").read_text() if (job / "notes.json").exists() else "[]") == []
 
 
+def test_note_refuses_the_question_when_it_speaks_to_the_person(job):
+    """24B e12 s2 (climb 4): no request word, but it says "you" to the person, and "your own ruler" in it
+    became the source "measured by the person", which no spec cites."""
+    cli.run(["new", "a snug cup that holds my HomePod mini on a shelf"])
+    cli.run(["show", "round_case"])
+    text, code = cli.run(["note", "HomePod mini diameter and height in mm, and where did you get them from "
+                                  "(the maker's spec page or your own ruler)"])
+    assert code == 1 and "that is your question, not the person's answer" in text
+    assert not (job / "notes.json").exists() or json.loads((job / "notes.json").read_text()) == []
+
+
 @pytest.mark.parametrize("answer", [
     "I don't have it with me; I'll measure it tonight",
     "Could not find it online, I measured it: 197 by 197 by 95 mm",
