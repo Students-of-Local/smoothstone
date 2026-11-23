@@ -249,29 +249,104 @@ def thin_lines(found: list[Thin], height: float, step: float) -> list[str]:
 # the split
 
 
-def plan_cuts(man, ext, bed) -> dict[int, list[float]]:
-    """Where to cut on each axis so every part fits the bed: as few cuts as fit, each where the
-    cross-section is broad (room for pins) and passes through no spire or rod."""
-    cuts: dict[int, list[float]] = {}
-    for ax in range(3):
-        L, U = float(ext[ax]), float(bed[ax]) - BED_ROOM
-        n = int(math.ceil(L / U - 1e-9))
-        if n <= 1:
-            continue
-        got, prev = [], 0.0
-        for k in range(1, n):
-            lo = max(prev + 1.0, L - (n - k) * U)
-            hi = min(prev + U, L - 1.0)
-            mid = prev + (L - prev) / (n - k + 1)
-            best, best_s = mid if lo <= mid <= hi else (lo + hi) / 2, -math.inf
-            for p in np.linspace(lo, hi, 41):
-                s = section_score(section(man, ax, float(p))) - 0.5 * abs(p - mid)
-                if s > best_s:
-                    best, best_s = float(p), s
-            got.append(round(best, 2))
-            prev = best
-        cuts[ax] = got
-    return cuts
+def _band_parts(lo_b, hi_b, bed) -> int:
+    """How many parts a band with this footprint box takes: one when it fits the bed."""
+    ex, ey = hi_b[0] - lo_b[0], hi_b[1] - lo_b[1]
+    return int(math.ceil(ex / (bed[0] - BED_ROOM) - 1e-9)) * int(math.ceil(ey / (bed[1] - BED_ROOM) - 1e-9))
+
+
+def _cut_score(cs) -> float:
+    """A place for a cut across the footprint: the smaller the cross-section the better, and never
+    through a spire or rod (a piece under SMALL_SECTION)."""
+    score = 0.0
+    for c in cs.decompose():
+        a = c.area()
+        score -= a if a >= SMALL_SECTION else 5000.0
+    return score
+
+
+def _cuts_along(man, ax: int, lo: float, L: float, U: float, score, mid_weight: float = 0.5) -> list[float]:
+    n = int(math.ceil(L / U - 1e-9))
+    got, prev = [], 0.0
+    for k in range(1, n):
+        a = max(prev + 1.0, L - (n - k) * U)
+        b = min(prev + U, L - 1.0)
+        mid = prev + (L - prev) / (n - k + 1)
+        best, best_s = mid if a <= mid <= b else (a + b) / 2, -math.inf
+        for q in np.linspace(a, b, 41):
+            sc = score(section(man, ax, lo + float(q))) - mid_weight * abs(q - mid)
+            if sc > best_s:
+                best, best_s = float(q), sc
+        got.append(round(lo + best, 2))
+        prev = best
+    return got
+
+
+def plan_split(man, ext, bed) -> dict:
+    """Where to cut so every part fits the bed: {"z": [heights], "bands": [{0: [x], 1: [y]} per band
+    from the bottom]}. Cuts go across z first, as few as fit, each placed so the bands above and below
+    take the fewest parts (a tower above a wide base stays whole) and then where the section is broad
+    enough for pins. x and y cuts go only into a band whose own footprint is wider than the bed, where
+    its cross-section is smallest and through no spire."""
+    x0, y0, z0, x1, y1, z1 = man.bounding_box()
+    H = z1 - z0
+    Uz = float(bed[2]) - BED_ROOM
+    zs = np.arange(z0 + 0.5, z1, 1.0)
+    boxes = []
+    for z in zs:
+        b = man.slice(float(z)).bounds()
+        boxes.append(b if b[2] >= b[0] else (np.inf, np.inf, -np.inf, -np.inf))
+    boxes = np.asarray(boxes, float)
+
+    def band_box(a, b):
+        sel = boxes[(zs >= a) & (zs <= b)]
+        if not len(sel) or not np.isfinite(sel).any():
+            return (0.0, 0.0), (0.0, 0.0)
+        return (sel[:, 0].min(), sel[:, 1].min()), (sel[:, 2].max(), sel[:, 3].max())
+
+    n = int(math.ceil(H / Uz - 1e-9))
+    zc, prev = [], 0.0
+    for k in range(1, n):
+        a = max(prev + 1.0, H - (n - k) * Uz)
+        b = min(prev + Uz, H - 1.0)
+        best, best_key = (a + b) / 2, None
+        for q in np.linspace(a, b, 41):
+            q = float(q)
+            parts = _band_parts(*band_box(z0 + prev, z0 + q), bed)
+            if k == n - 1:
+                parts += _band_parts(*band_box(z0 + q, z1), bed)
+            key = (-parts, section_score(section(man, 2, z0 + q)))
+            if best_key is None or key > best_key:
+                best, best_key = q, key
+        zc.append(round(z0 + best, 2))
+        prev = best
+    edges = [z0, *zc, z1]
+    bands = []
+    for a, b in zip(edges[:-1], edges[1:]):
+        (bx0, by0), (bx1, by1) = band_box(a, b)
+        band = {}
+        for ax, lo_, hi_ in ((0, bx0, bx1), (1, by0, by1)):
+            U = float(bed[ax]) - BED_ROOM
+            if hi_ - lo_ > U:
+                band[ax] = _cuts_along(man, ax, lo_, hi_ - lo_, U, _cut_score)
+        bands.append(band)
+    return {"z": zc, "bands": bands}
+
+
+def plan_cuts_of(plan: dict) -> dict[int, list[float]]:
+    """Every cut plane of a plan by axis, for the joints."""
+    out: dict[int, list[float]] = {}
+    if plan["z"]:
+        out[2] = list(plan["z"])
+    for band in plan["bands"]:
+        for ax, ps in band.items():
+            out.setdefault(ax, [])
+            out[ax] += [p for p in ps if p not in out[ax]]
+    return out
+
+
+def plan_parts(plan: dict) -> int:
+    return sum((len(b.get(0, [])) + 1) * (len(b.get(1, [])) + 1) for b in plan["bands"])
 
 
 @dataclass
@@ -285,29 +360,40 @@ class Part:
     bodies: int = 1  # pieces in the part, each standing on the bed
 
 
-def split(man, cuts: dict[int, list[float]], log: list[str]) -> list[Part]:
-    pieces = [(man, (0, 0, 0))]
-    for ax in (0, 1, 2):
-        for k, p in enumerate(cuts.get(ax, [])):
-            nxt = []
-            for m, cell in pieces:
-                if cell[ax] != k:
-                    nxt.append((m, cell))
-                    continue
-                n = [0.0, 0.0, 0.0]
-                n[ax] = 1.0
-                top, bottom = m.split_by_plane(n, p)
-                if not bottom.is_empty():
-                    nxt.append((bottom, cell))
-                if not top.is_empty():
-                    c = list(cell)
-                    c[ax] = k + 1
-                    nxt.append((top, tuple(c)))
-            pieces = nxt
+def _cut(pieces, ax: int, ps: list[float], slot: int):
+    """Cut every piece at each plane along ax; the piece above a cut gets the next index in its cell."""
+    for k, p in enumerate(ps):
+        nxt = []
+        for m, cell in pieces:
+            if cell[slot] != k:
+                nxt.append((m, cell))
+                continue
+            n = [0.0, 0.0, 0.0]
+            n[ax] = 1.0
+            top, bottom = m.split_by_plane(n, p)
+            if not bottom.is_empty():
+                nxt.append((bottom, cell))
+            if not top.is_empty():
+                c = list(cell)
+                c[slot] = k + 1
+                nxt.append((top, tuple(c)))
+        pieces = nxt
+    return pieces
+
+
+def split(man, plan: dict, log: list[str]) -> list[Part]:
+    """The parts of a plan (plan_split), numbered from the bottom band up, then y, then x."""
+    pieces = _cut([(man, (0, 0, 0))], 2, plan["z"], 0)
+    cells = []
+    for band_i, band in enumerate(plan["bands"]):
+        mine = [(m, c) for m, c in pieces if c[0] == band_i]
+        mine = _cut(mine, 1, band.get(1, []), 1)
+        mine = _cut(mine, 0, band.get(0, []), 2)
+        cells += mine
     parts, crumbs = [], 0
-    for m, cell in pieces:
+    for m, cell in cells:
         # one part per cell: a cut through several towers leaves them as pieces of one part, each
-        # standing on its own cut face (the islands check fails any piece that does not)
+        # standing on its own cut face (the islands check finds any that does not)
         keep = []
         for c in m.decompose():
             if c.volume() < CRUMB:
@@ -320,7 +406,7 @@ def split(man, cuts: dict[int, list[float]], log: list[str]) -> list[Part]:
             parts.append(Part(m3.Manifold.compose(keep) if len(keep) > 1 else keep[0], cell, bodies=len(keep)))
     if crumbs:
         log.append(f"Left out {crumbs} crumbs under {CRUMB:g} mm3 that the cuts left.")
-    parts.sort(key=lambda p: (p.cell[2], p.cell[1], p.cell[0]))
+    parts.sort(key=lambda p: p.cell)
     for i, p in enumerate(parts, 1):
         p.number = i
     return parts
@@ -461,21 +547,21 @@ def flat_bottom(mesh) -> float:
 
 
 def lay_flat(mesh) -> tuple[object, np.ndarray, str | None]:
-    """Keep the model's up when the part has a flat bottom; else lay it on its flattest side."""
+    """Lay the part on its largest flat face (the model's own base or a cut face, most often): the
+    side of the six with the most area flat on the bed, keeping the model's up on a near tie."""
     import trimesh
 
-    if flat_bottom(mesh) >= 20.0:
-        return mesh, np.eye(4), None
     best, bestT, best_a, why = mesh, np.eye(4), flat_bottom(mesh), None
+    keep = best_a
     for d, name in (([1, 0, 0], "+x"), ([-1, 0, 0], "-x"), ([0, 1, 0], "+y"), ([0, -1, 0], "-y"), ([0, 0, 1], "+z")):
         T = trimesh.geometry.align_vectors(d, [0, 0, -1])
         m = mesh.copy()
         m.apply_transform(T)
         a = flat_bottom(m)
-        if a > best_a * 1.5:
+        if a > best_a and a > keep * 1.1:
             best, bestT, best_a, why = m, T, a, name
     if why is not None:
-        return best, bestT, f"its {why} side, the flattest"
+        return best, bestT, f"its {why} side, its largest flat face ({best_a:.0f} mm2)"
     return mesh, np.eye(4), None
 
 
@@ -487,34 +573,194 @@ def estimate(mesh) -> tuple[float, float]:
     return used / 1000 * PLA, used / FLOW / 3600
 
 
-def found_recipe(bodies: int = 1):
-    """What stone's checks read from a recipe, for a found model's part (or the pins, one body each)."""
+# a found model's own checks: thin walls measured and reported, overhangs printed on supports
+
+ONE_LINE = NOZZLE  # mm: a feature narrower than this prints as one thin line at best
+# The share of a found part's volume in features under one line past which it no longer prints as the
+# model. Measured (LOG.md, models 1, round 2) at the spec sizes: the parts that printed in round 1
+# (Cologne 0.03%, Taj Mahal by Bazzar701 0.005%), the MiniWorld3D models with dozens of makes each
+# (Taj 0.03%, St. Basil's 0.10%, Notre-Dame by gogole 0.09%), and the most made model of all, "Eiffel
+# Tower FDM printable" (180 makes at 220 mm), 0.89% at 200 mm. 1.5% clears the model makers print
+# with room for its size; a model past it is mostly lattice a nozzle cannot draw.
+DROP_LIMIT = 0.015
+SUPPORT_PX = 0.5  # mm: the support estimate's grid and layer
+SUPPORT_FILL = 0.15  # share of the support region a slicer's supports fill (tree or grid, with interface)
+SUPPORT_MIN = 0.5  # g: less than this is a few touch points, not a part that needs supports
+
+
+def _opened(cs, r: float) -> float:
+    """Area of the cross-section left after an opening of radius r: what lines r * 2 wide can draw."""
+    import manifold3d as m3
+
+    core = cs.offset(-r, m3.JoinType.Round, circular_segments=12)
+    return 0.0 if core.is_empty() else core.offset(r, m3.JoinType.Round, circular_segments=12).area()
+
+
+def thin_shares(man, step: float = 0.5) -> dict:
+    """The share of the part's volume in features narrower than what the slicer draws (DROPPED,
+    which Arachne leaves out), one line and two lines, from cross-sections every `step` mm in the
+    part's print orientation (the slicer's own view: a feature is thin across the layer)."""
+    x0, y0, z0, x1, y1, z1 = man.bounding_box()
+    tot = d0 = d1 = d2 = 0.0
+    for z in np.arange(z0 + step / 2, z1, step):
+        cs = man.slice(float(z))
+        a = cs.area()
+        if a <= 0:
+            continue
+        tot += a
+        d0 += a - _opened(cs, DROPPED / 2)
+        d1 += a - _opened(cs, ONE_LINE / 2)
+        d2 += a - _opened(cs, TWO_LINES / 2)
+    if tot <= 0:
+        return {"dropped": 0.0, "one_line": 0.0, "two_lines": 0.0}
+    return {"dropped": round(d0 / tot, 5), "one_line": round(d1 / tot, 5), "two_lines": round(d2 / tot, 5)}
+
+
+def surface_thickness(mesh, samples: int = 3000) -> dict:
+    """The share of the surface on walls thinner than one line and two lines (a ray in from each
+    sample point), and the thinnest wall at stone's percentile (check.WALL_PERCENTILE)."""
+    from . import check
+
+    import trimesh
+
+    pts, fi = trimesh.sample.sample_surface(mesh, samples, seed=0)
+    n = mesh.face_normals[fi]
+    o = pts - n * 1e-4
+    got = check._ray_hits(mesh, o, -n)
+    if got is None or not len(got[0]):
+        return {"one_line": None, "two_lines": None, "wall": None}
+    idx, loc = got
+    d = np.linalg.norm(loc - o[idx], axis=1)
+    d = d[d > 5e-3]
+    if not len(d):
+        return {"one_line": None, "two_lines": None, "wall": None}
+    return {"one_line": round(float((d < ONE_LINE).mean()), 4), "two_lines": round(float((d < TWO_LINES).mean()), 4),
+            "wall": round(float(np.percentile(d, check.WALL_PERCENTILE)), 3)}
+
+
+def cut_loose(mesh, rep) -> list[dict]:
+    """Pieces the slicer finds in the air that the model itself holds up: material is right under
+    them, but too thin to print, so dropping it cuts the piece loose. A piece with nothing under it
+    is an overhang, which supports hold."""
+    man = to_manifold(mesh)
+    out = []
+    for pc in getattr(rep, "floating", []):
+        below = man.slice(float(pc["bottom"]) - rep.layer / 2)
+        if below.is_empty() or "joined" in pc:  # a piece that joins the part above hangs on it: supports hold it
+            continue
+        pts = np.asarray(pc["xy"], float)
+        pts = pts[:: max(1, len(pts) // 40)]
+        if any(_inside(below, float(x), float(y), ONE_LINE / 2) for x, y in pts):
+            out.append({"z": round(float(pc["bottom"]), 1), "where": pc["where"], "area": round(float(pc["peak"]), 1)})
+    return out
+
+
+def _raster(cs, x0: float, y0: float, w: int, h: int, px: float) -> np.ndarray:
+    from skimage.draw import polygon
+
+    m = np.zeros((h, w), bool)
+    for poly in cs.to_polygons():
+        q = np.asarray(poly, float)
+        if len(q) < 3:
+            continue
+        rr, cc = polygon((q[:, 1] - y0) / px, (q[:, 0] - x0) / px, (h, w))
+        t = np.zeros((h, w), bool)
+        t[rr, cc] = True
+        m ^= t  # even-odd: a hole's polygon cancels its outline's
+    return m
+
+
+def support_volume(man, px: float = SUPPORT_PX) -> float:
+    """mm3 of space a slicer fills with supports: under every spot that hangs past 45 degrees, down
+    to the bed or to the part below, on a px mm grid and px mm layers."""
+    from scipy import ndimage
+
+    x0, y0, z0, x1, y1, z1 = man.bounding_box()
+    w, h = int(math.ceil((x1 - x0) / px)) + 2, int(math.ceil((y1 - y0) / px)) + 2
+    zs = np.arange(z0 + px / 2, z1, px)
+    if len(zs) < 2 or w * h > 4_000_000:
+        return 0.0
+    solid = [_raster(man.slice(float(z)), x0 - px, y0 - px, w, h, px) for z in zs]
+    reach = np.ones((3, 3), bool)  # one cell a layer as tall as it is wide: 45 degrees
+    need = np.zeros((h, w), bool)
+    vol = 0.0
+    for k in range(len(zs) - 1, 0, -1):
+        over = solid[k] & ~ndimage.binary_dilation(solid[k - 1], reach)
+        need = (need | over) & ~solid[k - 1]
+        vol += float(need.sum()) * px * px * px
+    return vol
+
+
+def found_checks(path: str, bed, bodies: int = 1) -> dict:
+    """stone's checks on a found model's part, with the slicer's view of it (run in its own process).
+
+    The walls of a model made for display are thinner than two lines almost everywhere they are fine
+    (spires, railings, lattices), so min_wall here is measured, not a bar: the part fails it only when
+    more of its volume than DROP_LIMIT is under one line, or when what the slicer drops cuts a piece
+    loose. Overhangs and pieces in the air print on supports, which the build reports; recipes and
+    engineering parts keep the 0.8 mm bar and the overhang limit unchanged (check.py)."""
+    from concurrent.futures import Future
     from types import SimpleNamespace
 
-    return SimpleNamespace(max_bodies=bodies, max_overhang=0.05, skip={"bed_edge": "a found model's part"},
-                           min_wall=TWO_LINES, supports=False, dims=None)
+    from . import check, slicer
+
+    mesh = check._load(Path(path))
+    out = [check.Result("loads", len(mesh.faces) > 0, len(mesh.faces), f"{len(mesh.faces)} faces")]
+    rep = slicer.slice_mesh(mesh, bed=tuple(bed))
+    done: Future = Future()
+    done.set_result(rep)
+    recipe = SimpleNamespace(max_bodies=bodies, max_overhang=1.0, skip={"bed_edge": "a found model's part"},
+                             min_wall=0.0, supports=True, dims=None)
+    res = check._check_rest(mesh, out, done, recipe, None, tuple(bed), None, bodies, 1.0)
+    man = to_manifold(mesh)
+    shares = thin_shares(man)
+    surf = surface_thickness(mesh)
+    loose = cut_loose(mesh, rep)
+    sup = support_volume(man) * SUPPORT_FILL
+    g, h = sup / 1000 * PLA, sup / FLOW / 3600
+    floating = len(getattr(rep, "floating", []))
+    final = []
+    for r in res:
+        if r.name == "min_wall":
+            over = DROP_LIMIT is not None and shares["one_line"] > DROP_LIMIT
+            ok = not over and not loose
+            bits = [f"{shares['one_line'] * 100:.1f}% of the volume under one line ({ONE_LINE:g} mm), "
+                    f"{shares['two_lines'] * 100:.1f}% under two, {shares['dropped'] * 100:.2f}% dropped by the slicer"]
+            if over:
+                bits.append(f"over the {DROP_LIMIT * 100:.0f}% that still prints as the model")
+            if loose:
+                bits.append(f"{len(loose)} piece{'s' if len(loose) > 1 else ''} cut loose where a thin neck is "
+                            f"dropped (first at {loose[0]['z']:.0f} mm up)")
+            r = check.Result("min_wall", ok, shares["one_line"], "; ".join(bits),
+                             advice="print it bigger, or with a 0.2 mm nozzle or resin")
+        elif r.name == "overhang":
+            r = check.Result("overhang", True, r.value, r.detail.split(" (max")[0] + ": printed on supports")
+        final.append(r)
+    final.append(check.Result("supports", True, round(g, 1),
+                              f"about {g:.0f} g and {h:.1f} h of supports" if g >= SUPPORT_MIN else "none needed"))
+    return {"checks": [r.to_dict() for r in final], "shares": shares, "surface": surf, "cut_loose": loose,
+            "support_g": round(g, 1), "support_h": round(h, 2), "floating": floating}
 
 
 def check_part(path: str, bed, bodies: int = 1) -> list[dict]:
-    """stone's print checks on one part file (run in its own process)."""
-    from . import check
-
-    return [r.to_dict() for r in check.check_stl(Path(path), recipe=found_recipe(bodies), bed=tuple(bed))]
+    """The checks of found_checks alone (the grader runs them again on the files)."""
+    return found_checks(path, bed, bodies)["checks"]
 
 
-def export(mesh, path: Path) -> tuple[object, np.ndarray]:
+def export(mesh, path: Path) -> tuple[object, np.ndarray, bool]:
     """Write the part as a slicer will read it (float32, closed, no zero-area faces), its lowest
     corner at the origin. Returns the mesh written and the shift that put it there."""
     from . import clean
 
+    broken = False
     try:
         m = clean.for_slicer(mesh)
-    except ValueError:
-        m = mesh.copy()
+    except ValueError:  # solids that only touch keep edges a slicer calls broken (LOG.md, models 1)
+        m, broken = mesh.copy(), True
     shift = -np.asarray(m.bounds[0], float)
     m.apply_translation(shift)
     m.export(str(path))
-    return m, shift
+    return m, shift, broken
 
 
 def render(meshes: list, rgb: list, out: Path) -> Path | None:
@@ -598,9 +844,10 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
     say("measuring thin features")
     thin = thin_features(man, H, step)
     say("planning the cuts")
-    cuts = plan_cuts(man, mesh.extents, bed)
+    plan = plan_split(man, mesh.extents, bed)
+    cuts = plan_cuts_of(plan)
     if cuts:
-        parts = split(man, cuts, log)
+        parts = split(man, plan, log)
         where = ", ".join(f"{'xyz'[a]} " + " and ".join(f"{p:.1f}" for p in ps) for a, ps in sorted(cuts.items()))
         log.append(f"Split it into {len(parts)} parts so each fits the {models.fmt3(bed)} bed: cuts at {where} mm.")
         say("placing alignment pins")
@@ -620,20 +867,20 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
         assembled.append(tm.copy())
         flat, T, why = lay_flat(tm)
         f = root / (f"{name}.stl" if len(parts) == 1 else f"{name}_part{p.number}.stl")
-        written, shift = export(flat, f)
+        written, shift, broken = export(flat, f)
         M = np.eye(4)
         M[:3, 3] = shift
         p.to_print = M @ T
         p.file = str(f)
         if why:
-            log.append(f"Part {p.number} has no flat bottom: it lies on {why}.")
+            log.append(f"Part {p.number} lies on {why}.")
         if p.bodies > 1:
             log.append(f"Part {p.number} prints as {p.bodies} pieces, each standing on its cut face.")
         files.append(f)
         g, h = estimate(written)
         records.append({"number": p.number, "file": str(f), "cell": list(p.cell), "to_print": p.to_print.tolist(),
                         "size_mm": [round(float(x), 2) for x in written.extents], "grams": round(g, 1),
-                        "hours": round(h, 2), "holes": p.holes, "bodies": p.bodies})
+                        "hours": round(h, 2), "holes": p.holes, "bodies": p.bodies, "saves_broken": broken})
     pin_lengths = [2 * d - PIN_SHORT for j in js if j.kind == "pin" for _, _, d in j.pins]
     pins_file = None
     if pin_lengths:
@@ -643,15 +890,19 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
     say(f"checking {len(files)} part{'s' if len(files) > 1 else ''}")
     jobs = [(str(f), bed, p.bodies) for f, p in zip(files, parts)] + ([(str(pins_file), bed, len(pin_lengths))] if pins_file else [])
     with ProcessPoolExecutor(max_workers=max(1, min(len(jobs), 8)), mp_context=mp.get_context("spawn")) as pool:
-        res = list(pool.map(check_part, *zip(*jobs)))
+        full = list(pool.map(found_checks, *zip(*jobs)))
+    res = [f_["checks"] for f_ in full]
     ok = True
     part_lines, fixes = [], []
-    for rec, r in zip(records, res):
-        rec["checks"] = r
+    for rec, f_ in zip(records, full):
+        r = f_["checks"]
+        rec.update({"checks": r, "thin_shares": f_["shares"], "surface": f_["surface"], "cut_loose": f_["cut_loose"],
+                    "support_g": f_["support_g"], "support_h": f_["support_h"]})
         bad = [x for x in r if not x["ok"]]
         e = rec["size_mm"]
+        sup = f", supports {rec['support_g']:.0f} g" if rec["support_g"] >= SUPPORT_MIN else ""
         head = (f"Part {rec['number']}" if len(parts) > 1 else "Part") + \
-            f": {e[0]:.1f} x {e[1]:.1f} x {e[2]:.1f} mm, {rec['grams']:.0f} g, {rec['hours']:.1f} h"
+            f": {e[0]:.1f} x {e[1]:.1f} x {e[2]:.1f} mm, {rec['grams']:.0f} g, {rec['hours']:.1f} h{sup}"
         if bad:
             ok = False
             part_lines.append(head + ", FIX " + "; ".join(f"{x['name']} {x['detail']}" for x in bad)[:200])
@@ -670,8 +921,26 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
             part_lines.append(f"Pins: {len(pin_lengths)} square pins {PIN:g} mm, print {pins_file.name}; "
                               f"all {len(r)} checks pass")
     pegs = sum(len(j.pins) for j in js if j.kind == "peg")
-    grams = sum(r["grams"] for r in records)
-    hours = sum(r["hours"] for r in records)
+    sup_g = sum(r["support_g"] for r in records)
+    sup_h = sum(r["support_h"] for r in records)
+    grams = sum(r["grams"] for r in records) + sup_g
+    hours = sum(r["hours"] for r in records) + sup_h
+    need = [r["number"] for r in records if r["support_g"] >= SUPPORT_MIN]
+    if need:
+        who = "It needs" if len(records) == 1 else \
+            f"Part{'s' if len(need) > 1 else ''} {', '.join(map(str, need))} need{'' if len(need) > 1 else 's'}"
+        part_lines.append(f"Supports: {who} supports under overhangs and pieces that start in the air, about "
+                          f"{sup_g:.0f} g and {sup_h:.1f} h; tree supports suit towers and spires and come off cleaner.")
+    walls = [r["surface"]["wall"] for r in records if r["surface"].get("wall")]
+    one = max((r["thin_shares"]["one_line"] for r in records), default=0.0)
+    if walls and min(walls) < TWO_LINES:
+        k = TWO_LINES / min(walls)
+        size_now = np.ptp(np.concatenate([m.bounds for m in assembled]), axis=0)
+        within = "within" if one <= DROP_LIMIT else "over"
+        part_lines.append(f"Thin walls: the thinnest are {min(walls):.2f} mm and {one * 100:.1f}% of the volume is under "
+                          f"one line ({ONE_LINE:g} mm), {within} the {DROP_LIMIT * 100:.1f}% that prints as the model. "
+                          f"To print them whole: make it {k:.1f} times bigger ({max(size_now) * k:.0f} mm on its "
+                          f"longest side), or use a 0.2 mm nozzle or a resin printer.")
     if pins_file:
         g, h = estimate(trimesh.load(str(pins_file), force="mesh"))
         grams, hours = grams + g, hours + h
@@ -709,4 +978,5 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
     lines.append(f"Total: {n} part{'s' if n > 1 else ''}{' and the pins' if pins_file else ''}, about {grams:.0f} g "
                  f"of PLA and {hours:.1f} h (15% infill, two walls, 0.2 mm layers; your slicer's figure is exact)")
     return {"ok": ok, "lines": lines, "fixes": fixes, "files": [str(f) for f in files],
+            "broken": [r["number"] for r in records if r["saves_broken"]],
             "pins": str(pins_file) if pins_file else None, "views": views, "layout": lay_png, "data": data}

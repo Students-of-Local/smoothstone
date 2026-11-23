@@ -1780,6 +1780,10 @@ def cmd_models(args, job: Job) -> Out:
     out.next = "stone models --take 1"
     out.stage = "models"
     out.result = f"found {len(kept)} models of {nm['label']}"
+    if mdl.clear_lead(kept):
+        # the plain pick: taken now, so the next step is the build (stone models --take <n> for another)
+        out.add("Model 1 leads on makes and likes, so stone takes it; for another: stone models --take <n>.")
+        return _models_take(1, job, out)
     return out
 
 
@@ -1887,7 +1891,12 @@ def _models_build(job: Job) -> Out:
         out.result = f"model fitted: {len(files)} part{'s' if len(files) > 1 else ''}"
         job.update(builds=builds, failed_builds=0, passed=True)
         return out
-    out.fix("a part does not pass the print checks at this size; another model may print better")
+    if res.get("broken"):
+        k = res["broken"]
+        out.fix(f"this model's solids only touch, so part{'s' if len(k) > 1 else ''} {', '.join(map(str, k))} "
+                "save with broken edges a slicer rejects; the next model may be built cleaner")
+    else:
+        out.fix("a part does not pass the print checks at this size; another model may print better")
     out.next = _next_take(job, n)
     out.stage = "build_failed"
     out.result = "a part fails the print checks"

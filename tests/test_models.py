@@ -197,10 +197,11 @@ def test_split_a_tower_taller_than_the_bed_into_pinned_parts():
     tower = trimesh.creation.box((40, 40, 300))
     tower.apply_translation(-tower.bounds[0])
     man = modelprint.to_manifold(tower)
-    cuts = modelprint.plan_cuts(man, tower.extents, [220, 220, 220])
-    assert list(cuts) == [2] and len(cuts[2]) == 1
+    plan = modelprint.plan_split(man, tower.extents, [220, 220, 220])
+    cuts = modelprint.plan_cuts_of(plan)
+    assert list(cuts) == [2] and len(cuts[2]) == 1 and modelprint.plan_parts(plan) == 2
     log = []
-    parts = modelprint.split(man, cuts, log)
+    parts = modelprint.split(man, plan, log)
     assert [p.number for p in parts] == [1, 2]
     for p in parts:
         assert max(np.ptp(np.asarray(p.man.bounding_box()).reshape(2, 3), axis=0)) <= 219
@@ -217,7 +218,29 @@ def test_split_a_tower_taller_than_the_bed_into_pinned_parts():
 def test_no_cut_when_it_fits():
     box = trimesh.creation.box((100, 100, 100))
     box.apply_translation(-box.bounds[0])
-    assert modelprint.plan_cuts(modelprint.to_manifold(box), box.extents, [220, 220, 220]) == {}
+    plan = modelprint.plan_split(modelprint.to_manifold(box), box.extents, [220, 220, 220])
+    assert modelprint.plan_cuts_of(plan) == {} and modelprint.plan_parts(plan) == 1
+
+
+def test_a_wide_base_is_cut_across_only_where_it_is_wider_than_the_bed():
+    """A 300 mm base under a 300 mm tower: the z cut takes the tower's top whole, and only the band
+    with the base gets an x cut, at its narrowest and off the tower (3 parts, not 4)."""
+    base = trimesh.creation.box((300, 60, 20))
+    tower = trimesh.creation.box((40, 40, 300))
+    tower.apply_translation((130, 0, 160))
+    base.apply_translation((0, 0, 10))
+    body = trimesh.boolean.union([base, tower], engine="manifold")
+    body.apply_translation(-body.bounds[0])
+    man = modelprint.to_manifold(body)
+    plan = modelprint.plan_split(man, body.extents, [220, 220, 220])
+    assert modelprint.plan_parts(plan) == 3, plan
+    assert len(plan["z"]) == 1 and sum(bool(b.get(0)) or bool(b.get(1)) for b in plan["bands"]) == 1
+    xs = [c for b in plan["bands"] for c in b.get(0, [])]
+    assert xs and all(x < 260 - 1 for x in xs), xs  # the tower stands on the base's end, 260 to 300 mm
+    parts = modelprint.split(man, plan, [])
+    assert len(parts) == 3
+    for p in parts:
+        assert max(np.ptp(np.asarray(p.man.bounding_box()).reshape(2, 3), axis=0)) <= 219
 
 
 def test_lay_flat_keeps_a_flat_bottom_down():
@@ -228,6 +251,58 @@ def test_lay_flat_keeps_a_flat_bottom_down():
     spike.apply_transform(trimesh.transformations.rotation_matrix(np.pi, (1, 0, 0)))
     flat, T, why = modelprint.lay_flat(spike)
     assert why and modelprint.flat_bottom(flat) > 20
+
+
+def test_lay_flat_lays_a_part_on_its_largest_flat_face():
+    slab = trimesh.creation.box((100, 5, 80))  # stands on a 500 mm2 edge; its side is 8000 mm2
+    flat, T, why = modelprint.lay_flat(slab)
+    assert why and "largest flat face" in why and modelprint.flat_bottom(flat) == pytest.approx(8000)
+
+
+# a found model's checks: thin walls measured, overhangs on supports
+
+
+def _part(tmp_path, mesh, name="part.stl"):
+    mesh.apply_translation(-mesh.bounds[0] + (10, 10, 0))
+    f = tmp_path / name
+    mesh.export(f)
+    return str(f)
+
+
+def test_a_few_thin_spires_are_reported_not_failed(tmp_path):
+    block = trimesh.creation.box((30, 30, 20))
+    spire = trimesh.creation.box((0.3, 0.3, 8))
+    spire.apply_translation((0, 0, 14))
+    got = modelprint.found_checks(_part(tmp_path, trimesh.util.concatenate([block, spire])), (220, 220, 220))
+    wall = {c["name"]: c for c in got["checks"]}["min_wall"]
+    assert wall["ok"] and 0 < got["shares"]["one_line"] < modelprint.DROP_LIMIT, (wall, got["shares"])
+    assert "under one line" in wall["detail"]
+
+
+def test_a_lattice_past_the_limit_fails_min_wall(tmp_path):
+    bars = []
+    for i in range(12):  # twelve 0.3 mm fins on a thin plinth: most of the volume is under one line
+        f = trimesh.creation.box((0.3, 30, 20))
+        f.apply_translation((i * 2.5, 0, 10.5))
+        bars.append(f)
+    plinth = trimesh.creation.box((30, 30, 1))
+    plinth.apply_translation((13.75, 0, 0.5))
+    got = modelprint.found_checks(_part(tmp_path, trimesh.util.concatenate([plinth, *bars])), (220, 220, 220))
+    wall = {c["name"]: c for c in got["checks"]}["min_wall"]
+    assert not wall["ok"] and got["shares"]["one_line"] > modelprint.DROP_LIMIT
+    assert "0.2 mm nozzle" in wall["advice"]
+
+
+def test_an_overhang_prints_on_supports(tmp_path):
+    post = trimesh.creation.box((30, 30, 30))
+    top = trimesh.creation.box((60, 60, 4))  # a table top 15 mm out past its post on every side
+    top.apply_translation((0, 0, 16))
+    table = trimesh.boolean.union([post, top], engine="manifold")
+    got = modelprint.found_checks(_part(tmp_path, table), (220, 220, 220))
+    by = {c["name"]: c for c in got["checks"]}
+    assert by["overhang"]["ok"] and "supports" in by["overhang"]["detail"]
+    assert by["supports"]["ok"] and got["support_g"] >= modelprint.SUPPORT_MIN, got["support_g"]
+    assert not [c["name"] for c in got["checks"] if not c["ok"]], got["checks"]
 
 
 # the thin feature report
@@ -387,3 +462,52 @@ def test_an_uncut_model_of_separate_towers_counts_its_bodies(tmp_path):
     rec = got["data"]["parts"][0]
     assert rec["bodies"] == 2
     assert not [x["name"] for x in rec["checks"] if not x["ok"] and x["name"] == "bodies"]
+
+
+def test_a_clear_lead_is_taken_and_the_rest_offered(jobenv, recorded, monkeypatch):
+    rec = recorded
+    stone("new", REQ)
+    kept = [cand(name="Eiffel Tower FDM printable", makes=180, likes=1735, match=2),
+            cand(id="2", name="Eiffel Tower", makes=30, likes=500, match=2)]
+    monkeypatch.setattr(models, "search", lambda subject, request, cache: {
+        "subject": "Eiffel Tower", "names": NM, "terms": ["Eiffel Tower"], "kept": kept, "left_out": [],
+        "sources": {"printables": {"found": 2, "why": ""}, "commons": {"found": 0}, "sketchfab": {"searched": False}}})
+    taken = {}
+
+    def take(n, job, out):
+        taken["n"] = n
+        out.next = "stone build"
+        return out
+
+    monkeypatch.setattr(cli, "_models_take", take)
+    text, code, nxt = stone("models", "Eiffel Tower")
+    assert taken == {"n": 1} and nxt == "stone build", text
+    assert "stone models --take <n>" in text and "2. Eiffel Tower" in text
+
+
+def test_clear_lead_needs_a_name_match_a_license_and_the_most_makes_and_likes():
+    top = cand(makes=100, likes=900, match=2)
+    assert models.clear_lead([top, cand(id="2", makes=10, likes=50, match=2)])
+    assert not models.clear_lead([top, cand(id="2", makes=120, likes=50, match=2)])
+    assert not models.clear_lead([{**top, "match": 1}, cand(id="2", makes=1, likes=1, match=2)])
+    assert not models.clear_lead([{**top, "license_code": "", "license": ""}])
+    assert not models.clear_lead([])
+
+
+def test_a_model_whose_solids_save_broken_says_so_and_offers_the_next(jobenv, monkeypatch):
+    stone("new", REQ)
+    root = jobenv / "stone-job"
+    (root / "models").mkdir(parents=True, exist_ok=True)
+    (root / "models" / "found.json").write_text(json.dumps({"kept": [cand(), cand(id="2")]}))
+    (root / "model").mkdir()
+    (root / "model" / "model.json").write_text(json.dumps({"stl": str(root / "model" / "model.stl"), "index": 1,
+                                                           "name": "Notre-Dame", "subject": "Notre-Dame"}))
+
+    def make(root_, request, bed, progress=None):
+        return {"ok": False, "lines": ["Part 1: fails bodies"], "fixes": [], "files": [str(root / "p1.stl")],
+                "pins": None, "views": None, "layout": None, "data": {}, "broken": [1]}
+
+    monkeypatch.setattr(modelprint, "make", make)
+    text, code, nxt = stone("build")
+    assert "solids only touch" in text and "part 1 save with broken edges" in text, text
+    assert nxt == "stone models --take 2"

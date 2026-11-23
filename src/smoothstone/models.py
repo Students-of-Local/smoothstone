@@ -392,6 +392,18 @@ def rank(cands: list[dict], nm: dict, request: str) -> tuple[list[dict], list[di
     return kept, out
 
 
+def clear_lead(kept: list[dict]) -> bool:
+    """The first model is the plain pick: named for the subject, licensed for a personal print, and
+    ahead of every other on both makes and likes (a model many people printed). Then stone models
+    takes it itself, and the list stays for a person who wants another."""
+    if not kept:
+        return False
+    top = kept[0]
+    rest = kept[1:]
+    return (top.get("match") == 2 and license_ok(top) and top["source"] == "printables"
+            and all(top["makes"] > c["makes"] and top["likes"] > c["likes"] for c in rest))
+
+
 def search(subject: str, request: str, cache: Path | None) -> dict:
     """Everything stone models prints and --take reads: names, ranked candidates, what each source said."""
     nm = names(subject)
