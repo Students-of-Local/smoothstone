@@ -415,3 +415,10 @@ def test_a_near_recipe_for_a_catalog_product_points_to_the_one_stone_picked(requ
     assert nxt == f"stone show {want}" and text.startswith(f"For this request: {want} makes the {noun} for the "), text
     text, code, nxt = _stone("show", shown)
     assert code == 1 and nxt == f"stone show {want}", text
+
+
+def test_a_year_in_the_product_name_is_not_offered_as_a_size():
+    """Climb 3, LFM2.5-24B-A2B on e04: show said "Not placed yet: 2021 one; one" for "an Apple AirTag
+    (the 2021 one)", and the model spent four steps trying size=2021 on a recipe with no size."""
+    sug, left = match.suggest_full(rc.load("round_case", REPO / "recipes"), "a case for an Apple AirTag (the 2021 one)")
+    assert sug == {"product": "apple_airtag"} and left == [], (sug, left)
