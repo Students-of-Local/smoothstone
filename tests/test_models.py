@@ -326,3 +326,64 @@ def test_grader_size_and_credits(tmp_path):
 def test_printables_search_answers_live():
     found = models.search("Cologne Cathedral", "A model of Cologne Cathedral", None)
     assert found["sources"]["printables"]["why"] is None and found["kept"]
+
+
+# faults the first eval run found (LOG.md, models 1)
+
+
+def test_saint_abbreviation_keeps_the_whole_name():
+    # m06 searched "St" and took an egg cup named Stockholm
+    assert models.subject_of("A 150 mm tall model of St. Basil's Cathedral.") == "Saint Basil's Cathedral"
+    assert models.subject_of("A model of Mt. Rushmore") == "Mount Rushmore"
+
+
+def test_lego_sets_and_egg_cups_are_not_models():
+    nm = {**NM, "names": ["Taj Mahal"]}
+    kept, out = models.rank([cand(name="Lego Taj Mahal 21056"), cand(name="Egg Cup Taj Mahal"), cand(name="Taj Mahal")],
+                            nm, "A model of the Taj Mahal")
+    assert [c["name"] for c in kept] == ["Taj Mahal"]
+    assert sorted(c["why"] for c in out) == ["brick set", "vase"]
+
+
+def test_two_years_of_one_model_are_not_merged():
+    files = [{"id": "1", "name": "2014-eiffel-tower-miniworld3d.stl", "size": 5},
+             {"id": "2", "name": "2022-eiffel-tower-miniworld3d.stl", "size": 4}]
+    keep, left = models.choose_files(files)
+    assert [f["id"] for f in keep] == ["2"] and "another year" in left[0][1]
+    parts = [{"id": "3", "name": "tower_part1.stl", "size": 5}, {"id": "4", "name": "tower_part2.stl", "size": 5}]
+    assert len(models.choose_files(parts)[0]) == 2
+
+
+def test_read_3mf_without_lxml(tmp_path):
+    import zipfile
+
+    box = trimesh.creation.box((10, 20, 30))
+    v = "".join(f'<vertex x="{a}" y="{b}" z="{c}"/>' for a, b, c in box.vertices)
+    t = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in box.faces)
+    xml = ('<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" '
+           'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>'
+           f'<object id="1" type="model"><mesh><vertices>{v}</vertices><triangles>{t}</triangles></mesh></object>'
+           '<object id="2" type="model"><components><component objectid="1" transform="1 0 0 0 1 0 0 0 1 100 0 0"/>'
+           '</components></object></resources><build><item objectid="1"/>'
+           '<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 5"/></build></model>')
+    f = tmp_path / "two.3mf"
+    with zipfile.ZipFile(f, "w") as z:
+        z.writestr("3D/3dmodel.model", xml)
+    m = models.load_mesh([f])
+    assert len(m.faces) == 24 and m.body_count == 2
+    assert m.bounds[1] == pytest.approx([105, 10, 20])
+
+
+def test_an_uncut_model_of_separate_towers_counts_its_bodies(tmp_path):
+    a = trimesh.creation.box((10, 10, 30))
+    b = trimesh.creation.box((10, 10, 30))
+    b.apply_translation((30, 0, 0))
+    root = tmp_path / "job"
+    (root / "model").mkdir(parents=True)
+    trimesh.util.concatenate([a, b]).export(root / "model" / "model.stl")
+    (root / "model" / "model.json").write_text(json.dumps({"stl": str(root / "model" / "model.stl"),
+                                                           "name": "Two towers", "subject": "Two towers"}))
+    got = modelprint.make(root, "A 60 mm tall model of two towers", (256, 256, 256))
+    rec = got["data"]["parts"][0]
+    assert rec["bodies"] == 2
+    assert not [x["name"] for x in rec["checks"] if not x["ok"] and x["name"] == "bodies"]

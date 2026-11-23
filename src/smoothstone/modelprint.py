@@ -606,7 +606,9 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
         say("placing alignment pins")
         js = joints(parts, cuts, log)
     else:
-        parts, js = [Part(man, (0, 0, 0), 1)], []
+        # no cut: the model's own separate pieces (towers on one base plate) each stand on the bed,
+        # and the islands check still fails any that starts in the air
+        parts, js = [Part(man, (0, 0, 0), 1, bodies=len(man.decompose()))], []
     bd = root / "build" / "model"
     bd.mkdir(parents=True, exist_ok=True)
     name = models.slug(info.get("subject") or info.get("name") or "model")

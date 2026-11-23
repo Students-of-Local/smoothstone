@@ -65,9 +65,10 @@ NOT_A_MODEL = [
                    r"\bwindow\b|\bfacade only\b"),
     ("lamp", r"\blamp\b|\blight(?:ing)?\b|\bled\b|night ?light"),
     ("game piece", r"puzzle|gravitrax|board game|game pieces?|chess|tensegrity|impossible"),
+    ("brick set", r"\blego\b|\bduplo\b|kosti\u010dk"),
     ("map", r"\bmap\b|\bcity\b|skyline|1/\d{3,}"),
     ("bust", r"\bbust\b"),
-    ("vase", r"\bvase\b|planter|pen holder|\bholder\b|\bbox\b|bookend"),
+    ("vase", r"\bvase\b|planter|pen holder|\bholder\b|\bbox\b|bookend|egg ?cup|\bmug\b"),
     ("costume", r"carnival|costume|accessory"),
     ("tag", r"\btag\b|etiqueta|label"),
 ]
@@ -454,6 +455,22 @@ ACCESSORY = re.compile(r"crane|\bpins?\b|\bpegs?\b|support|\btest\b|calibrat|key
 WHOLE = re.compile(r"complete|full|whole|assembled|entire|all[-_ ]?in[-_ ]?one|one[-_ ]?piece|single", re.I)
 
 
+YEAR = re.compile(r"(?:19|20)\d\d")
+
+
+def _year_twin(f: dict, files: list[dict]) -> dict | None:
+    """The newest other file that differs from f only by a year (2014-eiffel and 2022-eiffel are
+    two versions of one model, not two parts of it), when f is not the newest."""
+    if not YEAR.search(f["name"]):
+        return None
+    key = bare(YEAR.sub("", f["name"]))
+    same = [g for g in files if YEAR.search(g["name"]) and bare(YEAR.sub("", g["name"])) == key]
+    if len(same) < 2:
+        return None
+    newest = max(same, key=lambda g: (max(int(y) for y in YEAR.findall(g["name"])), g["size"]))
+    return None if newest is f else newest
+
+
 def choose_files(files: list[dict]) -> tuple[list[dict], list[tuple[dict, str]]]:
     """(files to merge, [(file, why left out)]). A file named complete or whole is the model on its
     own; accessories (a crane, pins, supports) are left out; a fixed or repaired copy wins over the
@@ -468,6 +485,8 @@ def choose_files(files: list[dict]) -> tuple[list[dict], list[tuple[dict, str]]]
     for f in stl:
         if ACCESSORY.search(f["name"]) and len(stl) > 1:
             left.append((f, "an accessory, not the model"))
+        elif (twin := _year_twin(f, stl)) is not None:
+            left.append((f, f"{twin['name']} is the same model in another year's version"))
         else:
             keep.append(f)
     fixed = [f for f in keep if re.search(r"repair|fixed", f["name"], re.I)]
@@ -515,6 +534,66 @@ def sketchfab_link(c: dict) -> str:
     return url
 
 
+def _3mf_matrix(text: str | None) -> np.ndarray:
+    """A 3MF transform ("m00 m01 m02 m10 ... m32", rows of a 4x3) as a 4x4 for column vectors."""
+    M = np.eye(4)
+    if text:
+        v = [float(x) for x in text.split()]
+        M[:3, :4] = np.array(v, float).reshape(4, 3).T
+    return M
+
+
+def read_3mf(path: Path):
+    """The build items of a 3MF file as one mesh, read with the standard library (trimesh's own
+    reader needs lxml, which stone does not ship): each object's triangles, its components and
+    the build's transforms."""
+    import xml.etree.ElementTree as ET
+
+    import trimesh
+
+    with zipfile.ZipFile(path) as z:
+        models = {n: ET.fromstring(z.read(n)) for n in z.namelist() if n.lower().endswith(".model")}
+    if not models:
+        raise ModelsProblem(f"{path.name} holds no 3D model")
+    objects: dict[tuple[str, str], object] = {}
+    for name, root in models.items():
+        ns = root.tag[:root.tag.index("}") + 1] if root.tag.startswith("{") else ""
+        for ob in root.iter(ns + "object"):
+            objects[("/" + name.lstrip("/"), ob.get("id"))] = (ob, ns)
+    main = next((n for n in models if n.lower().endswith("3dmodel.model") and "/3d/" in "/" + n.lower()),
+                next(iter(models)))
+
+    def mesh_of(key, depth=0):
+        if depth > 8 or key not in objects:
+            return []
+        ob, ns = objects[key]
+        out = []
+        mesh = ob.find(ns + "mesh")
+        if mesh is not None:
+            v = np.array([[float(e.get(a)) for a in "xyz"] for e in mesh.find(ns + "vertices")], float)
+            f = np.array([[int(e.get(a)) for a in ("v1", "v2", "v3")] for e in mesh.find(ns + "triangles")], np.int64)
+            if len(v) and len(f):
+                out.append((v, f))
+        comps = ob.find(ns + "components")
+        for c in (comps if comps is not None else []):
+            ref = c.get("{http://schemas.microsoft.com/3dmanufacturing/production/2015/06}path") or key[0]
+            M = _3mf_matrix(c.get("transform"))
+            for v, f in mesh_of(("/" + ref.lstrip("/"), c.get("objectid")), depth + 1):
+                out.append((v @ M[:3, :3].T + M[:3, 3], f))
+        return out
+
+    root = models[main]
+    ns = root.tag[:root.tag.index("}") + 1] if root.tag.startswith("{") else ""
+    parts = []
+    for item in root.iter(ns + "item"):
+        M = _3mf_matrix(item.get("transform"))
+        for v, f in mesh_of(("/" + main.lstrip("/"), item.get("objectid"))):
+            parts.append(trimesh.Trimesh(v @ M[:3, :3].T + M[:3, 3], f, process=False))
+    if not parts:
+        raise ModelsProblem(f"{path.name} has no triangles in its build")
+    return trimesh.util.concatenate(parts)
+
+
 def load_mesh(paths: list[Path]):
     """Every file's triangles in one mesh. A glTF zip (Sketchfab) is opened in memory."""
     import trimesh
@@ -530,6 +609,8 @@ def load_mesh(paths: list[Path]):
             scene = trimesh.load(io.BytesIO(raw), file_type=gl.rsplit(".", 1)[1],
                                  resolver=trimesh.resolvers.ZipResolver(io.BytesIO(p.read_bytes())))
             m = scene.dump(concatenate=True) if hasattr(scene, "dump") else scene
+        elif p.suffix.lower() == ".3mf":
+            m = read_3mf(p)
         else:
             m = trimesh.load(str(p), force="mesh")
         if isinstance(m, trimesh.Trimesh) and len(m.faces):
@@ -735,12 +816,17 @@ MODEL_WORDS = re.compile(r"\b(?:model|replica|miniature|landmark|scale model|dio
 PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica"}
 
 
+# "St. Basil's Cathedral": the period is an abbreviation's, not the end of the subject
+ABBREV = re.compile(r"\b(St|Ste|Mt|Ft)\.\s+(?=[A-Z])")
+ABBREVS = {"st": "Saint", "ste": "Sainte", "mt": "Mount", "ft": "Fort"}
+
+
 def subject_of(request: str) -> str | None:
     """The landmark a request names, or None: 'a model of Cologne Cathedral that fits my 220 mm bed'
     gives 'Cologne Cathedral', 'a 300 mm tall Sagrada Familia' gives 'Sagrada Familia'."""
     from . import find
 
-    req = request.replace("’", "'")
+    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("’", "'"))
     m = re.search(r"\b(?:model|replica|miniature|version|print)s?\s+of\s+(?:the\s+)?(.+)", req, re.I)
     if m:
         s = find._phrase(m.group(1))
