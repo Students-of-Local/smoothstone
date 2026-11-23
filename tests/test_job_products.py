@@ -370,3 +370,24 @@ def test_a_question_noted_after_the_set_redirect_is_refused(job):
     assert code == 1 and "that is your question" in text
     text, _ = cli.run(["note", CUP_SAYS])
     assert _next(text) == CUP_ADD
+
+
+@pytest.mark.parametrize("cmd", [
+    # 24B e11 s2 (climb 4 round 3): after a full note, the shell split size=196 196 94, set read no size,
+    # and stone asked the person again, a loop to the step limit
+    ["set", "product_mount", "size=196", "196", "94"],
+    ["set", "product_mount"],
+    ["show", "product_mount"],
+])
+def test_after_a_full_note_stone_never_asks_again(job, cmd):
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    cli.run(["note", STUDIO_SAYS])
+    text, _ = cli.run(cmd)
+    assert _next(text) == ('stone product add "Mac Studio (2025)" --size 197 197 95 '
+                           '--source "https://support.apple.com/en-us/122211"'), text
+    assert "ask the person" not in text and "no sourced sizes" not in text
+
+
+def test_size_split_by_the_shell_is_read_whole(job):
+    assert cli.set_sizes(["product_mount", "size=196", "196", "94"]) == {"w": 196, "d": 196, "h": 94}

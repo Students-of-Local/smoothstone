@@ -532,6 +532,18 @@ def ask_product_size(out: Out, job: Job, x: str, t: str) -> Out:
     st = job.status()
     kept = st.get("ask_got") if st.get("ask_product") == x else None  # a show again keeps what the person said
     job.update(ask_recipe=top.name if top is not None else None, ask_product=x, ask_got=kept, ask_round=rnd)
+    noted = noted_answer({"ask_got": kept}, rnd)
+    if noted is not None:
+        # the person already answered: never ask again; their noted numbers go to stone product add
+        out.lines = [ln for ln in out.lines if not ln.startswith(("The catalog has no sourced sizes",
+                                                                   "FIX: the catalog has no sourced sizes"))]
+        if out.code:
+            out.lines.append(f"FIX: {x} goes in with stone product add first, from the person's noted answer")
+        out.add(f"The person's answer is noted: {x}, {short_size([noted['w'], noted['w'] if rnd else noted['d'], noted['h']])}"
+                + f", source {noted['source']}.")
+        out.after = []
+        out.next = product_add_line(x, noted, rnd, open_for(job.request()))
+        out.result = f"the size of {x} is noted; it goes to stone product add"
     return out
 
 
@@ -554,12 +566,18 @@ def set_sizes(items: list[str], round_: bool = False) -> dict:
     in mm: {"w", "d", "h"} for those given, "round" when a diameter is given. On a round product a
     size= with one number is its diameter."""
     got: dict = {}
-    for it in items:
+    for i, it in enumerate(items):
         if "=" not in it and ":" not in it:
             continue
         k, v = re.split(r"[=:]", it, maxsplit=1)
         k = k.strip().lower()
         nums = [float(n) for n in re.findall(r"\d+(?:\.\d+)?", v)]
+        if k in ("size", "dims", "dimensions"):
+            # size=196 196 94 split by the shell: the bare numbers after it belong to it
+            for nxt in items[i + 1:]:
+                if len(nums) >= 3 or not re.fullmatch(r"\d+(?:\.\d+)?(?:mm)?", nxt.strip()):
+                    break
+                nums.append(float(re.sub(r"mm$", "", nxt.strip())))
         if not nums:
             continue
         if k in ("size", "dims", "dimensions") and len(nums) in (2, 3):
