@@ -300,7 +300,10 @@ def main():
                 break
 
     exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
-    grade = grade_job(job, {**spec, "expect": exp}, messages)
+    if spec_path.parent.name in MODELS:
+        grade = models_run(rdir, job, spec)
+    else:
+        grade = grade_job(job, {**spec, "expect": exp}, messages)
     if first is not None and not first["pass"]:
         grade.update({"pass": False, "why": ["before the answer: " + w for w in first["why"]] + grade["why"]})
     if exp.get("judge") and grade["pass"]:
@@ -483,6 +486,21 @@ def engineering_grade():
     import engineering_grade as eg
 
     return eg
+
+
+# found models (stone models): the suite and its held-out set, graded by evals/models_grade.py
+MODELS = ("models", "models_heldout")
+
+
+def models_run(rdir: Path, job: Path, spec: dict) -> dict:
+    """A found model run: credits, every part's fit and checks, the size, then the landmark judge."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import models_grade
+
+    g = models_grade.grade(job, spec)
+    if (job / "build" / "views.png").is_file():
+        g = models_grade.judged(rdir, job, spec, g)
+    return g
 
 
 def judge_run(rdir: Path, job: Path, request: str, want: dict, grade: dict) -> dict:

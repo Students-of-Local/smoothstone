@@ -1,0 +1,21 @@
+{
+  "id": "m03_sagrada",
+  "request": "A 300 mm tall model of the Sagrada Familia for my 220 mm bed.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Sagrada Fam\u00edlia",
+      "size": {
+        "mode": "z",
+        "mm": 300
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "parts_min": 2
+    }
+  },
+  "why": "Taller than the bed: stone must cut it into numbered parts that each fit, with pins to line them up."
+}

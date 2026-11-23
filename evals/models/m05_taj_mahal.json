@@ -1,0 +1,20 @@
+{
+  "id": "m05_taj_mahal",
+  "request": "A model of the Taj Mahal, 150 mm across.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Taj Mahal",
+      "size": {
+        "mode": "long",
+        "mm": 150
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "Minarets and finials: a found model with thin points at a desk size."
+}

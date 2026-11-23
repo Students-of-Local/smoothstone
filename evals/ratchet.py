@@ -24,7 +24,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FLOOR = ROOT / "evals" / "floor.json"
-GUARDED = ("evals/tuning", "evals/figure", "evals/regressions", "evals/engineering", "evals/engineering_heldout")
+GUARDED = ("evals/tuning", "evals/figure", "evals/regressions", "evals/engineering", "evals/engineering_heldout",
+           "evals/models", "evals/models_heldout")
 
 
 def _suite_of(spec_id: str, evals: Path) -> str:

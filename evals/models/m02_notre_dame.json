@@ -1,0 +1,20 @@
+{
+  "id": "m02_notre_dame",
+  "request": "A 150 mm long model of Notre-Dame de Paris.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Notre-Dame de Paris",
+      "size": {
+        "mode": "long",
+        "mm": 150
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "A size along the nave: the longest horizontal side is 150 mm."
+}

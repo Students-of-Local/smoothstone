@@ -1,0 +1,20 @@
+{
+  "id": "h03_neuschwanstein",
+  "request": "A 200 mm tall model of Neuschwanstein Castle.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Neuschwanstein Castle",
+      "size": {
+        "mode": "z",
+        "mm": 200
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "Held out: towers and thin turrets."
+}

@@ -1,0 +1,19 @@
+{
+  "id": "m01_cologne",
+  "request": "A model of Cologne Cathedral that fits my 220 mm bed.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Cologne Cathedral",
+      "size": {
+        "mode": "fit"
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ]
+    }
+  },
+  "why": "No recipe makes a cathedral: stone must find an open model, credit it, and scale it as large as a 220 mm bed takes."
+}

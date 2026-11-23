@@ -1,0 +1,20 @@
+{
+  "id": "h05_colosseum",
+  "request": "A model of the Colosseum, 150 mm across.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Colosseum",
+      "size": {
+        "mode": "long",
+        "mm": 150
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "Held out: a wide, low ruin with arches."
+}

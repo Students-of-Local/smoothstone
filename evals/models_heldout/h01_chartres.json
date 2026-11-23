@@ -1,0 +1,20 @@
+{
+  "id": "h01_chartres",
+  "request": "A model of Chartres Cathedral, 180 mm long.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Chartres Cathedral",
+      "size": {
+        "mode": "long",
+        "mm": 180
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "Held out: a Gothic cathedral the suite never tuned on."
+}
