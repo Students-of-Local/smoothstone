@@ -649,11 +649,20 @@ def note_product(out: Out, job: Job, st: dict, text: str) -> Out:
     x = st["ask_product"]
     prev = st.get("ask_got") or {}
     new = match.size_answer(text, x)
+    if not any(new.get(k) for k in ("w", "d", "h")) and not any(prev.get(k) for k in ("w", "d", "h")):
+        # a source with no size, before any size: "I'll measure it tonight" or a link alone never waits
+        # for numbers a later note may guess; it answers only "where do these numbers come from"
+        new.pop("source", None)
     got = {**prev, **{k: v for k, v in new.items() if v}}
-    got["round"] = bool(prev.get("round") or new.get("round"))
     ar = rc.load(st["ask_recipe"]) if st.get("ask_recipe") else None
     cp = rc.catalog_param(ar) if ar is not None else None
-    round_ = got["round"] or bool(st.get("ask_round")) or (cp is not None and cp.catalog == "round_case")
+    # roundness comes from the job (the request or a round_case recipe), or a diameter with no depth;
+    # a depth that differs from the width is a box's, and is never dropped
+    round_ = bool(prev.get("round") or new.get("round") or st.get("ask_round")
+                  or (cp is not None and cp.catalog == "round_case"))
+    if got.get("d") and got.get("w") and abs(got["d"] - got["w"]) > 0.05:
+        round_ = False
+    got["round"] = round_
     names = {"w": "diameter" if round_ else "width", "d": "depth", "h": "height"}
     missing = [names[k] for k in (("w", "h") if round_ else ("w", "d", "h")) if not got.get(k)]
     out.owns_next = True

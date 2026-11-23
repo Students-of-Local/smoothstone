@@ -468,3 +468,48 @@ def test_recipe_text_values_read_back_literally(v, tmp_path):
 def test_the_metric_triple_wins_over_inches(answer, size):
     got = match.size_answer(answer, "Mac Studio (2025)")
     assert (got["w"], got["d"], got["h"]) == size
+
+
+@pytest.mark.parametrize("first", [
+    # PR 76 review round 2: these set "measured by the person", and the next numbers-only note, a guess,
+    # reached stone product add with it
+    "I'll measure it tonight",
+    "Could you measure it with a ruler?",
+    "the numbers are on https://support.apple.com/en-us/122211",
+])
+def test_a_source_with_no_size_never_sources_later_numbers(job, first):
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    cli.run(["note", first])
+    text, _ = cli.run(["note", "196 x 196 x 94"])
+    assert not _next(text).startswith("stone product add"), text
+    assert _next(text).startswith("ask the person: where Mac Studio (2025)'s numbers come from"), text
+
+
+def test_a_measured_answer_with_numbers_is_sourced(job):
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    text, _ = cli.run(["note", "I measured it with my ruler: 197 x 197 x 95 mm"])
+    assert _next(text) == "stone product add 'Mac Studio (2025)' --size 197 197 95 --source 'measured by the person'"
+
+
+@pytest.mark.parametrize("answer,size", [
+    # PR 76 review round 2: "across" and "round corners" made the box a disc, dropping its depth
+    ("19.7 cm across, 19.7 cm deep and 9.5 cm high, https://support.apple.com/en-us/122211", "197 197 95"),
+    ("120 x 80 x 30 mm with round corners, https://support.apple.com/en-us/122211", "120 80 30"),
+    ("a round puck shape, 120 x 80 x 30 mm, https://support.apple.com/en-us/122211", "120 80 30"),
+])
+def test_round_words_never_make_a_box_a_disc(job, answer, size):
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    text, _ = cli.run(["note", answer])
+    assert _next(text) == f"stone product add 'Mac Studio (2025)' --size {size} --source https://support.apple.com/en-us/122211"
+    text, code = cli.run(shlex.split(_next(text))[1:])
+    assert code == 0 and _next(text) == "stone set product_mount product=mac_studio_2025", text
+
+
+def test_a_diameter_with_no_depth_is_round(job):
+    cli.run(["new", CUP])
+    cli.run(["show", "round_case"])
+    text, _ = cli.run(["note", "diameter 97.9 mm, height 84.3 mm, https://support.apple.com/en-us/111914"])
+    assert _next(text) == CUP_ADD

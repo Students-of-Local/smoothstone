@@ -437,7 +437,10 @@ QTY_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(mm|millimet(?:er|re)s?|cm|cen
 # W x D x H; a "?" in the middle is a depth not known (a round product's)
 BY3_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*(\d+(?:\.\d+)?|\?)\s*(?:by|x|×)\s*"
                     r"(\d+(?:\.\d+)?)\s*(mm|cm|inches|inch|in\b|\")?", re.I)
-MEASURED_RE = re.compile(r"\b(?:ruler|measured|measure|calipers?|caliper|tape)\b", re.I)
+# the person says they measured it, in the past: "I measured it", "with my ruler"; never "I'll measure it"
+MEASURED_RE = re.compile(r"\bI(?:'ve|\s+have)?(?:\s+just)?\s+measured\b|\bwe(?:'ve|\s+have)?\s+measured\b|"
+                         r"\bmeasured\s+(?:it|them|this)\b|\bwith\s+(?:a|my|our)\s+(?:ruler|calipers?|tape(?:\s+measure)?)\b",
+                         re.I)
 
 
 def _mm(v: str, unit: str | None) -> float:
@@ -454,16 +457,23 @@ def size_answer(text: str, name: str | None = None) -> dict:
     own name (name) holds no size: "Mac Studio (2025)" is not 2025 mm wide."""
     from .catalog import first_url
 
-    out: dict = {}
+    out = _sizes_in(text, name)
     url = first_url(text)
     if url:
         out["source"] = url
-    elif MEASURED_RE.search(text or ""):
-        out["source"] = "measured by the person"
+    elif MEASURED_RE.search(text or "") and not re.search(r"\?|\byou\b", text or "", re.I):
+        out["source"] = "measured by the person"  # never from a question ("Could you measure it?")
+    # round only from a diameter with no depth: "across", "round corners" or "disc" say nothing of it
+    out["round"] = bool(re.search(r"\bdiameter\b|Ø|⌀", text or "", re.I)) and not out.get("d")
+    return out
+
+
+def _sizes_in(text: str, name: str | None) -> dict:
+    """The sizes in the person's answer, in mm: {"w", "d", "h"} for those given."""
+    out: dict = {}
     rest = re.sub(r"https?://\S+", " ", text or "")
     if name:
         rest = re.sub(re.escape(name), " ", rest, flags=re.I)
-    out["round"] = bool(re.search(r"\b(?:diameter|round|across|disc|circular)\b|Ø", rest, re.I))
     found = list(BY3_RE.finditer(rest))
     # "3.7 x 7.7 x 7.7 in (9.5 x 19.7 x 19.7 cm)": the metric triple is the one the maker printed
     m = next((t for t in found if t.group(4) and t.group(4).lower()[0] in "mc"), found[0] if found else None)
