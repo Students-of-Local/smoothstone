@@ -1,0 +1,16 @@
+{
+ "id": "m7_star_keychain",
+ "request": "Make a keychain charm from this drawing, 2 inches across.",
+ "image": "m7_star.png",
+ "note": "A hand drawn star (drawn in code with PIL). 2 in = 50.8 mm.",
+ "expect": {
+  "recipe": "keychain",
+  "image_used": "image",
+  "params": {
+   "size": [
+    49.8,
+    51.8
+   ]
+  }
+ }
+}

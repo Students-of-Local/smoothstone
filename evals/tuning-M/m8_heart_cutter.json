@@ -1,0 +1,16 @@
+{
+ "id": "m8_heart_cutter",
+ "request": "A cookie cutter in the shape of this drawing, 3 inches wide.",
+ "image": "m8_heart.png",
+ "note": "A hand drawn heart (drawn in code with PIL). 3 in = 76.2 mm.",
+ "expect": {
+  "recipe": "cookie_cutter",
+  "image_used": "image",
+  "params": {
+   "size": [
+    75,
+    77.4
+   ]
+  }
+ }
+}

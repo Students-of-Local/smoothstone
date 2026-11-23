@@ -1,0 +1,15 @@
+{
+ "id": "m4_noctua_guard",
+ "request": "A honeycomb guard for my Noctua NF-A9 fan, 2.5 mm thick.",
+ "sources": [
+  "https://noctua.at/en/nf-a9-pwm/specification (NF-A9 PWM: 92 x 92 x 25 mm)"
+ ],
+ "expect": {
+  "recipe": "fan_guard",
+  "params": {
+   "size": 92,
+   "style": "honeycomb",
+   "thickness": 2.5
+  }
+ }
+}
