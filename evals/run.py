@@ -214,11 +214,13 @@ def main():
         if a.driver in ("claude", "codex"):
             session = cli_run(a, log, messages, system, say or user, env, job, rdir, phase, session)
             continue
+        cut = None  # openai: the assistant message a cut turn left open, which the next turn goes on
         for step in range(1, MAX_STEPS + 1):
             st = {"step": step, "phase": phase, "t": round(time.time() - t0, 2)}
             if a.compact_at and step == a.compact_at + 1 and a.driver in ("lfm3", "openai"):
                 messages = [{"role": "system", "content": system}, {"role": "user", "content": user + "\n\n" + COMPACTED}]
                 pending = ""
+                cut = None
                 st["compacted"] = True
                 print(f"{step:>2} (context compacted)", flush=True)
             if a.driver == "next":
@@ -237,9 +239,16 @@ def main():
                 am = {"role": "assistant", "content": r["content"]}
                 if calls:
                     am["tool_calls"] = calls
+                if cut is not None:
+                    # the turn goes on from the cut one: one assistant message, since a chat template
+                    # takes at most one at the end (Ollama answers HTTP 400 to two)
+                    messages.remove(cut)
+                    am["content"] = (cut["content"] or "") + (am["content"] or "")
+                    cut = None
                 if r["finish_reason"] == "length" and not calls:
                     # a cut turn: kept in the chat, and the model goes on from it on the next step
                     messages.append(am)
+                    cut = am
                     st["tool_calls"] = []
                     log["steps"].append(st)
                     print(f"{step:>2} (cut at {MAX_NEW} tokens, continues)", flush=True)

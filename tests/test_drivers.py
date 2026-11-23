@@ -47,13 +47,25 @@ SCRIPT = ["stone status", "stone recipes", "stone show fan_guard", "stone set fa
 class FakeChat(BaseHTTPRequestHandler):
     seen: list = []
     auth: list = []
+    cuts = 0  # turns cut at the token limit before the script starts
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         FakeChat.seen.append({"path": self.path, "body": body})
         FakeChat.auth.append(self.headers.get("Authorization"))
         n = sum(m["role"] == "tool" for m in body["messages"])
-        if n < len(SCRIPT):
+        if [m["role"] for m in body["messages"][-2:]] == ["assistant", "assistant"]:
+            # what llama.cpp's chat template says, through Ollama
+            out = json.dumps({"error": {"code": 400, "message": "Cannot have 2 or more assistant messages at the end of the list."}}).encode()
+            self.send_response(400)
+            self.send_header("Content-Length", str(len(out)))
+            self.end_headers()
+            self.wfile.write(out)
+            return
+        if FakeChat.cuts:
+            FakeChat.cuts -= 1
+            msg, finish = {"role": "assistant", "content": "thinking about the guard "}, "length"
+        elif n < len(SCRIPT):
             msg = {"role": "assistant", "content": "", "tool_calls": [
                 {"id": f"call_{n}", "type": "function",
                  "function": {"name": "stone", "arguments": json.dumps({"command": SCRIPT[n]})}}]}
@@ -74,7 +86,7 @@ class FakeChat(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def fake_chat():
-    FakeChat.seen, FakeChat.auth = [], []
+    FakeChat.seen, FakeChat.auth, FakeChat.cuts = [], [], 0
     srv = HTTPServer(("127.0.0.1", 0), FakeChat)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_port}/v1"
@@ -114,6 +126,20 @@ def test_the_openai_driver_builds_a_part_through_tool_calls(monkeypatch, tmp_pat
     assert DUMMY not in path.read_text() and DUMMY not in (tmp_path / "scores.jsonl").read_text()
     line = json.loads((tmp_path / "scores.jsonl").read_text())
     assert line["driver"] == "openai" and line["condition"] == "openai-fake-model_cardS" and line["pass"] == 1
+
+
+@pytest.mark.skipif(not HAS_STONE, reason="no stone in .venv")
+def test_two_cut_turns_in_a_row_go_on_as_one_assistant_message(monkeypatch, tmp_path, fake_chat, openscad):
+    FakeChat.cuts = 2
+    log, _ = _main(monkeypatch, tmp_path, "--driver", "openai", "--model", "fake-model", "--base-url", fake_chat)
+    assert log["pass"], log["why"]
+    assert [s.get("finish_reason") for s in log["steps"][:3]] == ["length", "length", "tool_calls"]
+    # the third request goes on from one open assistant message holding both cut turns
+    third = FakeChat.seen[2]["body"]["messages"]
+    assert third[-1] == {"role": "assistant", "content": "thinking about the guard thinking about the guard "}
+    # and the chat keeps one assistant turn for the three steps, the tool call on it
+    first_call = next(m for m in log["messages"] if m["role"] == "assistant")
+    assert first_call["content"].count("thinking about the guard") == 2 and first_call["tool_calls"]
 
 
 def test_the_openai_driver_reads_ollama_style_arguments(monkeypatch):
