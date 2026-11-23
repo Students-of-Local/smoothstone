@@ -3,7 +3,8 @@
 uv run python evals/ratchet.py <runs dir> [<runs dir> ...] [--floor evals/floor.json]
 uv run python evals/ratchet.py --check-git origin/main
 
-With runs: groups the runs by (suite, card) (the next driver counts as card "next"), and compares
+With runs: groups the runs by (suite, card) (the next driver counts as card "next"; the openai, claude and
+codex drivers count as their condition, such as claude-haiku_cardS), and compares
 each group to evals/floor.json. Below the floor it names the specs that regressed and exits 1.
 Above it, or for a group the floor does not have yet, it raises the floor in the file and says
 so. It never lowers a floor.
@@ -40,7 +41,13 @@ def load_runs(dirs: list[Path], evals: Path = ROOT / "evals") -> list[dict]:
         for p in logs:
             log = json.loads(p.read_text())
             suite = log.get("suite") or _suite_of(log["spec"], evals)
-            card = "next" if log.get("driver") == "next" else str(log.get("card"))
+            drv = log.get("driver") or "lfm3"
+            if drv == "next":
+                card = "next"
+            elif drv == "lfm3":
+                card = str(log.get("card"))
+            else:  # another model class keeps its own floor, so a frontier run never sets LFM3's
+                card = log.get("condition") or f"{drv}_card{log.get('card')}"
             jp = p.parent / "judge.json"
             judge = json.loads(jp.read_text())["score"] if jp.exists() else log.get("judge")
             runs.append({"key": f"{suite}/{card}", "spec": log["spec"], "pass": bool(log.get("pass")),
