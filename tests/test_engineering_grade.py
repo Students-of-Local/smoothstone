@@ -689,6 +689,29 @@ def test_pi5_standoffs_into_the_board_fail():
     assert any("inside the part" in w for w in why), why
 
 
+def _pi5_pins(d: float):
+    sp, _ = pi5_case()
+    w, dd, h = (sp["product"]["body"][k] for k in ("w", "d", "h"))
+    case = _box([-2.3, -2.3, -4.0], [w + 2.3, dd + 2.3, h]) - _box([-0.3, -0.3, -2.0], [w + 0.3, dd + 0.3, h + 1])
+    for x, y in PI5_HOLES:  # a standoff to the PCB underside, then a pin 1 mm up into the hole
+        case = case + _cyl(x, y, -2.5, 1.45, 3.0) + _cyl(x, y, 1.4, 2.45, d / 2)
+    return sp, _mesh(case)
+
+
+def test_a_locating_pin_inside_a_mounting_hole_is_not_inside_the_product():
+    """PR 67 round 2: a 2.4 mm pin in the Pi 5's 2.7 mm hole read as 1.85 mm of interference, so the
+    grader refused the pins that keep the board from sliding off its snap catch. A hole is empty."""
+    sp, mesh = _pi5_pins(2.4)
+    why, _ = eg.check_fit(mesh, sp, np.eye(4), "PLA")
+    assert why == [], why
+
+
+def test_a_pin_wider_than_the_hole_still_pushes_into_the_board():
+    sp, mesh = _pi5_pins(3.6)
+    why, _ = eg.check_fit(mesh, sp, np.eye(4), "PLA")
+    assert any("inside the part" in w for w in why), why
+
+
 # --- the second review's faults (review-r2), each on a part built by hand ----------------------------
 
 def test_snap_catch_is_measured():

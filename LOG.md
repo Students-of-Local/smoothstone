@@ -430,3 +430,81 @@ moment of area. Its stress runs along the load, so a cut across a -z load is gra
 layers (x0.5) whatever layers the declared section lies in (review round 2): the neck reads 70 MPa
 against 11.75 allowed, a 15 x 1.5 neck 15 (it passed against 23.5 before), a 20 x 3 neck 3.2, the
 whole wall 0.75.
+
+## 2026-11-22 climb 1: a fitted case from a product catalog
+
+The first step up the engineering suite. Stone now has a product catalog,
+src/smoothstone/products/<slug>.json, one file per product: the product block of its engineering
+spec word for word (name, body, body_sources, features, sources) plus the names and model numbers
+people type (aliases, ABX00080 included), which faces must stay open, and for a board where its PCB
+sits. These ten products are the tuning set. Products for a held-out set come later and must not be
+tuned on.
+
+A new recipe, fitted_case, builds a tray case from a catalog product: a window for every feature
+the maker locates on a walled side (its plug or opening plus 0.5 mm), open faces where the maker
+locates nothing, standoffs on a board's hole pads (or two ledges under its short ends) 2.75 mm over
+the floor for the leads, a clearance per side inside the grader's band (PLA slip 0.3, snug 0.15,
+TPU snug 0.1 interference), and retention none, friction, or two snap arms cut free from opposite
+walls (strain at 75% of the limit). The build writes build/engineering.json from what the OpenSCAD
+echoes it built, with the URL the catalog cites for every size. The request picks the product
+(stone show says "Product: <name> (catalog, sourced: ...)"); a product not in the catalog gets a
+question for its width, depth and height and which faces have ports, never a guess. It ranks first
+only when the request names a catalog product, so iPhone cases stay phone_case. It learns from two
+open designs: YAPP_Box (MIT, https://github.com/mrWheel/YAPP_Box) for per-face center-and-size
+cutouts, no code copied; BOSL2 (BSD-2, vendored) is the library it may
+build on, unused so far.
+
+NEXT driver, seed 1, before (origin/main 887ef71, and the 7e38f42 table above for e04 to e09) and after:
+
+| spec | before | after | after: top failure |
+| --- | --- | --- | --- |
+| e01_rpi5_case | no recipe, asks | pass | |
+| e02_flipper_zero_case | no recipe, asks | pass | |
+| e03_power_bank_case | no recipe, asks | pass | |
+| e04_airtag_case | no recipe, asks | asks: the catalog has the AirTag, a tray cannot hold its dome | no finished part |
+| e05_appletv_wall_holder | no recipe, asks | builds a fitted_case tray | attach: no M4 holes to screw it to the wall |
+| e06_iphone_desk_holder | phone_stand | phone_stand | no engineering.json |
+| e07_mac_mini_mount | no recipe, asks | no recipe, asks | no finished part |
+| e08_rpi4_vesa_adapter | panel | panel | no engineering.json |
+| e09_pot_knob | no recipe, asks | no recipe, asks | no finished part |
+| e10_model_number_case | no recipe, asks | pass | |
+
+4 of 10. The floor in evals/floor.json is left for the lead to raise.
+
+PR 67 review, round 1, fixed on the branch:
+
+- A case whose walls hide ports: raspberry_pi_4 (its spec grades a VESA plate and locates no ports)
+  and mac_mini_m4_2024 (Apple does not locate its bottom power button, and a tray's floor covers the
+  bottom) are no longer case products; stone names them and says why. Each case product now records
+  port_faces, and a test holds every port face open or located, never an unlocated bottom.
+- e01's snap catches hooked air over the body box's edge. The catch now bears on the rear USB stack's
+  shell, as GPT-6.1 Sol's gold e01 part does: one arm in the +y wall at x 77.09, catch underside 0.465
+  above the shell top (18.815), reaching 0.55 past its edge (0.25 after the 0.3 side shift), y 2.6,
+  L 23, strain 1.47% against PLA's 2%. The shell's x span (70.78 to 88.265) is new: the STEP body
+  whose y span and top match usb_stack_b's cited bbox, measured from the same STEP file. A product with
+  no located catch surface refuses retention=snap, and a test checks every catch over its surface.
+- Friction was claimed for a 0.3 mm slip gap. The grader checks only that a friction gap lies in the
+  fit's band, so it cannot catch that; the part now claims friction only at a gap at or below zero
+  (auto picks it there, and an explicit friction with a gap is refused).
+
+e01, e02, e03 and e10 still pass on --driver next.
+
+PR 67 review, round 2:
+
+- second-S1 fixed: for a product not in the catalog, fitted_case asks only which product it is (maker
+  and model). An answer that names none ends the ask: it says fitted_case builds only for products
+  with sourced sizes, names some, and points to box for a custom size, instead of asking again.
+- first-F1 fixed: with the catch sized for the side clearance, the Pi 5 could slide 1.93 mm toward
+  -y (its PCB edge stops on the -y wall, its HDMI shells slide into their windows) and the catch then
+  missed the USB shell. Each standoff now carries a 2.4 mm locating pin in the 2.7 mm hole (YAPP_Box's
+  size; pin = hole - 0.3), 1.0 mm over the PCB's underside with a 0.4 mm chamfer (no PCB thickness is
+  sourced, so 1.0 mm is a stated minimum). The board slides at most 0.15 mm, and the catch reach is
+  sized from that: y 2.3 for PLA slip, catch 0.4 past the shell's edge, 0.25 after the worst slide.
+  Snap needs pins. This needed the grader change in the commit before it (a pin inside a product's
+  mounting hole is not inside the product); e01 fails without it.
+
+2026-11-22, PR 67 round 2: the grader's fit check read a locating pin inside a mounting hole as the
+part inside the product (1.85 mm on e01), so it refused the pins that keep a Pi from sliding off its
+snap catch. A hole is empty through the board: check_fit now leaves out samples inside a hole
+feature's own diameter (not its pad, no margin). A standoff pushed into the board around the hole
+still fails (test_pi5_standoffs_into_the_board_fail, test_a_pin_wider_than_the_hole_still_pushes_into_the_board).

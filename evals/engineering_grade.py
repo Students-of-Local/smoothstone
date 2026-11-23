@@ -340,17 +340,18 @@ def is_circle(f: dict) -> bool:
     return f.get("shape") == "circle"
 
 
-def feature_mask(P: np.ndarray, label: np.ndarray, body: dict, features: list[dict]) -> np.ndarray:
+def feature_mask(P: np.ndarray, label: np.ndarray, body: dict, features: list[dict],
+                 margin: float = FEATURE_MARGIN) -> np.ndarray:
     """True for samples on a feature's rectangle or disc (size, plug or pad, the largest) plus
-    FEATURE_MARGIN."""
+    margin (FEATURE_MARGIN by default)."""
     m = np.zeros(len(P), bool)
     for f in features:
         on = label == f["face"]
         if not on.any():
             continue
         uv = face_uv(f["face"], P[on], body)
-        sw = max(f["size"][0], (f.get("plug") or f["size"])[0], (f.get("pad") or f["size"])[0]) / 2 + FEATURE_MARGIN
-        sh = max(f["size"][1], (f.get("plug") or f["size"])[1], (f.get("pad") or f["size"])[1]) / 2 + FEATURE_MARGIN
+        sw = max(f["size"][0], (f.get("plug") or f["size"])[0], (f.get("pad") or f["size"])[0]) / 2 + margin
+        sh = max(f["size"][1], (f.get("plug") or f["size"])[1], (f.get("pad") or f["size"])[1]) / 2 + margin
         du, dv = uv[:, 0] - f["c"][0], uv[:, 1] - f["c"][1]
         if is_circle(f):
             hit = du * du + dv * dv <= sw * sw
@@ -467,7 +468,12 @@ def check_fit(mesh, spec: dict, M: np.ndarray, material: str) -> tuple[list[str]
     feat = feature_mask(P, label, body, prod.get("features", []))
     why, out = [], {"samples": int(len(P)), "per_mm2": round(1 / STEP ** 2, 2), "range": [lo, hi], "faces": {}}
     floor = {f: min(face_range(exp, f, lo, hi)[0], 0.0) for f in FACES}
-    tight = g < np.array([floor[f] for f in label]) - TOUCH
+    # a mounting hole is empty through the product, so a locating pin inside its own diameter (not
+    # its pad, no margin) is not inside the product; the pad around it still counts
+    in_hole = feature_mask(P, label, body, [{**f, "pad": None, "plug": None}
+                                            for f in prod.get("features", []) if f["kind"] == "hole"],
+                           margin=0.0)
+    tight = (g < np.array([floor[f] for f in label]) - TOUCH) & ~in_hole
     if tight.any():
         worst = float(g[tight].min())
         faces = sorted(set(label[tight]))

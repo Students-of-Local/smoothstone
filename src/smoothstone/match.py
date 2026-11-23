@@ -316,6 +316,9 @@ FIT_RE = re.compile(r"\b(?:case|cover|lid|cap|mount|holder|bracket|adapter|sleev
                     r"\b(?:to fit|that fits|fits)\s+(?P<thing2>[^,.;!?]+)", re.I)
 
 
+TRAY_RE = re.compile(r"\b(?:tray|enclosure)s?\b", re.I)  # a fitted case's own words: it holds a product
+
+
 def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None) -> str | None:
     """The question to ask when the part must fit something real and nothing says how big it is.
 
@@ -323,11 +326,36 @@ def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None)
     (phone_case phone) needs one of its products named instead, as a number there is no size."""
     if r.name == "figure":
         return None
-    m = FIT_RE.search(request)
-    if not m:
-        return None
     text = " ".join([request, *(notes or [])])
     low = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()) + " "
+    m = FIT_RE.search(request) or TRAY_RE.search(request)
+    if not m:
+        return None
+    cat = rc.catalog_param(r)
+    if cat is not None:
+        # a part built from the catalog's sourced sizes: the product must be one it has, by name,
+        # model number or slug; any other product's sizes come from the person, never a guess
+        from . import catalog
+
+        if catalog.find(text, list(cat.choices)) or any(
+                " " + str(c).replace("_", " ") + " " in low for c in cat.choices):
+            return None
+        other = catalog.find(text)
+        if other:  # a product with sourced sizes that this part cannot hold (the AirTag's round body)
+            p = catalog.get(other)
+            return (f"I have the {p['name']}'s sizes, but this {r.title.lower()} cannot hold it "
+                    f"({p.get('fitted_case_why', 'not a body a tray holds')}). Should I make something else?")
+        if not notes:
+            return "Which product is it, exactly (its maker and model number)?"
+        # the person answered and still named no product it has: this recipe takes no sizes, so asking
+        # again would loop; say what it builds for and where a custom size goes
+        have = ", ".join(catalog.get(c)["name"] for c in list(cat.choices)[:4])
+        return (f"{r.name} builds only for products whose sizes it has sourced from the maker "
+                f"({have} and others), and this is not one of them. For a part to your own measurements, "
+                f"the box recipe takes a size: stone show box")
+    if not FIT_RE.search(request):
+        return None
+    m = FIT_RE.search(request)
     product = next((p for p in r.params if p.product), None)
     if product:
         # only a product the recipe knows is a size: "iPhone 15" has a number but no case here fits it,
