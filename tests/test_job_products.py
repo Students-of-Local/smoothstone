@@ -177,24 +177,69 @@ def test_the_products_own_name_is_no_size(job):
     assert "w" not in match.size_answer("Mac Studio (2025)'s width is on the spec page", "Mac Studio (2025)")
 
 
-@pytest.mark.parametrize("items,line", [
-    (["product_mount", "width=197", "depth=197", "height=95"], "--size 197 197 95"),
-    (["product_mount", "height=95mm", "w=197", "d=197"], "--size 197 197 95"),
-    (["product_mount", "size=197x197x95"], "--size 197 197 95"),
+NOTE_LINE = 'stone note "<the person\'s words, copied exactly>"'
+CUP = "a snug cup that holds my HomePod mini on a shelf"
+CUP_SAYS = ("Apple lists Height: 3.3 inches (84.3 mm), Width: 3.9 inches (97.9 mm) at "
+            "https://support.apple.com/en-us/111914")
+
+
+@pytest.mark.parametrize("items", [
+    ["product_mount", "width=196", "depth=196", "height=94"],
+    ["product_mount", "height=93.98mm", "w=195.58", "d=195.58"],
+    ["product_mount", "size=197x197x95"],
+    ["product_mount", "width=196"],
 ])
-def test_sizes_set_on_the_recipe_become_the_product_add_line(job, items, line):
-    """24B e11 phase 1, every seed (climb 4): it set width=197 depth=197 height=95 on product_mount and
-    stone asked the question again, a loop. The sizes go to stone product add, with the source the
-    person gave when stone has it."""
+def test_sizes_set_before_a_note_go_to_the_persons_words(job, items):
+    """LFM3 e11 s1, s2 and 24B e11 s1 to s3 (climb 4 round 2): the model skipped stone note, converted
+    Apple's inches itself (195.58, 196) and set them; the redirect made them the product add line and
+    the part pressed 0.7 mm into the product. Sizes come from the person's own words, read by stone."""
     cli.run(["new", STUDIO])
     cli.run(["show", "product_mount"])
-    text, code = cli.run(["set", *items])
-    assert code == 1 and _next(text) == (f'stone product add "Mac Studio (2025)" {line} '
-                                         '--source "<where the person said the numbers come from>"')
+    for _ in range(3):  # asked again, it says the same, and never sends the model to the person stuck
+        text, code = cli.run(["set", *items])
+        assert code == 1 and _next(text) == NOTE_LINE, text
+    assert "If the person has not answered yet, ask them: Mac Studio (2025)'s width" in text
+    assert not (job / "plan.json").exists() and not list((job / "products").glob("*.json"))
+
+
+@pytest.mark.parametrize("items,differs", [
+    (["product_mount", "width=196", "depth=196", "height=94"], True),
+    (["product_mount", "width=195.58", "depth=195.58", "height=93.98"], True),
+    (["product_mount", "width=197", "depth=197", "height=95"], False),
+    (["product_mount", "width=197.04", "depth=197", "height=95"], False),
+])
+def test_noted_sizes_win_over_sizes_set_after_them(job, items, differs):
+    """Once the person's answer is noted, a set with other numbers keeps the noted ones, and the metric
+    figure Apple prints beside the inches ("3.7 inches (9.5 cm)") is the one stone reads."""
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
     cli.run(["note", STUDIO_SAYS])
+    cli.run(["show", "product_mount"])  # a show again keeps what the person said
+    text, code = cli.run(["set", *items])
+    assert code == 1 and _next(text) == ('stone product add "Mac Studio (2025)" --size 197 197 95 '
+                                         '--source "https://support.apple.com/en-us/122211"')
+    assert ("differ from what the person said" in text) == differs
+    if differs:
+        assert "stone keeps the noted numbers" in text
+
+
+@pytest.mark.parametrize("items", [
+    ["round_case", "size=97.9", "height=84.3"],
+    ["round_case", "diameter=98", "height=85"],
+    ["round_case", "size=97.9x84.3"],
+])
+def test_round_case_takes_size_and_diameter_on_set(job, items):
+    """24B e12 s1 (climb 4 round 2): size=97.9 height=84.3 on round_case read no diameter, and stone
+    asked the question again, eleven times. On a round product size= is the diameter, routed to the
+    note, then to the noted numbers."""
+    cli.run(["new", CUP])
+    cli.run(["show", "round_case"])
     text, _ = cli.run(["set", *items])
-    assert _next(text) == f'stone product add "Mac Studio (2025)" {line} --source "https://support.apple.com/en-us/122211"'
-    assert not (job / "plan.json").exists()
+    assert _next(text) == NOTE_LINE, text
+    cli.run(["note", CUP_SAYS])
+    text, _ = cli.run(["set", *items])
+    assert _next(text) == ('stone product add "HomePod mini" --size 97.9 97.9 84.3 --round --open +z '
+                           '--source "https://support.apple.com/en-us/111914"')
 
 
 def test_after_the_answer_next_is_the_product_add_line(job):
@@ -270,3 +315,58 @@ def test_a_round_product_open_on_top_gets_a_cup_with_no_rim(job, openscad):
     top = m.vertices[m.vertices[:, 2] > m.bounds[1][2] - 0.01]
     # the top edge is the wall alone: nothing reaches in over the puck (r 20, 0.2 clearance)
     assert ((top[:, 0] - cx) ** 2 + (top[:, 1] - cy) ** 2).min() ** 0.5 >= 20.15
+
+
+CUP_ADD = ('stone product add "HomePod mini" --size 97.9 97.9 84.3 --round --open +z '
+           '--source "https://support.apple.com/en-us/111914"')
+
+
+@pytest.mark.parametrize("line", [
+    # LFM3 e12 s2 (climb 4 round 2): stone read all of it as the name, and asked for the source three times
+    'stone product add "HomePod mini" size=97.9,97.9,84.3 round open z source="https://support.apple.com/en-us/111914"',
+    'stone product add --name="HomePod mini" --size=97.9,97.9,84.3 --round --open z '
+    '--source="https://support.apple.com/en-us/111914"',
+    'stone product add name="HomePod mini" diameter=97.9 h=84.3 open=+z source=https://support.apple.com/en-us/111914',
+    'stone product add "HomePod mini" source=https://support.apple.com/en-us/111914 size=97.9x84.3 round open=top',
+    'stone product add "HomePod mini" size=97.9 97.9 84.3 --round --open +z --source https://support.apple.com/en-us/111914',
+])
+def test_product_add_reads_name_value_words(job, line):
+    """stone product add reads name=value words in any order, as stone set does."""
+    cli.run(["new", CUP])
+    cli.run(["show", "round_case"])
+    text, code = cli.run(shlex.split(line)[1:])
+    assert code == 0, text
+    rec = json.loads((job / "products" / "homepod_mini.json").read_text())
+    assert rec["name"] == "HomePod mini" and rec["body"]["w"] == 97.9 and rec["body"]["h"] == 84.3
+    assert rec["open_faces"] == ["+z"] and rec["sources"] == ["https://support.apple.com/en-us/111914"]
+    assert _next(text).startswith("stone set round_case product=homepod_mini")
+
+
+def test_product_add_box_from_w_d_h(job):
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    text, code = cli.run(["product", "add", "Mac Studio (2025)", "w=197", "d=197", "h=95",
+                          "source=https://support.apple.com/en-us/122211"])
+    assert code == 0, text
+    assert json.loads((job / "products" / "mac_studio_2025.json").read_text())["body"]["d"] == 197
+
+
+def test_product_add_gives_the_corrected_line_for_words_it_cannot_read(job):
+    cli.run(["new", CUP])
+    cli.run(["show", "round_case"])
+    text, code = cli.run(["product", "add", "HomePod mini", "size=97.9x84.3", "round", "open=z", "color=white",
+                          "source=https://support.apple.com/en-us/111914"])
+    assert code == 1 and "could not read: color=white" in text
+    assert _next(text) == CUP_ADD and not list((job / "products").glob("*.json"))
+    text, code = cli.run(shlex.split(_next(text))[1:])
+    assert code == 0, text
+
+
+def test_a_question_noted_after_the_set_redirect_is_refused(job):
+    cli.run(["new", CUP])
+    cli.run(["show", "round_case"])
+    cli.run(["set", "round_case", "diameter=98", "height=85"])
+    text, code = cli.run(["note", "What are the HomePod mini's diameter and height in mm?"])
+    assert code == 1 and "that is your question" in text
+    text, _ = cli.run(["note", CUP_SAYS])
+    assert _next(text) == CUP_ADD
