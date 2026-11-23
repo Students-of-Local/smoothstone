@@ -1,0 +1,27 @@
+{
+ "id": "m1_comb_inches",
+ "request": "A cable comb about 4 inches long for six quarter inch cables, with lead in chamfers and a grip so the cables click in.",
+ "note": "4 in = 101.6 mm; a 1/4 in cable is 6.35 mm, and the recipe's slot is the cable plus 0.2 to 0.5 mm.",
+ "expect": {
+  "recipe": "cable_comb",
+  "params": {
+   "length": [
+    99,
+    104.2
+   ],
+   "slots": 6,
+   "slot_w": [
+    6.55,
+    6.85
+   ],
+   "lead_in": [
+    0.1,
+    4
+   ],
+   "grip": [
+    0.1,
+    2
+   ]
+  }
+ }
+}

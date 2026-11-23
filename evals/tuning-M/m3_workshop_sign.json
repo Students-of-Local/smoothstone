@@ -1,0 +1,25 @@
+{
+ "id": "m3_workshop_sign",
+ "request": "A sign for my workshop door that says WORKSHOP, 8 inches wide and 2 inches tall, in serif letters, with a raised rim and holes at the top to hang it.",
+ "note": "8 in = 203.2 mm, 2 in = 50.8 mm.",
+ "expect": {
+  "recipe": "sign",
+  "params": {
+   "text": "WORKSHOP",
+   "w": [
+    201,
+    205.5
+   ],
+   "h": [
+    49.8,
+    51.8
+   ],
+   "font": "serif",
+   "rim": [
+    0.5,
+    10
+   ],
+   "holes": "top"
+  }
+ }
+}

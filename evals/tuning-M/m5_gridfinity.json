@@ -1,0 +1,17 @@
+{
+ "id": "m5_gridfinity",
+ "request": "A Gridfinity bin 3 by 2 grid units and 6 units tall, split into three compartments along its width, with magnets underneath and a label shelf.",
+ "note": "div_x dividers make div_x + 1 compartments across X (recipes/gridfinity_bin/recipe.scad).",
+ "expect": {
+  "recipe": "gridfinity_bin",
+  "params": {
+   "grid_x": 3,
+   "grid_y": 2,
+   "units": 6,
+   "div_x": 2,
+   "div_y": 0,
+   "magnets": true,
+   "label": true
+  }
+ }
+}

@@ -58,6 +58,34 @@
   "rate": 1.0,
   "total": 16
  },
+ "tuning-M/claude-haiku_cardL": {
+  "judge": null,
+  "passing": [
+   "m1_comb_inches",
+   "m3_workshop_sign",
+   "m4_noctua_guard",
+   "m5_gridfinity",
+   "m6_faceted_planter",
+   "m7_star_keychain",
+   "m8_heart_cutter"
+  ],
+  "rate": 0.875,
+  "total": 16
+ },
+ "tuning-M/claude-opus_cardL": {
+  "judge": null,
+  "passing": [
+   "m1_comb_inches",
+   "m3_workshop_sign",
+   "m4_noctua_guard",
+   "m5_gridfinity",
+   "m6_faceted_planter",
+   "m7_star_keychain",
+   "m8_heart_cutter"
+  ],
+  "rate": 0.9375,
+  "total": 16
+ },
  "tuning/S": {
   "judge": null,
   "passing": [
