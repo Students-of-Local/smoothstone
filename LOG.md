@@ -761,3 +761,34 @@ Open:
   stone reads the maker's metric figure. That changes what the round 2 brief asked set to print,
   so it is not made here.
 - `stone product add` could read the name=value words stone set takes (size=, source=, round, open).
+
+### Round 3: sizes come from the person's own words
+
+- While the job waits on an unknown product's size and no stone note has read an answer, `stone set`
+  with sizes gives FIX and NEXT = `stone note "<the person's words, copied exactly>"`, never the
+  product add line, so converting units and rounding stay stone's job (the metric figure wins when a
+  page prints inches too). Once a note gave every size and a source, a set with numbers more than
+  0.05 mm off says so and keeps the noted ones, and show and set give the noted product add line
+  instead of asking again.
+- round_case reads size= (one number is the diameter) and diameter= on stone set; a size= the shell
+  split ("size=196 196 94") is read whole.
+- `stone product add` reads name=value words in any order (size=WxDxH or size=W D H, w= d= h=,
+  diameter=, source=, round, open=..., name=), and gives back the exact corrected line for a word it
+  cannot read.
+- Cards S, M and SKILL.md: note the person's words exactly; never convert or round a number.
+
+A first round 3 run, on aaf74a3, showed a full note followed by `stone set ... size=196 196 94` asking
+the person again; 01310d8 fixes that, and every check and run below is on 01310d8.
+Checks: suite 874 passed, timing passed, `--driver next` e01 to e12 12 of 12, ratchet holds.
+
+| Model (card S, e11 and e12, seeds 1 to 3) | Pass | Fail | Crash | Text calls |
+| --- | --- | --- | --- | --- |
+| LFM3-1.7B, round 3 | 3 | 1 | 2 (Ollama HTTP 400, e11 s1, e12 s3) | 0 |
+| LFM2.5-24B-A2B, round 3 | 6 | 0 | 0 | 0 |
+
+LFM3's fail (e11 s2) ran out of tokens after the person answered and made no call. In 24B e11 s2
+and s3 and e12 s3, the model still set its own numbers (196, 95), and stone sent it to note the
+person's words, which gave 197 and 97.9. Runs are under the climb4 scratchpad after3/.
+
+Open: a model that writes its own conversion into the note ("7.7 inches (196 mm)", 24B on aaf74a3)
+still gets its numbers; stone cannot tell them from the person's.
