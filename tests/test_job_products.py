@@ -119,14 +119,35 @@ def test_the_ask_comes_before_the_note_hint(job):
     assert lines[at + 1].startswith("After the person answers (not before): stone note")
 
 
-@pytest.mark.parametrize("note", [ASK[len("ask the person: "):],
-                                  "Ask for the Mac Studio (2025) width, depth and height in mm and where they come from"])
+@pytest.mark.parametrize("note", [
+    ASK[len("ask the person: "):],
+    "Ask for the Mac Studio (2025) width, depth and height in mm and where they come from",
+    # 24B e11 s2 (climb 4, after round 2): reworded with a request, the overlap fell under the bar,
+    # and "your own ruler" in the question was then kept as the person's source
+    "Mac Studio (2025) under desk mount: please provide its width, depth, and height in mm, and where "
+    "those numbers come from (e.g., maker's spec page or your own ruler).",
+    "I need the Mac Studio (2025) dimensions: please provide its width, depth, and height in mm, and "
+    "where you got them (e.g., Apple's spec page or your own ruler).",
+])
 def test_note_refuses_stones_own_question(job, note):
     cli.run(["new", STUDIO])
     cli.run(["show", "product_mount"])
     text, code = cli.run(["note", note])
     assert code == 1 and "that is your question, not the person's answer" in text
     assert _next(text) == ASK and json.loads((job / "notes.json").read_text() if (job / "notes.json").exists() else "[]") == []
+
+
+@pytest.mark.parametrize("answer", [
+    "I don't have it with me; I'll measure it tonight",
+    "Could not find it online, I measured it: 197 by 197 by 95 mm",
+    "It is the one on apple.com, what is the next step?",
+])
+def test_a_persons_answer_is_still_noted(job, answer):
+    """The question check refuses only a note that asks for a size with no number or URL of its own."""
+    cli.run(["new", STUDIO])
+    cli.run(["show", "product_mount"])
+    text, _ = cli.run(["note", answer])
+    assert "that is your question" not in text
 
 
 def test_a_round_product_is_asked_its_diameter_and_height(job):

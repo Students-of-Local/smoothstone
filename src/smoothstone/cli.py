@@ -577,15 +577,22 @@ def open_for(request: str) -> list[str]:
     return ["+z"] if noun in OPEN_TOP else []
 
 
+ASKING_RE = re.compile(r"\?|\b(?:please|provide|could you|can you|would you|tell me|let me know|what (?:is|are))\b", re.I)
+SIZE_WORDS_RE = re.compile(r"\b(?:width|depth|height|diameter|dimensions?|sizes?|measurements?)\b", re.I)
+
+
 def is_the_question(text: str, asked: str) -> bool:
     """A note that is stone's own question, or restates it with no number of its own: a model noting
-    the question instead of asking it."""
+    the question instead of asking it. A note with no number and no URL that asks for a size ("please
+    provide its width, depth and height") is the question too, however it is worded."""
     q = asked[len("ask the person"):].lstrip(": ")
     words = lambda s: {w for w in re.findall(r"[a-z]+", s.lower()) if len(w) > 2} - rc.STOPWORDS  # noqa: E731
     nums = lambda s: set(re.findall(r"\d+(?:\.\d+)?", s))  # noqa: E731
     tw, qw = words(text), words(q)
     if not tw or not nums(text) <= nums(q) or catalog.first_url(text):
         return False
+    if ASKING_RE.search(text) and SIZE_WORDS_RE.search(text):
+        return True
     return len(tw) >= 4 and len(tw & qw) / len(tw) >= 0.7
 
 
