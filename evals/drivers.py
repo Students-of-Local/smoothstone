@@ -28,7 +28,9 @@ from pathlib import Path
 
 MODEL_DRIVERS = ("openai", "claude", "codex")
 # variables that would switch a CLI from the person's sign-in to paid API billing
-BILLING_ENV = {"claude": ("ANTHROPIC_API_KEY",), "codex": ("OPENAI_API_KEY", "CODEX_API_KEY")}
+BILLING_ENV = {"claude": ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+                          "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"),
+               "codex": ("OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL")}
 OPENAI_SAMPLING = {"temperature": 0.1}  # the lfm3 temperature; top_k and repeat_penalty are not in the API
 # a CLI has its own shell tool, not one named stone; this goes after the harness's system line
 CLI_NOTE = ("The stone tool is the stone command: run it with your shell tool, one stone command per call, "

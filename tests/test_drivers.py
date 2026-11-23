@@ -290,3 +290,11 @@ def test_summary_keeps_model_conditions_apart(tmp_path):
     assert out[1].split() == ["t1_fan_guard", "1/1", "0/1", "1/1"]
     # each column starts where its name does, so long names do not run together
     assert out[1].index("0/1") == out[0].index("claude-haiku_cardS")
+
+
+def test_no_route_to_api_billing_reaches_claude():
+    """A gateway token, base URL or cloud provider switch would bill the API, not the sign-in."""
+    bad = {k: DUMMY for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+                              "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")}
+    env = drivers.cli_env("claude", {**bad, "PATH": "/usr/bin", "HOME": "/h"}, Path("/v/bin"))
+    assert not set(bad) & set(env)
