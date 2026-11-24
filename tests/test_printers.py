@@ -238,3 +238,39 @@ def test_run_reports_a_missing_binary_without_raising(monkeypatch):
     monkeypatch.setattr(subprocess, "run", gone)
     code, text = printers._run(["gantrel-printer", "list", "--json"])
     assert code == 1 and "gantrel-printer" in text
+
+
+# the slicer's settings for each printer and plastic (tools/orca_profiles.py)
+
+PLASTICS = ("PLA", "PETG", "ABS", "ASA", "PC", "PA", "TPU", "PLA-CF", "PETG-CF")
+
+
+@pytest.mark.parametrize("pid", sorted(WANT))
+def test_every_printer_has_its_slicer_settings_for_every_plastic(pid):
+    p = printers.get(pid)
+    proc = printers.process(p)
+    assert 10 <= proc["speeds"]["first_layer"] <= proc["speeds"]["travel"] <= 1000
+    assert all(0.3 <= w <= 0.8 for w in proc["widths"].values()) and proc["shells"]["wall_loops"] >= 2
+    assert all(100 <= a <= 40000 for a in proc["accels"].values()) and 0.2 <= proc["retract_mm"] <= 6
+    for m in PLASTICS:
+        s = printers.settings(p, m)
+        assert 190 <= s["nozzle"] <= (p["max_hotend_c"] or 300) and 20 <= s["bed"] <= (p["max_bed_c"] or 120), (m, s)
+        assert 1 <= s["max_flow"] <= 40 and s["diameter"] == 1.75 and s["url"].startswith("https://github.com/OrcaSlicer/")
+    heat = {m: printers.settings(p, m)["nozzle"] for m in PLASTICS}
+    assert heat["PLA"] < heat["ABS"] and heat["PLA"] < heat["PC"]
+
+
+def test_the_k2s_process_is_the_one_the_refs_already_cite():
+    from smoothstone import refs
+
+    proc = printers.process(printers.get(OWNERS))
+    for k in ("widths", "speeds", "shells"):
+        want = refs.get(f"slicer.k2_{k}")["value"]
+        assert {n: proc[k][n] for n in want} == want, k
+
+
+def test_heat_the_printer_does_not_reach_is_cut_and_said():
+    s = printers.settings(printers.get("creality_k2"), "PC")  # the profile asks for 110 C
+    assert s["bed"] == 100 and s["cut"] == ["OrcaSlicer Generic PC @System wants the bed at 110 C; the Creality K2 reaches 100 C"]
+    assert printers.settings(printers.get("creality_k2"), "pla")["cut"] == []
+    assert printers.settings(printers.get("creality_k2"), "HIPS") is None and printers.settings({"id": "other"}, "PLA") is None

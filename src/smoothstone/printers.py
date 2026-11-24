@@ -20,6 +20,7 @@ from pathlib import Path
 from . import config
 
 PRINTERS_DIR = Path(__file__).resolve().parent / "printers"
+SETTINGS = config.REPO_ROOT / "recipes" / "lib" / "refs" / "printer_settings.json"
 GANTREL = "gantrel-printer"
 GANTREL_INSTALL = "uv tool install git+https://github.com/baney75/Gantrel"
 
@@ -32,6 +33,32 @@ def load() -> dict[str, dict]:
         p = json.loads(f.read_text())
         out[p["id"]] = p
     return dict(sorted(out.items(), key=lambda kv: (kv[1]["maker"], kv[1]["name"])))
+
+
+@lru_cache(maxsize=1)
+def _settings() -> dict[str, dict]:
+    return {e["id"]: e for e in json.loads(SETTINGS.read_text())["entries"]}
+
+
+def settings(p: dict, material: str) -> dict | None:
+    """What this printer's slicer profile prints the plastic with (tools/orca_profiles.py), or None: nozzle, bed
+    and chamber in C, fan %, max_flow mm3/s, diameter mm, its profile and url. Heat the maker says the printer
+    does not reach is cut to what it does, and `cut` says so."""
+    e = _settings().get(f"orca.{p['id']}.{material.upper()}")
+    if not e:
+        return None
+    out = {**e["value"], "profile": e["cite"], "url": e["url"], "cut": []}
+    for k, top in (("nozzle", p.get("max_hotend_c")), ("bed", p.get("max_bed_c"))):
+        if top and out.get(k, 0) > top:
+            out["cut"].append(f"{e['cite']} wants the {k} at {out[k]:g} C; the {p['name']} reaches {top:g} C")
+            out[k] = top
+    return out
+
+
+def process(p: dict) -> dict | None:
+    """This printer's slicer process: widths, speeds, accels, shells, retract_mm, nozzle_volume_mm3 (where Orca gives it)."""
+    e = _settings().get(f"orca.{p['id']}.process")
+    return {**e["value"], "profile": e["cite"], "url": e["url"]} if e else None
 
 
 def _key(text: str) -> str:
