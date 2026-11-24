@@ -1,0 +1,53 @@
+{
+ "id": "anycubic_kobra_3",
+ "name": "Anycubic Kobra 3",
+ "maker": "Anycubic",
+ "firmware": "other",
+ "build_volume_mm": [
+  255.0,
+  255.0,
+  260.0
+ ],
+ "kinematics": "bedslinger",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 300,
+ "max_bed_c": 110,
+ "limits_source": "https://store.anycubic.com/products/anycubic-kobra-3",
+ "bed_surface": {
+  "type": "PEI spring steel plate",
+  "clean": "If the first layer shows spots, clean the platform with clean water or detergent; glue on the plate helps a model that will not stick.",
+  "source": "https://wiki.anycubic.com/en/fdm-3d-printer/kobra-3-combo/first-layer",
+  "clean_by": "maker",
+  "type_source": "https://store.anycubic.com/products/anycubic-kobra-3"
+ },
+ "auto_level": "LeviQ 3.0 automatic leveling and Z offset",
+ "multi_material": "ACE Pro (optional)",
+ "camera": {
+  "where": "optional 720p camera",
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": "16:9",
+  "ir_night": false,
+  "timelapse_mode": "fixed",
+  "source": "https://store.anycubic.com/products/anycubic-kobra-3"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 15000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Anycubic/machine/Anycubic%20Kobra%203%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [],
+ "connect": {
+  "gantrel_type": "other",
+  "notes": "no Gantrel adapter yet"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Anycubic/machine/Anycubic%20Kobra%203%200.4%20nozzle.json (build volume)",
+  "https://store.anycubic.com/products/anycubic-kobra-3",
+  "https://store.anycubic.com/products/anycubic-ace-pro"
+ ],
+ "checked": "2026-11-24"
+}

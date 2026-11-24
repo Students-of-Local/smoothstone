@@ -1,0 +1,74 @@
+{
+ "id": "creality_k2",
+ "name": "Creality K2",
+ "maker": "Creality",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  260.0,
+  260.0,
+  260.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": true,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 300,
+ "max_bed_c": 100,
+ "limits_source": "https://www.creality.com/products/k2-series-3d-printer (compare table: 300 C nozzle, 100 C bed, no chamber heating)",
+ "bed_surface": {
+  "type": "PEI double-sided frosted (textured) flexible plate, 270 x 293 mm",
+  "clean": "Hand sweat is the first cause Creality lists: wash the plate with dish soap and water; wash built-up glue off with water; then a thin layer of the included glue stick.",
+  "source": "https://wiki.creality.com/en/k2-flagship-series/k2/first-layer-adhesion-compression",
+  "clean_by": "maker",
+  "type_source": "https://store.creality.com/products/k2-pei-double-sided-frosted-build-plate"
+ },
+ "auto_level": "strain gauge in the hotbed, Smart Auto Leveling (probes only where the model prints)",
+ "multi_material": "CFS (1 in the Combo, up to 4)",
+ "camera": {
+  "where": "chamber camera on the right frame, inside the chamber (720p)",
+  "pos_mm": [
+   300,
+   40,
+   200
+  ],
+  "look_at_mm": [
+   130,
+   130,
+   0
+  ],
+  "hfov_deg": 70,
+  "aspect": "16:9",
+  "ir_night": true,
+  "timelapse_mode": "fixed",
+  "source": "https://wiki.creality.com/en/k2-flagship-series/k2/camera-maintenance",
+  "assumption": "position and field of view estimated from the owner's IR frame; Creality says only 'right frame'. IR night view seen in the owner's frame."
+ },
+ "speeds": {
+  "typical_print_mm_s": 300,
+  "max_accel_mm_s2": 20000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20K2%200.4%20nozzle.json (machine_max_acceleration_x); https://www.creality.com/products/k2-series-3d-printer (note 4: typical print speed)"
+ },
+ "quirks": [
+  {
+   "failure": "bed_adhesion",
+   "note": "Creality lists hand sweat on the platform first for a first layer that will not stick, then leveling, a cold bed, filament left on the nozzle (bad Z homing) and the strain gauge.",
+   "source": "https://wiki.creality.com/en/k2-flagship-series/k2/first-layer-adhesion-compression"
+  },
+  {
+   "failure": "blob_on_nozzle",
+   "note": "Creality's K2 Plus guide: a model that detaches clumps on the hotend; keep the bed clean, match the slice to the filament, raise the bed 10 C below 15 C room.",
+   "source": "https://wiki.creality.com/en/k2-flagship-series/k2-plus/hotend-clumping"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "creality",
+  "gantrel_model": "creality-k2",
+  "notes": "Klipper with Moonraker underneath; the chamber camera is WebRTC (the fleet relays it through go2rtc)."
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20K2%200.4%20nozzle.json (build volume)",
+  "https://www.creality.com/products/k2-series-3d-printer",
+  "https://www.creality.com/support/k2-series-3d-printer"
+ ],
+ "checked": "2026-11-24"
+}

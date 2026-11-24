@@ -1,0 +1,57 @@
+{
+ "id": "elegoo_neptune_4_pro",
+ "name": "Elegoo Neptune 4 Pro",
+ "maker": "Elegoo",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  230.0,
+  230.0,
+  265.0
+ ],
+ "kinematics": "bedslinger",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 300,
+ "max_bed_c": 110,
+ "limits_source": "https://www.elegoo.com/products/elegoo-neptune-4-pro-fdm-3d-printer",
+ "bed_surface": {
+  "type": "dual-sided plate: a PLA surface and a textured PEI surface",
+  "clean": "Clean the PEI plate with alcohol or water before printing, then dry it.",
+  "source": "https://wiki.elegoo.com/en/neptune/neptune-4-series-firs-layer-not-sticking-to-pei-plate",
+  "clean_by": "maker",
+  "type_source": "https://www.elegoo.com/products/elegoo-neptune-4-pro-fdm-3d-printer"
+ },
+ "auto_level": "metal-sensing proximity switch, 121-point automatic mesh, manual Z offset",
+ "multi_material": "none",
+ "camera": {
+  "where": null,
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": null,
+  "ir_night": false,
+  "timelapse_mode": "fixed"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 10000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Elegoo/machine/EN4SERIES/Elegoo%20Neptune%204%20Pro%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "first_layer",
+   "note": "Elegoo: a wrong Z offset or failed auto calibration stops the first layer sticking.",
+   "source": "https://wiki.elegoo.com/en/neptune/neptune-4-series-firs-layer-not-sticking-to-pei-plate"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "moonraker"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Elegoo/machine/EN4SERIES/Elegoo%20Neptune%204%20Pro%200.4%20nozzle.json (build volume)",
+  "https://www.elegoo.com/products/elegoo-neptune-4-pro-fdm-3d-printer",
+  "https://wiki.elegoo.com/en/neptune/why-i-need-to-re-level-the-neptune-4-pro-every-time"
+ ],
+ "checked": "2026-11-24"
+}

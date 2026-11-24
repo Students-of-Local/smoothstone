@@ -28,6 +28,7 @@ from . import catalog
 from . import fitted
 from . import recipes as rc
 from . import printable
+from . import printers
 from . import scad
 from .job import Job, read_json, write_json
 
@@ -2593,6 +2594,11 @@ def make_parser() -> Parser:
                    help="frames in one turn of the figure (8 or more; 144 for one run, 120 each in a series)")
     s.add_argument("--with", dest="runs", action="append", metavar="RUN",
                    help="another finished run (a folder with job/ and log.json); the clip shows every figure")
+    s = sub.add_parser("printer", parents=[common], help="your printer: stone printer [set <id> | show | status | camera]")
+    s.add_argument("action", nargs="?")
+    s.add_argument("id", nargs="?")
+    s.add_argument("--out", help="camera: where to save the frame")
+    s.add_argument("--name", help="status, camera: the printer's name in gantrel-printer")
     return p
 
 
@@ -2624,6 +2630,7 @@ COMMANDS = {
     "done": cmd_done,
     "colors": cmd_colors,
     "video": cmd_video,
+    "printer": printers.cmd_printer,
 }
 
 
@@ -2640,7 +2647,8 @@ def _guess_job(argv: list[str]) -> Path:
 SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes",
             "search": "recipes", "info": "show", "scale": "measure", "describe": "show", "finish": "done", "check_status": "status",
             "color": "colors", "colour": "colors", "colours": "colors", "paint": "colors",
-            "references": "refs", "reference": "refs", "material": "refs", "materials": "refs"}
+            "references": "refs", "reference": "refs", "material": "refs", "materials": "refs",
+            "printers": "printer"}
 NO_WORDS = ("status", "build", "done")
 
 
@@ -2677,7 +2685,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "usage", "error")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "usage", "error")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:

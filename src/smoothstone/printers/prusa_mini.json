@@ -1,0 +1,56 @@
+{
+ "id": "prusa_mini",
+ "name": "Original Prusa MINI+",
+ "maker": "Prusa Research",
+ "firmware": "prusa",
+ "build_volume_mm": [
+  180.0,
+  180.0,
+  180.0
+ ],
+ "kinematics": "bedslinger",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 280,
+ "max_bed_c": 100,
+ "limits_source": "https://www.prusa3d.com/product/original-prusa-mini-3/ (280 C nozzle, 100 C bed)",
+ "bed_surface": {
+  "type": "removable PEI spring steel sheet (smooth, satin or textured)",
+  "clean": "Wipe the cold sheet with 90% isopropyl alcohol before prints; if adhesion still drops, a few drops of dish soap and warm (not hot) water, then dry well; acetone only on smooth PEI, about once a month.",
+  "source": "https://help.prusa3d.com/article/first-layer-issues_1804",
+  "clean_by": "maker",
+  "type_source": "https://www.prusa3d.com/product/original-prusa-mini-3/"
+ },
+ "auto_level": "SuperPINDA probe, mesh leveling",
+ "multi_material": "none",
+ "camera": {
+  "where": null,
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": null,
+  "ir_night": false,
+  "timelapse_mode": "fixed"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 2500,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Prusa/machine/Prusa%20MINI%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "under_extrusion",
+   "note": "Prusa: filament shavings in the extruder gear grooves and loose grip cause under-extrusion on the MINI.",
+   "source": "https://help.prusa3d.com/article/regular-maintenance-mini-mini_133222"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "prusalink"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Prusa/machine/Prusa%20MINI%200.4%20nozzle.json (build volume)",
+  "https://www.prusa3d.com/product/original-prusa-mini-3/"
+ ],
+ "checked": "2026-11-24"
+}

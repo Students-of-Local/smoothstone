@@ -1,0 +1,51 @@
+{
+ "id": "voron_24",
+ "name": "Voron 2.4 (300 mm)",
+ "maker": "Voron Design",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  300.0,
+  300.0,
+  275.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": true,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": null,
+ "max_bed_c": null,
+ "limits_source": "self-sourced kit: hotend and bed limits depend on the parts used",
+ "bed_surface": {
+  "type": "varies by kit: usually a PEI spring steel sheet on a magnetic bed",
+  "clean": "Voron's docs give no plate cleaning steps (checked 2026-11-24); use your sheet maker's steps.",
+  "source": "https://docs.vorondesign.com/",
+  "clean_by": "none"
+ },
+ "auto_level": "inductive probe; quad gantry leveling and a bed mesh",
+ "multi_material": "none (add-ons exist)",
+ "camera": {
+  "where": null,
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": null,
+  "ir_night": false,
+  "timelapse_mode": "fixed"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 20000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Voron/machine/Voron%202.4%20300%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [],
+ "connect": {
+  "gantrel_type": "moonraker",
+  "notes": "Klipper and Moonraker"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Voron/machine/Voron%202.4%20300%200.4%20nozzle.json (build volume)",
+  "https://docs.vorondesign.com/",
+  "https://docs.vorondesign.com/sourcing.html"
+ ],
+ "checked": "2026-11-24"
+}

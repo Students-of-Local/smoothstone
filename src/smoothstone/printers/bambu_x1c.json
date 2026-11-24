@@ -1,0 +1,64 @@
+{
+ "id": "bambu_x1c",
+ "name": "Bambu Lab X1 Carbon",
+ "maker": "Bambu Lab",
+ "firmware": "bambu",
+ "build_volume_mm": [
+  256.0,
+  256.0,
+  256.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": true,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 300,
+ "max_bed_c": 110,
+ "limits_source": "https://public-cdn.bambulab.com/store/X1-Carbon%20tech%20specs.pdf (300 C hot end; bed 110 C at 220 V, 120 C at 110 V, so 110 C)",
+ "bed_surface": {
+  "type": "Bambu textured PEI plate (some units ship another Bambu plate)",
+  "clean": "Wash the cold plate with warm water and dish soap (no oils or moisturizers) using a sponge or plastic brush, rinse, dry with a paper towel; never acetone on textured PEI; don't touch the print area. Clean plate: water spreads as a film, dirty plate: it beads.",
+  "source": "https://wiki.bambulab.com/en/filament-acc/acc/pei-plate-clean-guide",
+  "clean_by": "maker",
+  "type_source": "https://wiki.bambulab.com/en/filament-acc/acc/plates"
+ },
+ "auto_level": "lidar and force sensors",
+ "multi_material": "AMS (in the Combo)",
+ "camera": {
+  "where": "chamber camera and a lidar camera on the toolhead",
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": "16:9",
+  "ir_night": false,
+  "timelapse_mode": "fixed",
+  "source": "https://bambulab.com/en/x1"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 20000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/BBL/machine/Bambu%20Lab%20X1%20Carbon%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "blob_on_nozzle",
+   "note": "Bambu says hotend clumping usually starts when the plate was not cleaned and the model detached in the first layers.",
+   "source": "https://wiki.bambulab.com/en/a1-mini/maintenance/hotend_blob"
+  },
+  {
+   "failure": "bed_adhesion",
+   "note": "Bambu: selecting the wrong plate type in the slicer sets the wrong bed temperature and, for the textured plate, a nozzle 0.04 mm too high.",
+   "source": "https://wiki.bambulab.com/en/knowledge-sharing/first-layer-not-sticking"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "bambu",
+  "gantrel_model": "bambu-x1c"
+ },
+ "sources": [
+  "https://public-cdn.bambulab.com/store/X1-Carbon%20tech%20specs.pdf (build volume 256 x 256 x 256 mm; Orca slices to 250 mm high)",
+  "https://bambulab.com/en/x1",
+  "https://public-cdn.bambulab.com/store/X1-Carbon%20tech%20specs.pdf"
+ ],
+ "checked": "2026-11-24"
+}
