@@ -214,7 +214,10 @@ LOOKS_CHECKED = "evals/doctor/photo_runs.jsonl, split dev"
 # weight by 1 + KNN_W * v, from the same LOOK_FLOOR start. Set on the dev photos too.
 KNN_K = 7
 KNN_W = 12.0
-KNN_CAP = 0.99  # not tuned, only below 1: a failure only the vote names stays under every described one
+# a failure only the vote names stays below the KNN_HOLD likeliest described ones, so the vote can fill the
+# last of three lines and no more. 2 scored best on the dev photos (1, 2, 3, all and no cap tried).
+KNN_HOLD = 2
+KNN_CAP = 0.99  # not tuned, only below 1
 
 
 # what the screen says when the firmware stopped a heater; while one stands, nothing else gets heated
@@ -250,15 +253,13 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
         scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * lr
     # a photo cannot show a thermal fault or a clog, so a vote for one counts for nothing
     votes = {fid: v for fid, v in (knn or {}).items() if failure(fid) and fid not in NOT_SEEN}
-    if votes:
-        for fid in looks[len(LOOK_LR):]:  # a look past the LR list is described too, so a vote stays below it
-            scores.setdefault(fid, LOOK_FLOOR * base)
     named = set(scores)  # what the words or --looks described
     for fid, v in votes.items():
         scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * (1 + KNN_W * v)
+    named |= set(looks) & set(scores)  # a look past the LR list is described too
     # the vote reorders what was described; nothing undescribed, voted or a differential of a boosted top,
-    # passes one of them
-    cap = min(scores[f] for f in named) * KNN_CAP if votes and named else math.inf
+    # passes the two likeliest of them
+    cap = sorted((scores[f] for f in named), reverse=True)[:KNN_HOLD][-1] * KNN_CAP if votes and named else math.inf
     scores.update({f: min(s, cap) for f, s in scores.items() if f not in named})
     if scores:
         top = max(scores, key=scores.get)

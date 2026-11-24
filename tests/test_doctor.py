@@ -534,32 +534,32 @@ def test_owner_case_with_looks_and_image_match():
         assert all(s in lines for s in blob), (looks, lines)  # never yank; heat before pulling plastic
 
 
-def test_image_vote_never_outranks_what_was_described():
+def _held(d):
+    """The two likeliest described failures lead: an image vote only fills the lines below them."""
+    n = min(doctor.KNN_HOLD, len(d["described"]))
+    return set(f for f, _ in d["failures"][:n]) <= set(d["described"])
+
+
+def test_image_vote_never_outranks_the_two_likeliest_described():
     for said, looks, want in (("thin hairs of plastic between the towers", [], "stringing"),
                               ("the print failed", ["warping"], "warping")):
         d = doctor.diagnose(said, None, None, looks, {"spaghetti": 1.0, "layer_shift": 0.9})
         ranked = [f for f, _ in d["failures"]]
-        assert ranked[0] == want and set(d["described"]) <= set(ranked[:len(d["described"])]), ranked
+        assert ranked[0] == want and _held(d), ranked
     d = doctor.diagnose("", None, None, [], {"spaghetti": 0.6})
     assert d["failures"][0][0] == "spaghetti"  # with nothing described, the vote alone still ranks
-
-
-def _undescribed_ahead(d):
-    ranked = [f for f, _ in d["failures"]]
-    return [f for f in d["described"] if f not in ranked] + [
-        f for i, f in enumerate(ranked) if f not in d["described"] and set(ranked[i:]) & set(d["described"])]
 
 
 @pytest.mark.parametrize("votes", [{"bed_adhesion": 1.0}, {"bed_adhesion": 0.5, "spaghetti": 0.5}, {"spaghetti": 1.0}])
 def test_a_strong_vote_lifts_no_differential_past_the_described_blob(votes):
     for looks in ([], ["bed_adhesion", "blob_on_nozzle"]):
         d = doctor.diagnose(OWNER["said"], printers.get("creality_k2"), "PLA", looks, votes)
-        assert not _undescribed_ahead(d), (looks, d["failures"])
+        assert _held(d) and "blob_on_nozzle" in [f for f, _ in d["failures"][:3]], (looks, d["failures"])
 
 
-def test_image_vote_stays_below_a_fourth_look():
+def test_image_vote_stays_below_two_looks_and_takes_the_third_line():
     d = doctor.diagnose("", None, None, ["stringing", "warping", "layer_shift", "blob_on_nozzle"], {"spaghetti": 1.0})
-    assert not _undescribed_ahead(d), d["failures"]
+    assert [f for f, _ in d["failures"][:3]] == ["stringing", "warping", "spaghetti"], d["failures"]
 
 
 def test_image_vote_stays_below_the_described_on_every_recorded_reply():
@@ -569,7 +569,7 @@ def test_image_vote_stays_below_the_described_on_every_recorded_reply():
     assert len(runs) == 151
     for f, r in runs.items():
         d = doctor.diagnose(r["words"], None, None, r["looks"], photo_match.votes(near[f], doctor.KNN_K))
-        assert not d["described"] or not _undescribed_ahead(d), (f, d["described"], d["failures"])
+        assert _held(d), (f, d["described"], d["failures"])
 
 
 def test_safety_lines_of_a_failure_described_below_the_top_three():
