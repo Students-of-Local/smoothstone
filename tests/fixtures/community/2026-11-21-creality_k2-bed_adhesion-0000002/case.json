@@ -1,0 +1,15 @@
+{
+ "schema": 1,
+ "failure": "bed_adhesion",
+ "cause": "first_layer_too_high",
+ "printer": "creality_k2",
+ "material": "PLA",
+ "said": "test fixture: the first layer never stuck and came off",
+ "fixed_by": "test fixture: lowered the z offset",
+ "answers": [],
+ "photo": null,
+ "stone_version": "0.1.0",
+ "date": "2026-11-21",
+ "license": "MIT",
+ "id": "2026-11-21-creality_k2-bed_adhesion-0000002"
+}

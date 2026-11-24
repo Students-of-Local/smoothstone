@@ -15,6 +15,7 @@ import datetime as _dt
 import json
 import math
 import re
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
@@ -25,6 +26,9 @@ from .job import read_json, write_json
 FAIL_DIR = Path(__file__).resolve().parent / "failures"
 CATALOG = FAIL_DIR / "catalog.json"
 LABELS = config.REPO_ROOT / "failures" / "gallery" / "labels.jsonl"  # the gallery, at the checkout root like recipes/
+# fixes people shared with stone doctor share; merged into the repo, read at load time
+COMMUNITY = config.REPO_ROOT / "failures" / "community"
+CAP = 3.0  # assumption: shared cases move a cause at most 3x up or down, so a few cases cannot swamp the catalog
 SURE = 0.70  # the top cause past this: stop asking, try its fix
 MAX_PX = 1280
 NOT_SEEN = ("clog", "heat_creep", "feeder_grinding", "multi_material_feed", "thermal_error", "other")
@@ -256,10 +260,37 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple
     return ranked
 
 
+@lru_cache(maxsize=1)
+def community() -> tuple[dict, ...]:
+    """Every shared case in failures/community/*/case.json (a broken one is skipped)."""
+    out = []
+    for f in sorted(COMMUNITY.glob("*/case.json")):
+        try:
+            out.append({**json.loads(f.read_text()), "dir": str(f.parent)})
+        except (OSError, json.JSONDecodeError):
+            continue
+    return tuple(out)
+
+
+def community_counts(pid: str | None, fid: str) -> tuple[Counter, int]:
+    """How often each cause fixed this failure on this printer in the shared cases, and how many cases."""
+    rows = [c for c in community() if pid and c.get("printer") == pid and c.get("failure") == fid]
+    return Counter(c.get("cause") for c in rows), len(rows)
+
+
+def community_mult(f: dict, pid: str | None) -> dict[str, float]:
+    """Laplace smoothed share of the fixes over the even share 1/K, kept within 1/CAP and CAP: with M shared
+    cases and n of them fixed by a cause, K (n + 1) / (M + K). No cases: no change."""
+    n, m = community_counts(pid, f["id"])
+    k = len(f["causes"])
+    return {c["id"]: min(CAP, max(1 / CAP, k * (n[c["id"]] + 1) / (m + k))) for c in f["causes"]} if m else {}
+
+
 def cause_priors(f: dict, said: str, ctx: set[str]) -> dict[str, float]:
     raw = {}
+    shared = community_mult(f, next((c[8:] for c in ctx if c.startswith("printer:")), None))
     for c in f["causes"]:
-        w = c["prior"] * _mods(c.get("modifiers", {}), ctx)
+        w = c["prior"] * _mods(c.get("modifiers", {}), ctx) * shared.get(c["id"], 1.0)
         if c.get("words") and word_score(said, c["words"], guess=False) > 0:
             w *= 2.0  # the person named this cause themselves
         raw[c["id"]] = w
@@ -397,10 +428,9 @@ def answer_key(text: str, keys: list[str]) -> str | None:
 
 
 def examples(fid: str, printer_id: str | None, n: int = 3) -> list[str]:
-    if not LABELS.is_file():
-        return []
-    rows = []
-    for ln in LABELS.read_text().splitlines():
+    rows = [{"file": str(Path(c["dir"]) / c["photo"]), "printer": c.get("printer")} for c in community()
+            if c.get("failure") == fid and c.get("photo")]
+    for ln in (LABELS.read_text().splitlines() if LABELS.is_file() else []):
         try:
             r = json.loads(ln)
         except json.JSONDecodeError:
@@ -455,13 +485,13 @@ def save_case(job, case: dict) -> Path:
     return d / "case.json"
 
 
-def save_photo(src: Path, dest: Path) -> Path:
-    """The photo as a JPEG at most MAX_PX on its long side, turned upright, with EXIF (GPS, camera) left out."""
+def save_photo(src: Path, dest: Path, px: int = MAX_PX) -> Path:
+    """The photo as a JPEG at most px (MAX_PX) on its long side, turned upright, with EXIF (GPS, camera) left out."""
     from PIL import Image, ImageOps
 
     with Image.open(src) as im:
         im = ImageOps.exif_transpose(im).convert("RGB")
-        im.thumbnail((MAX_PX, MAX_PX))
+        im.thumbnail((px, px))
         dest.parent.mkdir(parents=True, exist_ok=True)
         im.save(dest, "JPEG", quality=90)  # no exif= argument: nothing from the original carries over
     return dest
@@ -595,6 +625,10 @@ def report(case: dict, p: dict | None) -> list[str]:
     by_id = {c["id"]: c for c in top["causes"]}
     for i, (cid, pr) in enumerate(causes, 1):
         lines.append(f"Cause {i}: {by_id[cid]['cause']} ({cid}) {pr:.0%}")
+    n, m = community_counts(p["id"] if p else None, top["id"])
+    if n and n.most_common(1)[0][1] >= 2:
+        cid, k = n.most_common(1)[0]
+        lines.append(f"On {p['name']}, {k} of {m} shared {top['id']} cases were fixed by {cid}")
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
     if "thermal_error" not in described_ids:
         lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
@@ -611,9 +645,9 @@ def looks_lines() -> list[str]:
         ["Not seen in a photo: " + ", ".join(i for i in NOT_SEEN if i != "other") + " (ask what the printer did)"]
 
 
-# stone doctor "<what they see>" | answer "<their answer>" | try [cause] | fixed "<what worked>" | looks
+# stone doctor "<what they see>" | answer "<their answer>" | try [cause] | fixed "<what worked>" | looks | share
 
-SUBS = ("answer", "try", "fixed", "looks")
+SUBS = ("answer", "try", "fixed", "looks", "share")
 
 
 def cmd_doctor(args, job):
@@ -629,6 +663,10 @@ def cmd_doctor(args, job):
         return out
     if sub is None:
         return _new(args, job, rest, out)
+    if sub == "share":
+        from . import share
+
+        return share.cmd_share(args, job, rest, out)
     case = open_case(job)
     if case is None or not case.get("failure"):
         out.fix("no open doctor case with a description yet")
@@ -784,7 +822,10 @@ def _fixed(job, case, text, out):
     f = save_case(job, case)
     with open(doctor_dir(job) / "outcomes.jsonl", "a") as fh:
         fh.write(json.dumps(share_payload(case)) + "\n")
-    out.add(f"Recorded: {case['failure']}, cause {cause}" + (f", fixed by: {text}" if text else "") + f" ({f})")
-    out.next = DONE
+    out.add(f"Recorded: {case['failure']}, cause {cause}" + (f", fixed by: {text}" if text else "") + f" ({f})",
+            "Sharing it (optional) helps the next person with this printer: stone doctor ranks this cause higher.")
+    from .share import ASK
+
+    out.next = ASK
     out.result = f"doctor fixed {cause}"
     return out
