@@ -238,9 +238,9 @@ def test_a_thin_tab_the_cells_miss_is_never_called_fine():
 def test_a_whole_number_of_cells_stays_whole():
     from smoothstone import fea
 
-    for side in (8.5, 10.0, 3.3):
+    for side in (2.1, 4.2, 4.3):  # side / (side / 7) is a hair over 7 for each
         grid = fea.voxelize(trimesh.creation.box(extents=[40, 40, side]), side / 7)
-        assert grid.solid.any((0, 1)).sum() == 7, side
+        assert grid.shape[2] == 7 and grid.solid.any((0, 1)).sum() == 7, side
 
 
 def test_a_slender_post_pushed_toward_its_hold_buckles():
