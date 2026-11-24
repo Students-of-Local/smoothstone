@@ -286,7 +286,6 @@ def test_f1_configured_printer_wins_over_a_guess(work):
 
 @pytest.mark.parametrize("text,keys,want", [
     ("yes, I never wash it", ["yes", "no"], "yes"),
-    ("no, it never gets washed", ["yes", "no"], "no"),
     ("it doesn't bead, it spreads", ["beads", "film"], "film"),
     ("it doesn't bead", ["beads", "film"], "film"),
     ("it does not spread at all", ["beads", "film"], "beads"),
@@ -449,3 +448,30 @@ def test_r2_stone_printer_set_after_open_does_change_the_case(work):
     stone("printer", "set", "prusa_mk4s")  # the person set another printer on purpose
     text, code, nxt = stone("doctor", "the part came off the bed")
     assert text.splitlines()[0].endswith("Original Prusa MK4S"), text
+
+
+@pytest.mark.parametrize("text,want", [
+    ("I never wash it", None),  # a negator says nothing about yes or no: ask again
+    ("didn't clean it in weeks", None),
+    ("it never gets washed", None),
+    ("no, I wash it before every print", "no"),
+    ("nope", "no"),
+    ("yes it has", "yes"),
+    ("it is not", None),
+])
+def test_r2_a_bare_negator_is_not_a_no(text, want):
+    assert doctor.answer_key(text, ["yes", "no"]) == want
+
+
+def test_r2_owner_flow_reads_the_wash_question_and_reaches_plate_contaminated(work):
+    stone("printer", "set", "creality_k2")
+    stone("doctor", OWNER["said"], "--material", "PLA")
+    text, code, nxt = stone("doctor", "answer", "can't tell")
+    wash = nxt
+    assert "wash" in wash and " or " not in wash.split("?")[0], wash  # one fact per question
+    text, code, nxt = stone("doctor", "answer", "I never wash it")
+    assert "could not tell" in text and nxt == wash, text
+    text, code, nxt = stone("doctor", "answer", "yes")
+    assert re.search(r"^Cause 1: .*\(plate_contaminated\)", text, re.M), text  # "I never wash it" no longer lowers it
+    text, code, nxt = stone("doctor", "answer", "no, they were pressed flat")
+    assert nxt == "stone doctor try plate_contaminated", nxt

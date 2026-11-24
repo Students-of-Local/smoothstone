@@ -217,17 +217,6 @@
   "no": [
    "no",
    "nope",
-   "not",
-   "never",
-   "didnt",
-   "didn't",
-   "doesnt",
-   "doesn't",
-   "isnt",
-   "isn't",
-   "wasnt",
-   "wasn't",
-   "none",
    "nah"
   ],
   "yes": [
@@ -340,7 +329,7 @@
        }
       },
       {
-       "ask": "Has the plate gone several prints without a wash, or been touched with bare fingers?",
+       "ask": "Has the plate gone several prints since its last wash with soap and water?",
        "answers": {
         "yes": 2.5,
         "no": 0.5
@@ -597,7 +586,7 @@
        }
       },
       {
-       "ask": "Has the plate gone several prints without a wash, or been touched with bare fingers?",
+       "ask": "Has the plate gone several prints since its last wash with soap and water?",
        "answers": {
         "yes": 2.5,
         "no": 0.5
