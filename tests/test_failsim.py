@@ -95,7 +95,7 @@ def test_bead_cooling_matches_the_hand_numbers():
 
 
 def test_the_flow_index_is_the_rigs_stress_over_its_rate():
-    """9 g in ten minutes of PLA at 210 C under 2.16 kg, by hand: 19.8 kPa at the wall, 13 1/s there."""
+    """8.8 g in ten minutes of PLA at 210 C under 2.16 kg, by hand: 19.5 kPa at the wall, 13 1/s there."""
     stress = 2.16 * 9.80665 / (math.pi / 8 * (9.5504e-3 ** 2 + 9.4742e-3 ** 2)) * 1.0475e-3 / 16e-3
     rate = 4 * (math.sqrt(77) / 600 / 1.24e6) / (math.pi * 1.0475e-3 ** 3)
     assert (stress, rate) == pytest.approx((19508, 13.1), rel=0.005)
@@ -106,6 +106,8 @@ def test_the_flow_index_is_the_rigs_stress_over_its_rate():
 def test_each_melt_passes_its_filaments_flow_index(mat):
     t, rate, eta = fs.flow_index(mat)
     assert float(fs.viscosity(t, rate, mat)) == pytest.approx(eta, rel=1e-6)
+    kg = fs.fact("mfi_test")[mat][1]
+    assert f"at {t:g} C, {kg:g} kg;" in fs._props(mat)[0]["mfi"]["note"]  # the weight the grams were measured under
     assert fs.note("mfi_rig") in fs.material(mat).stand_ins
 
 
@@ -118,7 +120,13 @@ def test_two_melts_agree_with_what_others_measured_on_them():
         return eta0 / (1 + (eta0 * rate / p["tau_star_Pa"]) ** (1 - p["n"]))
     ratio = {m: fs.flow_index(m)[2] / published(m.lower(), *fs.flow_index(m)[:2]) for m in ("PLA", "ABS")}
     assert 0.5 < ratio["ABS"] < 2 and 6 < ratio["PLA"] < 8
-    assert 600 < float(fs.viscosity(240, 0, "PETG")) < 1800
+    assert float(fs.viscosity(240, 0, "PETG")) == pytest.approx(1730, rel=0.01)  # what its note says
+    assert 43900 / float(fs.viscosity(240, 0, "ABS")) == pytest.approx(51, rel=0.01)  # and ABS's
+    for m, a1, t_star, tau, n in (("PLA", 16.71, 373.15, 1.29e5, 0.3846), ("ABS", 28.3, 365, 41070, 0.341)):  # its shape is its own
+        bend = [a1 * (t + 273.15 - t_star) / (51.6 + t + 273.15 - t_star) for t in (200, 240)]
+        rest = [float(fs.viscosity(t, 0, m)) for t in (200, 240)]
+        assert rest[0] / rest[1] == pytest.approx(math.exp(bend[1] - bend[0]), rel=1e-9)
+        assert rest[1] / float(fs.viscosity(240, 1500, m)) == pytest.approx(1 + (rest[1] * 1500 / tau) ** (1 - n), rel=1e-9)
     shift = 17.44 * (240 - 66) / (51.6 + 240 - 66) - 17.44 * (200 - 66) / (51.6 + 200 - 66)
     assert float(fs.viscosity(200, 0, "PETG") / fs.viscosity(240, 0, "PETG")) == pytest.approx(10 ** shift)
     assert fs.material("PETG").k == 0.21
