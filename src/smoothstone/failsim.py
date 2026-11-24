@@ -164,14 +164,17 @@ def nusselt(re, pr) -> np.ndarray:
     return np.where(pe > 0.2, cb, 1 / (0.8237 - np.log(np.minimum(pe, 0.2) ** 0.5)))
 
 
-def h_strand(d_mm, t_c, air_c: float, wind=0.0) -> np.ndarray:
-    """W/(m2 K) off a strand d_mm thick at t_c in air at air_c: the larger of the wind's convection (m/s
-    across it) and its own rising air's (Churchill-Chu, Lienhard 8.28), plus radiation."""
+def h_strand(d_mm, t_c, air_c: float, wind=0.0, along=0.0) -> np.ndarray:
+    """W/(m2 K) off a strand d_mm thick at t_c in air at air_c: the largest of the wind's convection (m/s
+    across it), the air's along it (m/s; Kase and Matsuo) and its own rising air's (Churchill-Chu, Lienhard
+    8.28), plus radiation."""
     d, t = np.asarray(d_mm, float) * 1e-3, np.asarray(t_c, float)
     p = air((t + air_c) / 2)
     ra = fact("gravity") * np.maximum(t - air_c, 0.0) / ((t + air_c) / 2 + 273.15) * d ** 3 * p["pr"] / p["nu"] ** 2
     free = 0.36 + 0.518 * ra ** 0.25 / (1 + (0.559 / p["pr"]) ** (9 / 16)) ** (4 / 9)
-    nu = np.maximum(free, nusselt(np.asarray(wind, float) * d / p["nu"], p["pr"]))
+    c, power = fact("along_nusselt")
+    nu = np.maximum(np.maximum(free, c * (np.asarray(along, float) * d / p["nu"]) ** power),
+                    nusselt(np.asarray(wind, float) * d / p["nu"], p["pr"]))
     a, b = t + 273.15, air_c + 273.15
     return nu * p["k"] / d + fact("emissivity") * fact("stefan_boltzmann") * (a * a + b * b) * (a + b)
 
