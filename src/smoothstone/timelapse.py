@@ -222,7 +222,7 @@ def render(tp: gcode.Toolpath, frs: list[dict], prof: dict, cam: dict, out: Path
     for k, fr in enumerate(frs):
         ex = _extras(extras(k, fr), out / f"extras_{k:04d}.npz") if extras else None
         items.append({"full": fr["full"], "part": fr["part"], "head": None if parked else fr["head"], "extras": str(ex) if ex else None,
-                      "shift": camera_shift(prof, fr, parked)})
+                      "shift": camera_shift(prof, fr, parked), "close": fr.get("close")})
     cfg = {"camera": cam, "size": list(size), "frames": items, "head_mm": list(HEAD_MM), "nozzle_mm": NOZZLE_MM}
     (out / "frames.json").write_text(json.dumps(cfg))
     script = Path(__file__).with_name("timelapse_blender.py")
@@ -263,10 +263,10 @@ def video(files: list[Path], mp4: Path, seconds: float | None) -> float:
     return len(files) / rate
 
 
-def sheet(files: list[Path], frs: list[dict], png: Path) -> None:
+def sheet(files: list[Path], frs: list[dict], png: Path, pick: list[int] | None = None) -> None:
     from PIL import Image, ImageDraw, ImageFont
 
-    pick = sorted(set(np.linspace(0, len(files) - 1, min(SHEET, len(files))).round().astype(int).tolist()))
+    pick = pick or sorted(set(np.linspace(0, len(files) - 1, min(SHEET, len(files))).round().astype(int).tolist()))
     ims = [Image.open(files[k]).convert("RGB") for k in pick]
     w, h = ims[0].size
     cols = 3
@@ -276,6 +276,8 @@ def sheet(files: list[Path], frs: list[dict], png: Path) -> None:
         d = ImageDraw.Draw(im)
         fr = frs[k]
         d.text((8, 6), f"layer {fr['layer'] + 1}  z {fr['z_mm']:.2f} mm  {clock(fr['t_s'])}", fill=(255, 220, 80), font=font)
+        if fr.get("note"):
+            d.text((8, 10 + font.size), fr["note"], fill=(255, 90, 70), font=font)
         out.paste(im, ((j % cols) * w, (j // cols) * h))
     out.save(png)
 
@@ -456,10 +458,46 @@ def out_dir(args, job, f: Path) -> Path:
 def again(args, **change) -> str:
     """The command as typed, with some options changed or dropped (None)."""
     v = {"file": args.file, "--gcode": args.gcode, "--printer": args.printer, "--mode": args.mode, "--supports": args.supports,
-         "--seconds": args.seconds, **change}
+         "--seconds": args.seconds, "--material": args.material, **change}
     out = ["stone timelapse"] + ([shlex.quote(v.pop("file"))] if v.get("file") else [])
     out += [f"{k} {shlex.quote(str(x))}" for k, x in v.items() if x not in (None, "auto", "per-layer") and k.startswith("--")]
+    if args.fail:
+        out += [f"--fail {args.fail}"] + (["--plate dirty"] if args.plate == "dirty" else [])
     return " ".join(out + (["--night"] if args.night else []))
+
+
+def start(args, job, prof, out):
+    """What to draw: (toolpath, words saying where it came from, the input file), or None with a FIX and a NEXT."""
+    if args.gcode and (args.file or args.supports != "auto"):
+        out.fix("the G-code already has its own part and supports; drop the file and --supports")
+        out.next = again(args, file=None, **{"--supports": None})
+        return None
+    if not args.gcode:
+        f = Path(args.file).expanduser().resolve() if args.file else job.build_dir / "part.stl"
+        if not f.is_file():
+            out.fix(f"no file at {f}" if args.file else "no built part yet; build first, or name an STL or --gcode file")
+            out.next = "stone build" if not args.file else again(args, file="<file.stl>")
+            return None
+    elif not Path(args.gcode).expanduser().is_file():
+        out.fix(f"no G-code at {args.gcode}")
+        out.next = again(args, **{"--gcode": "<file.gcode>"})
+        return None
+    if args.seconds is not None and not 1 <= args.seconds <= 600:
+        out.fix("--seconds: give 1 to 600")
+        out.next = again(args, **{"--seconds": None})
+        return None
+    try:
+        return toolpath_from(args, job, prof)
+    except (OSError, ValueError) as e:
+        out.fix(str(e))
+        out.next = "ask the person for another file: " + again(args) if args.file or args.gcode else "stone build"
+        return None
+
+
+def why(e: Exception) -> str:
+    """What stopped a video, with what the program said."""
+    said = (e.stderr or b"").decode(errors="replace")[-200:] if isinstance(e, subprocess.CalledProcessError) else ""
+    return f"{e} {said}".rstrip()
 
 
 def cmd(args, job, out):
@@ -473,30 +511,14 @@ def cmd(args, job, out):
         return out
     if args.camera_from:
         return fit_from(args, job, prof, out)
-    if args.gcode and (args.file or args.supports != "auto"):
-        out.fix("the G-code already has its own part and supports; drop the file and --supports")
-        out.next = again(args, file=None, **{"--supports": None})
+    if args.fail:
+        from . import failvideo
+
+        return failvideo.cmd(args, job, prof, out)
+    got = start(args, job, prof, out)
+    if got is None:
         return out
-    if not args.gcode:
-        f = Path(args.file).expanduser().resolve() if args.file else job.build_dir / "part.stl"
-        if not f.is_file():
-            out.fix(f"no file at {f}" if args.file else "no built part yet; build first, or name an STL or --gcode file")
-            out.next = "stone build" if not args.file else again(args, file="<file.stl>")
-            return out
-    elif not Path(args.gcode).expanduser().is_file():
-        out.fix(f"no G-code at {args.gcode}")
-        out.next = again(args, **{"--gcode": "<file.gcode>"})
-        return out
-    if args.seconds is not None and not 1 <= args.seconds <= 600:
-        out.fix("--seconds: give 1 to 600")
-        out.next = again(args, **{"--seconds": None})
-        return out
-    try:
-        tp, what, f = toolpath_from(args, job, prof)
-    except (OSError, ValueError) as e:
-        out.fix(str(e))
-        out.next = "ask the person for another file: " + again(args) if args.file or args.gcode else "stone build"
-        return out
+    tp, what, f = got
     total = tp.total_s()
     est = f" (the slicer says {clock(tp.estimate_s)})" if tp.estimate_s else ""
     cname, rgb, named = color(job)
@@ -521,9 +543,8 @@ def cmd(args, job, out):
         secs = video(files, mp4, args.seconds or (SECONDS if args.mode == "realtime" else None))
         sheet(files, frs, png)
     except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as e:
-        said = (getattr(e, "stderr", None) or b"").decode(errors="replace")[-200:] if isinstance(e, subprocess.CalledProcessError) else ""
         out.add(*head)
-        out.fix(f"no video: {e} {said}".rstrip())
+        out.fix(f"no video: {why(e)}")
         out.next = "none, the print time is above"
         return out
     finally:

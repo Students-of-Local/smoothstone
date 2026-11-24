@@ -3433,6 +3433,10 @@ def make_parser() -> Parser:
     s.add_argument("--bed-corners", help='the bed corners in that snapshot: "x1,y1 x2,y2 x3,y3 x4,y4"')
     s.add_argument("--snap-at", type=float, help="the printer's Z (or Y, on a bed-slinger) in mm when the snapshot was taken")
     s.add_argument("--save-camera", action="store_true", help="keep the fitted camera for every job")
+    s.add_argument("--fail", nargs="?", const="auto",
+                   help="the print failing as physics says (a model): auto, or a what-if: supports, detach, droop, bridge")
+    s.add_argument("--plate", choices=("clean", "dirty"), default="clean", help="for --fail: the plate's state")
+    s.add_argument("--material", help="for --fail: PLA, PETG or ABS; default: the job's material")
 
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
