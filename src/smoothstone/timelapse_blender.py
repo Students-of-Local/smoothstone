@@ -7,7 +7,8 @@ flat ribbon, line width x layer height, in print order; lv and lq, each layer's 
 first quad (one more entry than layers); bed (2,) mm; rgb (3,) the filament color 0..255.
 frames.json holds the camera, the image size, the head size, and per frame: "full" (layers shown
 whole), "part" ([layer, lines] of the layer in progress, or null), "head" ([x, y, z] mm of the
-nozzle, or null when the head is parked out of view) and "extras" (an npz of extra geometry for this
+nozzle, or null when the head is parked out of view), "shift" (mm the camera moves in the bed's frame, for a
+printer that moves its bed) and "extras" (an npz of extra geometry for this
 frame, or null: V0 F0 C0, V1 F1 C1 ... meshes with their colors, added by stone timelapse --fail).
 Writes f_0000.png ... in frame order.
 """
@@ -53,6 +54,7 @@ def mesh(name, V, F, mat):
     me.loops.foreach_set("vertex_index", F.astype(np.int32).ravel())
     me.polygons.add(len(F))
     me.polygons.foreach_set("loop_start", np.arange(0, F.size, k, dtype=np.int32))
+    me.polygons.foreach_set("use_smooth", np.zeros(len(F), bool))  # flat faces: Blender 4.1 and later start out smooth
     me.update(calc_edges=True)
     me.materials.append(mat)
     ob = bpy.data.objects.new(name, me)
@@ -137,6 +139,7 @@ for k, fr in enumerate(cfg["frames"]):
     head.hide_render = fr.get("head") is None
     if fr.get("head") is not None:
         head.location = Vector([v * M for v in fr["head"]])
+    cam.location = pos + Vector([v * M for v in fr.get("shift", (0, 0, 0))])
     scene.render.filepath = str(out / f"f_{k:04d}.png")
     bpy.ops.render.render(write_still=True)
     for ob in temp:

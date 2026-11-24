@@ -4,8 +4,11 @@ The toolpaths come from the G-code when there is one (gcode.py), else from stone
 (toolpaths.py). Every printed line becomes a flat ribbon, line width x layer height, merged per layer,
 and Blender (a separate process; timelapse_blender.py) renders them from the printer's camera: one
 frame per layer like a printer's timelapse, or frames at equal print-time steps (realtime). Then
-ffmpeg makes build/timelapse.mp4, with build/timelapse_sheet.png (9 frames) and build/timelapse.json
-(each frame's time, layer, height and file).
+ffmpeg makes timelapse.mp4, with timelapse_sheet.png (9 frames) and timelapse.json (each frame's time,
+layer, height and file): in build/ for the job's part, else in a folder named after the file.
+
+Everything is drawn in the bed's own frame. A printer that moves its bed (down in z as the print grows, or
+along y) is drawn by moving the camera the other way, so the still nozzle stays where the camera sees it.
 
 Extra geometry per frame (drooped strands, a toppled part) goes in through render(..., extras=):
 a function of (frame index, frame dict) returning a list of {"mesh": (V, F), "rgb"} or
@@ -17,6 +20,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import shlex
 import shutil
 import subprocess
 import time
@@ -35,7 +39,10 @@ SIZE = (640, 480)
 HEAD_MM = (50.0, 50.0, 60.0)  # the toolhead box drawn in fixed mode (assumption: roughly a K2 head)
 NOZZLE_MM = 12.0  # nozzle tip to the bottom of the head (assumption: heater block and nozzle)
 SHEET = 9
-FIT_PX = 3.0  # a camera fit whose corners land farther off than this gets a warning
+FIT_PX = 3.0  # a camera fit whose corners land farther off than this is refused
+MAX_FRAMES = 1800  # realtime mode renders at most this many frames and holds each longer (about 12 min of Blender)
+FLYING_GANTRY = ("voron_24", "sovol_sv08")  # corexy printers whose gantry climbs over a still bed
+BED_AXIS = {"corexy": "z", "bedslinger": "y", "corexz": "y"}
 # A camera for a printer whose profile gives no pose: low at the front left, looking back across the bed
 # (assumption: where most enclosed printers put it; --camera-from fits the real one). pos and look_at are
 # shares of the bed's width and depth, then mm up.
@@ -53,6 +60,22 @@ def printer(job, pid: str | None) -> dict:
     return p or {**printers.get("creality_k2"), "assumed": True}
 
 
+def bed_axis(prof: dict) -> str:
+    """The axis the printer moves its bed along: z (it sinks as the print grows), y, or "" for a still bed."""
+    return "" if prof.get("id") in FLYING_GANTRY else BED_AXIS.get(prof.get("kinematics"), "")
+
+
+def camera_shift(prof: dict, fr: dict, parked: bool) -> list[float]:
+    """How far the still camera is from its pose, in the bed's frame, at this frame. The pose is for a bed with
+    the nozzle at z 0 (or, on a bed-slinger, at the bed's middle y)."""
+    axis = bed_axis(prof)
+    if axis == "z":
+        return [0.0, 0.0, fr["z_mm"]]
+    if axis == "y" and not parked:
+        return [0.0, fr["head"][1] - prof["build_volume_mm"][1] / 2, 0.0]
+    return [0.0, 0.0, 0.0]
+
+
 def aspect(v) -> float:
     """A camera's width over height, from a number or "16:9"."""
     if isinstance(v, str) and ":" in v:
@@ -64,17 +87,23 @@ def aspect(v) -> float:
 def camera(job, prof: dict) -> dict:
     """The camera: a pose fit with --camera-from (the job's, then the machine's), else the profile's, else ANY_CAMERA."""
     cam = dict(prof.get("camera") or {})
-    for f in (job.root / "camera.json", config.user_config_dir() / "camera.json"):
+    for f in camera_files(job, prof):
         if f.is_file():
-            c = json.loads(f.read_text())
-            if c.get("printer") in (None, prof.get("id")):
-                return {**cam, **c, "from": str(f)}
+            try:
+                return {**cam, **json.loads(f.read_text()), "from": str(f)}
+            except ValueError as e:
+                raise ValueError(f"{f} is not a saved camera ({e}); fit it again or remove it") from e
     if not (cam.get("pos_mm") and cam.get("look_at_mm") and cam.get("hfov_deg")):
         bx, by = prof["build_volume_mm"][:2]
         at = {k: [v[0] * bx, v[1] * by, v[2]] for k, v in ANY_CAMERA.items() if k != "hfov_deg"}
         cam.update(pos_mm=at["pos"], look_at_mm=at["look_at"], hfov_deg=ANY_CAMERA["hfov_deg"],
                    assumption="pose not in the profile; assumed low at the front left")
     return cam
+
+
+def camera_files(job, prof: dict) -> list[Path]:
+    """Where a fitted camera for this printer is kept: the job, then the machine."""
+    return [d / f"camera-{prof['id']}.json" for d in (job.root, config.user_config_dir())]
 
 
 # frames
@@ -98,7 +127,7 @@ def frames(tp: gcode.Toolpath, mode: str = "per-layer", seconds: float | None = 
                         "head": tp.p1[m, :3].tolist()})
         return out
     total = tp.total_s()
-    n = max(2, int(round((seconds or SECONDS) * fps)))
+    n = min(MAX_FRAMES, max(2, int(round((seconds or SECONDS) * fps))))
     done = np.zeros(tp.n, int)  # extruding lines of its own layer printed by the end of each move
     for L in np.unique(lay):
         sel = lay == L
@@ -191,12 +220,13 @@ def render(tp: gcode.Toolpath, frs: list[dict], prof: dict, cam: dict, out: Path
     items = []
     for k, fr in enumerate(frs):
         ex = _extras(extras(k, fr), out / f"extras_{k:04d}.npz") if extras else None
-        items.append({"full": fr["full"], "part": fr["part"], "head": None if parked else fr["head"], "extras": str(ex) if ex else None})
+        items.append({"full": fr["full"], "part": fr["part"], "head": None if parked else fr["head"], "extras": str(ex) if ex else None,
+                      "shift": camera_shift(prof, fr, parked)})
     cfg = {"camera": cam, "size": list(size), "frames": items, "head_mm": list(HEAD_MM), "nozzle_mm": NOZZLE_MM}
     (out / "frames.json").write_text(json.dumps(cfg))
     script = Path(__file__).with_name("timelapse_blender.py")
     run = subprocess.run([b, "-b", "--factory-startup", "--python", str(script), "--", str(scene), str(out / "frames.json"), str(out)],
-                         capture_output=True, text=True, timeout=3600)
+                         capture_output=True, text=True, timeout=600 + 4 * len(frs))
     if log:
         log(run.stdout[-4000:] + run.stderr[-4000:])
     files = [out / f"f_{k:04d}.png" for k in range(len(frs))]
@@ -259,7 +289,8 @@ def clock(s: float) -> str:
 def fit_camera(corners_px, image_size, bed_mm) -> dict:
     """The camera pose from the bed's four corners in a snapshot, in order front left, front right,
     back right, back left (printer x, y = 0, 0 is front left). Focal length from the homography with
-    square pixels and the principal point at the center (Zhang's constraints), then cv2.solvePnP.
+    square pixels and the principal point at the center (both of Zhang's constraints by least squares, so one
+    the view cannot settle weighs nothing), then cv2.solvePnP. ValueError when no camera above the bed fits.
     Returns pos_mm, rot (columns: Blender camera right, up and back axes in printer space), hfov_deg,
     and each corner's reprojection error in px."""
     import cv2
@@ -269,16 +300,17 @@ def fit_camera(corners_px, image_size, bed_mm) -> dict:
     obj = np.array([[0, 0, 0], [bx, 0, 0], [bx, by, 0], [0, by, 0]], np.float64)
     w, h = image_size
     cx, cy = w / 2.0, h / 2.0
+    if not np.isfinite(img).all() or cv2.contourArea(img.astype(np.float32)) < 100 or not cv2.isContourConvex(img.astype(np.float32)):
+        raise ValueError("the four corners are not a four-sided shape; check each one, and their order")
     H, _ = cv2.findHomography(obj[:, :2], img)
     Hc = np.array([[1, 0, -cx], [0, 1, -cy], [0, 0, 1.0]]) @ H
     (h11, h12, _), (h21, h22, _), (h31, h32, _) = Hc
-    est = []
-    if abs(h31 * h32) > 1e-12:
-        est.append(-(h11 * h12 + h21 * h22) / (h31 * h32))
-    if abs(h31 ** 2 - h32 ** 2) > 1e-12:
-        est.append((h12 ** 2 + h22 ** 2 - h11 ** 2 - h21 ** 2) / (h31 ** 2 - h32 ** 2))
-    good = [e for e in est if e > 0]
-    f = math.sqrt(np.mean(good)) if good else w / 2 / math.tan(math.radians(80) / 2)
+    a = np.array([h31 * h32, h31 ** 2 - h32 ** 2])
+    b = np.array([-(h11 * h12 + h21 * h22), h12 ** 2 + h22 ** 2 - h11 ** 2 - h21 ** 2])
+    f2 = a @ b / (a @ a) if a @ a > 1e-18 else (w / 2 / math.tan(math.radians(80) / 2)) ** 2  # straight down: assume 80
+    if f2 <= (w / 8) ** 2:
+        raise ValueError("no camera fits those corners; check each one, and their order")
+    f = math.sqrt(f2)
     K = np.array([[f, 0, cx], [0, f, cy], [0, 0, 1.0]])
     ok, rv, tv = cv2.solvePnP(obj, img, K, None, flags=cv2.SOLVEPNP_IPPE)
     ok, rv, tv = cv2.solvePnP(obj, img, K, None, rv, tv, useExtrinsicGuess=True, flags=cv2.SOLVEPNP_ITERATIVE)
@@ -286,6 +318,8 @@ def fit_camera(corners_px, image_size, bed_mm) -> dict:
     err = np.linalg.norm(proj[:, 0, :] - img, axis=1)
     R, _ = cv2.Rodrigues(rv)
     pos = (-R.T @ tv).ravel()
+    if pos[2] <= 0:
+        raise ValueError("those corners put the camera under the bed; give them in order: front left, front right, back right, back left")
     rot = R.T @ np.diag([1.0, -1.0, -1.0])  # OpenCV looks down +z with y down; Blender down -z with y up
     return {"pos_mm": pos.round(2).tolist(), "rot": rot.round(6).tolist(), "hfov_deg": round(math.degrees(2 * math.atan(w / 2 / f)), 3),
             "aspect": w / h, "image_px": [w, h], "focal_px": round(f, 2), "fit_error_px": err.round(3).tolist()}
@@ -350,122 +384,156 @@ def toolpath_from(args, job, prof):
     return tp, what, f
 
 
-def fit_from(args, job, prof, out) -> dict | None:
+def side(cam: dict, bed) -> str:
+    """Where over the bed the camera sits, in words: "front right"."""
+    x, y = cam["pos_mm"][0] / bed[0], cam["pos_mm"][1] / bed[1]
+    words = ["front" if y < 1 / 3 else "back" if y > 2 / 3 else "", "left" if x < 1 / 3 else "right" if x > 2 / 3 else ""]
+    return " ".join(w for w in words if w) or "middle"
+
+
+def fit_from(args, job, prof, out):
+    """--camera-from: fit the camera, keep it, and ask the person if it is where their camera is (a fit cannot
+    tell which corner of a square bed came first)."""
     from PIL import Image
 
     snap = Path(args.camera_from).expanduser().resolve()
-    if not args.bed_corners:
-        out.fix('--camera-from needs the bed corners: --bed-corners "x1,y1 x2,y2 x3,y3 x4,y4" '
-                "(front left, front right, back right, back left, in pixels)")
-        return None
+    bed, axis = prof["build_volume_mm"], bed_axis(prof)
+    again = f'stone timelapse --camera-from {shlex.quote(str(snap))} --bed-corners "<x1,y1 x2,y2 x3,y3 x4,y4>"'
+    dests = camera_files(job, prof)[0 if job.exists() else 1:2 if args.save_camera else 1]
+    if prof.get("assumed"):
+        out.fix("the fit needs this printer's bed size, and no printer is set")
+        out.next = "ask the person: which printer is it? Then: stone printer set <id>, and run this again"
+        return out
+    out.next = again + (" --save-camera" if args.save_camera or not dests else "")
+    if not args.bed_corners or not dests:
+        out.fix('--camera-from needs the bed corners in pixels: front left, front right, back right, back left'
+                if not args.bed_corners else "no job here to keep the camera in; add --save-camera")
+        return out
     try:
         with Image.open(snap) as im:
             size = im.size
-        cam = fit_camera(parse_corners(args.bed_corners), size, prof["build_volume_mm"])
+        cam = fit_camera(parse_corners(args.bed_corners), size, bed)
     except (OSError, ValueError) as e:
         out.fix(f"--camera-from: {e}")
-        return None
-    cam.update({"printer": prof.get("id"), "timelapse_mode": (prof.get("camera") or {}).get("timelapse_mode", "fixed"),
-                "ir_night": (prof.get("camera") or {}).get("ir_night", False), "source": f"fit to {snap.name}"})
-    dests = ([job.root / "camera.json"] if job.exists() else []) + ([config_camera()] if args.save_camera else [])
+        return out
+    off = max(cam["fit_error_px"])
+    if off > FIT_PX:
+        out.fix(f"the corners do not fit one camera (off by up to {off:.0f} px); check each one, and their order")
+        return out
+    if axis:
+        ref = 0.0 if axis == "z" else bed[1] / 2
+        at = ref if args.snap_at is None else args.snap_at
+        cam["pos_mm"]["xyz".index(axis)] -= at - ref
+        out.add(f"The snapshot counts as taken with the printer at {axis.upper()} {at:g} mm"
+                + ("; if it was not, run this again with --snap-at." if args.snap_at is None else "."))
+    profcam = prof.get("camera") or {}
+    cam.update({"printer": prof["id"], "timelapse_mode": profcam.get("timelapse_mode", "fixed"),
+                "ir_night": profcam.get("ir_night", False), "source": f"fit to {snap.name}"})
     for d in dests:
         d.parent.mkdir(parents=True, exist_ok=True)
         d.write_text(json.dumps(cam, indent=1))
-    out.add(f"Camera fit to {snap.name}: corners land within {max(cam['fit_error_px']):.1f} px, "
-            f"{cam['hfov_deg']:.0f} degrees wide, at {', '.join(f'{v:.0f}' for v in cam['pos_mm'])} mm.")
-    if max(cam["fit_error_px"]) > FIT_PX:
-        out.add(f"Warning: the corners do not fit one camera (off by up to {max(cam['fit_error_px']):.0f} px). "
-                "Check their order: front left, front right, back right, back left.")
-    if dests:
-        out.add("Saved: " + ", ".join(str(d) for d in dests))
-    if not args.save_camera:
-        out.add("To use this camera for every job, run it again with --save-camera.")
-    return cam
+    where = f"at the {side(cam, bed)} of the bed, {cam['pos_mm'][2]:.0f} mm above it"
+    out.add(f"Camera fit to {snap.name}: corners land within {off:.1f} px, {cam['hfov_deg']:.0f} degrees wide, {where}.",
+            "Saved: " + ", ".join(str(d) for d in dests))
+    out.next = (f"ask the person: is the printer's camera {where}? If not, the corners started at the wrong one: run it again. "
+                "If so: stone timelapse")
+    return out
 
 
-def config_camera() -> Path:
-    return config.user_config_dir() / "camera.json"
+def out_dir(args, job, f: Path) -> Path:
+    """build/ for the job's own part, else a folder beside the file and named after it."""
+    return job.build_dir if job.exists() and not args.file and not args.gcode else f.parent / f"{f.name}-timelapse"
+
+
+def again(args, **change) -> str:
+    """The command as typed, with some options changed or dropped (None)."""
+    v = {"file": args.file, "--gcode": args.gcode, "--printer": args.printer, "--mode": args.mode, "--supports": args.supports,
+         "--seconds": args.seconds, **change}
+    out = ["stone timelapse"] + ([shlex.quote(v.pop("file"))] if v.get("file") else [])
+    out += [f"{k} {shlex.quote(str(x))}" for k, x in v.items() if x not in (None, "auto", "per-layer") and k.startswith("--")]
+    return " ".join(out + (["--night"] if args.night else []))
 
 
 def cmd(args, job, out):
-    """stone timelapse: build/timelapse.mp4, timelapse_sheet.png and timelapse.json."""
+    """stone timelapse: timelapse.mp4, timelapse_sheet.png and timelapse.json."""
     t_start = time.time()
     try:
         prof = printer(job, args.printer)
     except ValueError as e:
         out.fix(str(e))
-        out.next = "stone timelapse"
+        out.next = "stone printer"
         return out
-    cam = fit_from(args, job, prof, out) if args.camera_from else None
-    if out.code:
+    if args.camera_from:
+        return fit_from(args, job, prof, out)
+    if args.gcode and (args.file or args.supports != "auto"):
+        out.fix("the G-code already has its own part and supports; drop the file and --supports")
+        out.next = again(args, file=None, **{"--supports": None})
         return out
     if not args.gcode:
         f = Path(args.file).expanduser().resolve() if args.file else job.build_dir / "part.stl"
         if not f.is_file():
-            if cam:  # a camera fit alone is a finished step
-                out.next = "stone timelapse"
-                return out
             out.fix(f"no file at {f}" if args.file else "no built part yet; build first, or name an STL or --gcode file")
-            out.next = "stone build" if not args.file else "stone timelapse <file.stl>"
+            out.next = "stone build" if not args.file else again(args, file="<file.stl>")
             return out
     elif not Path(args.gcode).expanduser().is_file():
         out.fix(f"no G-code at {args.gcode}")
-        out.next = "stone timelapse --gcode <file.gcode>"
+        out.next = again(args, **{"--gcode": "<file.gcode>"})
         return out
-    if args.seconds is not None and not 0 < args.seconds <= 600:
+    if args.seconds is not None and not 1 <= args.seconds <= 600:
         out.fix("--seconds: give 1 to 600")
-        out.next = "stone timelapse"
+        out.next = again(args, **{"--seconds": None})
         return out
     try:
         tp, what, f = toolpath_from(args, job, prof)
     except ValueError as e:
         out.fix(str(e))
-        out.next = "stone timelapse"
+        out.next = "ask the person for another file: " + again(args) if args.file or args.gcode else "stone build"
         return out
     total = tp.total_s()
     est = f" (the slicer says {clock(tp.estimate_s)})" if tp.estimate_s else ""
     cname, rgb = color(job)
-    print_time = f"Print time: {clock(total)}{est}, {len(tp.layer_z)} layers, {cname} filament."
+    named = bool(config._toml(job.root if job.exists() else None).get("filaments"))
+    shade = f"{cname} filament" if named and not args.gcode else f"all drawn {cname}" + (
+        "; the G-code's own colors are not read" if args.gcode else ", no filament named")
+    head = [f"Toolpaths: {what}.", f"Print time: {clock(total)}{est}, {len(tp.layer_z)} layers, {shade}."]
     no = missing()
     if no:
-        out.add(f"Toolpaths: {what}.", print_time)
+        out.add(*head)
         out.fix(f"no video: {no}")
         out.next = "none, the print time is above; the video needs that program"
         return out
-    cam = cam or camera(job, prof)
-    dest = job.build_dir if job.exists() and not args.file and not args.gcode else f.parent
-    dest.mkdir(parents=True, exist_ok=True)
+    dest = out_dir(args, job, f)
     frs = frames(tp, args.mode, args.seconds)
-    w = SIZE[0]
-    size = (w, int(round(w / aspect(cam.get("aspect")) / 2)) * 2)
-    night = args.night
+    mp4, png, js = dest / "timelapse.mp4", dest / "timelapse_sheet.png", dest / "timelapse.json"
     t_render = time.time()
     try:
-        files = render(tp, frs, prof, cam, dest / "timelapse", rgb, night, size, log=job.log if job.exists() else None)
-    except (RuntimeError, subprocess.TimeoutExpired) as e:
-        out.add(f"Toolpaths: {what}.", print_time)
-        out.fix(f"no video: {e}")
+        cam = camera(job, prof)
+        size = (SIZE[0], int(round(SIZE[0] / aspect(cam.get("aspect")) / 2)) * 2)
+        files = render(tp, frs, prof, cam, dest / "timelapse", rgb, args.night, size, log=job.log if job.exists() else None)
+        render_s = time.time() - t_render
+        secs = video(files, mp4, args.seconds or (SECONDS if args.mode == "realtime" else None))
+        sheet(files, frs, png)
+    except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as e:
+        said = (getattr(e, "stderr", None) or b"").decode(errors="replace")[-200:] if isinstance(e, subprocess.CalledProcessError) else ""
+        out.add(*head)
+        out.fix(f"no video: {e} {said}".rstrip())
         out.next = "none, the print time is above"
         return out
-    render_s = time.time() - t_render
-    mp4, png, js = dest / "timelapse.mp4", dest / "timelapse_sheet.png", dest / "timelapse.json"
-    secs = video(files, mp4, args.seconds or (SECONDS if args.mode == "realtime" else None))
-    sheet(files, frs, png)
-    for x in (dest / "timelapse").glob("*.npz"):
-        x.unlink()
+    finally:
+        for x in (dest / "timelapse").glob("*.npz"):
+            x.unlink()
     data = {"source": what, "input": str(f), "printer": prof.get("id"), "printer_assumed": bool(prof.get("assumed")),
-            "mode": args.mode, "night": night, "color": cname, "print_s": round(total, 1), "slicer_estimate_s": tp.estimate_s,
+            "mode": args.mode, "night": args.night, "color": cname, "print_s": round(total, 1), "slicer_estimate_s": tp.estimate_s,
             "layers": len(tp.layer_z), "video_s": round(secs, 2), "render_s": round(render_s, 1), "size_px": list(size),
             "camera": cam, "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"],
                                        "frame": str(p.relative_to(dest))} for fr, p in zip(frs, files)]}
     js.write_text(json.dumps(data, indent=1))
-    out.add(f"Toolpaths: {what}.")
     pname = prof.get("name") or prof.get("id")
-    out.add(f"Printer: {pname}{' (none set; stone printer set <id>)' if prof.get('assumed') else ''}; camera "
-            + (f"from {Path(cam['from']).name}" if cam.get("from") else cam.get("source") or "pose from the profile, an assumption"))
-    out.add(print_time)
-    out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s, {args.mode}{', night view' if night else ''})")
-    out.add(f"Sheet: {png} (9 frames)")
+    out.add(head[0], f"Printer: {pname}{' (none set; stone printer set <id>)' if prof.get('assumed') else ''}; camera "
+            + (f"from {Path(cam['from']).name}" if cam.get("from") else cam.get("assumption") or "pose from the profile"))
+    out.add(head[1])
+    out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s, {args.mode}{', night view' if args.night else ''})")
+    out.add(f"Sheet: {png} ({min(SHEET, len(files))} frames)")
     out.add(f"Data: {js} (rendered in {render_s:.0f} s, {time.time() - t_start:.0f} s in all)")
     out.result = f"timelapse made, {len(files)} frames"
     nxt = job.status().get("next") if job.exists() else None

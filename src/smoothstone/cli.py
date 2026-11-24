@@ -3409,6 +3409,7 @@ def make_parser() -> Parser:
     s.add_argument("--night", action="store_true", help="the infrared night view")
     s.add_argument("--camera-from", help="a snapshot from the printer's camera, to fit its pose")
     s.add_argument("--bed-corners", help='the bed corners in that snapshot: "x1,y1 x2,y2 x3,y3 x4,y4"')
+    s.add_argument("--snap-at", type=float, help="the printer's Z (or Y, on a bed-slinger) in mm when the snapshot was taken")
     s.add_argument("--save-camera", action="store_true", help="keep the fitted camera for every job")
 
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
