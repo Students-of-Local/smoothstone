@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from smoothstone import gcode, toolpaths
+from smoothstone import gcode, printers, toolpaths
 
 from test_slicer import _box, _union
 
@@ -84,7 +84,28 @@ def test_a_slower_printer_travels_slower_too():
     fast, slow = toolpaths.profile(), toolpaths.profile({"speeds": {"typical_print_mm_s": 50, "max_accel_mm_s2": 500}})
     f = 50 / fast["speeds"]["inner_wall"]
     assert all(slow["speeds"][k] == pytest.approx(v * f) for k, v in fast["speeds"].items())
-    assert max(slow["accels"].values()) <= 500 and slow["scaled"]
+    assert max(slow["accels"].values()) <= 500 and slow["whose"] == "OrcaSlicer's K2 speeds scaled to this printer"
+
+
+@pytest.mark.parametrize("pid", printers.load())
+def test_a_printer_prints_by_its_own_slicer_process(pid):
+    p = printers.get(pid)
+    got, own = toolpaths.profile(p), printers.process(p)
+    assert all(got[k] == own[k] for k in ("layer", "widths", "speeds", "shells"))
+    assert own["accels"].items() <= got["accels"].items() and got["accels"]["sparse_infill"] == own["accels"]["default"]
+    assert got["whose"] == f"OrcaSlicer's {printers.short_name(p)} speeds"
+    assert got.keys() == toolpaths.profile().keys() and all(got[k].keys() >= toolpaths.profile()[k].keys() for k in ("widths", "speeds", "accels"))
+
+
+def test_the_k2s_own_process_is_the_one_stone_uses_with_no_printer():
+    assert {**toolpaths.profile(), "whose": ""} == {**toolpaths.profile(printers.get("creality_k2")), "whose": ""}
+
+
+def test_a_minis_walls_take_longer_than_a_k2s():
+    mesh = _box((20, 20, 2), (0, 0, 0))
+    mini, k2 = (toolpaths.generate(mesh, toolpaths.profile(printers.get(p)), 0.2, None, (90, 90)) for p in ("prusa_mini", "creality_k2"))
+    outer = lambda tp: float(np.median(tp.feed[tp.extruding() & (tp.layer > 0) & (tp.feature == gcode.FEATURES.index("outer wall"))]))  # noqa: E731
+    assert (outer(mini), outer(k2)) == (40, 200) and mini.t1.max() > 2 * k2.t1.max()
 
 
 @pytest.mark.parametrize("along_x", [True, False])
