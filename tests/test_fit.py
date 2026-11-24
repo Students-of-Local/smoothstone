@@ -211,6 +211,27 @@ def test_a_deferred_coupon_never_calibrates_from_a_later_answer(jobenv, openscad
     assert not home.is_file() and not fit.printer().calibrated
 
 
+@pytest.mark.parametrize("words", ["I'll print it later, carry on", "Not any time soon, carry on",
+                                   "not yet", "haven't printed it, skip that"])
+def test_putting_the_coupon_off_never_calibrates(words):
+    assert fit.defers(words)
+    assert not (fit.parse_calibration([words], 6, 0.1).get("none"))
+
+
+@pytest.mark.parametrize("words,slide", [("3", 0.3), ("3, square 20.14", 0.3), ("0.2", 0.2),
+                                         ("none of them", 0.6), ("label 2 slides, later I'll measure", 0.2)])
+def test_the_plainest_answers_read(words, slide):
+    assert not fit.defers(words)
+    assert fit.parse_calibration([words], 6, 0.1)["slide"] == pytest.approx(slide)
+
+
+def test_a_bare_label_answer_reaches_calibrate(jobenv, openscad, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("fit", "coupon")
+    _, _, nxt = stone("note", "3")
+    assert nxt.startswith("stone fit calibrate ")
+
+
 def test_calibrate_without_a_slide_offers_a_way_on(jobenv):
     text, code, nxt = stone("fit", "calibrate", "not printed yet")
     assert nxt.startswith("stone fit calibrate slide=")

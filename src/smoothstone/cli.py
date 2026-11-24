@@ -1865,13 +1865,12 @@ def cmd_note(args, job: Job) -> Out:
         # only the coupon question's answer calibrates; "later, carry on" drops the question instead
         from . import fit
 
-        if "slide" in fit.parse_calibration([text], 6, 0.1):
-            out.owns_next = True
-            out.next = f"{st['ask_then']} {json.dumps(text)}"
-            return out
-        job.update(ask_then=None, ask_then_q=None)
         out.owns_next = True
-        out.next = fit._continue(job)
+        if fit.defers(text):
+            job.update(ask_then=None, ask_then_q=None)
+            out.next = fit._continue(job)
+        else:  # calibrate reads the answer, and asks again with a way on when it cannot
+            out.next = f"{st['ask_then']} {json.dumps(text)}"
         return out
     if st.get("ask_then") and not asked.startswith("ask the person"):
         job.update(ask_then=None, ask_then_q=None)  # the job moved on: a later answer is not the coupon's

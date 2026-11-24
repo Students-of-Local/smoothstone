@@ -787,6 +787,15 @@ def coupon_params(job) -> dict:
 
 # calibrate
 
+DEFER = re.compile(r"\b(?:later|soon|tomorrow|not (?:yet|now)|skip|carry on|go on|move on|keep going|"
+                   r"haven'?t (?:printed|got)|didn'?t print|not printed|no time)\b", re.I)
+
+
+def defers(text: str) -> bool:
+    """The person puts the coupon off ("I'll print it later, carry on"): words of delay and no number."""
+    return bool(DEFER.search(text)) and not re.search(r"\d", text)
+
+
 def parse_calibration(items: list[str], steps: int, step: float) -> dict:
     """slide=0.2 square=20.12 hole=9.78, or the person's words ("the 2 hole slides, square 20.12")."""
     text = " ".join(items).lower().replace(",", " ")
@@ -799,8 +808,10 @@ def parse_calibration(items: list[str], steps: int, step: float) -> dict:
             g = next(x for x in m.groups() if x)
             got[key] = g.upper() if key == "material" else float(g)
     m = re.search(r"slide\w*\s*=\s*(none|\d+(?:\.\d+)?)", text) or re.search(r"(\d+(?:\.\d+)?)\D{0,24}slid", text) \
-        or re.search(r"slid\w*\D{0,24}?(\d+(?:\.\d+)?)", text) or re.search(r"label\D{0,4}(\d)", text)
-    if re.search(r"\bnone\b|no hole|not? (?:any|one)", text) and not (m and m.group(1) != "none"):
+        or re.search(r"slid\w*\D{0,24}?(\d+(?:\.\d+)?)", text) or re.search(r"label\D{0,4}(\d)", text) \
+        or re.search(r"^\s*(\d(?:\.\d+)?)(?![\d.])", text)  # the plainest answer: just the label, "3"
+    if re.search(r"\bnone\b|no hole|not? (?:any|one)(?: of them| of the holes| hole| label)", text) \
+            and not (m and m.group(1) != "none"):
         got["slide"] = round(steps * step, 3)
         got["none"] = True
     elif m:
@@ -860,6 +871,8 @@ def cmd_calibrate(items: list[str], job, Out):
     if problems:
         out.fix("; ".join(problems))
         out.next = "ask the person: Please measure the coupon again: the lowest label the peg slides into, the square and the big hole, in mm."
+        if job.exists() and job.status().get("ask_then"):
+            job.update(ask_then_q=out.next)  # the answer to this question calibrates too
         return out
     material = got.get("material") or (reftool.material_for(job.request(), None).material if job.exists() else "PLA")
     s, _ = shrink(material)
