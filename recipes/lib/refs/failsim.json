@@ -20,12 +20,13 @@
    "key": "h_still",
    "value": 10,
    "unit": "W/(m2 K)",
-   "note": "Convection from the part's walls in still air (fan off). A strand loses far more; failsim.churchill_chu.",
+   "note": "Convection from the part's walls in still air (fan off). The paper uses it for its PLA beads; a 0.4 mm bead loses about six times as much (failsim.churchill_chu), so stone keeps it for walls only.",
    "quote": "Convective heat Transfer coefficient h 10 W·m−2K−1 Natural convection of air",
    "source": "He, Zhu, Zhang, Yang, Investigation on Bridging Defects in 3D-Printed Polylactic Acid Beams Using Fused Filament Fabrication, Polymers 2026, 18(2), 261, Table 3",
    "cite": "Polymers 2026 18:261 PLA bridging, Table 3",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12845589/",
-   "checked": "2026-11-24"
+   "checked": "2026-11-24",
+   "assumption": "With the fan off the part's walls lose 10 W/(m2 K), the value a paper used for beads in still air"
   },
   {
    "id": "failsim.pla.k",
@@ -33,7 +34,7 @@
    "key": "pla.k",
    "value": 0.13,
    "unit": "W/(m K)",
-   "note": "PLA thermal conductivity, same table; used only to check the bead is thin enough for a lumped model (Biot number).",
+   "note": "PLA thermal conductivity, same table; carries heat up the printed column, and checks the bead is thin enough for a lumped model (Biot number).",
    "quote": "Thermal conductivity k 0.13 W·m−1K−1",
    "source": "He, Zhu, Zhang, Yang, Investigation on Bridging Defects in 3D-Printed Polylactic Acid Beams Using Fused Filament Fabrication, Polymers 2026, 18(2), 261, Table 3",
    "cite": "Polymers 2026 18:261 PLA bridging, Table 3",
@@ -184,7 +185,8 @@
    "source": "Lienhard and Lienhard, A Heat Transfer Textbook, version 6.00, MIT, eq. 8.28",
    "cite": "Lienhard 2024 eq. 8.28",
    "url": "https://ahtt.mit.edu/wp-content/uploads/2024/04/AHTTv600.pdf",
-   "checked": "2026-11-24"
+   "checked": "2026-11-24",
+   "assumption": "With the fan off every line cools as a lone strand with air all around it; the lines inside a wide ledge touch, cool slower and sag more"
   },
   {
    "id": "failsim.nakai_okazaki",
@@ -312,7 +314,7 @@
    "cite": "arXiv 2311.05158 Table 2",
    "url": "https://arxiv.org/abs/2311.05158",
    "checked": "2026-11-24",
-   "assumption": "PETG's viscosity is one fit (600 Pa s at 240 C, the weighted mean of its 3 modes: the sum a slow sag feels is 600 to 1800, so it may sag less) moved to other temperatures by the universal WLF constants, thinning with speed as PLA does"
+   "assumption": "PETG's viscosity is one fit (600 Pa s at 240 C, the weighted mean of its 3 modes: the sum a slow sag feels is 600 to 1800, so it may sag less and drag on the nozzle up to 1.8 times as hard) moved to other temperatures by the universal WLF constants, thinning with speed as PLA does"
   },
   {
    "id": "failsim.wlf",
@@ -426,6 +428,40 @@
     94,
     107
    ]
+  },
+  {
+   "id": "failsim.peel.abs",
+   "topic": "failsim",
+   "key": "peel.abs",
+   "value": 60,
+   "unit": "N",
+   "note": "ABS on borosilicate glass, read off Fig. 76 by eye: the bar, of the peak forces, is at 60 N, its error bar 54 to 66.",
+   "quote": "In Fig. 76 the observed maximum forces for each build surface and filament are plotted.",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24",
+   "range": [
+    54,
+    66
+   ]
+  },
+  {
+   "id": "failsim.peel_bed",
+   "topic": "failsim",
+   "key": "peel_bed",
+   "value": {
+    "PLA": 50,
+    "PETG": 96,
+    "ABS": 125
+   },
+   "unit": "C",
+   "note": "Glass plate temperature of the peel tests, Table 5.",
+   "quote": "PLA 230 220 230 60 70 50 ... PETG 250 230 230 100 96 96 ... ABS 270 230 230 130 125 125 (nozzle then build platform temperature, on brass, Pertinax and glass)",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24"
   },
   {
    "id": "failsim.peel_specimen",
@@ -1310,7 +1346,7 @@
    "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7664205/",
    "checked": "2026-11-24",
-   "assumption": "The part fan gives every exposed face of the part this h. Between 40 and 459 W/(m2 K) (the bead's fan h at full speed, failsim.churchill_bernstein) on every face, each of stone's warp test cases keeps its verdict; the closest, PLA 150 x 150 x 10 mm on an open printer, keeps a margin of 1.12 to 1.33."
+   "assumption": "The part fan gives every exposed face of the part this h. Between 40 and 459 W/(m2 K) (the bead's fan h at full speed, failsim.churchill_bernstein) on every face, each of stone's warp test cases keeps its verdict but one: ABS 150 x 150 x 10 mm on an open printer comes loose from 100 up and holds at 40 (margin 1.11). PLA there keeps a margin of 1.53 to 1.83."
   },
   {
    "id": "failsim.room_air",
@@ -1340,17 +1376,63 @@
    "assumption": "Sparse infill conducts in proportion to its density. The first layers of a part count as bottom shell."
   },
   {
-   "id": "failsim.bond_hot",
+   "id": "failsim.hold_curve",
    "topic": "failsim",
-   "key": "bond_hot",
-   "value": "bond = min(peel stress, tensile_z x E(T_plate) / E(20 C)) x plate factor",
+   "key": "hold_curve",
+   "value": [
+    [
+     -30,
+     59.5
+    ],
+    [
+     -20,
+     48.5
+    ],
+    [
+     -10,
+     60
+    ],
+    [
+     0,
+     93.5
+    ],
+    [
+     10,
+     80
+    ],
+    [
+     20,
+     45
+    ],
+    [
+     30,
+     22
+    ],
+    [
+     40,
+     16.5
+    ]
+   ],
+   "unit": "C past Tg, N",
+   "note": "Peak force to knock a PLA cylinder off a polyimide film at each plate temperature (Tr), the mean of the parts printed at 60 and at 70 C, read off Fig. 3 (a) and (b); their PLA softens at about 60 C. On bare glass the same parts let go below 40 C.",
+   "quote": "bed adhesion is maximized between 60 and 70 °C ... transition temperature of PLA is ∼60 °C ... for PI, heating after printing may be more effective than cooling at lowering Fr. In particular, Fr only decreased ∼50% when testing on PI-coated glass when Tr < Tp. However, for Tr > Tp, decreases in Fr of 80 to 90% were observed.",
+   "source": "Snapp, Gongora, Brown, Increasing Throughput in Fused Deposition Modeling by Modulating Bed Temperature, Journal of Manufacturing Science and Engineering 2021, 143(9), 094502, Fig. 3",
+   "cite": "JMSE 2021 143:094502 Fig. 3",
+   "url": "https://doi.org/10.1115/1.4050177",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.bond_rule",
+   "topic": "failsim",
+   "key": "bond_rule",
+   "value": "bond = min(peel stress, tensile_z) x min(1, hold(max(T_plate, T_peel) - Tg) / hold(T_peel - Tg)) x plate factor",
    "unit": "rule",
-   "note": "The first layer sits at the plate temperature. PLA on a 50 C plate keeps 0.73 of its stiffness, so 31 x 0.73 = 22.6 MPa; ABS on a 100 C plate keeps 0.23, so 28 x 0.23 = 6.4 MPa. The peel stress (failsim.peel_specimen) is used as measured.",
-   "source": "stone assumption from materials.json modulus_vs_temp",
+   "note": "hold is failsim.hold_curve. PLA was peeled at 50 C (11 C under its Tg): an 80 C plate holds 0.82 of that, and a 60 C plate counts as no better, though the curve says 1.5 times. The curve is of parts that cooled after printing, so it says nothing of a colder plate. PETG and ABS were peeled 30 and 24 C past their Tg, the weakest part of the curve, so their measured force stands at every colder plate. A plate is never credited with more than was measured.",
+   "source": "stone rule from failsim.peel.* and failsim.hold_curve",
    "cite": "assumption",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "The plastic's strength between layers falls with its stiffness at the plate temperature (materials.json has no strength-vs-temperature curve)."
+   "assumption": "The plate holds what the peel test on glass measured, less on a plate so warm that PLA on polyimide held less (PETG and ABS by the same curve, past their own Tg), never more than the plastic's strength between layers as tested at room temperature. PETG and ABS were peeled on plates 30 and 24 C past their Tg, where they hold least, so on a colder plate 'comes loose' can be a false alarm. How much less a first layer laid on a cold plate sticks is not modeled"
   },
   {
    "id": "failsim.k2_shells",
