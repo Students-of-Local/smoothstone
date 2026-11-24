@@ -1,0 +1,14 @@
+{
+  "styles": {"value": ["Italian Gothic architecture", "Flamboyant"], "source": "https://www.wikidata.org/wiki/Q18068#P149"},
+  "expected_height_m": {"value": 108.5, "source": "https://www.wikidata.org/wiki/Q18068#P2048"},
+  "osm_relation": {"value": 18017026, "source": "https://www.openstreetmap.org/relation/18017026"},
+  "west_portals": {"value": 5, "source": "https://www.duomomilano.it/en/banco-bpm-spire-on-the-duomo-s-facade/"},
+  "rose_width_ratio": {"value": 0, "source": "https://commons.wikimedia.org/wiki/File:Milan_Cathedral_from_Piazza_del_Duomo.jpg", "reason": "The central upper window is tall and pointed, with tracery."},
+  "spire_count": {"value": 135, "source": "https://www.duomomilano.it/en/art-and-culture/the-terraces/"},
+  "facade_pinnacles": {"value": 6, "source": "https://commons.wikimedia.org/wiki/File:Milan_Cathedral_from_Piazza_del_Duomo.jpg", "reason": "Six prominent pinnacle groups cap the vertical divisions of the five portal bays."},
+  "madonnina_height_m": {"value": 4.16, "source": "https://www.duomomilano.it/en/art-and-culture/the-madonnina/"},
+  "west_facade_height_m": {"value": 65, "source": "https://www.cipaheritagedocumentation.org/wp-content/uploads/2018/12/Giunta-e.a.-Integrated-3D-database-for-diagnostics-and-documentation-of-Milan%E2%80%99s-Cathedral-fa%C3%A7ade.pdf"},
+  "west_facade_profile": {"value": [[-0.5, 0.43], [-0.36, 0.49], [-0.28, 0.57], [-0.15, 0.73], [0, 0.87], [0.15, 0.73], [0.28, 0.57], [0.36, 0.49], [0.5, 0.43]], "source": "https://www.cipaheritagedocumentation.org/wp-content/uploads/2018/12/Giunta-e.a.-Integrated-3D-database-for-diagnostics-and-documentation-of-Milan%E2%80%99s-Cathedral-fa%C3%A7ade.pdf", "reason": "Sampled the masonry roofline from the laser orthophotograph. Horizontal positions are fractions of facade width; heights are fractions of the full 65 m including spires."},
+  "west_buttress_spires": {"value": [[-0.465, 0.71], [-0.28, 0.85], [-0.115, 1], [0.115, 1], [0.28, 0.85], [0.465, 0.71]], "source": "https://www.cipaheritagedocumentation.org/wp-content/uploads/2018/12/Giunta-e.a.-Integrated-3D-database-for-diagnostics-and-documentation-of-Milan%E2%80%99s-Cathedral-fa%C3%A7ade.pdf", "reason": "Six buttress groups each carry a pair of narrow spires. Positions and tip heights are fractions of facade width and height."},
+  "spire_rise_m": {"value": 17, "source": "https://www.duomomilano.it/en/art-and-culture/the-terraces/", "reason": "Typical height of a spire from its terrace or roof base."}
+}

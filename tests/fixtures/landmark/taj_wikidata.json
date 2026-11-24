@@ -1,0 +1,464 @@
+{
+  "entities": {
+    "Q9141": {
+      "id": "Q9141",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Taj Mahal"
+        }
+      },
+      "descriptions": {
+        "en": {
+          "language": "en",
+          "value": "marble mausoleum in Agra, India"
+        }
+      },
+      "claims": {
+        "P31": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P31",
+              "hash": "50078869a72d3f2e251fc1666639b361b420e617",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 162875,
+                  "id": "Q162875"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "Q9141$e531e905-49c4-d519-b9c5-753f519ee6a0",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "85b73b175785b189506d5a0007038783426563a2",
+                "snaks": {
+                  "P854": [
+                    {
+                      "snaktype": "value",
+                      "property": "P854",
+                      "hash": "082b79b85ee9e70e464c6799681d39920417a143",
+                      "datavalue": {
+                        "value": "http://www.history.com/topics/taj-mahal",
+                        "type": "string"
+                      },
+                      "datatype": "url"
+                    }
+                  ],
+                  "P1476": [
+                    {
+                      "snaktype": "value",
+                      "property": "P1476",
+                      "hash": "45002787d71dad193ff234090ae24aa8c62ffde1",
+                      "datavalue": {
+                        "value": {
+                          "text": "TAJ MAHAL",
+                          "language": "en"
+                        },
+                        "type": "monolingualtext"
+                      },
+                      "datatype": "monolingualtext"
+                    }
+                  ],
+                  "P1433": [
+                    {
+                      "snaktype": "value",
+                      "property": "P1433",
+                      "hash": "1f7f41d4d5acecbf76f32fc83d8bbc97ebb05004",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 1621107,
+                          "id": "Q1621107"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ],
+                  "P813": [
+                    {
+                      "snaktype": "value",
+                      "property": "P813",
+                      "hash": "05e0d68c60164acc5783a75f50bca5ea257f5b8a",
+                      "datavalue": {
+                        "value": {
+                          "time": "+2018-02-25T00:00:00Z",
+                          "timezone": 0,
+                          "before": 0,
+                          "after": 0,
+                          "precision": 11,
+                          "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                        },
+                        "type": "time"
+                      },
+                      "datatype": "time"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P854",
+                  "P1476",
+                  "P1433",
+                  "P813"
+                ]
+              }
+            ]
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P31",
+              "hash": "59ad38c0e537f8c6ecc92b6eed08582f8b11cdd4",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 381885,
+                  "id": "Q381885"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "Q9141$249802D6-7576-4B5E-BE07-110A9356DCF6",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "7936034f34d6109787a0b3893234590e0651391b",
+                "snaks": {
+                  "P5383": [
+                    {
+                      "snaktype": "value",
+                      "property": "P5383",
+                      "hash": "adcc0670e30aed57344a60cf9e9196b9c919854a",
+                      "datavalue": {
+                        "value": "3845",
+                        "type": "string"
+                      },
+                      "datatype": "external-id"
+                    }
+                  ],
+                  "P248": [
+                    {
+                      "snaktype": "value",
+                      "property": "P248",
+                      "hash": "c619cc6e0e5fe3733a8c4a47939343e5970e0e9d",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 265049,
+                          "id": "Q265049"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ],
+                  "P813": [
+                    {
+                      "snaktype": "value",
+                      "property": "P813",
+                      "hash": "85ea22a51e2754f68995adedbe871fb46b17df5f",
+                      "datavalue": {
+                        "value": {
+                          "time": "+2021-09-29T00:00:00Z",
+                          "timezone": 0,
+                          "before": 0,
+                          "after": 0,
+                          "precision": 11,
+                          "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                        },
+                        "type": "time"
+                      },
+                      "datatype": "time"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P5383",
+                  "P248",
+                  "P813"
+                ]
+              }
+            ]
+          }
+        ],
+        "P625": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P625",
+              "hash": "1a75afc9435c6902e337de7374c84ec48cf245b3",
+              "datavalue": {
+                "value": {
+                  "latitude": 27.175,
+                  "longitude": 78.04194444444444,
+                  "altitude": null,
+                  "precision": 0.0002777777777777778,
+                  "globe": "http://www.wikidata.org/entity/Q2"
+                },
+                "type": "globecoordinate"
+              },
+              "datatype": "globe-coordinate"
+            },
+            "type": "statement",
+            "id": "q9141$9D6705EE-565B-4CF9-BB6E-AEA74626ED82",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "63d38f848ca73845b8259f001eb31f9bd7735ba6",
+                "snaks": {
+                  "P854": [
+                    {
+                      "snaktype": "value",
+                      "property": "P854",
+                      "hash": "09026de266e99db7f7b93859d69854dbe7bd8fd0",
+                      "datavalue": {
+                        "value": "https://www.latlong.net/place/taj-mahal-agra-uttar-pradesh-india-25.html",
+                        "type": "string"
+                      },
+                      "datatype": "url"
+                    }
+                  ],
+                  "P1476": [
+                    {
+                      "snaktype": "value",
+                      "property": "P1476",
+                      "hash": "fcba1f1ef19301f726545664671cde58e21ab7c1",
+                      "datavalue": {
+                        "value": {
+                          "text": "Taj Mahal, Agra, Uttar Pradesh, India",
+                          "language": "en"
+                        },
+                        "type": "monolingualtext"
+                      },
+                      "datatype": "monolingualtext"
+                    }
+                  ],
+                  "P813": [
+                    {
+                      "snaktype": "value",
+                      "property": "P813",
+                      "hash": "05e0d68c60164acc5783a75f50bca5ea257f5b8a",
+                      "datavalue": {
+                        "value": {
+                          "time": "+2018-02-25T00:00:00Z",
+                          "timezone": 0,
+                          "before": 0,
+                          "after": 0,
+                          "precision": 11,
+                          "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                        },
+                        "type": "time"
+                      },
+                      "datatype": "time"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P854",
+                  "P1476",
+                  "P813"
+                ]
+              }
+            ]
+          }
+        ],
+        "P18": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P18",
+              "hash": "69905413399feff5d8a7c3cd3ea9271848194ac1",
+              "datavalue": {
+                "value": "Taj Mahal (Edited).jpeg",
+                "type": "string"
+              },
+              "datatype": "commonsMedia"
+            },
+            "type": "statement",
+            "id": "q9141$B6DFAD2E-AEAA-4F5E-A39A-6887C164C5F1",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "e71a7903858496c67eea189a7084d5559f788edb",
+                "snaks": {
+                  "P143": [
+                    {
+                      "snaktype": "value",
+                      "property": "P143",
+                      "hash": "5d3b16d350189b0a81818758208505444c86c127",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 565,
+                          "id": "Q565"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P143"
+                ]
+              }
+            ]
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P18",
+              "hash": "1c4121da9b18d58d89c56d56639b74e8ee21e71c",
+              "datavalue": {
+                "value": "Taj Mahal, Agra, India edit3.jpg",
+                "type": "string"
+              },
+              "datatype": "commonsMedia"
+            },
+            "type": "statement",
+            "id": "Q9141$3279b34a-419c-0068-6dee-8526040bfc3c",
+            "rank": "preferred",
+            "references": [
+              {
+                "hash": "fa278ebfc458360e5aed63d5058cca83c46134f1",
+                "snaks": {
+                  "P143": [
+                    {
+                      "snaktype": "value",
+                      "property": "P143",
+                      "hash": "e4f6d9441d0600513c4533c672b5ab472dc73694",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 328,
+                          "id": "Q328"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P143"
+                ]
+              }
+            ]
+          }
+        ],
+        "P149": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P149",
+              "hash": "1af8e5f5ddf68f88396253247a69782be64918ac",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 212940,
+                  "id": "Q212940"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "Q9141$aad474d1-463f-10cc-406b-135b5f2f350b",
+            "rank": "normal"
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P149",
+              "hash": "766cdebfb0d35befd16863dfdafcb1e37f507cbe",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 1501585,
+                  "id": "Q1501585"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "Q9141$391c0f47-4164-7ae3-c335-7ed9d249c113",
+            "rank": "normal"
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P149",
+              "hash": "f24ec89d792cab205509018313156b361d236c20",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 542261,
+                  "id": "Q542261"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "Q9141$614a7c7f-406c-990c-1d3b-d74260c2d5ee",
+            "rank": "normal"
+          }
+        ],
+        "P2048": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P2048",
+              "hash": "d3c18f2eddc923a55a77c80710bfbd28948a539c",
+              "datavalue": {
+                "value": {
+                  "amount": "+73",
+                  "unit": "http://www.wikidata.org/entity/Q11573"
+                },
+                "type": "quantity"
+              },
+              "datatype": "quantity"
+            },
+            "type": "statement",
+            "id": "Q9141$0592f46f-42e8-b056-039b-e26c11f1c895",
+            "rank": "normal"
+          }
+        ],
+        "P10689": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P10689",
+              "hash": "e632722314412af9a794ac3153cf22f97500a25a",
+              "datavalue": {
+                "value": "375257537",
+                "type": "string"
+              },
+              "datatype": "external-id"
+            },
+            "type": "statement",
+            "id": "Q9141$5ca92060-4a41-aa96-6f80-ad651b0dddc5",
+            "rank": "normal"
+          }
+        ]
+      },
+      "sitelinks": {
+        "enwiki": {
+          "site": "enwiki",
+          "title": "Taj Mahal",
+          "badges": [],
+          "url": "https://en.wikipedia.org/wiki/Taj_Mahal"
+        }
+      }
+    }
+  }
+}

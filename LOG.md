@@ -957,3 +957,48 @@ and video frames are packed (#98).
 
 Open: the held-out six stay sealed until the build path (`stone landmark`) is graded too; LFM3-1.7B
 has not driven a landmark run yet.
+
+## 2026-11-24 landmarks 1: a landmark built from its references
+
+What changed for the person: "Print me Cologne Cathedral, about 20 cm tall" builds the cathedral
+itself, true to its measured shape, instead of taking a stranger's mesh. `stone landmark "<name>"`:
+- finds the landmark on Wikidata (coordinates, height, style) and its outline and every
+  `building:part` in OpenStreetMap's Simple 3D Buildings (height, min_height, roof shape and height);
+- builds each part's walls and roof (gabled, hipped, pyramidal spires, domes, onion domes), and adds a
+  style kit keyed on the Wikidata style: Gothic buttresses, pointed windows, pinnacles, portals and a
+  rose window; Mughal onion dome on a drum with its finial, iwans and chhatris; domes with drum and lantern;
+  steel lattice;
+- loads a cited reference pack (`src/smoothstone/landmarks/<slug>.json`) for facts OSM lacks, and a
+  tier L model can add one with `--refs`;
+- makes it printable at the size asked: spires and finials thickened from the top down, never
+  shortened, walls at least 1.2 mm, a 2 mm plinth, then modelprint's checks, split, pins and views;
+- credits OpenStreetMap contributors (ODbL), Wikidata and Wikipedia; every guessed height is marked
+  guessed in `refs/landmark.json`. With no 3D parts in OSM (Sagrada Familia) it says so and NEXT is
+  `stone models`.
+A request to find or download a model ("Find me an open model of ...") still goes to `stone models`;
+the six evals/models requests now say "Find me an open model of", sizes and beds unchanged.
+
+Evals: evals/landmarks l01 to l06, graded by evals/landmarks_grade.py on the checks and bed, height to
+length and width within 4% of the cited references, the tallest point within 4% of its cited height,
+feature counts, credits, and the blind Opus judge on the views against the Wikipedia lead photo.
+Notre-Dame's spec names its tallest point, the restored 96 m spire, with its source, because Wikidata's
+height (P2048) for it is the 69 m west towers. evals/landmarks is now guarded by the ratchet.
+
+`--driver next`, seed 1:
+
+| spec | landmark built | judge | found model (m spec) | judge |
+| --- | --- | --- | --- | --- |
+| Cologne | PASS | 8 | PASS | 8 |
+| Taj Mahal | PASS | 8 | PASS | 9 |
+| Milan | PASS | 6 | (none) | |
+| Notre-Dame | PASS | 7 | PASS | 9 |
+| St Paul's | PASS | 8 | (none) | |
+| Eiffel Tower | PASS | 8 | PASS | 10 |
+
+Proportions land within 2% of the references (Cologne height over length 1.083 against 1.082).
+LFM3-1.7B with card S built Cologne and the Taj Mahal on its first try, one `stone landmark` call each,
+judged 8 and 8.
+
+Open: the built models score a point or two under the best found models on likeness, because tracery,
+crockets and sculpture are simplified. Milan has fewer, thicker pinnacles than its 135. Physical prints
+untested. The held-out six stay sealed until the last run of this track.

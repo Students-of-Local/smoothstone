@@ -1,6 +1,6 @@
 {
   "id": "m04_eiffel",
-  "request": "A 200 mm tall model of the Eiffel Tower.",
+  "request": "Find me an open model of the Eiffel Tower, 200 mm tall.",
   "input": "text",
   "expect": {
     "models": {

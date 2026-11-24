@@ -1,0 +1,10 @@
+{
+  "styles": {"value": ["Iron lattice tower"], "source": "https://www.toureiffel.paris/en/the-monument/key-figures"},
+  "expected_height_m": {"value": 330, "source": "https://www.wikidata.org/wiki/Q243#P2048", "reason": "The preferred current height includes the newest antenna."},
+  "osm_way": {"value": 5013364, "source": "https://www.openstreetmap.org/way/5013364"},
+  "deck_heights_m": {"value": [57, 115, 276], "source": "https://www.toureiffel.paris/fr/le-monument/chiffres-cle"},
+  "deck_widths_m": {"value": [70.695, 37.63, 18.65], "source": "https://www.e-rara.ch/zut/download/pdf/2595721", "reason": "Widths in the period elevation, with the second width taken at the structural frame."},
+  "foot_width_m": {"value": 25, "source": "https://www.toureiffel.paris/fr/le-monument/chiffres-cle"},
+  "arch_height_m": {"value": 39.4, "source": "https://www.e-rara.ch/zut/download/pdf/2595721"},
+  "historic_top_m": {"value": 312, "source": "https://www.toureiffel.paris/fr/le-monument/chiffres-cle"}
+}

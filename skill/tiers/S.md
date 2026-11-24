@@ -19,7 +19,12 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 - If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. A FIX from stone colors: run only the NEXT line it gives, never stone build.
 - Stop when stone says the part is ready.
 
-## Steps
+## Landmarks
+For a landmark, call stone landmark "<name>" first, with just its name.
+To find or download a model, call stone models "<name>" instead.
+Follow its NEXT line. Stop when stone says the parts are ready.
+
+## Recipe steps
 1. stone status
 2. stone recipes, then stone show <the best recipe>
 3. stone show prints "From the request: ..." and maybe "Not placed yet: ...". For each size
@@ -32,12 +37,6 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 For a figure, statue or bust of a person, pet or thing, the recipe is figure. Set height and
 name only. stone set then says NEXT: stone find "<name>"; run that line, then run
 stone build. The build takes a few minutes.
-
-## Landmarks
-For a cathedral, tower or other landmark no recipe makes, stone recipes says
-NEXT: stone models "<landmark>". Run it, then stone models --take 1, then stone build.
-If the build prints FIX, its NEXT is the next model (--take 2); run it, then stone build.
-A big model prints as numbered parts with pins. Stop when stone says the parts are ready.
 
 ## Example
 Request: A guard for a 92 mm fan with a honeycomb grille.

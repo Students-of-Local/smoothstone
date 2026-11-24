@@ -1,6 +1,6 @@
 {
   "id": "m05_taj_mahal",
-  "request": "A model of the Taj Mahal, 150 mm across.",
+  "request": "Find me an open model of the Taj Mahal, 150 mm across.",
   "input": "text",
   "expect": {
     "models": {

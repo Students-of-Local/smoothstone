@@ -1,0 +1,14 @@
+{
+  "id": "l05_st_pauls",
+  "request": "I'd like a print of St Paul's Cathedral, about 20 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "St Paul's Cathedral",
+      "size": {"mode": "long", "mm": 200},
+      "bed": [220, 220, 220],
+      "features": {"main_dome": {"count": 1}, "west_tower": {"count": 2}}
+    }
+  },
+  "why": "The central dome and the two west towers distinguish this cathedral."
+}

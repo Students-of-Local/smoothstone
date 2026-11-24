@@ -1,0 +1,14 @@
+{
+  "id": "l02_taj_mahal",
+  "request": "Can you print Taj Mahal, about 19 cm across?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Taj Mahal",
+      "size": {"mode": "long", "mm": 190},
+      "bed": [220, 220, 220],
+      "features": {"minaret": {"count": 4}, "main_dome": {"count": 1}}
+    }
+  },
+  "why": "The mausoleum's central dome and four detached minarets must print at the same scale."
+}

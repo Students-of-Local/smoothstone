@@ -28,7 +28,7 @@ import numpy as np
 SIZE_TOL = 0.03
 PASS = 6
 
-RUBRIC = """A tool found an open 3D model of a landmark for this request and fitted it to a printer:
+RUBRIC = """A tool prepared a printable model of a landmark for this request:
 {request}
 
 Read the pictures with the Read tool:
@@ -67,15 +67,20 @@ def credits_why(job: Path) -> list[str]:
     return why
 
 
-def assembled_size(parts: list[dict]) -> np.ndarray:
-    """The model's size put back together: each part file moved back by the inverse of to_print."""
+def assembled_vertices(parts: list[dict]):
+    """Each part's STL vertices mapped back into the assembled model."""
     import trimesh
 
-    lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
     for p in parts:
         m = trimesh.load(p["file"], force="mesh", process=False)
         back = np.linalg.inv(np.asarray(p["to_print"], float))
-        v = m.vertices @ back[:3, :3].T + back[:3, 3]
+        yield m.vertices @ back[:3, :3].T + back[:3, 3]
+
+
+def assembled_size(parts: list[dict]) -> np.ndarray:
+    """The model's size put back together from the printed part files."""
+    lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
+    for v in assembled_vertices(parts):
         lo, hi = np.minimum(lo, v.min(0)), np.maximum(hi, v.max(0))
     return hi - lo
 
@@ -109,11 +114,12 @@ def fit_why(f: Path, bed) -> list[str]:
     return []
 
 
-def checks_why(data: dict, bed, workers: int = 8) -> tuple[list[str], list[dict]]:
-    """stone's checks again on every part file and the pins, in parallel."""
-    jobs = [(p["file"], bed, p.get("bodies", 1)) for p in data["parts"]]
+def checks_why(data: dict, bed, *, recorded: bool = False) -> tuple[list[str], list[dict]]:
+    """Check file fit, then collect the results of stone's checks on every part and pin."""
+    parts = list(data["parts"])
     if data.get("pins"):
-        jobs.append((data["pins"]["file"], bed, data["pins"]["count"]))
+        parts.append(data["pins"])
+    jobs = [(p["file"], bed, p.get("bodies", p.get("count", 1))) for p in parts]
     why = []
     for f, *_ in jobs:
         if not Path(f).is_file():
@@ -122,11 +128,14 @@ def checks_why(data: dict, bed, workers: int = 8) -> tuple[list[str], list[dict]
         return why, []
     for f, *_ in jobs:
         why += fit_why(Path(f), bed)
-    with ProcessPoolExecutor(max_workers=max(1, min(len(jobs), workers)), mp_context=mp.get_context("spawn")) as pool:
-        res = list(pool.map(_check, *zip(*jobs)))
+    if recorded:
+        res = [p.get("checks") or [] for p in parts]
+    else:
+        with ProcessPoolExecutor(max_workers=max(1, min(len(jobs), 8)), mp_context=mp.get_context("spawn")) as pool:
+            res = list(pool.map(_check, *zip(*jobs)))
     out = []
     for (f, *_), r in zip(jobs, res):
-        bad = [x["name"] for x in r if not x["ok"]]
+        bad = [x["name"] for x in r if not x["ok"]] if r else ["no check results"]
         if bad:
             why.append(f"{Path(f).name}: print checks fail: " + ", ".join(bad))
         out.append({"file": f, "fails": bad})
@@ -159,7 +168,8 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
     return {**out, "pass": not why, "why": why or ["all checks pass"]}
 
 
-def judge(job: Path, request: str, title: str | None = None, model: str = "opus") -> dict:
+def judge(job: Path, request: str, title: str | None = None, model: str = "opus", *,
+          reference_out: Path | None = None) -> dict:
     """The blind landmark judge on build/views.png: {"score", "conflicts", "pass", "reference"}."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_likeness as jl
@@ -174,7 +184,10 @@ def judge(job: Path, request: str, title: str | None = None, model: str = "opus"
     ext = jl._suffix(data)
     if not ext:
         raise jl.JudgeProblem(f"the lead image of {title!r} is in a format the judge cannot read")
-    with tempfile.TemporaryDirectory(prefix="landmark-") as tmp:
+    if reference_out is not None:
+        (reference_out / f"reference{ext}").write_bytes(data)
+        ref["file"] = f"reference{ext}"
+    with tempfile.TemporaryDirectory(prefix="landmark-", dir=reference_out) as tmp:
         t = Path(tmp)
         (t / f"reference{ext}").write_bytes(data)
         shutil.copy(views, t / "views.png")
@@ -184,10 +197,12 @@ def judge(job: Path, request: str, title: str | None = None, model: str = "opus"
     return {**res, "pass": res["score"] >= PASS, "reference": ref, "model": model, "request": request}
 
 
-def judged(rdir: Path, job: Path, spec: dict, g: dict) -> dict:
+def judged(rdir: Path, job: Path, spec: dict, g: dict, *, suite: str = "models",
+           save_reference: bool = False) -> dict:
     """The grade with the judge's verdict, saved as landmark.json; a judge that cannot answer fails it."""
     try:
-        res = judge(job, spec["request"], spec["expect"]["models"].get("wikipedia"))
+        res = judge(job, spec["request"], spec["expect"][suite].get("wikipedia"),
+                    reference_out=rdir if save_reference else None)
     except Exception as e:  # never passed unjudged
         res = {"score": None, "pass": False, "conflicts": [], "error": f"{type(e).__name__}: {e}"}
     (rdir / "landmark.json").write_text(json.dumps(res, indent=1))

@@ -1,0 +1,14 @@
+{
+  "id": "l01_cologne",
+  "request": "Print me Cologne Cathedral, about 20 cm tall.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Cologne Cathedral",
+      "size": {"mode": "z", "mm": 200},
+      "bed": [220, 220, 220],
+      "features": {"west_spire": {"count": 2, "tallest": true}}
+    }
+  },
+  "why": "Both west spires must survive the build and rise above the rest of the cathedral."
+}

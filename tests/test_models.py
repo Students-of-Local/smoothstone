@@ -370,6 +370,8 @@ def stone(*argv):
 @pytest.mark.parametrize("request_,subject", [
     ("A model of Cologne Cathedral that fits my 220 mm bed", "Cologne Cathedral"),
     ("A 300 mm tall Sagrada Familia for my 220 mm bed", "Sagrada Familia"),
+    ("Can you print Taj Mahal, about 19 cm across?", "Taj Mahal"),
+    ("Can you print the Eiffel Tower, around 20 cm tall?", "Eiffel Tower"),
 ])
 def test_names_landmark(request_, subject):
     assert models.names_landmark(request_) == subject
@@ -377,6 +379,50 @@ def test_names_landmark(request_, subject):
 
 def test_names_landmark_leaves_ordinary_parts_alone():
     assert models.names_landmark("a wall hook for a 20 mm rail") is None
+
+
+def test_a_landmark_request_routes_to_stone_landmark(jobenv, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(EVALS.parent / "recipes"))  # the real catalog: no recipe fits
+    stone("new", "A model of Cologne Cathedral that fits my 220 mm bed")
+    text, code, nxt = stone("recipes")
+    assert nxt == "stone landmark 'Cologne Cathedral'", text
+
+
+def _route(monkeypatch, request_):
+    monkeypatch.setenv("STONE_RECIPES", str(EVALS.parent / "recipes"))  # the real catalog: no recipe fits
+    stone("new", request_)
+    text, code, nxt = stone("recipes")
+    return shlex.split(nxt)[:2], text
+
+
+@pytest.mark.parametrize("request_", [
+    "Find me an open model of the Eiffel Tower",
+    "Download an STL of the Taj Mahal",
+    "Find the Eiffel Tower on Thingiverse",
+    "Grab the Cologne Cathedral file from Printables",
+    "Find me a 3D printable model of the Eiffel Tower",
+])
+def test_a_find_request_routes_to_stone_models(jobenv, monkeypatch, request_):
+    cmd, text = _route(monkeypatch, request_)
+    assert cmd == ["stone", "models"], text
+
+
+@pytest.mark.parametrize("request_", ["Print me the Eiffel Tower", "A 200 mm tall model of the Eiffel Tower"])
+def test_a_plain_landmark_request_routes_to_stone_landmark(jobenv, monkeypatch, request_):
+    cmd, text = _route(monkeypatch, request_)
+    assert cmd == ["stone", "landmark"], text
+
+
+@pytest.mark.parametrize("spec", sorted((EVALS / "models").glob("m0*.json")), ids=lambda p: p.stem)
+def test_every_models_eval_routes_to_stone_models(jobenv, monkeypatch, spec):
+    cmd, text = _route(monkeypatch, json.loads(spec.read_text())["request"])
+    assert cmd == ["stone", "models"], text
+
+
+@pytest.mark.parametrize("spec", sorted((EVALS / "landmarks").glob("l0*.json")), ids=lambda p: p.stem)
+def test_every_landmarks_eval_routes_to_stone_landmark(jobenv, monkeypatch, spec):
+    cmd, text = _route(monkeypatch, json.loads(spec.read_text())["request"])
+    assert cmd == ["stone", "landmark"], text
 
 
 @pytest.mark.parametrize("request_", ["A stand for my Kindle Paperwhite", "A case for my Flipper Zero"])
@@ -404,7 +450,7 @@ ODD = 'Tower of "$(touch pwned)" `x`'
 
 def test_models_route_quotes_the_subject_for_the_shell():
     out = cli.models_route(cli.Out(), ODD)
-    assert shlex.split(out.next) == ["stone", "models", ODD], out.next
+    assert shlex.split(out.next) == ["stone", "landmark", ODD], out.next
 
 
 def test_models_take_quotes_the_subject_for_the_shell(jobenv, monkeypatch):
@@ -414,12 +460,72 @@ def test_models_take_quotes_the_subject_for_the_shell(jobenv, monkeypatch):
     assert shlex.split(nxt) == ["stone", "models", ODD], nxt
 
 
-def test_a_landmark_request_routes_to_stone_models(jobenv, monkeypatch):
-    monkeypatch.setenv("STONE_RECIPES", str(EVALS.parent / "recipes"))  # the real catalog: no recipe fits
-    stone("new", "A model of Cologne Cathedral that fits my 220 mm bed")
-    text, code, nxt = stone("recipes")
-    assert nxt == "stone models 'Cologne Cathedral'", text
 
+def test_landmark_creates_job_and_runs_shared_build(jobenv, monkeypatch):
+    import types
+    import smoothstone
+
+    module = types.ModuleType("smoothstone.landmark")
+    module.LandmarkProblem = type("LandmarkProblem", (Exception,), {})
+    calls = []
+
+    def generate(name, root, bed, size, detail):
+        calls.append((name, size, detail))
+        return {"stl": str(root / "model" / "model.stl"), "name": name, "subject": name, "source": "landmark"}
+
+    module.generate = generate
+    monkeypatch.setattr(smoothstone, "landmark", module, raising=False)
+    monkeypatch.setitem(sys.modules, "smoothstone.landmark", module)
+    monkeypatch.setattr(cli, "_models_build", lambda job: cli.Out(lines=["Part ready"], next=cli.DONE_NEXT))
+    text, code, nxt = stone("landmark", "Cologne Cathedral", "--size", "150", "--detail", "low")
+    assert code == 0 and nxt == cli.DONE_NEXT, text
+    assert calls == [("Cologne Cathedral", 150.0, "low")]
+    assert models.taken(jobenv / "stone-job")["source"] == "landmark"
+
+
+def test_landmark_without_parts_routes_to_models_and_does_not_loop(jobenv, monkeypatch):
+    import types
+    import smoothstone
+
+    module = types.ModuleType("smoothstone.landmark")
+    module.LandmarkProblem = type("LandmarkProblem", (Exception,), {})
+
+    def generate(*args):
+        raise module.LandmarkProblem("no 3D building parts found")
+
+    module.generate = generate
+    monkeypatch.setattr(smoothstone, "landmark", module, raising=False)
+    monkeypatch.setitem(sys.modules, "smoothstone.landmark", module)
+    text, code, nxt = stone("landmark", "Cologne Cathedral")
+    assert code == 1 and "FIX: no 3D building parts found" in text
+    assert nxt == "stone models 'Cologne Cathedral'"
+    found = {
+        "subject": "Cologne Cathedral", "names": {"kind": "building", "label": "Cologne Cathedral"},
+        "terms": [], "kept": [], "left_out": [],
+        "sources": {"sketchfab": {"searched": False}, "printables": {"found": 0, "why": ""},
+                    "commons": {"found": 0}},
+    }
+    monkeypatch.setattr(models, "search", lambda *args: found)
+    text, code, nxt = stone("models", "Cologne Cathedral")
+    assert code == 1 and nxt.startswith("ask the person:"), text
+
+
+def test_landmark_done_reports_model_credits(jobenv):
+    stone("new", "A model of Cologne Cathedral")
+    root = jobenv / "stone-job"
+    part = root / "cathedral.stl"
+    part.touch()
+    credits = root / "model" / "credits.txt"
+    models.model_file(root).parent.mkdir(parents=True)
+    models.model_file(root).write_text(json.dumps({"stl": str(part), "name": "Cologne Cathedral",
+                                                  "source": "landmark", "credits": str(credits)}))
+    data_file = root / "build" / "model" / "parts.json"
+    data_file.parent.mkdir(parents=True)
+    data_file.write_text(json.dumps({"parts": [{"file": str(part)}], "size_mm": [100, 100, 200]}))
+    cli.Job(root).update(passed=True)
+    text, code, nxt = stone("done")
+    assert code == 0 and nxt == cli.DONE_NEXT, text
+    assert f"Credits: {credits}" in text
 
 def test_stone_models_lists_candidates_and_offers_the_first(jobenv, recorded):
     stone("new", REQ)
@@ -579,3 +685,8 @@ def test_a_model_whose_solids_save_broken_says_so_and_offers_the_next(jobenv, mo
     text, code, nxt = stone("build")
     assert "solids only touch" in text and "part 1 save with broken edges" in text, text
     assert nxt == "stone models --take 2"
+
+
+def test_get_my_files_is_no_found_model_request():
+    from smoothstone import models as mdl
+    assert not mdl.asks_found_model("A tray to get my files sorted beside my Steam Deck")

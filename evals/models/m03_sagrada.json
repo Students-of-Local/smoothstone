@@ -1,6 +1,6 @@
 {
   "id": "m03_sagrada",
-  "request": "A 300 mm tall model of the Sagrada Familia for my 220 mm bed.",
+  "request": "Find me an open model of the Sagrada Familia, 300 mm tall, for my 220 mm bed.",
   "input": "text",
   "expect": {
     "models": {

@@ -842,13 +842,18 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
 
     say = progress or (lambda text: None)
     info = models.taken(root)
-    t = models.target(request, bed_default)
+    generated = info.get("source") == "landmark" and isinstance(info.get("target"), dict)
+    t = info["target"] if generated else models.target(request, bed_default)
     bed = [float(x) for x in t["bed"]]
     lines = [models.asked_size_line(t)]
     mesh = trimesh.load(info["stl"], force="mesh", process=False)
     log: list[str] = []
     mesh = footprint_turn(mesh, log)
-    mesh, s = scale_to(mesh, t, log)
+    if generated:
+        s = 1.0
+        log.append("Kept the landmark's generated scale, 2 mm plinth and printable tip dimensions.")
+    else:
+        mesh, s = scale_to(mesh, t, log)
     man = to_manifold(mesh)
     H = float(mesh.extents[2])
     step = max(0.5, H / 300)
@@ -900,7 +905,7 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
         pm.export(str(pins_file))
     say(f"checking {len(files)} part{'s' if len(files) > 1 else ''}")
     jobs = [(str(f), bed, p.bodies) for f, p in zip(files, parts)] + ([(str(pins_file), bed, len(pin_lengths))] if pins_file else [])
-    with ProcessPoolExecutor(max_workers=max(1, min(len(jobs), 8)), mp_context=mp.get_context("spawn")) as pool:
+    with ProcessPoolExecutor(max_workers=max(1, min(len(jobs), 3 if generated else 8)), mp_context=mp.get_context("spawn")) as pool:
         full = list(pool.map(found_checks, *zip(*jobs)))
     res = [f_["checks"] for f_ in full]
     ok = True
@@ -959,7 +964,7 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
     views = render(assembled, [CLAY] * len(assembled), root / "build" / "views.png")
     laid = layout([trimesh.load(str(f), force="mesh", process=False) for f in files])
     cols = [PALETTE[i % len(PALETTE)] for i in range(len(laid))]
-    lay_png = render(laid, cols, root / "build" / "layout.png") if len(laid) > 1 else None
+    lay_png = render(laid, cols, root / "build" / "layout.png") if len(laid) > 1 or generated else None
     if lay_png:
         label_layout(lay_png, [(f"part {r['number']}", c) for r, c in zip(records, cols)])
     size = np.ptp(np.concatenate([m.bounds for m in assembled]), axis=0)

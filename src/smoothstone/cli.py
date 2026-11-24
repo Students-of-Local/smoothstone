@@ -339,7 +339,7 @@ def cmd_recipes(args, job: Job) -> Out:
         ranked.sort(key=lambda sr: -fits[sr[1].name])  # stable: keeps the word score within a fit
         top = ranked[0][1]
         if fits[top.name] == 0 and (landmark := request_landmark(query)):
-            return models_route(out, landmark)
+            return models_route(out, landmark, query)
         if fits[top.name] == 0:
             # no recipe makes this: handing over the nearest one ready would be a wrong part
             what = top.title.lower()
@@ -2193,27 +2193,96 @@ def cmd_video(args, job: Job) -> Out:
 # found models: a landmark no recipe makes, from the best open model made for printing
 
 
-def models_route(out: Out, subject: str) -> Out:
-    """No recipe makes a landmark: stone finds an open model of it made for printing instead."""
-    out.add(f"No recipe makes {subject}: stone finds the best open model of it made for printing, "
-            "credits it, and fits it to your printer.")
-    out.next = f"stone models {shlex.quote(subject)}"
+def _landmark_command(command: str, subject: str) -> str:
+    """Quote a name safely in a command that a shell can run."""
+    return f"{command} {shlex.quote(subject)}"
+
+
+def models_route(out: Out, subject: str, request: str = "") -> Out:
+    """A landmark starts with its measured reference geometry, unless the person asks for a made model."""
+    from . import models as mdl
+
     out.owns_next = True
     out.stage = "no_recipe"
-    out.result = f"no recipe: find a model of {subject}"
+    if mdl.asks_found_model(request):
+        out.add(f"No recipe makes {subject}: the person asks for an open model, so stone searches for one.")
+        out.next = _landmark_command("stone models", subject)
+        out.result = f"no recipe: find an open model of {subject}"
+        return out
+    out.add(f"No recipe makes {subject}: stone builds it from public landmark references.")
+    out.next = _landmark_command("stone landmark", subject)
+    out.result = f"no recipe: build {subject} from references"
     return out
 
 
+def _landmark_fallback(job: Job, subject: str) -> str:
+    attempted = str(job.status().get("landmark_attempted") or "")
+    if attempted.casefold() == subject.casefold():
+        return ("ask the person: neither the landmark references nor an open model produced a printable part. "
+                'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
+    return _landmark_command("stone landmark", subject)
+
+
 def _next_take(job: Job, n: int) -> str:
-    """The next candidate after the n-th, or a question when there is none."""
+    """Try the next open model, then the reference build."""
     from . import models as mdl
 
     found = read_json(mdl.found_file(job.root)) or {}
     if n < len(found.get("kept") or []):
         return f"stone models --take {n + 1}"
-    return ("ask the person: none of the open models stone found prints well at this size. "
-            "Would a smaller size do, or do you have a model file of your own? When they answer: "
-            'stone note "<their answer>"')
+    subject = found.get("subject") or mdl.names_landmark(job.request()) or "<landmark>"
+    return _landmark_fallback(job, subject)
+
+
+def cmd_landmark(args, job: Job) -> Out:
+    """Build a named landmark from reference data and run the model print checks."""
+    from . import landmark
+    from . import models as mdl
+
+    out = Out()
+    subject = " ".join(args.subject).strip().strip("\"'") or mdl.names_landmark(job.request()) or ""
+    if not subject:
+        out.fix('say which landmark, like stone landmark "Cologne Cathedral"')
+        out.next = 'stone landmark "<landmark>"'
+        return out
+    if args.size is not None and (not math.isfinite(args.size) or args.size <= 0):
+        out.fix("size must be a positive number of millimeters")
+        out.next = _landmark_command("stone landmark", subject)
+        return out
+    if not job.exists():
+        try:
+            job.create(f"A model of {subject}")
+        except FileExistsError:
+            out.fix(f"{job.root} already contains files; choose an empty job folder with --job")
+            out.next = _landmark_command("stone landmark", subject)
+            return out
+    bed = config.bed(job.root)
+    target = mdl.target(job.request(), bed)
+    size = args.size
+    if size is None:
+        size = target if target["mode"] != "fit" or target.get("bed_said") else min(200.0, *bed)
+    job.update(landmark_attempted=subject)
+    progress(job, f"building {subject} from landmark references")
+    try:
+        options = {"ref_pack": args.refs} if args.refs else {}
+        info = landmark.generate(subject, job.root, bed, size, args.detail, **options)
+    except Exception as e:
+        if not isinstance(e, landmark.LandmarkProblem):
+            job.log("landmark failed:\n" + traceback.format_exc())
+            e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
+        out.fix(str(e))
+        out.next = _landmark_command("stone models", subject)
+        out.stage = "landmark_failed"
+        out.result = f"landmark failed: {str(e)}"[:120]
+        return out
+    out.add(*(info.get("lines") or []))
+    write_json(mdl.model_file(job.root), info)
+    job.plan_file.unlink(missing_ok=True)
+    (job.root / "build" / "model" / "parts.json").unlink(missing_ok=True)
+    job.update(passed=False)
+    built = _models_build(job)
+    built.lines = out.lines + built.lines
+    return built
 
 
 def cmd_models(args, job: Job) -> Out:
@@ -2254,8 +2323,7 @@ def cmd_models(args, job: Job) -> Out:
         out.add(f"FIX: Printables could not be searched: {src['printables']['why']}; try stone models again later")
     if not kept:
         out.fix(f"no open model of {nm['label']} made for printing was found")
-        out.next = (f"ask the person: stone found no open model of {nm['label']} made for printing. Do you have a "
-                    'model file, or another name for it? When they answer: stone note "<their answer>"')
+        out.next = _landmark_fallback(job, subject)
         out.result = "models: none found"
         return out
     out.code = 0
@@ -2352,7 +2420,10 @@ def _models_build(job: Job) -> Out:
     out = Out()
     info = mdl.taken(job.root)
     n = int(info.get("index") or 1)
-    out.add(f"Model: {info['name']} by {info.get('author') or 'unknown'}, {mdl.license_short(info)}")
+    if info.get("source") == "landmark":
+        out.add(f"Landmark: {info['name']} from public references")
+    else:
+        out.add(f"Model: {info['name']} by {info.get('author') or 'unknown'}, {mdl.license_short(info)}")
     st = job.status()
     builds = int(st.get("builds", 0)) + 1
     try:
@@ -2360,7 +2431,8 @@ def _models_build(job: Job) -> Out:
     except Exception as e:
         job.log("models build failed:\n" + traceback.format_exc())
         out.fix(f"could not fit this model to the printer ({type(e).__name__}: {str(e)[:100]})")
-        out.next = _next_take(job, n)
+        out.next = (_landmark_command("stone models", info.get("subject") or info["name"])
+                    if info.get("source") == "landmark" else _next_take(job, n))
         out.stage = "build_failed"
         out.result = "model build failed"
         job.update(builds=builds, passed=False)
@@ -2373,7 +2445,7 @@ def _models_build(job: Job) -> Out:
     if res["layout"]:
         out.add(f"Layout: {res['layout']} (every part as it prints)")
     show([p for p in (res["views"], res["layout"]) if p], f"{info['name']}, fitted to your printer")
-    out.add(f"Credits: {job.root / 'credits.txt'}")
+    out.add(f"Credits: {info.get('credits') or job.root / 'credits.txt'}")
     if res["ok"]:
         out.add(f"Part{'s' if len(files) > 1 else ''} ready: print every file above, then push the pins in and glue "
                 "the joints." if len(files) > 1 else f"Part ready: {files[0]}")
@@ -2388,7 +2460,8 @@ def _models_build(job: Job) -> Out:
                 "save with broken edges a slicer rejects; the next model may be built cleaner")
     else:
         out.fix("a part does not pass the print checks at this size; another model may print better")
-    out.next = _next_take(job, n)
+    out.next = (_landmark_command("stone models", info.get("subject") or info["name"])
+                if info.get("source") == "landmark" else _next_take(job, n))
     out.stage = "build_failed"
     out.result = "a part fails the print checks"
     job.update(builds=builds, failed_builds=int(st.get("failed_builds", 0)) + 1, passed=False)
@@ -2414,7 +2487,7 @@ def _models_done(job: Job) -> Out:
     out.add(*[f"STL: {f}" for f in files[:8]])
     if data.get("pins"):
         out.add(f"Pins: {data['pins']['file']}")
-    out.add(f"Credits: {job.root / 'credits.txt'}")
+    out.add(f"Credits: {info.get('credits') or job.root / 'credits.txt'}")
     out.next = DONE_NEXT
     out.stage = "done"
     out.result = "done, found model"
@@ -3352,6 +3425,12 @@ def make_parser() -> Parser:
     s.add_argument("--with", dest="runs", action="append", metavar="RUN",
                    help="another finished run (a folder with job/ and log.json); the clip shows every figure")
 
+    s = sub.add_parser("landmark", parents=[common], help="build a landmark from public references")
+    s.add_argument("subject", nargs="*")
+    s.add_argument("--size", type=float, help="longest dimension in millimeters")
+    s.add_argument("--detail", choices=("low", "high"))
+    s.add_argument("--refs", type=Path, metavar="FILE", help="JSON facts with a source URL for each fact")
+
     s = sub.add_parser("models", parents=[common],
                        help='open models of a landmark made for printing: stone models "Cologne Cathedral"')
     s.add_argument("subject", nargs="*")
@@ -3402,6 +3481,7 @@ COMMANDS = {
     "colors": cmd_colors,
     "video": cmd_video,
     "models": cmd_models,
+    "landmark": cmd_landmark,
     "printer": printers.cmd_printer,
     "fit": cmd_fit,
     "doctor": doctor.cmd_doctor,

@@ -39,6 +39,10 @@ You can drive stone like tier M, and you can also write new recipes when no reci
 - You may pass your own mesh: stone set figure figure=path/to/unit_height.stl.
 
 ## Found models
+- For a landmark, run stone landmark "<name>" first. Follow its NEXT line.
+- To find or download a model, run stone models "<landmark>" instead.
+- Add sources for a new landmark with stone landmark "<name>" --refs <file>.
+  Write a JSON object of named facts, each holding {"value": ..., "source": "https://..."}.
 - stone models "<landmark>" searches Printables, Wikimedia Commons, and Sketchfab only with the
   person's own key in STONE_SKETCHFAB_TOKEN. --take <n> downloads, repairs (src/smoothstone/models.py)
   and makes it the job's part; stone build scales, measures thin features, cuts it to the bed with

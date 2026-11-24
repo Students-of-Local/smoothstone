@@ -1,0 +1,14 @@
+{
+  "id": "l03_milan",
+  "request": "Print me Milan Cathedral, about 20 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Milan Cathedral",
+      "size": {"mode": "long", "mm": 200},
+      "bed": [220, 220, 220],
+      "features": {"pinnacle": {"min": 50}}
+    }
+  },
+  "why": "At least 50 of Milan Cathedral's defining pinnacles must be in the model."
+}
