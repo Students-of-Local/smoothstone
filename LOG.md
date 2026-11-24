@@ -1002,3 +1002,51 @@ judged 8 and 8.
 Open: the built models score a point or two under the best found models on likeness, because tracery,
 crockets and sculpture are simplified. Milan has fewer, thicker pinnacles than its 135. Physical prints
 untested. The held-out six stay sealed until the last run of this track.
+
+## 2026-11-24 landmarks 2: closer to the real building, and buildings with no reference pack
+
+What changed for the person: the six landmarks with a cited pack look more like the real ones, and a
+cathedral nobody wrote a pack for (Westminster Abbey, St. Vitus, Florence) builds from its OpenStreetMap
+parts alone. GPT 6.2 Sol wrote the modeling and was stopped at a two hour limit before its report; the lead
+finished it, found the faults below and ran the checks.
+
+- Gothic detail: flying buttresses as open self-supporting arches, rose windows, west galleries, gables and
+  towers, from pack facts (landmark_gothic.py). Detail too fine for the size is dropped and the build says so.
+- No pack: matched west towers, a dome split from its lantern, bell towers Wikidata lists as part of the
+  building, low walls from the outline (landmark_massing.py). A nave mapped as two gabled halves about a
+  church's axis gets one ridge, marked as inferred (Florence had an "M" roof).
+- Milan: 135 pinnacles. 115 positions are from the Duomo's published plan, 4 side pins are mirrored and 16
+  around the crossing are approximated; the pack says so. Pier widths come from the mapped outline.
+- Fixed from landmarks 1: a taper scaled about the map origin, so corner pinnacles leaned. Now `_tapered`.
+- Name search prefers an exact name; a cached answer is used only for the name it was found under.
+- Grading: the judge's bar for landmarks is 8 (found models keep theirs). `in_mesh` counts a feature in the
+  printed mesh, not in the generator's labels: Milan has 134 standing (the main spire is under its statue),
+  and the old model 50 of its 54 labels. l03 now wants 135 pinnacles, 134 in the mesh, where it wanted 50 labels.
+- New specs: l07 to l10 (no pack) and regressions/r8_milan_pinnacles.
+
+`--driver next`, seed 1, one attempt each on the final code (c3aa0d6):
+
+| spec | landmarks 1 | landmarks 2 |
+| --- | --- | --- |
+| l01 Cologne | 8 | 9 |
+| l02 Taj Mahal | 8 | 8 |
+| l03 Milan | 6 | 8 |
+| l04 Notre-Dame | 7 | 9 |
+| l05 St Paul's | 8 | 8 |
+| l06 Eiffel Tower | 8 | 8 |
+| l07 Westminster Abbey | new | 9 |
+| l08 St. Vitus | new | 8 |
+| l09 Florence Cathedral | new | 9 |
+| l10 Sydney Opera House | new | not built: the honest FIX line and NEXT `stone models` |
+| r8 Milan pinnacles | 50 of 135 standing | 134 standing, judge 7: FAIL |
+
+Milan is borderline: l03 and r8 ask for the same model, and the judge gave 8 and 7 twice (two code states).
+r8's mesh and print checks pass and its likeness fails; it stays in as an open fault. Runs during the climb
+failed first: Milan, Notre-Dame and Florence at 7, St. Vitus twice on checks.
+LFM3-1.7B with card S, one `stone landmark` call: Milan 8 on the final code; Westminster 9 and the Sydney
+fallback one commit earlier. m01 to m06 pass (found models, run before the last two commits).
+Suite 1337 passed, 2 skipped; timing passes; the ratchet holds.
+
+Open, from the judge: Milan's facade reads flat and its spires as plain rods (the middle front pair is 4 m
+short of the survey); the Taj lacks its guldastas; the Eiffel's second deck is nearly missing; St Paul's side
+walls are blank; St. Vitus's south tower is too slim. Physical prints untested. The held-out six stay sealed.
