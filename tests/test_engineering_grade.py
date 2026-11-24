@@ -277,7 +277,7 @@ def test_run_grades_a_product_spec_with_no_part(tmp_path):
 def test_every_engineering_spec_is_well_formed():
     """Each spec in evals/engineering: the schema of evals/README.md, a source for every number."""
     specs = sorted((ROOT / "evals" / "engineering").glob("*.json"))
-    assert len(specs) == 10
+    assert len(specs) == 12
     for p in specs:
         s = json.loads(p.read_text())
         assert s["id"] == p.stem and s["input"] in ("text", "model_number", "photo")
@@ -307,7 +307,7 @@ def test_every_engineering_spec_is_well_formed():
         if exp.get("attach"):
             att = exp["attach"]
             assert att["face"] in eg.FACES and att["screw"] in eg.CLEARANCE and att["min"] >= 1 and att["source"]
-        assert bool(exp.get("attach")) == (p.stem in ("e05_appletv_wall_holder", "e07_mac_mini_mount")), p.name
+        assert bool(exp.get("attach")) == (p.stem in ("e05_appletv_wall_holder", "e07_mac_mini_mount", "e11_mac_studio_mount")), p.name
         for ph in exp.get("part_holes", []):
             assert ph["axis"] in eg.FACES and ph["d"] > 0 and ph["pattern"] and ph["source"]
         # review r1 F5: a part hung from a wall or desk carries a load too

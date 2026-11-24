@@ -8,6 +8,7 @@ import json
 import math
 import operator
 import re
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -140,7 +141,11 @@ def fmt_num(v) -> str:
 def fmt_value(p: Param | None, v) -> str:
     if p is not None and p.type in ("text", "choice", "image"):
         s = str(v)
-        return s if s and " " not in s and "=" not in s else json.dumps(s)
+        if s and re.fullmatch(r"[\w@%+:,./-]+", s):
+            return s
+        # text from the request goes on a command line: a shell must read it back as the literal text,
+        # so text with a character the shell acts on inside double quotes is single quoted
+        return json.dumps(s) if not re.search(r"[$`\\\"!]", s) and s.isprintable() else shlex.quote(s)
     return fmt_num(v)
 
 

@@ -68,13 +68,15 @@ def _shorten(line: str, n: int = 160) -> str:
     return line if len(line) <= n else line[: n - 3] + "..."
 
 
-def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path) -> ScadRun:
+def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path, defines: dict[str, str] | None = None) -> ScadRun:
     """Build the recipe to <out_stl>.off (OpenSCAD's exact mesh) and <out_stl>: that mesh rebuilt as a
     float32 2-manifold (clean.for_slicer), the file that is checked and shipped. Written straight
     from the OFF, float32 rounding can merge distinct vertices and leave non-manifold edges that a
-    slicer reports even though the float64 mesh was closed."""
+    slicer reports even though the float64 mesh was closed. `defines` (name -> OpenSCAD value) are
+    passed with -D after the params: a job's own products reach the catalog tables this way."""
     out_off = out_stl.with_suffix(".off")
-    cmd = _base_cmd(binary) + ["-o", str(out_off)] + d_flags(recipe, params) + [str(recipe.scad)]
+    extra = [a for k, v in (defines or {}).items() for a in ("-D", f"{k}={v}")]
+    cmd = _base_cmd(binary) + ["-o", str(out_off)] + d_flags(recipe, params) + extra + [str(recipe.scad)]
     try:
         proc = subprocess.run(
             cmd,

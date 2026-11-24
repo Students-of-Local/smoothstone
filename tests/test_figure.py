@@ -72,8 +72,8 @@ def test_build_without_photos_asks_for_find(jobenv, monkeypatch):
     stone("new", "A mini figure of Ada Lovelace, 80 mm tall")
     stone("set", "figure", "height=80")
     text, code, nxt = stone("build")
-    assert code == 1 and nxt == 'stone find "Ada Lovelace"'
-    assert stone("status")[2] == 'stone find "Ada Lovelace"'
+    assert code == 1 and nxt == "stone find 'Ada Lovelace'"
+    assert stone("status")[2] == "stone find 'Ada Lovelace'"
 
 
 def test_set_points_a_figure_without_photos_at_find(jobenv, monkeypatch):
@@ -81,7 +81,7 @@ def test_set_points_a_figure_without_photos_at_find(jobenv, monkeypatch):
     step less on a path that ran out of steps for the small model (evals/distill.py, f5 and f6)."""
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
     stone("new", "A mini figure of Ada Lovelace, 80 mm tall")
-    assert stone("set", "figure", "height=80")[2] == 'stone find "Ada Lovelace"'
+    assert stone("set", "figure", "height=80")[2] == "stone find 'Ada Lovelace'"
     stone("new", "A guard for a 92 mm fan")
     assert stone("set", "fan_guard", "size=92")[2] == "stone build"
 

@@ -11,6 +11,10 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 - If NEXT says ask the person, write that question as your reply, with no tool call, and stop.
   When the person answers, run: stone note "<their answer>", then run the NEXT line it prints.
 - If you lost track or your memory was cleared, run: stone status
+- A part for a product stone does not know: NEXT asks for its size (a round one: diameter and
+  height) and where the numbers come from. Ask exactly that; never guess a size. Never note the
+  question yourself. When the person answers, stone note their words exactly as written (never
+  convert or round a number), then run the stone product add line NEXT gives.
 - For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
 - If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. A FIX from stone colors: run only the NEXT line it gives, never stone build.
 - Stop when stone says the part is ready.

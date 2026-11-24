@@ -38,7 +38,9 @@ def test_it_stops_with_a_plain_question_and_goes_on_after_the_answer(jobenv, ope
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
     code, lines = _go(capsys, "go", "A cover for the cable hole in my desk.")
     assert code == 1 and any(ln.startswith("Needs you: ") for ln in lines), lines
-    assert "When that is done, run: stone go" in lines and lines[-1].startswith("NEXT: ask the person"), lines
+    # the answer must reach stone: stone note keeps it, then stone go goes on (PR 76 review)
+    assert 'When you have the answer, run: stone note "<your answer>", then stone go' in lines, lines
+    assert lines[-1].startswith("NEXT: ask the person"), lines
     cli.run(["note", "It is a round hole, 60 mm across."])
     capsys.readouterr()
     code, lines = _go(capsys, "go")
@@ -170,3 +172,13 @@ def test_job_given_as_one_word_reaches_every_step():
 
     go(["--job=elsewhere", "a part"], run, say=lambda s: None, hooks={})
     assert seen == [["new", "a part", "--job=elsewhere"]]
+
+
+def test_a_product_stone_does_not_know_stops_with_the_question_and_the_note(jobenv, monkeypatch, capsys):
+    """PR 76 review: stone go stops on the person's question, never on a stone note line to fill in."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    code, lines = _go(capsys, "go", "an under desk mount for my Mac Studio (2025)")
+    assert code == 1 and lines[-1].startswith("NEXT: ask the person: Mac Studio (2025)'s width"), lines
+    assert "Needs you: Mac Studio (2025)'s width, depth and height in mm" in "\n".join(lines), lines
+    assert 'When you have the answer, run: stone note "<your answer>", then stone go' in lines, lines
+    assert not any("with it filled in" in ln for ln in lines), lines

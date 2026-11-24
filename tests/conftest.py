@@ -17,6 +17,16 @@ def no_user_config(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("STONE_FACES", "0")
 
 
+@pytest.fixture(autouse=True)
+def shipped_catalog_after():
+    """stone makes each command's job the current one, with its own products in the catalog
+    (catalog.use_job): the next test starts from the shipped catalog."""
+    yield
+    from smoothstone import catalog
+
+    catalog.use_job(None)
+
+
 @pytest.fixture
 def openscad():
     binary = config.find_openscad()
