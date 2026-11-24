@@ -1,8 +1,8 @@
 """stone heat: will the part keep its shape where it lives, and will it warp on the bed.
 
 Service temperatures, stiffness retention curves, HDT, Tg, CTE and shrink come from
-recipes/lib/refs/materials.json. With a load, the part is solved again (stone strength's model) at the
-softened stiffness and strength. Modeling choices are marked "assumption".
+recipes/lib/refs/materials.json. With a load, the part is solved at room temperature (stone
+strength's model) and scaled to the softened stiffness and strength. Modeling choices are marked "assumption".
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def clamped_stress(name: str, alpha: float, t0: float, t1: float) -> float:
     return float(np.sum((es[1:] + es[:-1]) / 2 * np.diff(ts)) * alpha)
 
 
-def warp(name: str, mesh, enclosed: bool, bed: float | None, temp: float | None = None) -> dict:
+def warp(name: str, mesh, enclosed: bool, bed: float | None) -> dict:
     """Corner lift risk of the worst first-layer piece: shrink x its longest extent, raised for a thin contact,
     a cold bed, an open printer for a material that wants an enclosure, and nylon's crystals."""
     p = reftool.props(name)
@@ -118,7 +118,8 @@ def warp(name: str, mesh, enclosed: bool, bed: float | None, temp: float | None 
     if thin:
         why.append("a thin first layer for its length")
     bed_range = p.get("bed", {}).get("value")
-    if bed is not None and isinstance(bed_range, list) and bed < bed_range[0]:
+    cold = bed is not None and isinstance(bed_range, list) and bed < bed_range[0]
+    if cold:
         level, why = level + 1, why + [f"bed {bed:g} C, under the {bed_range[0]}-{bed_range[1]} C {name} wants"]
     enc = str(p.get("enclosure", {}).get("value", ""))
     if not enclosed and re.match(r"(needed|required)", enc):
@@ -126,11 +127,10 @@ def warp(name: str, mesh, enclosed: bool, bed: float | None, temp: float | None 
     if name == "PA":
         level, why = level + 1, why + ["nylon shrinks more as it crystallizes"]
     level = min(level, 2)
-    less = [m for m in ("PLA", "PETG") if reftool.props(m)["shrink"]["value"] < shrink
-            and (temp is None or reftool.props(m)["hdt_045"]["value"] - temp >= CREEP_BAND)]
     fix = ["none needed", "add a 5 mm brim and round sharp corners on the bed",
-           "brim and glue on the bed" + ("" if enclosed else ", and an enclosure")
-           + (f", or {' or '.join(less)}, which shrinks less" if less else "")][level]
+           "brim and glue on the bed" + ("" if enclosed else ", and an enclosure")][level]
+    if cold:
+        fix = f"bed at {bed_range[0]}-{bed_range[1]} C" + ("" if level == 0 else f", and {fix}")
     return out | {"level": ["low", "medium", "high"][level], "lift_mm": round(lift, 2), "why": why, "fix": fix}
 
 
@@ -200,23 +200,26 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     named = next((r for r in rest if r.lower().endswith(".stl")), None)
     extra = [r for r in rest if r != named]
     if extra:
-        bad += strength.parse(extra)[2]
+        told = any(e.partition("=")[0].lower() in strength.HELP for e in extra)  # else a typo, not a load
+        bad += [b for b in strength.parse(extra)[2] if told or not b.startswith("load:")]
     need = dict.fromkeys(k for k in (re.match(r"\w*", b)[0].lower() for b in bad) if k in HELP | strength.HELP)
 
-    def again(*ask: str) -> str:
-        """This command with these words left for whoever fills them in; every other word stays as typed."""
-        kept = [i for i in items if i.partition("=")[0].lower() not in ask and ("=" in i or i == named)]
-        return " ".join(["stone heat", *map(shlex.quote, kept), *(f"{k}=<{(HELP | strength.HELP)[k]}>" for k in ask)])
+    def again(*ask: str, words: list[str] = (), file: str | None = named) -> str:
+        """This command with these words left for whoever fills them in; every other known word stays as typed."""
+        known = [i for i in [*items, *words] if "=" in i and i.partition("=")[0].lower() in {*HELP, *strength.HELP} - {*ask}]
+        kept = ([shlex.quote(file) if file == named else file] if file else []) + [shlex.quote(i) for i in known]
+        return " ".join(["stone heat", *kept, *(f"{k}=<{(HELP | strength.HELP)[k]}>" for k in ask)])
 
     if bad:
         out.fix("; ".join(bad))
-        out.next = ("ask the person: where does the part live? Then: " if "where" in need else "") + again(*need)
+        q = "where does the part live?" if "where" in need else f"what is right for {', '.join(need)}?" if need else ""
+        out.next = (f"ask the person: {q} Then: " if q else "") + again(*need)
         return
     temp, words, ref = where
     f = Path(named).expanduser().resolve() if named else job.build_dir / "part.stl"
     if not f.is_file():
         out.fix(f"no file at {f}" if named else "no built part yet; build first or name an STL file")
-        out.next = f"ask the person: where is the STL? Then: {again()}" if named else "stone build"
+        out.next = f"ask the person: where is the STL? Then: {again(file='<the STL file>')}" if named else "stone build"
         return
     own = job.exists() and f.resolve() == (job.build_dir / "part.stl").resolve()  # the job's part, not another file
     pick = reftool.strength_material(plan_material) if own else ""
@@ -251,15 +254,15 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     else:
         src = "enclosed= given"
     res = st = load = None
-    cure = _cure(name, temp)  # a plastic that takes it
-    redo = ""  # a load that has to be told another way
+    cure = plain = _cure(name, temp)  # a plastic that takes the heat
+    redo = weak = ""  # a load that has to be told another way; a part too weak even cold
     if case_words:
-        case = strength.parse(case_words)[0]
+        case, given = strength.parse(case_words)[0], [] if extra else [w for w in case_words if not w.startswith("material=")]
         problem = ""
         if not mesh.is_watertight:
-            problem, redo = f"{f.name} is not a closed shape", f"is there a closed STL of it? Then: {again()}"
+            problem, redo = f"{f.name} is not a closed shape", f"is there a closed STL of it? Then: {again(words=given, file='<the STL file>')}"
         elif keep[0] is None:
-            problem, redo = f"no softening curve for {name}", f"which plastic instead? Then: {again('material')}"
+            problem, redo = f"no softening curve for {name}", f"which plastic instead? Then: {again('material', words=given)}"
         if not problem:
             st, res = strength.solve(mesh, case, strength.material(name), case.voxels)  # at room temperature; the rest scales
             if res and res.thin and not case.voxels:
@@ -271,27 +274,29 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
             cure = None
             if st is not None:
                 redo = (f"what holds the part still ({strength.HELP['fixed']}), and where does the load go? "
-                        f"Then: {again('at', 'fixed')}")
+                        f"Then: {again('at', 'fixed', words=given)}")
             lines.append(f"Load not checked: {problem}.")
         else:
             cold, (sf, mode) = abs(res.deflection), _moved(res, name, name, temp)
-            hot = cold / max(keep[0], 1e-9)
+            hot, room = cold / max(keep[0], 1e-9), _moved(res, name, name, ROOM)[0]
             how = ("it will bend too far" if mode == "sag" else "it will fail") if sf < 1 else (
                 "not sure, part of it is too thin for this model" if res.thin else
                 ("it bends close to its limit" if mode == "sag" else "little margin") if sf < strength.FINE else "fine")
             cap = max(1.0, 0.1 * st.lever)  # past a tenth of the lever a linear model only says "a lot"
-            given = "" if extra else " (the load from the last stone strength)"
-            lines.append(f"Load {case.load:.0f} N{given}: deflection {cold:.2f} mm at room temperature -> "
+            last = "" if extra else " (the load from the last stone strength)"
+            lines.append(f"Load {case.load:g} N{last}: deflection {cold:.2f} mm at room temperature -> "
                          + (f"{hot:.2f} mm" if hot <= cap else f"more than {cap:.0f} mm") + f" at {temp:g} C (limit {res.limit:.1f} mm), "
-                         + (f"safety factor {sf:.1f}" if sf >= 0.1 else "safety factor under 0.1") + f", {how}.")
+                         + f"safety factor {room:.1f} -> " + (f"{sf:.1f}" if sf >= 0.1 else "under 0.1") + f", {how}.")
             load = {"words": case_words, "deflection_room_mm": round(cold, 3), "deflection_hot_mm": round(hot, 3),
-                    "safety_factor_hot": sf, "fails_by": mode}
+                    "safety_factor_room": room, "safety_factor_hot": sf, "fails_by": mode}
             cure = None if res.thin else _cure(name, temp, res)
             if res.thin or sf < strength.FINE:
-                flag = "too hot" if sf < 1 else ("close" if flag == "fine" else flag)
                 if margin > 0:
-                    why = (f"the {case.load:.0f} N load leaves a safety factor of {sf:.1f} there ({strength.FINE:g} is fine)"
-                           if sf < strength.FINE else f"part of it is too thin for this model to judge the {case.load:.0f} N load")
+                    if room < strength.FINE:
+                        weak = f", {room:.1f} even at room temperature"
+                    flag = ("too weak" if room < 1 else "too hot") if sf < 1 else "close"
+                    why = (f"the {case.load:g} N load leaves a safety factor of {sf:.1f} there{weak} ({strength.FINE:g} is fine)"
+                           if sf < strength.FINE else f"part of it is too thin for this model to judge the {case.load:g} N load")
             if flag != "fine" and cure:
                 lines.append(f"{cure} there: safety factor {_moved(res, name, cure, temp)[0]:.1f}, fine.")
         if 0 < margin < CREEP_BAND:
@@ -299,27 +304,28 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     alpha = float(p["cte"]["value"]) * 1e-6
     longest = float(np.max(mesh.bounds[1] - mesh.bounds[0]))
     grow = alpha * (temp - ROOM) * longest
-    clamp = abs(clamped_stress(name, alpha, ROOM, temp))
-    k = 1.0 if keep[1] is None else keep[1]
-    share = f", {clamp / (float(p['tensile_xy']['value']) * k):.0%} of its strength there" if k >= 0.1 else "; this soft it bends instead"
-    lines.append(f"Expansion: it {'grows' if grow >= 0 else 'shrinks'} {abs(grow):.2f} mm over its {longest:.0f} mm; held tight at "
-                 f"both ends it {'pushes' if grow >= 0 else 'pulls'} with {clamp:.1f} MPa{share}.")
-    risk = warp(name, mesh, enclosed, bed, temp)
+    clamp, k = None if keep[1] is None else abs(clamped_stress(name, alpha, ROOM, temp)), keep[1]  # no curve, no stress
+    held = "" if k is None else (f"; held tight at both ends it {'pushes' if grow >= 0 else 'pulls'} with {clamp:.1f} MPa" + (
+        f", {clamp / (float(p['tensile_xy']['value']) * k):.0%} of its strength there" if k >= 0.1 else "; this soft it bends instead"))
+    lines.append(f"Expansion: it {'grows' if grow >= 0 else 'shrinks'} {abs(grow):.2f} mm over its {longest:.0f} mm{held}.")
+    risk = warp(name, mesh, enclosed, bed)
     lines.append(f"Warp risk on the bed: {risk['level']} ({'; '.join(risk['why'])}). Fix: {risk['fix']}.")
     write_json(bd / "heat.json", {
         "file": str(f), "where": words, "temp_c": temp, "temp_ref": ref, "material": name, "softens_c": soft, "softens_test": test,
         "tg_c": tg, "verdict": flag, "retention": keep[0], "strength_left": keep[1], "growth_mm": round(grow, 3),
-        "clamped_stress_mpa": round(clamp, 2), "cure": cure,
-        "load": load,
+        "clamped_stress_mpa": clamp and round(clamp, 2), "cure": cure, "load": load,
         "warp_risk": risk | {"enclosed_from": src}, "assumptions": ASSUMPTIONS})
     out.add(f"Part: {f.name}, {name}.", *lines)
     out.result = f"heat: {flag} at {temp:g} C in {name}"
     nxt = (job.status().get("next") or "stone status") if own else "none, the part takes the heat"
     if flag != "fine":
-        ask = redo or "a cooler spot, or a stiffer part?"
         if cure:
-            new = warp(cure, mesh, enclosed, None, temp)
+            new = warp(cure, mesh, enclosed, None)
             ask = f"print it in {cure}?" + (f" It is likely to warp: {new['fix']}." if new["level"] == "high" else "")
+        elif margin <= 0:  # no shape of this plastic holds there
+            ask = "a cooler spot" + (f", or a part in {plain} strong enough for the load (not checked)" if plain else "") + "?"
+        else:
+            ask = redo or ("a stiffer part, or less load?" if weak else "a cooler spot, or a stiffer part?" if case_words else "a cooler spot?")
         out.next = f"ask the person: {words} reaches {temp:g} C, {why}; {ask}"
     elif risk["level"] == "high":
         out.next = f"ask the person: it is likely to warp on the bed ({risk['why'][0]}); can you print it with {risk['fix']}? If so: {nxt}"

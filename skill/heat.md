@@ -12,7 +12,7 @@ stone heat where=car
 
 `where=` is `car` (a dashboard in summer sun, 85 C), `sun` (dark surfaces in full sun, 70 C),
 `dishwasher` (75 C), `outdoor` (hot summer shade, 41.5 C), or a temperature like `where=60C`.
-Each is from a measured source; `stone refs service` shows them.
+The named spots are sourced; `stone refs service` shows them. The sun's 70 C is a floor.
 
 If `stone strength` ran first on this part, its load is used again. To give one here, add the same words:
 `load=20N at=tip dir=down fixed=bottom`.
@@ -24,11 +24,11 @@ case (else the printer `stone printer` set, or open), `bed=60` (bed temperature,
 
 - Softens at: the HDT, where the plastic bends under a light load. Past it, the part deforms.
 - Keeps N% of its stiffness: what the plastic has left there, and the share of its strength stone counts on.
-- Load: the deflection at room temperature and when hot, and the safety factor there. 2 or more is fine.
+- Load: the deflection and the safety factor, at room temperature and when hot. 2 or more is fine.
 - Load not checked: the reason. NEXT asks for what is missing; don't call the part fine.
 - Creep: within 20 C of the HDT, a load held for days slowly bends the part.
 - Expansion: how much the part grows or shrinks, and the stress if held tight at both ends.
-- Warp risk: low, medium or high, with the fix (brim, enclosure, or another material).
+- Warp risk: low, medium or high, with the fix (bed temperature, brim, enclosure).
 
 When it is fine, NEXT goes on with the job. When it is not, NEXT asks the person: a material that
 takes the heat and holds the load, a cooler spot, or a stiffer part. A high warp risk also makes NEXT
@@ -43,7 +43,7 @@ $ stone heat where=outdoor
 Part: part.stl, PLA.
 Hot summer shade: 41.5 C. PLA softens at 55 C (HDT at 0.45 MPa), glass at 61 C: 13.5 C to spare.
 At 41.5 C PLA keeps about 90% of its stiffness; stone counts on 51% of its strength.
-Load 20 N (the load from the last stone strength): deflection 1.14 mm at room temperature -> 1.27 mm at 41.5 C (limit 2.3 mm), safety factor 1.1, little margin.
+Load 20 N (the load from the last stone strength): deflection 1.14 mm at room temperature -> 1.27 mm at 41.5 C (limit 2.3 mm), safety factor 2.0 -> 1.1, little margin.
 Creep: within 20 C of its HDT a load held for days slowly bends it (rule of thumb).
 Expansion: it grows 0.14 mm over its 77 mm; held tight at both ends it pushes with 4.4 MPa, 25% of its strength there.
 Warp risk on the bed: low (0.28 mm corner lift from 0.35% shrink over 80 mm). Fix: none needed.

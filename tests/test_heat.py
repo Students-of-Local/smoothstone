@@ -49,17 +49,6 @@ def test_clamped_expansion_stress_is_e_alpha_dt_for_a_bar():
     assert heat.clamped_stress("PLA", alpha, 23, 60) < e * alpha * 37  # softening relieves it
 
 
-def test_softened_part_bends_as_one_over_its_retention():
-    bar = trimesh.creation.box(extents=[60, 8, 8])
-    case = strength.parse(["load=5N", "at=right", "dir=down", "fixed=left"])[0]
-    p = strength.material("PETG")
-    r = heat.retention("PETG", 50)
-    hot = strength.Props("PETG", p.e_xy * r, p.e_z * r, p.s_xy * r, p.s_z * r, p.exponent)
-    cold_d = strength.solve(bar, case, p, 8_000)[1].deflection
-    hot_d = strength.solve(bar, case, hot, 8_000)[1].deflection
-    assert hot_d * r == pytest.approx(cold_d, rel=1e-4)
-
-
 def test_warp_risk_grows_with_length_and_falls_in_an_enclosure():
     long_abs = trimesh.creation.box(extents=[200, 20, 5])
     small = trimesh.creation.box(extents=[20, 20, 5])
@@ -103,8 +92,15 @@ def test_stone_heat_resolves_a_load(jobenv, monkeypatch):
     for word, kept in (("load=heavy", "where=40C"), ("bed=hot", "where=40C"), ("where=lava", "material=PC")):
         text, code, nxt = stone("heat", str(jobenv / "bar.stl"), "where=40C", "material=PC", word)
         assert code == 1 and f"FIX: {word}" in text and kept in nxt and f"{word.split('=')[0]}=<" in nxt, (text, nxt)
+        assert nxt.startswith("ask the person: "), nxt
     text, code, nxt = stone("heat", str(jobenv / "typo.stl"), "where=car")
-    assert code == 1 and "no file at" in text and "where is the STL?" in nxt and "where=car" in nxt, (text, nxt)
+    assert code == 1 and "no file at" in text and "where is the STL? Then: stone heat <the STL file> where=car" in nxt, (text, nxt)
+    text, code, nxt = stone("heat", str(jobenv / "bar.stl"), "where=car", "temp=85C")
+    assert code == 1 and "temp: not a strength word" in text and nxt == f"stone heat {jobenv / 'bar.stl'} where=car", (text, nxt)
+    open_bar = trimesh.creation.box(extents=[60, 8, 8])
+    trimesh.Trimesh(open_bar.vertices, open_bar.faces[2:]).export(jobenv / "open.stl")
+    nxt = stone("heat", str(jobenv / "open.stl"), "where=40C", "material=PC", "load=5N", *held)[2]
+    assert "a closed STL of it? Then: stone heat <the STL file> where=40C" in nxt and "load=5N" in nxt and "open.stl" not in nxt.partition("Then:")[2], nxt
 
 
 def test_the_other_plastic_it_names_holds_the_load_there(jobenv, monkeypatch):
@@ -117,8 +113,8 @@ def test_the_other_plastic_it_names_holds_the_load_there(jobenv, monkeypatch):
     r, k = heat.retention("PLA", 50), heat.strength_left("PLA", 50)
     assert k < r and mode != "sag"  # 50 C is most of the way from 23 to its glass temperature
     b = strength.material("PLA")
-    soft = strength.Props("PLA", b.e_xy * r, b.e_z * r, b.s_xy * k, b.s_z * k, b.exponent)
-    solved = strength.solve(bar, case, soft, 8_000)[1]
+    solved = strength.solve(bar, case, heat.softened("PLA", 50), 8_000)[1]
+    assert solved.deflection * r == pytest.approx(res.deflection, rel=1e-4)
     assert one == pytest.approx(solved.sf, abs=0.2) and mode == solved.mode  # scaling is what a new solve gives
     for load in (one / 2, one * 8):
         res = strength.solve(bar, strength.parse([f"load={load}N", *("at=right", "dir=down", "fixed=left")])[0], b, 8_000)[1]
@@ -132,6 +128,13 @@ def test_the_other_plastic_it_names_holds_the_load_there(jobenv, monkeypatch):
     d = json.loads((jobenv / "heat.json").read_text())
     assert d["load"]["deflection_room_mm"] < 2.5 < d["load"]["deflection_hot_mm"] and d["verdict"] == "too hot" and "it will bend too far" in text, text
     assert nxt.startswith("ask the person: ") and "load leaves a safety factor" in nxt, nxt
+    long.export(jobenv / "hot.stl")  # past its glass temperature no shape of PLA holds: never a stiffer part of the same
+    held = ("at=right", "dir=down", "fixed=left")
+    nxt = stone("heat", str(jobenv / "hot.stl"), "where=car", "material=PLA", "load=200N", *held)[2]
+    assert "a cooler spot, or a part in PC strong enough for the load (not checked)?" in nxt and "stiffer" not in nxt, nxt
+    text, code, nxt = stone("heat", str(jobenv / "hot.stl"), "where=23C", "material=PLA", "load=200N", *held)
+    assert "even at room temperature" in nxt and "cooler" not in nxt and nxt.endswith("a stiffer part, or less load?"), (text, nxt)
+    assert json.loads((jobenv / "heat.json").read_text())["verdict"] == "too weak"
 
 
 def test_tpu_is_judged_by_its_vicat_and_its_load_is_not_waved_through(jobenv):
@@ -141,16 +144,20 @@ def test_tpu_is_judged_by_its_vicat_and_its_load_is_not_waved_through(jobenv):
         assert json.loads((jobenv / "heat.json").read_text())["verdict"] == want, text
     text, code, nxt = stone("heat", str(jobenv / "pad.stl"), "where=40C", "material=TPU", "load=5N", "at=right", "fixed=left")
     assert "Load not checked: no softening curve for TPU" in text and nxt.startswith("ask the person: "), (text, nxt)
+    assert "MPa" not in next(ln for ln in text.splitlines() if ln.startswith("Expansion")), text  # no curve, no stress
 
 
-def test_the_warp_fix_never_names_a_plastic_the_spot_would_soften(jobenv):
+def test_the_warp_fix_never_names_a_plastic(jobenv):
+    """It knows neither the load nor the spot, so a plastic it named could be one that fails there."""
+    strength_names = ("PLA", "PETG", "ABS", "ASA", "PC", "PA")
     trimesh.creation.box(extents=[200, 20, 5]).export(jobenv / "bar.stl")
     text, code, nxt = stone("heat", str(jobenv / "bar.stl"), "where=60C", "material=ABS")
     warp = next(ln for ln in text.splitlines() if ln.startswith("Warp risk"))
-    assert "high" in warp and "PLA" not in warp and "PETG" not in warp and "enclosure" in warp, warp
+    assert "high" in warp and "enclosure" in warp and not any(m in warp.partition("Fix:")[2] for m in strength_names), warp
     assert nxt.startswith("ask the person: it is likely to warp") and "If so: " in nxt, nxt  # fine in the heat, still not waved on
-    bar = trimesh.creation.box(extents=[200, 20, 5])
-    assert "PLA or PETG" in heat.warp("ABS", bar, False, None, 30)["fix"] and "an enclosure" not in heat.warp("PLA", trimesh.creation.box(extents=[350, 40, 5]), True, None)["fix"]
+    assert "an enclosure" not in heat.warp("PLA", trimesh.creation.box(extents=[350, 40, 5]), True, None)["fix"]
+    text, code, nxt = stone("heat", str(jobenv / "bar.stl"), "where=120C", "material=ABS")  # nothing stands 120 C
+    assert nxt.endswith("; a cooler spot?"), nxt
     two = trimesh.util.concatenate([trimesh.creation.box(extents=[20, 20, 5]).apply_translation([x, 0, 0]) for x in (-90, 90)])
     assert heat.warp("PLA", two, False, None)["level"] == "low"  # two small pieces, not one 200 mm one
 
@@ -158,6 +165,7 @@ def test_the_warp_fix_never_names_a_plastic_the_spot_would_soften(jobenv):
 def test_warp_bumps_for_a_cold_bed_a_thin_contact_and_nylon():
     small, thin = trimesh.creation.box(extents=[60, 60, 5]), trimesh.creation.box(extents=[100, 3, 5])
     assert heat.warp("PLA", small, True, 60)["level"] == "low" and heat.warp("PLA", small, True, 20)["level"] == "medium"
+    assert heat.warp("PLA", small, True, 20)["fix"].startswith("bed at ")
     assert "thin first layer" in " ".join(heat.warp("PLA", thin, True, None)["why"])
     assert "nylon" in " ".join(heat.warp("PA", small, True, None)["why"])
     assert "needed" in " ".join(heat.warp("ABS", small, False, None)["why"])
@@ -185,6 +193,13 @@ def test_the_job_keeps_its_load_and_its_plastic(jobenv, monkeypatch):
     out = cli.Out()
     heat.report(job, ["where=40C"], out, "PETG")
     assert "(the load from the last stone strength)" in " ".join(out.lines) and "part.stl, PETG" in " ".join(out.lines), out.lines
+    strength.report(job, ["load=5N", "at=right", "dir=down", "fixed=left", "material=PLA"], cli.Out(), "PETG")
+    d = json.loads((job.build_dir / "strength.json").read_text())
+    d["inputs"]["words"]["at"] = "left"  # on the held place now
+    (job.build_dir / "strength.json").write_text(json.dumps(d))
+    out = cli.Out()
+    heat.report(job, ["where=40C"], out, "PETG")
+    assert "where=40C load=5N dir=down at=<" in out.next and "fixed=<" in out.next, out.next  # the saved load is not lost
     trimesh.creation.box(extents=[30, 30, 30]).export(jobenv / "other.stl")
     out = cli.Out()
     heat.report(job, ["other.stl", "where=40C"], out, "PETG")

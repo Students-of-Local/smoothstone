@@ -2605,7 +2605,7 @@
    "key": "service_temp",
    "value": 70,
    "unit": "C",
-   "note": "Dark surfaces in full summer sun. A light-colored part runs cooler.",
+   "note": "Dark surfaces in full summer sun. A light-colored part runs cooler. The source says over 70 C, so this is a floor.",
    "quote": "Using satellite imagery and infrared cameras, the City discovered that rubber mats under playground equipment reached over 70°C",
    "source": "Reimagining spaces where children play: developing guidance for thermally comfortable playgrounds in Canada, Canadian Journal of Public Health 2021, 112(4), 706-713",
    "cite": "Can J Public Health 2021 112:706 hot playgrounds",
