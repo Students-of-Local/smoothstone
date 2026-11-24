@@ -1210,6 +1210,13 @@ def cmd_slice(args, job: Job) -> Out:
     return out
 
 
+def cmd_supports(args, job: Job) -> Out:
+    """Whether the part needs supports, where and why, before it prints (supports.py)."""
+    from . import supports
+
+    return supports.cmd(args, job, Out(owns_next=False))
+
+
 # image
 
 
@@ -2563,6 +2570,11 @@ def make_parser() -> Parser:
     s.add_argument("--nozzle", type=float, default=0.4, help="nozzle width, mm")
     s.add_argument("--json", action="store_true", help="the full report as JSON")
 
+    s = sub.add_parser("supports", parents=[common], help="does the part need supports, where and why")
+    s.add_argument("file", nargs="?")
+    s.add_argument("--layer", type=float, default=0.2, help="layer height, mm")
+    s.add_argument("--material", help="PLA, PETG...; default: the job's material")
+
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
 
@@ -2616,6 +2628,7 @@ COMMANDS = {
     "build": cmd_build,
     "check": cmd_check,
     "slice": cmd_slice,
+    "supports": cmd_supports,
     "image": cmd_image,
     "measure": cmd_measure,
     "find": cmd_find,
@@ -2677,7 +2690,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "usage", "error")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "usage", "error", "supports")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import config
 
-FILES = ("filament", "standards", "design")
+FILES = ("filament", "standards", "design", "slicer")
 
 
 def refs_dir() -> Path:
