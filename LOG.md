@@ -717,3 +717,36 @@ Open:
 - A run spends 3 of its 10 steps before the first take, so it tries at most 3 or 4 models.
 - The Printables API is undocumented and may change; the search fails softly with a FIX line. The
   Sketchfab path is untested here: no key was set.
+
+## 2026-11-24 models 2: thin walls measured, supports, cuts only where the bed is too small
+
+What changed (11d596b), as the lead decided after models 1:
+- A found model's min_wall is measured, not a bar: a part fails only when over 1.5% of its volume is
+  under one nozzle line, or when what the slicer drops cuts a piece loose. The 1.5% comes from models
+  people print: the Taj, St. Basil's and Notre-Dame picks sit at 0.03 to 0.10%, and the most made
+  Eiffel model (180 makes) at 0.89%. The report names the remedy: print bigger, a 0.2 mm nozzle, or resin.
+  Recipes and engineering parts keep the 0.8 mm bar and the overhang limit.
+- Overhangs and pieces in the air print on supports; the build reports the grams and hours of support.
+- Splits cut in z first and across only where the footprint is wider than the bed, at the smallest
+  section away from spires, and every part is laid flat.
+- A clear lead in the ranking is taken without a question.
+
+`--driver next`, seed 1, on 11d596b, judged blind against the Wikipedia lead photo:
+
+| spec | result | judge | what the judge marked down |
+| --- | --- | --- | --- |
+| m01_cologne | PASS | 8 | west spires, tower proportion, west facade |
+| m02_notre_dame | PASS | 9 | transept rose windows |
+| m03_sagrada | PASS (take 2) | 8 | facade bell towers, overall massing |
+| m04_eiffel | PASS | 9 | top antenna, lattice and arch detail |
+| m05_taj_mahal | PASS | 9 | main dome, plinth |
+| m06_st_basils | PASS | 9 | domes, bell tower |
+
+6 of 6, up from 2 of 6. Unchanged: `--driver next` on evals/engineering e01 to e10, 10 of 10.
+
+Also found this round: two sessions on Parish1 were killed by systemd-oomd while the suite ran with
+`-n auto` beside these evals, and /tmp there is RAM. Heavy jobs now go through `scripts/heavy` (#81),
+and video frames are packed (#98).
+
+Open: the held-out six stay sealed until the build path (`stone landmark`) is graded too; LFM3-1.7B
+has not driven a landmark run yet.
