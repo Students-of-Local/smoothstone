@@ -1,13 +1,15 @@
 """Build a recipe's defaults and every example through the real `stone` CLI, then tile the previews.
 
-uv run python tools/sheet.py <recipe> [<recipe> ...] [--out DIR]
+uv run python tools/sheet.py <recipe> [<recipe> ...] [--out DIR] [--jobs N]
 
-Prints one line per build (PASS or the FIX lines) and writes DIR/<recipe>.png.
+Prints one line per build (PASS or the FIX lines), N builds at a time (default 1), and writes DIR/<recipe>.png.
 """
+import argparse
 import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -31,24 +33,32 @@ def build(recipe, name, params, out):
         rc, txt = run(job, "build")
     bad = [l for l in txt.splitlines() if l.startswith(("FIX", "ERROR")) or "ERROR" in l]
     size = next((l for l in txt.splitlines() if l.startswith("Size:")), "")
-    print(f"{recipe:16s} {name:16s} {'PASS' if rc == 0 else 'FAIL'}  {size}  {' | '.join(bad)[:200]}")
+    print(f"{recipe:16s} {name:16s} {'PASS' if rc == 0 else 'FAIL'}  {size}  {' | '.join(bad)[:200]}", flush=True)
     png = job / "build" / "preview.png"
     return name, (png if png.exists() else None), rc == 0
 
 
 def main():
-    args = sys.argv[1:]
-    out = Path(args[args.index("--out") + 1]) if "--out" in args else ROOT / "build" / "sheets"
-    recipes = [a for i, a in enumerate(args) if a != "--out" and (i == 0 or args[i - 1] != "--out")]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("recipes", nargs="+")
+    ap.add_argument("--out", type=Path, default=ROOT / "build" / "sheets")
+    ap.add_argument("--jobs", type=int, default=1)
+    args = ap.parse_args()
+    recipes, out = args.recipes, args.out
     if recipes == ["all"]:
         recipes = sorted(p.name for p in RECIPES.iterdir() if (p / "recipe.json").exists() and not p.name.startswith("_"))
     out.mkdir(parents=True, exist_ok=True)
     failed = 0
+    pool = ThreadPoolExecutor(args.jobs)  # each build is its own stone process and job folder
+    building = []
     for r in recipes:
         meta = json.loads((RECIPES / r / "recipe.json").read_text())
         needs_image = any(p.get("required") for p in meta["params"] if p["type"] == "image")
-        shots = ([] if needs_image else [build(r, "defaults", {}, out)]) + [build(r, e["name"], {**e["params"], **({"_image": e["image"]} if e.get("image") else {})}, out)
-                                              for e in meta.get("examples", [])]
+        todo = ([] if needs_image else [("defaults", {})]) + [
+            (e["name"], {**e["params"], **({"_image": e["image"]} if e.get("image") else {})}) for e in meta.get("examples", [])]
+        building.append((r, [pool.submit(build, r, name, params, out) for name, params in todo]))
+    for r, waits in building:
+        shots = [w.result() for w in waits]
         failed += sum(1 for s in shots if not s[2])
         if not shots:
             print(f"{r:16s} skipped: needs a photo and has no example (tests cover it)")

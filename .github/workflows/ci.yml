@@ -80,7 +80,7 @@ jobs:
         run: uv sync
 
       - name: Every recipe and example builds and passes the print checks
-        run: xvfb-run -a uv run python tools/sheet.py all --out "$RUNNER_TEMP/sheet"
+        run: xvfb-run -a uv run python tools/sheet.py all --jobs 4 --out "$RUNNER_TEMP/sheet"
 
       - name: The NEXT lines alone finish every tuning task
         run: |
