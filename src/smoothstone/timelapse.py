@@ -69,8 +69,8 @@ def camera_shift(prof: dict, fr: dict, parked: bool) -> list[float]:
     """How far the still camera is from its pose, in the bed's frame, at this frame. The pose is for a bed with
     the nozzle at z 0 (or, on a bed-slinger, at the bed's middle y)."""
     axis = bed_axis(prof)
-    if axis == "z":
-        return [0.0, 0.0, fr["z_mm"]]
+    if axis == "z":  # the nozzle's own height, so a z-hop moves the bed and not the head
+        return [0.0, 0.0, fr["z_mm"] if parked else fr["head"][2]]
     if axis == "y" and not parked:
         return [0.0, fr["head"][1] - prof["build_volume_mm"][1] / 2, 0.0]
     return [0.0, 0.0, 0.0]
@@ -85,14 +85,15 @@ def aspect(v) -> float:
 
 
 def camera(job, prof: dict) -> dict:
-    """The camera: a pose fit with --camera-from (the job's, then the machine's), else the profile's, else ANY_CAMERA."""
+    """The camera: the last pose fit with --camera-from (the job's or the machine's), else the profile's, else ANY_CAMERA."""
     cam = dict(prof.get("camera") or {})
-    for f in camera_files(job, prof):
-        if f.is_file():
-            try:
-                return {**cam, **json.loads(f.read_text()), "from": str(f)}
-            except ValueError as e:
-                raise ValueError(f"{f} is not a saved camera ({e}); fit it again or remove it") from e
+    kept = [f for f in camera_files(job, prof) if f.is_file()]
+    if kept:
+        f = max(kept, key=lambda f: f.stat().st_mtime_ns)
+        try:
+            return {**cam, **json.loads(f.read_text()), "from": str(f)}
+        except ValueError as e:
+            raise ValueError(f"{f} is not a saved camera ({e}); fit it again or remove it") from e
     if not (cam.get("pos_mm") and cam.get("look_at_mm") and cam.get("hfov_deg")):
         bx, by = prof["build_volume_mm"][:2]
         at = {k: [v[0] * bx, v[1] * by, v[2]] for k, v in ANY_CAMERA.items() if k != "hfov_deg"}
@@ -102,7 +103,7 @@ def camera(job, prof: dict) -> dict:
 
 
 def camera_files(job, prof: dict) -> list[Path]:
-    """Where a fitted camera for this printer is kept: the job, then the machine."""
+    """Where a fitted camera for this printer is kept: the job, the machine (--save-camera)."""
     return [d / f"camera-{prof['id']}.json" for d in (job.root, config.user_config_dir())]
 
 
@@ -255,7 +256,8 @@ def video(files: list[Path], mp4: Path, seconds: float | None) -> float:
     """h264 yuv420p mp4 of the frames, seconds long (default: FPS frames a second, at least MIN_SECONDS).
     Returns its length, s."""
     rate = len(files) / seconds if seconds else min(FPS, len(files) / MIN_SECONDS)
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", f"{rate:.6f}", "-i", str(files[0].parent / "f_%04d.png"),
+    frames_at = str(files[0].parent).replace("%", "%%")  # a % in a folder's name is not ffmpeg's pattern
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", f"{rate:.6f}", "-i", f"{frames_at}/f_%04d.png",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(FPS), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
                     "-movflags", "+faststart", str(mp4)], check=True, capture_output=True)
     return len(files) / rate
@@ -344,16 +346,17 @@ def parse_corners(text: str) -> list[tuple[float, float]]:
 # the command
 
 
-def color(job) -> tuple[str, tuple]:
-    """The filament color: slot 1 of stone.toml [filaments], white when the name is not a plain color."""
+def color(job) -> tuple[str, tuple, bool]:
+    """(name, rgb, whether stone.toml says so): slot 1 of its [filaments], white when the name is not a plain color."""
     from . import colors
 
-    name = (config.filaments(job.root if job.exists() else None) or ["white"])[0].lower()
+    root = job.root if job.exists() else None
+    name = (config.filaments(root) or ["white"])[0].lower()
     for word in name.replace("-", " ").split():
         word = colors.ALIASES.get(word, word)
         if word in colors.NAMES:
-            return word, colors.NAMES[word]
-    return "white", colors.NAMES["white"]
+            return word, colors.NAMES[word], bool(config._toml(root).get("filaments"))
+    return "white", colors.NAMES["white"], False
 
 
 def toolpath_from(args, job, prof):
@@ -398,14 +401,17 @@ def fit_from(args, job, prof, out):
 
     snap = Path(args.camera_from).expanduser().resolve()
     bed, axis = prof["build_volume_mm"], bed_axis(prof)
-    again = f'stone timelapse --camera-from {shlex.quote(str(snap))} --bed-corners "<x1,y1 x2,y2 x3,y3 x4,y4>"'
-    dests = camera_files(job, prof)[0 if job.exists() else 1:2 if args.save_camera else 1]
+    mine = f" --printer {shlex.quote(args.printer)}" if args.printer else ""
+    refit = (f'stone timelapse{mine} --camera-from {shlex.quote(str(snap))} --bed-corners "<x1,y1 x2,y2 x3,y3 x4,y4>"'
+             + ("" if args.snap_at is None else f" --snap-at {args.snap_at:g}"))
+    job_file, machine_file = camera_files(job, prof)
+    dest = machine_file if args.save_camera else job_file if job.exists() else None
     if prof.get("assumed"):
         out.fix("the fit needs this printer's bed size, and no printer is set")
         out.next = "ask the person: which printer is it? Then: stone printer set <id>, and run this again"
         return out
-    out.next = again + (" --save-camera" if args.save_camera or not dests else "")
-    if not args.bed_corners or not dests:
+    out.next = refit = refit + (" --save-camera" if args.save_camera or not dest else "")
+    if not args.bed_corners or not dest:
         out.fix('--camera-from needs the bed corners in pixels: front left, front right, back right, back left'
                 if not args.bed_corners else "no job here to keep the camera in; add --save-camera")
         return out
@@ -429,14 +435,16 @@ def fit_from(args, job, prof, out):
     profcam = prof.get("camera") or {}
     cam.update({"printer": prof["id"], "timelapse_mode": profcam.get("timelapse_mode", "fixed"),
                 "ir_night": profcam.get("ir_night", False), "source": f"fit to {snap.name}"})
-    for d in dests:
-        d.parent.mkdir(parents=True, exist_ok=True)
-        d.write_text(json.dumps(cam, indent=1))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    old = dest.with_suffix(".json.old")
+    if dest.is_file():
+        dest.replace(old)  # the person may say the new fit is wrong
+    dest.write_text(json.dumps(cam, indent=1))
     where = f"at the {side(cam, bed)} of the bed, {cam['pos_mm'][2]:.0f} mm above it"
     out.add(f"Camera fit to {snap.name}: corners land within {off:.1f} px, {cam['hfov_deg']:.0f} degrees wide, {where}.",
-            "Saved: " + ", ".join(str(d) for d in dests))
-    out.next = (f"ask the person: is the printer's camera {where}? If not, the corners started at the wrong one: run it again. "
-                "If so: stone timelapse")
+            f"Saved: {dest}" + (f" (the one before: {old.name})" if old.is_file() else ""))
+    out.next = (f"ask the person: is the printer's camera {where}? If so: stone timelapse{mine}. "
+                f"If not, the corners started at the wrong one: {refit}")
     return out
 
 
@@ -485,16 +493,15 @@ def cmd(args, job, out):
         return out
     try:
         tp, what, f = toolpath_from(args, job, prof)
-    except ValueError as e:
+    except (OSError, ValueError) as e:
         out.fix(str(e))
         out.next = "ask the person for another file: " + again(args) if args.file or args.gcode else "stone build"
         return out
     total = tp.total_s()
     est = f" (the slicer says {clock(tp.estimate_s)})" if tp.estimate_s else ""
-    cname, rgb = color(job)
-    named = bool(config._toml(job.root if job.exists() else None).get("filaments"))
+    cname, rgb, named = color(job)
     shade = f"{cname} filament" if named and not args.gcode else f"all drawn {cname}" + (
-        "; the G-code's own colors are not read" if args.gcode else ", no filament named")
+        "; the G-code's own colors are not read" if args.gcode else ", no filament color named")
     head = [f"Toolpaths: {what}.", f"Print time: {clock(total)}{est}, {len(tp.layer_z)} layers, {shade}."]
     no = missing()
     if no:
@@ -530,7 +537,7 @@ def cmd(args, job, out):
     js.write_text(json.dumps(data, indent=1))
     pname = prof.get("name") or prof.get("id")
     out.add(head[0], f"Printer: {pname}{' (none set; stone printer set <id>)' if prof.get('assumed') else ''}; camera "
-            + (f"from {Path(cam['from']).name}" if cam.get("from") else cam.get("assumption") or "pose from the profile"))
+            + (f"from {cam['from']}" if cam.get("from") else cam.get("assumption") or "pose from the profile"))
     out.add(head[1])
     out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s, {args.mode}{', night view' if args.night else ''})")
     out.add(f"Sheet: {png} ({min(SHEET, len(files))} frames)")

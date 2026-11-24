@@ -3405,7 +3405,7 @@ def make_parser() -> Parser:
     s.add_argument("--printer", help="printer profile id; default: the job's or the machine's")
     s.add_argument("--supports", choices=("auto", "on", "off"), default="auto")
     s.add_argument("--mode", choices=("per-layer", "realtime"), default="per-layer")
-    s.add_argument("--seconds", type=float, help="realtime video length, s")
+    s.add_argument("--seconds", type=float, help="the video's length, s")
     s.add_argument("--night", action="store_true", help="the infrared night view")
     s.add_argument("--camera-from", help="a snapshot from the printer's camera, to fit its pose")
     s.add_argument("--bed-corners", help='the bed corners in that snapshot: "x1,y1 x2,y2 x3,y3 x4,y4"')

@@ -54,6 +54,8 @@ def mesh(name, V, F, mat):
     me.loops.foreach_set("vertex_index", F.astype(np.int32).ravel())
     me.polygons.add(len(F))
     me.polygons.foreach_set("loop_start", np.arange(0, F.size, k, dtype=np.int32))
+    if bpy.app.version < (3, 6, 0):  # older ones do not work it out from loop_start
+        me.polygons.foreach_set("loop_total", np.full(len(F), k, np.int32))
     me.polygons.foreach_set("use_smooth", np.zeros(len(F), bool))  # flat faces: Blender 4.1 and later start out smooth
     me.update(calc_edges=True)
     me.materials.append(mat)

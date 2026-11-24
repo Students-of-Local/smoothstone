@@ -16,7 +16,7 @@ layers, in the same order, at the same times, from the printer's camera. It does
 - Tell them the print time from the "Print time:" line.
 - The "Video:" and "Sheet:" lines name the files. The sheet shows 9 frames: look at it before you
   describe the print.
-- All of it is drawn in one color. "no filament named" means the color is only a guess.
+- All of it is drawn in one color. "no filament color named" means the color is only a guess.
 - Options, only when asked:
   - --night: the black and white night camera look.
   - --mode realtime: frames at even steps of time, so slow layers last longer.
@@ -33,7 +33,8 @@ The camera pose is a guess until it is fit to a real snapshot from the printer's
 4. stone timelapse --camera-from snap.jpg --bed-corners "x1,y1 x2,y2 x3,y3 x4,y4" --save-camera
 5. A FIX line means a corner is off or the order is wrong: look again. A good fit can still start at the
    wrong corner of a square bed, so NEXT asks the person if the camera sits where the fit says. Ask it.
---save-camera keeps the pose for every job on that printer. Without it, only this job uses it.
+--save-camera keeps the pose for every job on that printer. Without it, only this job uses it. The last
+fit wins; the one before it stays beside it as camera-<printer>.json.old.
 
 ## Example
 Request: Show me how the hook prints standing up.

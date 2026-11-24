@@ -111,6 +111,8 @@ def test_the_nozzle_stays_put_in_view_while_the_bed_moves():
 
     low, high = {"z_mm": 0.2, "head": [130, 60, 0.2]}, {"z_mm": 77.0, "head": [130, 60, 77.0]}
     assert np.allclose(seen(k2, low), seen(k2, high)) and not np.allclose(seen(voron, low), seen(voron, high))
+    hop = {"z_mm": 77.0, "head": [130, 60, 77.4]}
+    assert np.allclose(seen(k2, low), seen(k2, hop))  # a z-hop drops the bed, not lifts the head
     front, back = {"z_mm": 5, "head": [130, 20, 5]}, {"z_mm": 5, "head": [130, 200, 5]}
     assert np.allclose(seen(a1, front), seen(a1, back)) and not np.allclose(seen(k2, front), seen(k2, back))
     assert timelapse.camera_shift(a1, back, True) == [0, 0, 0]
@@ -141,7 +143,9 @@ def test_stone_timelapse_fits_saves_and_reads_back_a_camera_per_printer(jobenv, 
         px = _pinhole(_look((300, 40, 200), (130, 130, 0), 70, (1280, 960)), [(x / 260 * bed[0], y / 260 * bed[1], 0) for x, y, _ in CORNERS])
         text, code = cli.run([*base, "--printer", pid, "--bed-corners", _corners_text(px), "--snap-at", str(z)])
         assert code == 0 and "at the front right of the bed" in text, text
-        assert text.splitlines()[-1].startswith("NEXT: ask the person: is the printer's camera at the front right"), text
+        nxt = text.splitlines()[-1]
+        assert nxt.startswith("NEXT: ask the person: is the printer's camera at the front right"), text
+        assert f"If so: stone timelapse --printer {pid}. If not" in nxt and f"--snap-at {z:g} --save-camera" in nxt, nxt
         cam = timelapse.camera(job, printers.get(pid))
         assert np.allclose(cam["pos_mm"], (300, 40, 200 - z), atol=2) and cam["printer"] == pid  # the bed had sunk z mm
     saved = {p: p.read_text() for p in (tmp_path / "config").rglob("camera-*.json")}
@@ -149,11 +153,20 @@ def test_stone_timelapse_fits_saves_and_reads_back_a_camera_per_printer(jobenv, 
     good = _corners_text(px).split()
     for bad in ([good[0], good[2], good[1], good[3]], good[::-1], [good[0], good[0], *good[2:]], ["nan,1", *good[1:]],
                 [good[0], good[1], "900,700", good[3]]):
-        text, code = cli.run([*base, "--printer", "bambu_x1c", "--bed-corners", " ".join(bad)])
+        text, code = cli.run([*base, "--printer", "bambu_x1c", "--bed-corners", " ".join(bad), "--snap-at", "30"])
         assert code == 1 and "FIX: " in text and "--bed-corners" in text.splitlines()[-1], (bad, text)
+        nxt = text.splitlines()[-1]  # the same fit again: no other printer's camera, no other bed height
+        assert "--printer bambu_x1c" in nxt and "--snap-at 30 --save-camera" in nxt, nxt
     assert saved == {p: p.read_text() for p in saved}  # a bad fit overwrites nothing
     text, code = cli.run([*base[:3], "--printer", "creality_k2", "--bed-corners", " ".join(good)])
     assert code == 1 and "add --save-camera" in text, text
+    mine, machine = timelapse.camera_files(job, printers.get("bambu_x1c"))
+    mine.parent.mkdir(parents=True, exist_ok=True)
+    mine.write_text(json.dumps({"hfov_deg": 11.0}))
+    assert timelapse.camera(job, printers.get("bambu_x1c"))["hfov_deg"] == 11.0  # the last fit wins, the job's here
+    text, code = cli.run([*base, "--printer", "bambu_x1c", "--bed-corners", " ".join(good)])
+    assert code == 0 and timelapse.camera(job, printers.get("bambu_x1c"))["from"] == str(machine), text  # and the machine's now
+    assert machine.with_suffix(".json.old").read_text() == saved[machine]
     next(iter(saved)).write_text("{")
     with pytest.raises(ValueError, match="is not a saved camera"):
         timelapse.camera(job, printers.get(next(iter(saved)).stem.removeprefix("camera-")))
@@ -180,11 +193,24 @@ def test_without_blender_the_print_time_still_comes_out(jobenv, tmp_path, monkey
     text, code = cli.run(["timelapse", str(stl)])
     assert code == 1 and "Print time: " in text and "FIX: no video: Blender not found" in text, text
     assert not (tmp_path / "timelapse.mp4").exists()
-    assert "all drawn white, no filament named" in text, text
+    assert "all drawn white, no filament color named" in text, text
     text, code = cli.run(["timelapse", str(stl), "--gcode", str(GCODES[0])])
     assert code == 1 and text.splitlines()[-1] == f"NEXT: stone timelapse --gcode {GCODES[0]}", text
     text, code = cli.run(["timelapse", str(stl), "--seconds", "0.01", "--night"])
     assert code == 1 and text.splitlines()[-1] == f"NEXT: stone timelapse {stl} --night", text
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="no ffmpeg")
+def test_a_percent_in_the_file_name_still_makes_a_video(tmp_path):
+    from PIL import Image
+
+    d = tmp_path / "hook_15%.gcode-timelapse" / "timelapse"
+    d.mkdir(parents=True)
+    files = [d / f"f_{k:04d}.png" for k in range(4)]
+    for f in files:
+        Image.new("RGB", (64, 48)).save(f)
+    timelapse.video(files, d.parent / "timelapse.mp4", None)
+    assert (d.parent / "timelapse.mp4").stat().st_size > 0
 
 
 def test_a_failing_ffmpeg_still_gives_the_print_time(jobenv, tmp_path, monkeypatch):
