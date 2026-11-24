@@ -1068,3 +1068,29 @@ three still fail the bar of 8. It says the piers barely project. They project th
 this size, and its one front view draws the facade about 120 pixels wide with the light head on. Whether the
 views are too coarse is the next question, tested on older models first. Suite 1454 passed, 2 skipped; timing
 passes; the ratchet holds.
+
+## 2026-11-24 Rejected: showing the landmark judge the faces up close
+
+views.png draws a facade about 120 pixels wide with the light head on, so a 2 mm pier does not show there. The
+trial gave the judge a second picture from the print files: the four faces, 560 pixels each, turned 25 degrees,
+lit from one side. Same rubric and bar. The gates were committed before any judging (272438e, not merged):
+medians of three on saved builds, and one miss rejects the change.
+
+| Saved build | views.png | With the faces | Gate | |
+| --- | --- | --- | --- | --- |
+| landmarks 1 Milan | 6 | 7, 7, 8 | below 8 | held |
+| Milan at 647c3df, tapered piers | 7 | 8, 8, 8 | below 8 | MISSED |
+| landmarks 1 Notre-Dame | 7 | 7, 7, 7 | below 8 | held |
+| St. Vitus at 626a339, walls in 45 pieces | 7 | 8, 8, 7 | below 8 | MISSED |
+| Cologne's build asked as Milan | not asked | 1, 1, 1 | 5 or less | held |
+| Florence's build asked as St Paul's | not asked | 1, 1, 1 | 5 or less | held |
+
+Two misses: rejected. The views cannot tell a better model from an easier picture, so Milan's 7, 8, 8 at 1964db8
+under them counts for nothing and its score stays 7. The judge keeps views.png and Milan stays below the bar.
+The passing landmarks (once each): Cologne 8, Taj 8, Notre-Dame 9, St Paul's 9, Eiffel 8, Westminster 8,
+St. Vitus 8, Florence 8.
+
+What the close pictures showed, as things to build, not scores: Milan's crossing spire is a thick smooth cone and
+its pinnacles blunt rods; Cologne's two west towers do not match, and its choir walls are loose slabs; the Taj's
+iwans are smeared and its minarets differ; St. Vitus's great tower steps in above the eaves; Florence's tribune
+half-domes and lantern are plain; St Paul's side walls are nearly blank.
