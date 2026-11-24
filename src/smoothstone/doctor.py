@@ -345,8 +345,9 @@ LEAD = {"yes": {"yes", "yeah", "yep", "yup", "sure", "correct"}, "no": {"no", "n
 def answer_key(text: str, keys: list[str]) -> str | None:
     """The answer key the person's words mean for this question, or None to ask again.
     "can't tell" words give "unknown". A reply that starts with yes or no is that. Otherwise each key's
-    words count unless "not", "doesn't" or "never" comes just before them ("it doesn't bead" is not beads);
-    with two keys, a denied one means the other. Two keys at once is unclear: ask again, never guess."""
+    words count unless "not", "doesn't" or "never" comes just before them, or "not" right after ("it doesn't
+    bead" is not beads); with two keys, a denied one means the other, except on a yes or no question, where
+    only yes or no words answer ("I never wash it" asks again). Two keys at once is unclear: ask again."""
     t = norm(text)
     words = catalog()["answers"]
     if any(norm(w) in t for w in words.get("unknown", [])):
@@ -360,14 +361,13 @@ def answer_key(text: str, keys: list[str]) -> str | None:
         c = norm(part)
         for k in keys:
             for w in words.get(k, []):
-                p, at = norm(w), 0
-                while (at := c.find(p, at)) >= 0:
-                    before = set(c[:at].split()[-3:])
-                    (denied if k != "no" and before & ANSWER_NEGATE else said).add(k)
-                    at += 1
+                for m in re.finditer(rf"(?<!\S){re.escape(norm(w).strip())}(?!\S)", c):  # whole words only
+                    near = set(c[:m.start()].split()[-3:]) | set(c[m.end():].split()[:1])  # "it is not"
+                    (denied if k != "no" and near & ANSWER_NEGATE else said).add(k)
     if len(said) == 1:
         return next(iter(said))
-    if not said and len(denied) == 1 and len(keys) == 2:
+    # "it doesn't bead" means film; but "I never wash it" is no answer to a yes or no question: ask again
+    if not said and len(denied) == 1 and len(keys) == 2 and set(keys) != {"yes", "no"}:
         return next(k for k in keys if k not in denied)
     return None
 
