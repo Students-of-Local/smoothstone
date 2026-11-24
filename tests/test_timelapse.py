@@ -95,6 +95,16 @@ def test_bed_corners_parse():
         timelapse.parse_corners("1,2 3,4")
 
 
+def test_without_blender_the_print_time_still_comes_out(jobenv, tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr(timelapse, "blender", lambda: None)
+    stl = tmp_path / "box.stl"
+    _box((20, 20, 2), (0, 0, 0)).export(stl)
+    text, code = cli.run(["timelapse", str(stl)])
+    assert code == 1 and "Print time: " in text and "FIX: no video: Blender not found" in text, text
+    assert not (tmp_path / "timelapse.mp4").exists()
+
+
 needs_blender = pytest.mark.skipif(not timelapse.blender() or not shutil.which("ffmpeg"), reason="no Blender or ffmpeg")
 
 

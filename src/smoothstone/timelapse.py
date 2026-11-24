@@ -172,6 +172,13 @@ def blender() -> str | None:
     return None
 
 
+def missing() -> str | None:
+    """What a video needs and this computer does not have, in words for a FIX line."""
+    if not blender():
+        return "Blender not found; ask the person to install it, or set STONE_BLENDER"
+    return None if shutil.which("ffmpeg") else "ffmpeg not found; ask the person to install it"
+
+
 def render(tp: gcode.Toolpath, frs: list[dict], prof: dict, cam: dict, out: Path, rgb=(240, 240, 240),
            night: bool = False, size=SIZE, extras=None, log=None) -> list[Path]:
     """Render every frame to out/f_0000.png ... with Blender. Returns the frame files."""
@@ -407,13 +414,22 @@ def cmd(args, job, out):
         out.next = "stone timelapse --gcode <file.gcode>"
         return out
     tp, what, f = toolpath_from(args, job, prof)
+    total = tp.total_s()
+    est = f" (the slicer says {clock(tp.estimate_s)})" if tp.estimate_s else ""
+    cname, rgb = color(job)
+    print_time = f"Print time: {clock(total)}{est}, {len(tp.layer_z)} layers, {cname} filament."
+    no = missing()
+    if no:
+        out.add(f"Toolpaths: {what}.", print_time)
+        out.fix(f"no video: {no}")
+        out.next = "none, the print time is above; the video needs that program"
+        return out
     cam = cam or camera(job, prof)
     dest = job.build_dir if job.exists() and not args.file and not args.gcode else f.parent
     dest.mkdir(parents=True, exist_ok=True)
     frs = frames(tp, args.mode, args.seconds)
     w = SIZE[0]
     size = (w, int(round(w / float(cam.get("aspect") or 4 / 3) / 2)) * 2)
-    cname, rgb = color(job)
     night = args.night
     t_render = time.time()
     files = render(tp, frs, prof, cam, dest / "timelapse", rgb, night, size, log=job.log if job.exists() else None)
@@ -423,7 +439,6 @@ def cmd(args, job, out):
     sheet(files, frs, png)
     for x in (dest / "timelapse").glob("*.npz"):
         x.unlink()
-    total = tp.total_s()
     data = {"source": what, "input": str(f), "printer": prof.get("id"), "printer_builtin": bool(prof.get("builtin")),
             "mode": args.mode, "night": night, "color": cname, "print_s": round(total, 1), "slicer_estimate_s": tp.estimate_s,
             "layers": len(tp.layer_z), "video_s": round(secs, 2), "render_s": round(render_s, 1), "size_px": list(size),
@@ -434,8 +449,7 @@ def cmd(args, job, out):
     pname = prof.get("name") or prof.get("id")
     out.add(f"Printer: {pname}{' (built-in profile)' if prof.get('builtin') else ''}; camera "
             + (f"from {Path(cam['from']).name}" if cam.get("from") else cam.get("source") or "pose from the profile, an assumption"))
-    est = f" (the slicer says {clock(tp.estimate_s)})" if tp.estimate_s else ""
-    out.add(f"Print time: {clock(total)}{est}, {len(tp.layer_z)} layers, {cname} filament.")
+    out.add(print_time)
     out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s, {args.mode}{', night view' if night else ''})")
     out.add(f"Sheet: {png} (9 frames)")
     out.add(f"Data: {js} (rendered in {render_s:.0f} s, {time.time() - t_start:.0f} s in all)")
