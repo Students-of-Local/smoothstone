@@ -20,7 +20,8 @@ physics model, not a recording. It does not print.
   supports. Say so.
 - "Nothing here fails by bridge" (or another mode): tell them that. There is no video.
 - "PLA is assumed": ask what plastic it is, then add --material (PETG, ABS, ASA, PLA-CF or
-  PETG-CF). "No numbers for HIPS": tell them the video is PLA's, not their plastic's.
+  PETG-CF). "No numbers for HIPS, so this is PLA's": tell them the video is
+  that plastic's (the line names it), not theirs.
 - --plate dirty: a plate that needs cleaning (holds about 5% as well). Use it when they ask about
   a dirty plate or a part that came loose.
 - Always tell the person:

@@ -405,7 +405,9 @@ def test_every_plastic_is_a_melt_then_a_solid_the_model_can_run(mat):
     assert m.tg < m.nozzle and 1000 < m.cp < 3000 and 0.1 < m.k < 0.3
     assert len(m.stand_ins) == len(set(m.stand_ins)) and fs.note("mfi_rig") in m.stand_ins
     assert 0 < fs.cooling(mat)["soft_s"] < 5 and np.isfinite(fs.droop([1.0, 5.0], mat)).all() and 0 < fs.layer_stress(mat, 25) < 30
-    assert 0 < fs.nozzle_hold(mat)["blob_mm3"] < 10
+    assert 0 < fs.nozzle_hold(mat)["blob_mm3"] < 10 and 0 < fs.nozzle_drag(mat) < 1
+    got = _box((20, 20, 8), 0.5, material=mat)[0]
+    assert np.isfinite(got.numbers["margin"]) and got.numbers["margin"] > 0 and 0 < fs.bond_stress(mat) < 100
 
 
 def test_what_a_plastic_borrows_is_the_one_it_is_like_and_its_own_is_its_own():
@@ -420,7 +422,9 @@ def test_what_a_plastic_borrows_is_the_one_it_is_like_and_its_own_is_its_own():
 
 @pytest.mark.parametrize("text, plastic", [
     ("PLA", "PLA"), ("pla silk", "PLA"), ("PLA+", "PLA"), ("PolyTerra PLA", "PLA"), ("HTPLA", "PLA"), ("PETG HF", "PETG"), ("PCTG", "PETG"),
-    ("ABS+", "ABS"), ("PLA-CF", "PLA-CF"), ("Carbon Fiber PLA", "PLA-CF"), ("PETG-CF10", "PETG-CF"),
+    ("ABS+", "ABS"), ("ASA", "ASA"), ("ASA+", "ASA"), ("PLA Silk Bronze", "PLA"), ("PLA Carbon Black", "PLA"),
+    ("PLA-CF", "PLA-CF"), ("Carbon Fiber PLA", "PLA-CF"), ("PLA Carbonfiber", "PLA-CF"), ("PLA+CF", "PLA-CF"), ("PETG-CF10", "PETG-CF"), ("PETG-rCF08", "PETG-CF"),
+    ("ASA-CF", None), ("PET", None), ("PLA/PHA", None), ("PC+ABS", None), ("Fiberglass PETG", None), ("PLA Bronzefill", None), ("Magnetic Iron PLA", None),
     ("PC Blend", None), ("nylon", None), ("TPU 95A", None),
     ("HIPS", None), ("PVA", None), ("PP", None), ("PA-CF", None), ("PET-CF", None), ("PC-ABS", None), ("ABS-GF", None), ("PLA-AERO", None),
     ("LW-PLA", None), ("wood", None), ("", None), (None, None)])

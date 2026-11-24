@@ -294,7 +294,7 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     assert failvideo.inputs(tp, "PLA").fan == 1  # the file says it from layer 4 on
     other = tmp_path / "other.gcode"
     for said, more, line, own in (("PLA", (), "Material: PLA, the G-code says.", True), ("HIPS", (), "no numbers for HIPS, so this is PLA's", False),
-                                  ("HIPS", ("--material", "ABS"), "Material: ABS.", True), ("PLA", ("--material", "ABS"), "Material: ABS.", False),
+                                  ("HIPS", ("--material", "ABS"), "Material: ABS.", True), ("PLA", ("--material", "ABS"), "Material: ABS.", False), ("ASA+", (), "ASA melts, sticks and holds heat as ABS does", True),
                                   (None, (), "PLA is assumed", False)):  # another plastic's heat is not this one's
         other.write_text(gcode.read(file).replace("; filament_type = PLA", f"; filament_type = {said}" if said else ";"))
         text, code = cli.run(["timelapse", "--gcode", str(other), "--fail", "bridge", *more])
@@ -306,3 +306,9 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
     assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
+    unsaid = failsim.note("k2_air")  # PETG-CF's profile names no chamber
+    for enclosed, chamber, said in ((True, np.nan, True), (True, 45, False), (False, np.nan, False)):
+        tp.run[:, 3] = chamber
+        inp = failvideo.inputs(tp, "PETG-CF", enclosed=enclosed)
+        assert (unsaid in failsim.predict(inp)[0].assumptions) is (unsaid in inp.notes) is said
+        assert not any("not the print's own" in n and "chamber" in n for n in inp.notes)

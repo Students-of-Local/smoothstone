@@ -92,19 +92,19 @@ def _props(m: str) -> tuple[dict, str]:
     return found, src
 
 
-PLASTICS = (("PLA", r"(HT|E)?PLA\+?"), ("PETG", r"PETG|PCTG|PET"), ("ABS", r"ABS\+?"), ("ASA", r"ASA"), ("PC", r"PC|POLYCARBONATE"),
+PLASTICS = (("PLA", r"(HT|E)?PLA"), ("PETG", r"PETG|PCTG"), ("ABS", r"ABS"), ("ASA", r"ASA"), ("PC", r"PC|POLYCARBONATE"),
             ("PA", r"PA(6|11|12|66|612)?|COPA|NYLON"), ("TPU", r"TPU(\d\dA)?"))
+OTHER = re.compile(r"[GK]F\d*|\w*GLASS\w*|KEVLAR|ARAMID|AERO|LW|\w*FOAM\w*|WOOD\w*|METAL\w*|IRON|MAGNETIC|\w*FILL(ED)?|SUPPORT|PET|PHA|PBAT|PBT|PP|PVA|"
+                   r"PVB|PTFE|PMMA|TPE|HIPS")
 
 
 def named(text: str) -> str | None:
     """The plastic of MATERIALS a file or a person names (PLA Silk, PETG-CF), or None: no numbers for it."""
-    words = re.findall(r"[A-Z0-9+]+", (text or "").upper())
+    words = re.findall(r"[A-Z0-9]+", (text or "").upper().replace("CARBON BLACK", "BLACK"))
     got = {m for w in words for m, names in PLASTICS if re.fullmatch(names, w)}
-    if len(got) != 1 or any(re.fullmatch(r"[GK]F\d*|GLASS|KEVLAR|AERO|LW|FOAM\w*|WOOD|METAL|HIPS|SUPPORT", w) for w in words):
+    if len(got) != 1 or any(map(OTHER.fullmatch, words)):
         return None  # a blend (PC-ABS), a foam or a filling stone has no numbers for
-    m = got.pop()
-    if any(re.fullmatch(r"CF\d*|CARBON", w) for w in words):
-        return m + "-CF" if m + "-CF" in MATERIALS and "PET" not in words else None
+    m = got.pop() + ("-CF" if any(re.fullmatch(r"R?CF\d*|CARBON(FIB(ER|RE))?", w) for w in words) else "")
     return m if m in MATERIALS else None
 
 
@@ -135,7 +135,7 @@ def material(name: str = "PLA") -> Material:
         cp = float(np.interp(np.linspace(tg, heat["nozzle"], 50), tab[:, 0], tab[:, 2]).mean())
         k = k or float(np.interp(np.linspace(fact("room_air"), tg, 50), tab[:, 0], tab[:, 1]).mean())
     stand = [note("mfi_rig"), *([note("like")] if base != m else [])]
-    stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith(f"failsim.{base.lower()}.")]
+    stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith((f"failsim.{base.lower()}.", f"failsim.{m.lower()}."))]
     if "chamber" not in heat:
         stand.append(note("k2_air"))
     if base == "PETG":
@@ -670,7 +670,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     air = inp.air
     where_air = f"{air:g} C chamber" if inp.enclosed else f"open printer, {air:g} C room air"
     base = [f"this is a model, not a recording; {m.name} ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})",
-            *m.stand_ins, *inp.notes]
+            *(x for x in m.stand_ins if inp.enclosed or x != note("k2_air")), *inp.notes]
     if inp.clean < 1:
         base.append(note("contamination"))
     if not inp.enclosed:

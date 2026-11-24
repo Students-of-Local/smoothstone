@@ -63,18 +63,23 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True) -> dict:  # h
     speed, width = (float(np.median(q[s])) if (s := on & (tp.feature == F.index(k))).any() else None
                     for q, k in ((tp.feed, "inner wall"), (tp.width, "outer wall")))
     m = failsim.material(material)
-    m = replace(m, nozzle=nozzle or m.nozzle, chamber=chamber if chamber and enclosed else m.chamber)
+    unsaid = failsim.note("k2_air") if failsim.note("k2_air") in m.stand_ins else None  # its profile names no chamber
+    if chamber and enclosed:
+        m = replace(m, chamber=chamber, stand_ins=tuple(x for x in m.stand_ins if x != unsaid))
+    m = replace(m, nozzle=nozzle or m.nozzle)
     got = {"bed": bed, "infill": tp.infill, "speed": speed, "width": width}
     said = [f"{k} {v:.3g} {u}" for k, v, u in (("bed", bed, "C"), ("nozzle", nozzle, "C"), ("chamber", chamber if enclosed else None, "C"),
             ("fan", None if fan is None else 100 * fan, "%"), ("infill", tp.infill, "%"), ("inner wall", speed, "mm/s"),
             ("line", width, "mm")) if v is not None]
     missing = [k for k, v in (("bed", bed), ("nozzle", nozzle), ("fan", fan), ("infill", tp.infill),
                                 ("inner wall speed", speed), ("line width", width)) if v is None]
-    if enclosed and chamber is None:
+    if enclosed and chamber is None and not unsaid:
         missing.append("chamber")
     notes = [f"this print's own settings: {', '.join(said)}"] if said else []
     if missing:
         notes.append(f"the K2 profile's, not the print's own: {', '.join(missing)}" + (" (fan full on)" if fan is None else ""))
+    if enclosed and chamber is None and unsaid:
+        notes.append(unsaid)
     return {**got, "material": m, "fan": True if fan is None else fan, "notes": notes}
 
 
@@ -517,6 +522,8 @@ def cmd(args, job, prof, out):
     note = [f"material: PLA is assumed; say --material {', '.join(failsim.MATERIALS[1:-1])} or {failsim.MATERIALS[-1]}" if not said else
             f"material: the model has no numbers for {said}, so this is {mat}'s; it has {', '.join(failsim.MATERIALS)}" if not own else
             f"material: {mat}" + ("" if mat == said else f", for {said}") + ("" if args.material or not tp.material else ", the G-code says")]
+    if failsim.like(mat) != mat:
+        note.append(failsim.note("like"))
     heat = file == mat or bool(own) and not file  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
     inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat)
@@ -583,7 +590,7 @@ def cmd(args, job, prof, out):
     data = {"model_not_recording": True, "mode": mode, "what_if": what_if, "kind": fail.kind, "taxonomy": fail.taxonomy,
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
-            "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
+            "assumptions": list(dict.fromkeys([*fail.assumptions, *note, *st.notes])), "material": mat, "plate": args.plate,
             "predicted": [x.kind for x in fails], "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
             "pre_failure_frame": str(files[first - 1].relative_to(dest)) if first else None,
             "first_failure_frame": str(files[first].relative_to(dest)),
