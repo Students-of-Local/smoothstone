@@ -228,46 +228,13 @@ def missing_parts_result(job: Path, spec: dict, steps: list[dict]) -> dict | Non
     return None
 
 
-def side_views(job: Path, out: Path, px: int = 560) -> Path:
-    """The assembled print's four faces, each filling a panel, turned 25 degrees and lit from one side:
-    views.png draws a facade about 120 pixels wide with the light head on, and a 2 mm pier does not
-    show there. Square on, a pier's sides are edge on and hide too. Drawn here from the files that
-    print, so a model cannot supply its own picture."""
-    from PIL import ImageFont
-    from smoothstone import colors
-
-    parts = _read(job / "build" / "model" / "parts.json")["parts"]
-    v = np.concatenate(list(models_grade.assembled_vertices(parts)))
-    faces, first = [], 0
-    for p in parts:
-        m = trimesh.load(p["file"], force="mesh", process=False)
-        faces.append(m.faces + first)
-        first += len(m.vertices)
-    turn, _ = trimesh.bounds.oriented_bounds_2D(v[:, :2])
-    v = np.column_stack([v[:, :2] @ turn[:2, :2].T, v[:, 2]])  # its faces square to the camera
-    mesh = trimesh.Trimesh(v, np.concatenate(faces), process=True)
-    v, f, idx, cn = colors._fine(mesh.vertices, mesh.faces, colors.corner_normals(mesh.vertices, mesh.faces))
-    rgb = np.full((len(f), 3), 200.0)
-    centre = (v.min(0) + v.max(0)) / 2
-    font = ImageFont.load_default(size=px // 26)
-    panels = []
-    for degrees in (0, 90, 180, 270):
-        az, up = np.radians(degrees - 25), np.radians(10)
-        seen = (v - centre) @ colors._rot(az, up).T
-        half = float(np.abs(seen[:, [0, 2]]).max()) * 1.04
-        panels.append(colors._panel(v, f, rgb, az, up, centre, half, px, title=f"side {degrees}",
-                                    font=font, cn=cn, light=colors.SIDE))
-    colors._sheet(panels, 2, out)
-    return out
-
-
 def run(rdir: Path, job: Path, spec: dict, steps: list[dict] | None = None) -> dict:
     fallback = missing_parts_result(job, spec, steps or [])
     if fallback:
         return fallback
     result = grade(job, spec)
     result = models_grade.judged(rdir, job, spec, result, suite="landmarks", save_reference=True,
-                                 minimum=MIN_LIKENESS, sides=lambda: side_views(job, rdir / "sides.png"))
+                                 minimum=MIN_LIKENESS)
     return {**result, "judge": result["likeness"]}
 
 

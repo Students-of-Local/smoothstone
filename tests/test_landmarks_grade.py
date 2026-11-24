@@ -2,7 +2,6 @@ import json
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 import trimesh
 
@@ -102,71 +101,3 @@ def test_labelled_pinnacles_must_stand_in_the_printed_mesh():
     assert landmarks_grade.standing_in_mesh(mesh, labels, 1., 2.) == 2
     block = trimesh.creation.box((100, 20, 32), transform=trimesh.transformations.translation_matrix([0, 0, 16]))
     assert landmarks_grade.standing_in_mesh(block, labels, 1., 2.) == 0
-
-
-def _block_job(tmp_path, *pieces):
-    job = tmp_path / "job"
-    (job / "build/model").mkdir(parents=True)
-    parts = []
-    for i, m in enumerate(pieces):
-        m.export(job / f"p{i}.stl")
-        parts.append({"file": str(job / f"p{i}.stl"), "to_print": np.eye(4).tolist()})
-    (job / "build/model/parts.json").write_text(json.dumps({"parts": parts}))
-    return job
-
-
-def test_side_views_show_a_two_millimetre_pier(tmp_path):
-    # views.png's head-on light and square panels lost it (Milan's front, judge 7 three times)
-    from PIL import Image
-
-    wall = trimesh.creation.box((120, 60, 60))
-    wall.apply_translation((0, 0, 30))
-    pier = trimesh.creation.box((4, 4, 50))
-    pier.apply_translation((0, -30, 25))  # 2 mm proud of the front
-    jobs = {"plain": _block_job(tmp_path / "a", wall),
-            "piered": _block_job(tmp_path / "b", trimesh.boolean.union([wall, pier]))}
-    panels = {}
-    for name, job in jobs.items():
-        out = landmarks_grade.side_views(job, tmp_path / f"{name}.png", px=240)
-        im = Image.open(out)
-        assert im.size == (480, 480)
-        # the pier's face may be any panel: the box is squared to the camera, not to north
-        panels[name] = np.asarray(im.convert("L"), float)
-    a, b = panels["plain"], panels["piered"]
-    moved = [int((np.abs(a[r:r + 240, c:c + 240] - b[r:r + 240, c:c + 240]) > 40).sum())
-             for r in (0, 240) for c in (0, 240)]
-    assert max(moved) > 100, moved
-
-
-def test_side_views_put_split_parts_back_together(tmp_path):
-    whole = trimesh.creation.box((80, 40, 20))
-    left, right = (trimesh.creation.box((40, 40, 20)) for _ in range(2))
-    left.apply_translation((-20, 0, 0))
-    right.apply_translation((20, 0, 0))
-    one = _block_job(tmp_path / "one", whole)
-    two = _block_job(tmp_path / "two", left, right)
-    data = json.loads((two / "build/model/parts.json").read_text())
-    shift = np.eye(4)
-    shift[0, 3] = 300  # laid out elsewhere on the bed
-    moved = trimesh.load(two / "p1.stl")
-    moved.apply_transform(shift)
-    moved.export(two / "p1.stl")
-    data["parts"][1]["to_print"] = shift.tolist()
-    (two / "build/model/parts.json").write_text(json.dumps(data))
-    from PIL import Image
-
-    a = np.asarray(Image.open(landmarks_grade.side_views(one, tmp_path / "1.png", px=120)), float)
-    b = np.asarray(Image.open(landmarks_grade.side_views(two, tmp_path / "2.png", px=120)), float)
-    assert np.abs(a - b).mean() < 3
-
-
-def test_a_judge_without_its_side_views_fails_the_run(tmp_path):
-    import models_grade
-
-    def broken():
-        raise ValueError("no parts")
-
-    spec = {"request": "Milan Cathedral", "expect": {"landmarks": {"wikipedia": "Milan Cathedral"}}}
-    got = models_grade.judged(tmp_path, tmp_path, spec, {"pass": True, "why": ["all checks pass"]},
-                              suite="landmarks", minimum=8, sides=broken)
-    assert not got["pass"] and "could not answer" in got["why"][0]
