@@ -581,6 +581,19 @@
    "assumption": "A strand comes out 1.2 times as wide as the bore, whatever the plastic, flow and heat (measured on ABS: 1.12 to 1.45)"
   },
   {
+   "id": "failsim.weld_rule",
+   "topic": "failsim",
+   "key": "weld_rule",
+   "value": 0.5,
+   "unit": "ratio",
+   "note": "Two like bodies brought together meet at the mean of their temperatures. A strand welds to the plastic it lands on when that mean is above the glass transition.",
+   "source": "stone model; the mean is Carslaw and Jaeger, Conduction of Heat in Solids, section 2.16",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "A strand stays where it lands on plastic if their mean temperature is above the glass transition; the plastic below is taken at the air's, so one just printed holds better than this says"
+  },
+  {
    "id": "failsim.fan_reach",
    "topic": "failsim",
    "key": "fan_reach",

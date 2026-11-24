@@ -99,7 +99,7 @@ def test_a_dropped_strand_lies_still_and_keeps_its_plastic():
         s.step()
     p = s.points()
     assert np.abs(s.v).max() < 2e-3
-    assert (p[:, 2] > 0.1).all() and p[:, 2].max() < 0.5
+    assert p[:, 2] == pytest.approx(np.r_[s.diameters()[0], s._nodes(s.diameters())[1:-1], s.diameters()[-1]] / 2, abs=0.01)
     assert s.vol.sum() == pytest.approx(vol, rel=1e-9)
 
 
@@ -147,6 +147,32 @@ def test_it_welds_to_hot_enough_plastic_and_not_to_the_bed():
         for _ in range(120):
             s.step()
     assert on.fixed.any() and not bed.fixed.any() and not cold.fixed.any()
+    assert on.points()[on.fixed, 2] == pytest.approx(0.2, abs=0.02)  # where it lies, not where it was about to land
+    step = lambda x, y: np.where(x < 10.2, 5.0, 0.0)  # noqa: E731  # plastic, 5 mm high up to its edge
+    off = st.Strand([[9.5, 0, 5.3], [10, 0, 5.3], [10.1, 0, 5.3]], 0.4, PLA, temp=220, ground=step, fan=False,
+                    plastic=lambda x, y: np.ones(np.shape(x), bool))
+    off.v[:, 0] = 0.4
+    for _ in range(24):
+        off.step()
+        assert off.points()[off.fixed, 2] == pytest.approx(step(off.points()[off.fixed, 0], 0) + 0.2, abs=0.05)
+
+
+@pytest.mark.parametrize("mm_s", (200, 2000))
+def test_a_wall_one_line_thick_stops_it(mm_s):
+    s = rod(10, ground=lambda x, y: np.where(np.abs(y - 3) < 0.21, 5.0, 0.0), temp=25)
+    s.x[:, 2] = 0.3e-3
+    s.v[:, 1] = mm_s * 1e-3
+    for _ in range(60):
+        s.step()
+        assert s.points()[:, 1].max() < 2.8
+
+
+def test_halved_the_fan_stays_where_the_nozzle_is(monkeypatch):
+    s, heads = rod(10, temp=220), []
+    step = s._step
+    monkeypatch.setattr(s, "_step", lambda dt, head, check: heads.append(head) or (not check and step(dt, head, check)))
+    s.step(head=(5.0, 0, 40.0), halve=1)
+    assert heads == [(5.0, 0, 40.0)] * 3
 
 
 def test_the_fan_blows_a_strand_down():

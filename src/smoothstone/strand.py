@@ -164,7 +164,7 @@ class Strand:
         self.__dict__.update(was)
         start = self.x[-1] * 1e3
         for part in (0.5, 1.0):
-            self.step(dt / 2, None if head is None else start + (np.asarray(head) - start) * part, halve - 1)
+            self.step(dt / 2, start + (np.asarray(head) - start) * part if self.nozzle and head is not None else head, halve - 1)
 
     def _step(self, dt, head, check) -> bool:
         m, n = self.m, len(self.x)
@@ -214,7 +214,7 @@ class Strand:
         vh = np.zeros((n, 3))
         if self.nozzle:
             hold[-1] = True
-            vh[-1] = (np.asarray(head) * 1e-3 - self.x[-1]) / dt
+            vh[-1] = 0.0 if head is None else (np.asarray(head) * 1e-3 - self.x[-1]) / dt
         big = np.where(hold, BIG, 0.0)
         rhs += big[:, None] * vh
         ab[-1] += np.c_[big, big, big, np.where(np.r_[self.fixed[1:] & self.fixed[:-1], False], BIG, 0.0)].ravel()
@@ -223,7 +223,8 @@ class Strand:
         touch, floor = np.zeros(n, bool), None
         if self.ground is not None:
             floor = np.asarray(self.ground(self.x[:, 0] * 1e3, self.x[:, 1] * 1e3), float) * 1e-3 + r
-            touch = (self.x[:, 2] <= floor + 1e-6) & (self.press >= 0) & ~hold
+            touch = (self.x[:, 2] <= floor + 1e-6) & ~hold
+            to = np.minimum((floor - self.x[:, 2]) / dt, 0.5)  # down onto the ground, or up out of it
         v = self.v
         kb = _series(e_mod * soft) * math.pi * ((d[1:] + d[:-1]) / 2) ** 4 / 64 * (ln[1:] + ln[:-1]) / 2
         kb = np.stack([kb, kb, kb, kb / (1 + NU)], 1)  # G J = E I / (1 + nu)
@@ -254,12 +255,12 @@ class Strand:
                     ab2[-1, 0::4] += fr
                     ab2[-1, 1::4] += fr
                     ab2[-1, 2::4] += np.where(touch, BIG, 0.0)
-                    rh2[touch, 2] += BIG * np.clip((floor - self.x[:, 2])[touch] / dt, 0, 0.5)
+                    rh2[touch, 2] += BIG * to[touch]
                 u = solveh_banded(ab2, rh2.ravel(), check_finite=False).reshape(n, 4)
                 v = u[:, :3]
                 if floor is None:
                     break
-                push = np.where(touch, BIG * (np.clip((floor - self.x[:, 2]) / dt, 0, 0.5) - v[:, 2]), 0.0)
+                push = np.where(touch, BIG * (to - v[:, 2]), 0.0)
                 deep = ~hold & ~touch & (self.x[:, 2] + dt * v[:, 2] < floor - 1e-9)
                 up = touch & (push < 0)
                 self.press = np.maximum(push, 0)
@@ -275,8 +276,11 @@ class Strand:
         if check and far > TURN:
             return False
         if floor is not None:  # what moved over higher ground this step stops at its side
-            f2 = np.asarray(self.ground(x[:, 0] * 1e3, x[:, 1] * 1e3), float) * 1e-3 + r
-            wall = ~hold & (f2 > self.x[:, 2] + r) & (f2 > floor + 1e-6)
+            go = x[:, :2] - self.x[:, :2]
+            via = np.linspace(0, 1, int(_norm(go).max() / r.min()) + 2)[1:, None, None] * go + self.x[:, :2]
+            path = np.asarray(self.ground(via[..., 0] * 1e3, via[..., 1] * 1e3), float) * 1e-3 + r
+            f2 = path[-1]
+            wall = ~hold & ((path > self.x[:, 2] + r) & (path > floor + 1e-6)).any(0)
             x[wall, :2] = self.x[wall, :2]
             v[wall, :2] = 0
             f2[wall] = floor[wall]
@@ -312,7 +316,7 @@ class Strand:
             self.t[-1] = self.hot
             self.vol[-1] += self.flow * dt
         if floor is not None and self.plastic is not None:
-            on = touch & ((self.t + self.air) / 2 > m.tg)
+            on = touch & (x[:, 2] < f2 + 1e-5) & (self.air + failsim.fact("weld_rule") * (self.t - self.air) > m.tg)
             if on.any():
                 at = self.x[on] * 1e3
                 self.fixed[np.flatnonzero(on)[np.asarray(self.plastic(at[:, 0], at[:, 1]), bool)]] = True
