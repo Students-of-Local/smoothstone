@@ -100,7 +100,7 @@ def material(name: str = "PLA") -> Material:
     curve = np.asarray(p["modulus_vs_temp"]["value"], float)
     curve[:, 1] = np.minimum.accumulate(curve[:, 1])  # Track S's rule: no credit for a rise on heating
     k2 = fact(f"k2.{m.lower()}")
-    stand = []
+    stand = [note("mfi_rig")]
     if m == "ABS":  # average cp from Tg to the nozzle on Bhandari's table
         tab = np.asarray(fact("abs.cp_k"), float)
         ts = np.linspace(p["tg"]["value"], k2["nozzle"], 50)
@@ -124,15 +124,28 @@ def _mat(m) -> Material:
 
 # melt, bead cooling, droop and curl
 
+def flow_index(name: str) -> tuple[float, float, float]:
+    """(C, 1/s, Pa s) of the melt in its filament's melt flow index test (failsim.mfi_rig)."""
+    rig, (t_c, kg), p = fact("mfi_rig"), fact("mfi_test")[name], _props(name)[0]
+    grams = math.exp(np.log(p["mfi"]["value"]).mean())  # the middle of a range
+    r, area = rig["die_mm"] / 2e3, math.pi / 8 * (rig["barrel_mm"] ** 2 + rig["piston_mm"] ** 2) * 1e-6
+    rate = 4 * grams / rig["seconds"] / (p["density"]["value"] * 1e6) / (math.pi * r ** 3)
+    return t_c, rate, kg * fact("gravity") / area * rig["die_mm"] / 2 / (2 * rig["length_mm"]) / rate
+
+
 @lru_cache(maxsize=None)
 def _melt(name: str) -> dict:
-    if name != "PETG":
-        return fact(name.lower() + ".cross_wlf")
-    q, u = fact("petg.melt"), fact("wlf")  # one measured point, moved by the universal WLF constants
-    tg = material("PETG").tg
-    a1 = u["C1"] * math.log(10)
-    d1 = q["eta0_Pa_s"] * math.exp(a1 * (q["at_C"] - tg) / (u["C2_K"] + q["at_C"] - tg))
-    return {**fact("pla.cross_wlf"), "A1": a1, "A2_K": u["C2_K"], "D1_Pa_s": d1, "T_star_K": tg + 273.15}
+    """Its Cross-WLF's shape, set to its filament's melt flow index."""
+    p, u = fact("pla.cross_wlf" if name == "PETG" else f"{name.lower()}.cross_wlf"), fact("wlf")
+    if name == "PETG":
+        p = {**p, "A1": u["C1"] * math.log(10), "A2_K": u["C2_K"], "T_star_K": _props(name)[0]["tg"]["value"] + 273.15}
+    t_c, rate, eta = flow_index(name)
+    lo, hi = math.log(eta), math.log(eta) + 20  # of the melt at rest: what thins to eta at the test's rate
+    for _ in range(80):
+        eta0 = math.exp((lo + hi) / 2)
+        lo, hi = (lo, (lo + hi) / 2) if eta0 / (1 + (eta0 * rate / p["tau_star_Pa"]) ** (1 - p["n"])) > eta else ((lo + hi) / 2, hi)
+    dt = t_c + 273.15 - p["T_star_K"]
+    return {**p, "D1_Pa_s": eta0 * math.exp(p["A1"] * dt / (p["A2_K"] + dt))}
 
 
 def viscosity(t_c, rate=0.0, mat="PLA") -> np.ndarray:

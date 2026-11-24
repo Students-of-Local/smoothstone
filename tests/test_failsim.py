@@ -94,16 +94,34 @@ def test_bead_cooling_matches_the_hand_numbers():
     assert still["tau_s"] == pytest.approx(1240 * 1400 * area / per * 1e-3 / still["h"])
 
 
-def test_each_plastic_melts_by_its_own_numbers():
-    assert float(fs.viscosity(240, 0, "PETG")) == pytest.approx(600, rel=1e-9)
+def test_the_flow_index_is_the_rigs_stress_over_its_rate():
+    """9 g in ten minutes of PLA at 210 C under 2.16 kg, by hand: 19.8 kPa at the wall, 13 1/s there."""
+    stress = 2.16 * 9.80665 / (math.pi / 8 * (9.5504e-3 ** 2 + 9.4742e-3 ** 2)) * 1.0475e-3 / 16e-3
+    rate = 4 * (math.sqrt(77) / 600 / 1.24e6) / (math.pi * 1.0475e-3 ** 3)
+    assert (stress, rate) == pytest.approx((19508, 13.1), rel=0.005)
+    assert fs.flow_index("PLA") == pytest.approx((210, rate, stress / rate))
+
+
+@pytest.mark.parametrize("mat", fs.MATERIALS)
+def test_each_melt_passes_its_filaments_flow_index(mat):
+    t, rate, eta = fs.flow_index(mat)
+    assert float(fs.viscosity(t, rate, mat)) == pytest.approx(eta, rel=1e-6)
+    assert fs.note("mfi_rig") in fs.material(mat).stand_ins
+
+
+def test_two_melts_agree_with_what_others_measured_on_them():
+    """What sets a curve is the flow index. ABS's own curve, another filament on another rig, comes within twice of it;
+    PETG's thickness at rest lies in the range a fit to stretch tests gave; PLA's injection grade does not (6.8 times thin)."""
+    def published(mat, t, rate):
+        p = fs.fact(mat + ".cross_wlf")
+        eta0 = p["D1_Pa_s"] * math.exp(-p["A1"] * (t + 273.15 - p["T_star_K"]) / (p["A2_K"] + t + 273.15 - p["T_star_K"]))
+        return eta0 / (1 + (eta0 * rate / p["tau_star_Pa"]) ** (1 - p["n"]))
+    ratio = {m: fs.flow_index(m)[2] / published(m.lower(), *fs.flow_index(m)[:2]) for m in ("PLA", "ABS")}
+    assert 0.5 < ratio["ABS"] < 2 and 6 < ratio["PLA"] < 8
+    assert 600 < float(fs.viscosity(240, 0, "PETG")) < 1800
     shift = 17.44 * (240 - 66) / (51.6 + 240 - 66) - 17.44 * (200 - 66) / (51.6 + 200 - 66)
-    assert float(fs.viscosity(200, 0, "PETG")) == pytest.approx(600 * 10 ** shift, rel=1e-9)
-    abs0 = 2.54e12 * math.exp(-28.3 * (513.15 - 365) / (51.6 + 513.15 - 365))  # NIST Table 1 at 240 C
-    assert float(fs.viscosity(240, 0, "ABS")) == pytest.approx(abs0, rel=1e-9) and 1500 < abs0 < 2500
-    thin = abs0 / (1 + (abs0 * 500 / 41070) ** (1 - 0.341))
-    assert float(fs.viscosity(240, 500, "ABS")) == pytest.approx(thin, rel=1e-9)
+    assert float(fs.viscosity(200, 0, "PETG") / fs.viscosity(240, 0, "PETG")) == pytest.approx(10 ** shift)
     assert fs.material("PETG").k == 0.21
-    assert not any("viscosity" in s for s in fs.material("ABS").stand_ins)
 
 
 def test_curl_lifts_the_ledge_by_the_bilayer_curvature():
@@ -279,7 +297,7 @@ def test_nozzle_drag_is_small():
     drag = fs.nozzle_drag("PLA", 200, 0.2)
     eta = fs.viscosity(220, 1000.0)
     assert drag == pytest.approx(eta * 1000.0 * 1e-6 * math.pi * 0.25, rel=1e-9)
-    assert 0.01 < drag < 0.2
+    assert 0.01 < drag < 0.3
 
 
 # predict
@@ -339,12 +357,11 @@ def test_the_melt_thickens_without_end_as_it_cools(mat):
 
 
 def test_the_nozzle_drags_by_each_plastics_own_melt():
-    """300 mm/s over a 0.2 mm layer is 1500 1/s: ABS's Cross-WLF stress there on the 1 mm tip, by hand."""
-    eta0 = 2.54e12 * math.exp(-28.3 * (260 + 273.15 - 365) / (51.6 + 260 + 273.15 - 365))
-    tau = 1500 * eta0 / (1 + (eta0 * 1500 / 41070) ** (1 - 0.341))
+    """300 mm/s over a 0.2 mm layer is 1500 1/s: each melt's stress there on the 1 mm tip."""
     drag = {m: fs.nozzle_drag(m, 300, 0.2) for m in fs.MATERIALS}
-    assert drag["ABS"] == pytest.approx(tau * math.pi * 0.5e-3 ** 2, rel=1e-3)
-    assert drag["PLA"] < drag["ABS"] < drag["PETG"] < 0.2
+    for m, got in drag.items():
+        assert got == pytest.approx(1500 * float(fs.viscosity(fs.material(m).nozzle, 1500, m)) * math.pi * 0.5e-3 ** 2)
+    assert 0.03 < drag["ABS"] < drag["PETG"] < drag["PLA"] < 0.4
 
 
 def test_half_the_fan_is_half_the_wind():
