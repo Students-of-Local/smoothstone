@@ -2,10 +2,9 @@
 features too thin for the nozzle, split it into bed-sized parts with alignment pins, check every part
 the way stone checks a recipe part, and say how much filament and time each takes.
 
-Every change to the mesh is a line the person can read. The parts keep the model's own up: the
-lowest part stands on the model's base, every other part on its flat cut face, so each prints flat
-side down with the overhangs its designer made printable. A part with no flat bottom is laid on its
-flattest side instead.
+Every change to the mesh is a line the person can read. Each part prints on its largest flat face:
+the lowest part's base or a cut face, or a flat side when that is clearly larger, and only in an
+orientation that still fits the bed. A part with no flat face is laid on its flattest side.
 """
 
 from __future__ import annotations
