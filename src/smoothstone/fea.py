@@ -94,7 +94,7 @@ class Grid:
 def voxelize(mesh, pitch: float) -> Grid:
     """Cells whose centers are inside the mesh, by casting one ray per column along z and counting crossings."""
     lo, hi = mesh.bounds
-    n = np.maximum(np.ceil((hi - lo) / pitch).astype(int), 1)
+    n = np.maximum(np.ceil((hi - lo) / pitch - 1e-6).astype(int), 1)  # 8.5 / (8.5 / 7) is a hair over 7
     origin = lo - (n * pitch - (hi - lo)) / 2
     xs = origin[0] + (np.arange(n[0]) + 0.5) * pitch
     ys = origin[1] + (np.arange(n[1]) + 0.5) * pitch
