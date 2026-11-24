@@ -2581,6 +2581,66 @@
    "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
   },
   {
+   "id": "service.car",
+   "topic": "materials",
+   "material": "ANY",
+   "key": "service_temp",
+   "value": 85,
+   "unit": "C",
+   "note": "A dashboard in summer sun, Tempe, Arizona: the hottest dashboard in the study (85.0 C); cabin air reached 48.9 in the same trial and 51.8 at most. Sun-exposed dashboards averaged about 69 C.",
+   "quote": "Midsize Sedan Jun-25 37.2 B 11:00 11:55 43.2 60.0 44.4 46.1 B 11:05 12:00 48.9 85.0 59.4 62.8",
+   "source": "Vanos et al., Evaluating the impact of solar radiation on pediatric heat balance within enclosed, hot vehicles, Temperature 2018, 5(3), 276-292, Table 1",
+   "cite": "Temperature 2018 5:276 hot vehicles",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6204985/",
+   "checked": "2026-11-24",
+   "range": [
+    49.9,
+    85.0
+   ]
+  },
+  {
+   "id": "service.sun",
+   "topic": "materials",
+   "material": "ANY",
+   "key": "service_temp",
+   "value": 70,
+   "unit": "C",
+   "note": "Dark surfaces in full summer sun. A light-colored part runs cooler.",
+   "quote": "Using satellite imagery and infrared cameras, the City discovered that rubber mats under playground equipment reached over 70°C",
+   "source": "Reimagining spaces where children play: developing guidance for thermally comfortable playgrounds in Canada, Canadian Journal of Public Health 2021, 112(4), 706-713",
+   "cite": "Can J Public Health 2021 112:706 hot playgrounds",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8225778/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "service.dishwasher",
+   "topic": "materials",
+   "material": "ANY",
+   "key": "service_temp",
+   "value": 75,
+   "unit": "C",
+   "note": "The sanitizing rinse of a home dishwasher.",
+   "quote": "Most consumer dishwashers use a 75 °C thermostat in the sanitizing process",
+   "source": "Wikipedia: Dishwasher",
+   "cite": "Wikipedia Dishwasher",
+   "url": "https://en.wikipedia.org/wiki/Dishwasher",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "service.outdoor",
+   "topic": "materials",
+   "material": "ANY",
+   "key": "service_temp",
+   "value": 41.5,
+   "unit": "C",
+   "note": "Shade air on a hot summer afternoon in Tempe, Arizona (Table 1, the T a column: the study's highest outdoor air, 41.5 C). In direct sun use where=sun.",
+   "quote": "41.5 C 12:30 13:25 42.0 76.1 48.9 45.6",
+   "source": "Vanos et al., Evaluating the impact of solar radiation on pediatric heat balance within enclosed, hot vehicles, Temperature 2018, 5(3), 276-292, Table 1",
+   "cite": "Temperature 2018 5:276 hot vehicles",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6204985/",
+   "checked": "2026-11-24"
+  },
+  {
    "id": "any.infill_exponent",
    "topic": "materials",
    "material": "ANY",
