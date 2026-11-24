@@ -206,10 +206,14 @@ ROOT_SHARE = 0.5  # assumption: a described root cause leads once it carries hal
 # --looks: the agent's own read of the photo, likeliest first. Each id it names multiplies that failure's
 # weight by a likelihood ratio, P(agent names it | it is the failure) / P(agent names it | it is not);
 # a failure the words never named starts at LOOK_FLOOR of the best word match. Set on the dev photos in
-# evals/doctor/photos.py (never on the held-out ones), together with the image match of a later change.
+# evals/doctor/photos.py (never on the held-out ones), together with the image match below.
 LOOK_LR = (3.0, 1.5, 1.0)
 LOOK_FLOOR = 1.0
 LOOKS_CHECKED = "evals/doctor/photo_runs.jsonl, split dev"
+# --image: the k most similar gallery photos vote (photo_match.py); a failure's share v multiplies its
+# weight by 1 + KNN_W * v, from the same LOOK_FLOOR start. Set on the dev photos too.
+KNN_K = 7
+KNN_W = 12.0
 
 
 # what the screen says when the firmware stopped a heater; while one stands, nothing else gets heated
@@ -230,7 +234,8 @@ def look_ids(text: str | None) -> tuple[list[str], list[str]]:
     return [i for i in dict.fromkeys(ids) if i in known], [i for i in ids if i not in known]
 
 
-def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple[str, float]]:
+def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str, float] | None = None
+                  ) -> list[tuple[str, float]]:
     """Failures by the words said, then by what the agent saw (--looks); the top failure's differentials
     (the ones the catalog says to tell apart from it) follow at a small share, so "Also check" lists
     them even when nobody named them."""
@@ -242,6 +247,9 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple
     base = max(scores.values(), default=0.0) or 1.0
     for lr, fid in zip(LOOK_LR, looks):
         scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * lr
+    for fid, v in (knn or {}).items():
+        if failure(fid):
+            scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * (1 + KNN_W * v)
     if scores:
         top = max(scores, key=scores.get)
         # root first: when a cause of the top failure is another failure the person also described
@@ -371,10 +379,11 @@ def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
     return head + [ln for ln in out if ln not in head][:max(0, limit - len(head))]
 
 
-def diagnose(said: str, printer: dict | None = None, material: str | None = None, looks: list[str] = ()) -> dict:
+def diagnose(said: str, printer: dict | None = None, material: str | None = None, looks: list[str] = (),
+             knn: dict[str, float] | None = None) -> dict:
     """The whole first pass, with no files: used by the command and by evals/doctor/run.py."""
     ctx = context(printer, material)
-    ranked = rank_failures(said, ctx, looks)
+    ranked = rank_failures(said, ctx, looks, knn)
     out = {"failures": ranked, "causes": {}, "question": None, "described": described(said, looks)}
     if ranked:
         f = failure(ranked[0][0])
@@ -598,6 +607,23 @@ def share_payload(case: dict) -> dict:
 # what the person reads
 
 
+def image_match(photo: Path) -> tuple[dict | None, str]:
+    """The nearest gallery photos' vote, kept out of sight until the agent has described the photo, so its
+    own read stays its own; and the line that says whether the match ran."""
+    from . import photo_match
+
+    ok, why = photo_match.available()
+    if ok:
+        try:
+            return photo_match.votes(photo_match.neighbors(photo), KNN_K), IMAGE_MATCH_ON
+        except Exception as e:  # noqa: BLE001 - a broken model install must not stop the diagnosis
+            why = f"{type(e).__name__}: {e}"
+    return None, f"Image match off ({why}): stone doctor runs on your words and --looks."
+
+
+IMAGE_MATCH_ON = "Image match on: the nearest labeled gallery photos count once you describe this one."
+
+
 def _printer_lines(p: dict | None, fids: list[str], causes: list[str]) -> list[str]:
     if not p:
         return []
@@ -632,6 +658,9 @@ def report(case: dict, p: dict | None) -> list[str]:
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
     if "thermal_error" not in described_ids:
         lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
+    if case.get("knn"):
+        lines.append("Image match (nearest gallery photos): "
+                     + ", ".join(f"{k} {v:.0%}" for k, v in list(case["knn"].items())[:3]))
     for fid in ranked[:3]:
         ex = examples(fid, p["id"] if p else None)
         if ex:
@@ -733,8 +762,11 @@ def _new(args, job, said: str, out):
         else:
             case["image"] = str(save_photo(frame, frame))
             case["camera"] = {"name": device["name"], "model": device.get("model")}
+    match_line = None
+    if case["image"] and "knn" not in case:
+        case["knn"], match_line = image_match(Path(case["image"]))
     case.update(said=said, looks=looks, printer=p["id"] if p else None, printer_set=cur_id, material=material)
-    d = diagnose(said, p, material, looks) if said or looks else {"failures": []}
+    d = diagnose(said, p, material, looks, case.get("knn")) if said or looks else {"failures": []}
     head = (f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
             + (f", seen: {', '.join(looks)}" if looks else ""))
     if not d["failures"]:
@@ -742,7 +774,7 @@ def _new(args, job, said: str, out):
         save_case(job, case)
         out.add(head)
         if case["image"]:
-            out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}",
+            out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}", match_line,
                     "Look at it: describe what you see, and pass the ids that match it with --looks (each id and "
                     "its look: stone doctor looks). If you cannot see images, ask the person what it looks like.")
             out.next = case_next(case)
@@ -754,6 +786,8 @@ def _new(args, job, said: str, out):
                 question=d["question"], described=d["described"], asked=[], answers=[], tried=[])
     save_case(job, case)
     out.add(head, *report(case, p))
+    if match_line and match_line != IMAGE_MATCH_ON:
+        out.add(match_line)
     if case["image"]:
         out.add(f"Photo: {case['image']}")
     out.next = case_next(case)

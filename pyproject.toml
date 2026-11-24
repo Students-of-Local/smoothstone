@@ -22,6 +22,10 @@ dependencies = [
     "pyamg>=5.4.1; (platform_machine == 'x86_64' or platform_machine == 'AMD64' or sys_platform == 'darwin') and python_version < '3.15'",
 ]
 
+[project.optional-dependencies]
+# stone doctor --image: match a photo against the labeled failure gallery (open_clip MIT, torch BSD); optional
+vision = ["open-clip-torch>=2.24"]
+
 [project.scripts]
 stone = "smoothstone.cli:main"
 

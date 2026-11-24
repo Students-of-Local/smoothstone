@@ -21,6 +21,7 @@ Use this when someone says a print failed, shows a photo of a failed print, or a
    Pick the ids that match the photo, likeliest first, at most 3. Add them with `--looks`:
    `stone doctor "<what you see>" --looks bed_adhesion,blob_on_nozzle`.
    Write the words too. stone weighs both.
+   With a photo, stone also compares it to its labeled failure photos, if the vision extra is installed.
    If you cannot see images, ask the person what the print looks like. Then leave out `--looks`.
 3. Ask the one question in NEXT. Then: `stone doctor answer "<their answer>"`.
 4. When NEXT says `stone doctor try <cause>`, run it and tell the person the steps.
@@ -43,6 +44,7 @@ giving differentials also helps".
 $ stone doctor --image k2.jpg
 Case 20261124-012644, Creality K2
 Photo saved (EXIF removed, at most 1280 px): stone-job/doctor/20261124-012644/photo.jpg
+Image match on: the nearest labeled gallery photos count once you describe this one.
 Look at it: describe what you see, and pass the ids that match it with --looks (each id and its look: stone doctor looks). ...
 NEXT: stone doctor "<what you see in stone-job/doctor/20261124-012644/photo.jpg: the part, the plate, the nozzle>" --looks <ids from stone doctor looks that match, likeliest first>
 

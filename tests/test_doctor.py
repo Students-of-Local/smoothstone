@@ -36,6 +36,7 @@ def work(tmp_path, monkeypatch):
     w.mkdir()
     monkeypatch.chdir(w)
     monkeypatch.setenv("STONE_JOB", str(w / "stone-job"))
+    monkeypatch.setenv("STONE_IMAGE_MATCH", "off")  # no model, no cache writes in the home folder
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError(f"subprocess {a}")))
     return w
 
@@ -478,7 +479,7 @@ def test_r2_owner_flow_reads_the_wash_question_and_reaches_plate_contaminated(wo
 
 
 
-# photos: --looks and the photo floor
+# photos: --looks, the image match and the photo floor
 
 def _photos():
     spec = importlib.util.spec_from_file_location("doctor_photos", REPO / "evals" / "doctor" / "photos.py")
@@ -487,10 +488,10 @@ def _photos():
     return mod
 
 
-@pytest.mark.parametrize("suite,way", [("doctor_photos_nomodel", "looks")])
+@pytest.mark.parametrize("suite,way", [("doctor_photos", "knn"), ("doctor_photos_nomodel", "looks")])
 def test_photo_floor(suite, way):
-    """The held-out photos' recorded replies, ranked again: a change may not fall below the floor
-    (measured once, less 0.02)."""
+    """The held-out photos' recorded replies and neighbors, ranked again: a change may not fall below the
+    floor (measured once, less 0.02), with and without the image match."""
     s = _photos().score("heldout")[way]
     floor = json.loads((REPO / "evals" / "floor.json").read_text())
     assert s["n"] == floor[f"{suite}/top1"]["total"] >= 100
@@ -514,6 +515,17 @@ def test_owner_case_with_looks():
         assert doctor.top_causes(d["causes"], 1)[0][0] == "plate_contaminated"
 
 
+def test_owner_case_with_looks_and_image_match():
+    ph = _photos()
+    near = {r["file"]: r["near"] for r in ph._rows(ph.KNN)}["bed_adhesion/k2-detached-plate-blob.jpg"]
+    from smoothstone import photo_match
+    votes = photo_match.votes(near, doctor.KNN_K)
+    for looks in ([], ["bed_adhesion", "blob_on_nozzle"]):
+        d = doctor.diagnose(OWNER["said"], printers.get("creality_k2"), "PLA", looks, votes)
+        assert d["failures"][0][0] == "bed_adhesion"
+        assert doctor.top_causes(d["causes"], 1)[0][0] == "plate_contaminated"
+
+
 def test_looks_names_what_the_words_do_not(work):
     text, code, nxt = stone("doctor", "the print failed", "--looks", "stringing")
     assert text.splitlines()[0].endswith("seen: stringing")
@@ -526,3 +538,19 @@ def test_looks_names_what_the_words_do_not(work):
 @pytest.mark.parametrize("text", ["yes and no", "yes, no", "no... well, yes"])
 def test_r2_yes_and_no_at_once_asks_again(text):
     assert doctor.answer_key(text, ["yes", "no"]) is None
+
+
+def test_image_match_off_says_so(work):
+    text, code, nxt = stone("doctor", "--image", str(_photo(work / "a.jpg")))
+    assert "Image match off (STONE_IMAGE_MATCH=off): stone doctor runs on your words and --looks." in text
+    assert "--looks" in nxt
+
+
+def test_knn_votes_and_frames_of_one_print():
+    from smoothstone import photo_match
+    near = [("a.jpg", "spaghetti", 0.9), ("b.jpg", "healthy", 0.9), ("c.jpg", "bed_adhesion", 0.2)]
+    assert photo_match.votes(near, 2) == {"spaghetti": 0.5}  # healthy counts against every id, names none
+    assert photo_match.group("spaghetti/u1-facade-spaghetti-2.jpg") == photo_match.group("spaghetti/u1-facade-spaghetti-3.jpg")
+    assert photo_match.group("spaghetti/u1-facade-spaghetti-2.jpg") != photo_match.group("spaghetti/other-2.jpg")
+    for r in _photos()._rows(_photos().KNN):
+        assert photo_match.group(r["file"]) not in {photo_match.group(f) for f, _, _ in r["near"]}
