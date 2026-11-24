@@ -53,6 +53,16 @@ def test_scrub_removes_private_details():
     assert share.scrub(keep, ["Shopy"]) == (keep, [])
 
 
+def test_scrub_and_leaks_catch_every_ipv6_form():
+    for addr in ("fd00::1234", "::1", "fe80::1", "2001:db8::8a2e:370:7334", "fd00::", "2001:db8:0:0:0:0:2:1", "10.0.0.2"):
+        text, gone = share.scrub(f"the printer at {addr} dropped", [])
+        assert text == "the printer at [address] dropped" and gone == ["address"], (addr, text)
+        assert share.leaks(f"at {addr}"), addr
+    assert share.scrub("camera at fd00::1234. Then fe80:1:2:3::5 too", [])[0] == "camera at [address]. Then [address] too"
+    keep = "paused at 12:30 and again 1:05:22 in, ratio 3:2"
+    assert share.scrub(keep, []) == (keep, []) and share.leaks(keep) == []
+
+
 @pytest.fixture
 def work(tmp_path, monkeypatch):
     w = tmp_path / "work"
@@ -217,6 +227,39 @@ def test_decline_after_a_partial_upload_names_what_stays_public(work, monkeypatc
     stone("doctor", "share", "--send")
     text, code, nxt = stone("doctor", "share", "no")
     assert "stays on this machine" not in text and "Still public on GitHub: case.json" in text
+
+
+def test_every_typed_field_is_scrubbed(work, monkeypatch):
+    gh = FakeGh()
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    stone("doctor", "--image", str(PHOTO), "--printer", "creality_k2")
+    stone("doctor", "the print came off the plate; camera at fd00::1234", "--material", "jo@example.com",
+          "--printer", "creality_k2")
+    stone("doctor", "try", "plate_contaminated")
+    stone("doctor", "fixed", "washed the plate")
+    text, code, nxt = stone("doctor", "share")
+    d = json.loads(next((work / "stone-job" / "doctor").glob("*/share/case.json")).read_text())
+    assert d["material"] == "[email]" and "[address]" in d["said"], d
+    raw = json.dumps(d)
+    assert "fd00" not in raw and "@" not in raw and share.leaks(raw) == [] and "fd00" not in text
+    assert share.leaks(raw.replace("[address]", "fd00::1234")) and share.leaks(raw.replace("[email]", "JO@EXAMPLE.COM"))
+
+
+def test_send_checks_the_bundle_once_more(work, monkeypatch):
+    gh = FakeGh()
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    scrub = share.scrub
+    stone("doctor", "--image", str(PHOTO), "--printer", "creality_k2")
+    stone("doctor", "the print came off; camera at fd00::1234", "--material", "jo@example.com", "--printer", "creality_k2")
+    stone("doctor", "try", "plate_contaminated")
+    stone("doctor", "fixed", "washed the plate")
+    monkeypatch.setattr(share, "scrub", lambda text, names=(): (text, []))  # a scrub that misses everything
+    stone("doctor", "share")
+    monkeypatch.setattr(share, "scrub", scrub)
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert code == 1 and "Nothing was sent" in text and gh.calls == [], (text, gh.calls)
 
 
 def test_owner_skips_the_fork(work, monkeypatch):

@@ -40,7 +40,10 @@ PATTERNS = [
     ("email", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
     ("path", re.compile(r"(?<![\w/~])(?:[A-Za-z]:)?(?:[/\\][\w.@-]+){2,}|(?<![\w/])~[/\\][\w.@/\\-]+")),
     ("address", re.compile(r"\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b", re.I)),
-    ("address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[0-9a-f]{1,4}:){3,7}[0-9a-f]{1,4}\b", re.I)),
+    # IPv6 with :: first (fd00::1234, ::1), so a full-form match never takes half of one; then IPv4, full IPv6
+    ("address", re.compile(r"(?<![\w:])(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6}::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?"
+                           r"|::[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})(?![\w:]|\.\d)"
+                           r"|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[0-9a-f]{1,4}:){3,7}[0-9a-f]{1,4}\b", re.I)),
     ("host", re.compile(r"\b[\w-]+(?:\.[\w-]+)*\.(?:local|lan|home|internal|localdomain|ts\.net)\b", re.I)),
     ("serial", re.compile(r"\b(?:serial(?:\s+(?:number|no\.?))?|s/?n)\b[\s:#]*(?:s/?n\b[\s:#]*)?"
                           r"[A-Za-z0-9-]*\d[A-Za-z0-9-]*", re.I)),
@@ -81,6 +84,17 @@ def leaks(text: str) -> list[str]:
     return [m.group(0) for _, rx in PATTERNS for m in rx.finditer(text)]
 
 
+def bundle_leaks(d, names: list[str] | tuple[str, ...] = ()) -> list[str]:
+    """What scrub would still remove from any text anywhere in the bundle data, private names included."""
+    if isinstance(d, dict):
+        return [x for v in d.values() for x in bundle_leaks(v, names)]
+    if isinstance(d, list):
+        return [x for v in d for x in bundle_leaks(v, names)]
+    if not isinstance(d, str):
+        return []
+    return leaks(d) + [n for n in names if re.search(rf"(?<!\w){re.escape(n)}(?!\w)", d, re.I)]
+
+
 def version() -> str:
     from importlib.metadata import PackageNotFoundError, version as v
 
@@ -102,9 +116,16 @@ def last_fixed(job) -> dict | None:
 def build(job, case: dict) -> tuple[Path, dict, list[str]]:
     """Write stone-job/doctor/<case>/share/ (case.json, photo.jpg, pr.md) and return it, the data and what
     the scrub removed."""
-    o, names = case["outcome"], private_names()
-    said, g1 = scrub(case.get("said") or "", names)
-    fixed_by, g2 = scrub(o.get("what_worked") or "", names)
+    o, names, gone = case["outcome"], private_names(), []
+
+    def clean(text):  # every free-text field goes through the same scrub
+        if text is None:
+            return None
+        text, g = scrub(str(text), names)
+        gone.extend(g)
+        return text
+
+    said, fixed_by, material = clean(case.get("said") or ""), clean(o.get("what_worked") or ""), clean(o.get("material"))
     out = doctor.doctor_dir(job) / case["id"] / "share"
     shutil.rmtree(out, ignore_errors=True)
     photo = Path(case["image"]) if case.get("image") else None
@@ -113,15 +134,15 @@ def build(job, case: dict) -> tuple[Path, dict, list[str]]:
     else:
         photo = None
     data = {"schema": 1, "failure": o["failure"], "cause": o["cause"], "printer": o["printer"],
-            "material": o.get("material"), "said": said, "fixed_by": fixed_by,
-            "answers": [{"ask": a["ask"], "key": a["key"]} for a in case.get("answers", [])],
+            "material": material, "said": said, "fixed_by": fixed_by,
+            "answers": [{"ask": clean(a["ask"]), "key": a["key"]} for a in case.get("answers", [])],
             "photo": "photo.jpg" if photo else None, "stone_version": version(), "date": o["date"], "license": "MIT"}
     h = hashlib.sha256(json.dumps(data, sort_keys=True).encode() + (photo.read_bytes() if photo else b""))
     data["id"] = f"{o['date']}-{o['printer']}-{o['failure']}-{h.hexdigest()[:7]}"
     out.mkdir(parents=True, exist_ok=True)
     (out / "case.json").write_text(json.dumps(data, indent=1) + "\n")
     (out / "pr.md").write_text(pr_body(data))
-    return out, data, g1 + g2
+    return out, data, gone
 
 
 def title(d: dict) -> str:
@@ -298,6 +319,12 @@ def cmd_share(args, job, rest: str, out):
 
 def _send(job, case, bundle: Path, out):
     d, st = json.loads((bundle / "case.json").read_text()), case["share"]
+    found = bundle_leaks(d, private_names())
+    if found:  # the last look before anything uploads: a detail the scrub missed stops the send
+        out.fix(f"Nothing was sent: the bundle still holds {len(found)} private detail(s) the scrub should have "
+                "removed. The case stays on this machine.")
+        out.next = doctor.DONE
+        return out
     url, why = send_pr(bundle, d, st, lambda: doctor.save_case(job, case))
     if url:
         case["share"] = st | {"state": "sent", "url": url}
