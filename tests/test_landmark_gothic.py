@@ -177,7 +177,7 @@ def test_a_pinnacle_keeps_its_mapped_peak_and_an_estimated_one_says_so():
     facts = landmark_refs.load_pack("Milan Cathedral")
     ring = [[-79., -46.], [79., -46.], [79., 46.], [-79., 46.], [-79., -46.]]
     plan = m3.CrossSection([ring[:-1]])
-    pin = next(p for p in facts["spire_plan"]["value"]["pins"] if p[3] != "main")
+    pin = next(p for p in facts["spire_plan"]["value"]["pins"] if p[3] == "outer")
     base, rise = facts["spire_plan"]["value"]["levels_m"][pin[3]]
     spot = [-79 + 158 * pin[1], -46 + 92 * pin[2]]
     peak = base + rise - 1.5
@@ -190,5 +190,9 @@ def test_a_pinnacle_keeps_its_mapped_peak_and_an_estimated_one_says_so():
     spires = {r["spire_id"]: r for r in out if r.get("spire_id") is not None}
     mapped = spires[pin[0]]
     assert mapped["height"]["metres"] == peak and not mapped["height"]["guessed"]
-    estimated = [r for n, r in spires.items() if r is not mapped and r["id"].startswith("terrace")]
-    assert len(estimated) > 100 and all(r["height"]["guessed"] for r in estimated)
+    front = {p[0] for p in facts["spire_plan"]["value"]["pins"] if str(p[3]).startswith("front") and p[1] < .05}
+    inner = [r for n, r in spires.items() if r is not mapped and n not in front and r["id"].startswith("terrace")]
+    assert len(inner) > 90 and all(r["height"]["guessed"] for r in inner)
+    # The laser survey measured the front, so it outranks both the map and the typical rise.
+    assert spires[13]["height"]["metres"] == 65 and spires[12]["height"]["metres"] == pytest.approx(55.25)
+    assert not spires[12]["height"]["guessed"] and spires[5]["height"]["guessed"]

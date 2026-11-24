@@ -213,6 +213,10 @@ def _reconcile_spire_plan(parts, refs: dict, facts: dict, notes: list[str]):
         ]
         return disk, max(support, default=1) - 1
 
+    survey = facts.get("west_buttress_spires") if "west_facade_height_m" in facts else None
+    # The survey counts across the facade and the plan across the whole building, so match their outermost piers.
+    front = {pin[0]: abs(pin[2] - .5) for pin in data["pins"] if str(pin[3]).startswith("front") and pin[1] < .05}
+    edge = max(front.values(), default=0)
     out = list(body)
     matched = set()
     recorded = 0
@@ -250,6 +254,11 @@ def _reconcile_spire_plan(parts, refs: dict, facts: dict, notes: list[str]):
             # takes precedence over a terrace's representative elevation.
             if abs(height - top) <= nominal_rise * .6:
                 top = height
+        surveyed = None
+        if survey and edge and number in front:
+            where = front[number] / edge * max(abs(place) for place, _ in survey["value"])
+            peak = min(survey["value"], key=lambda item: abs(abs(item[0]) - where))[1]
+            top = surveyed = peak * facts["west_facade_height_m"]["value"]
         diameter = min(data["diameter_m"], max(1.55, nominal_rise * .18))
         disk, support = anchored(xy, diameter)
         if (disk ^ footprint).area() < disk.area() * .05 and not seen:
@@ -266,7 +275,8 @@ def _reconcile_spire_plan(parts, refs: dict, facts: dict, notes: list[str]):
         source = old["source"] if seen else plan["source"]
         record = _new_part(f"terrace-spire-{number}", disk, max(0, support), top,
                            top - spring, "pyramidal", source, "pinnacle")
-        record["height"] = (_measurement(top, old["height"]["source"], "Mapped peak.") if seen and top == height else
+        record["height"] = (_measurement(top, survey["source"], "Tip in the facade survey.") if top == surveyed else
+                            _measurement(top, old["height"]["source"], "Mapped peak.") if seen and top == height else
                             _fact(top, rise["source"], True, "Typical rise above its source terrace."))
         record["spire_id"] = number
         record["placement_guessed"] = number in data["inferred"]
