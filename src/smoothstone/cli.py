@@ -1490,6 +1490,13 @@ def cmd_supports(args, job: Job) -> Out:
     return supports.cmd(args, job, Out(owns_next=False))
 
 
+def cmd_timelapse(args, job: Job) -> Out:
+    """The printer's own timelapse of this print, predicted (timelapse.py)."""
+    from . import timelapse
+
+    return timelapse.cmd(args, job, Out(owns_next=False))
+
+
 # image
 
 
@@ -3403,6 +3410,19 @@ def make_parser() -> Parser:
     s.add_argument("--layer", type=float, default=0.2, help="layer height, mm")
     s.add_argument("--material", help="PLA, PETG...; default: the job's material")
 
+    s = sub.add_parser("timelapse", parents=[common], help="the printer's timelapse of this print, before it prints")
+    s.add_argument("file", nargs="?")
+    s.add_argument("--gcode", help="sliced G-code to show; default: stone's own toolpaths")
+    s.add_argument("--printer", help="printer profile id; default: the job's or the machine's")
+    s.add_argument("--supports", choices=("auto", "on", "off"), default="auto")
+    s.add_argument("--mode", choices=("per-layer", "realtime"), default="per-layer")
+    s.add_argument("--seconds", type=float, help="the video's length, s")
+    s.add_argument("--night", action="store_true", help="the infrared night view")
+    s.add_argument("--camera-from", help="a snapshot from the printer's camera, to fit its pose")
+    s.add_argument("--bed-corners", help='the bed corners in that snapshot: "x1,y1 x2,y2 x3,y3 x4,y4"')
+    s.add_argument("--snap-at", type=float, help="the printer's Z (or Y, on a bed-slinger) in mm when the snapshot was taken")
+    s.add_argument("--save-camera", action="store_true", help="keep the fitted camera for every job")
+
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
 
@@ -3498,6 +3518,7 @@ COMMANDS = {
     "check": cmd_check,
     "slice": cmd_slice,
     "supports": cmd_supports,
+    "timelapse": cmd_timelapse,
     "image": cmd_image,
     "measure": cmd_measure,
     "find": cmd_find,
@@ -3567,7 +3588,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "fit", "doctor", "usage", "error", "supports")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "fit", "doctor", "usage", "error", "supports", "timelapse")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:
