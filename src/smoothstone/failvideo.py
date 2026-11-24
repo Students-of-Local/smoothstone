@@ -1,13 +1,14 @@
 """stone timelapse --fail: this print failing the way failsim's physics says it would, on stone
 timelapse's own toolpaths, renderer and camera. A model, not a recording.
 
-auto shows the first failure failsim.predict finds; a named mode (supports, detach, droop, bridge)
-shows that failure even when the model says the print holds, labeled a what-if. Up to the failure the
-frames are the normal timelapse's. From it on, the physics moves what is drawn:
+auto shows the first failure failsim.predict finds. A named mode (supports, detach, droop, bridge) shows
+that one where the model's own rules put it; detach also on a part that holds. What the print as asked
+does not do is labeled a what-if. Up to the failure the frames are the normal timelapse's, at most LEAD of
+them. From it on, every piece that fails by failsim's rules moves, and the rest prints:
 - supports: each layer's lines over air are one strand (failsim.drop_strand), held where it lies on
   printed plastic, falling and piling on what is below; lines above them print into air too;
 - droop: lines past the reach bend down (failsim.droop) and curl up as layers go on (failsim.curl);
-- bridge: lines held at both ends hang as a catenary (failsim.bridge_sag);
+- bridge: lines held at both ends hang as a catenary (failsim.bridge_sag); layers above rest on what hangs;
 - detach and topple: the part slides (failsim.rigid_slide) or tips (rigid_tip), every later layer
   prints into air, and plastic builds on the nozzle (failsim.blob_volume).
 Writes build/fail.mp4, fail_sheet.png and fail.json.
@@ -28,6 +29,7 @@ from . import failsim, timelapse
 
 MODES = ("auto", "supports", "detach", "droop", "bridge")
 AFTER = 12  # layers drawn after the failure (assumption: enough to see it; the printer would go on)
+LEAD = 30  # frames before the failure, evenly picked, so the failure is a good part of the video
 MOTION = 8  # frames of the failure itself
 STEP = 1.0  # mm between strand vertices
 MAX_SIM = 600.0  # mm of each layer's strand simulated; the rest drops straight down (assumption: speed)
@@ -38,6 +40,8 @@ WHAT = {"supports": "lines with nothing under them print into air and fall (spag
         "topple": "the nozzle's drag tips the part over; later layers print into air"}
 DOMINANT = {"supports": "droop_rule", "droop": "droop_rule", "bridge": "bridge_rule", "detach": "warp_rule",
             "topple": "nozzle_tip"}
+REMEDY = {"supports": "supports, or the part turned over", "droop": "supports, or the part turned over",
+          "bridge": "supports, or a shorter bridge", "detach": "a clean plate and a brim", "topple": "a brim, or the part lying down"}
 
 
 def layer_times(tp) -> np.ndarray:
@@ -63,24 +67,37 @@ def _dist(below: np.ndarray, cell: float) -> np.ndarray:
     return ndimage.distance_transform_edt(~below) * cell if below.any() else np.full(below.shape, np.inf)
 
 
-def _first(inp: failsim.Inputs, mode: str):
-    """The first layer with a piece of the asked kind past the reach: (layer, piece mask, mm past)."""
+def pieces(mk: np.ndarray, d: np.ndarray, inp: failsim.Inputs):
+    """Each piece of a layer past the reach, with what failsim.predict's rules say of it: (mask, mm past,
+    supports, droop, bridge or fine). d is the distance to the layer below."""
     from scipy import ndimage
 
-    eight, rch = np.ones((3, 3)), failsim.reach(inp.layer)
+    eight = np.ones((3, 3))
+    free = mk & (d > failsim.reach(inp.layer))
+    lab, n = ndimage.label(free, eight)
+    whole = ndimage.binary_fill_holes(mk & ~free) if n else None
+    for k in range(1, n + 1):
+        comp = lab == k
+        big, ring = float(d[comp].max()), ndimage.binary_dilation(comp, eight) & mk & ~free
+        if not ring.any():
+            yield comp, big, "supports"
+        elif ndimage.label(ring, eight)[1] >= 2 or whole[comp].all():
+            yield comp, big, "bridge" if 2 * big > failsim.fact("max_bridge_length") else "fine"
+        else:
+            tip, rule = -float(failsim.droop([big], inp.material, inp.layer, _width(inp), inp.fan)[0]), failsim.fact("droop_rule")
+            yield comp, big, next((m for m in ("supports", "droop") if tip >= rule[m] * inp.layer), "fine")
+
+
+def _width(inp) -> float:
+    return inp.width or failsim.fact("k2_widths")["outer_wall"]
+
+
+def _first(inp: failsim.Inputs, mode: str):
+    """The first layer with a piece that fails the asked way: (layer, piece mask, mm past)."""
     for i in range(1, len(inp.masks)):
-        mk = np.asarray(inp.masks[i], bool)
-        d = _dist(np.asarray(inp.masks[i - 1], bool), inp.cell)
-        free = mk & (d > rch)
-        lab, n = ndimage.label(free, eight)
-        for k in range(1, n + 1):
-            comp = lab == k
-            ring = ndimage.binary_dilation(comp, eight) & mk & ~free
-            two = ring.any() and (ndimage.label(ring, eight)[1] >= 2 or ndimage.binary_fill_holes(mk & ~free)[comp].all())
-            if two and 2 * float(d[comp].max()) <= failsim.fact("max_bridge_length"):
-                continue  # a short bridge (top skin over infill) prints fine: nothing to show
-            if mode == "supports" or (mode == "droop" and ring.any() and not two) or (mode == "bridge" and two):
-                return i, comp, float(d[comp].max())
+        for comp, big, kind in pieces(np.asarray(inp.masks[i], bool), _dist(np.asarray(inp.masks[i - 1], bool), inp.cell), inp):
+            if kind == mode:
+                return i, comp, big
     return None
 
 
@@ -122,8 +139,8 @@ class Story:
     """What the physics draws after the failure: the scene with the moves it took over removed, and per
     frame the extra geometry (ribbons of fallen or bent lines, the loose part, the blob)."""
 
-    def __init__(self, tp, inp: failsim.Inputs, fail: failsim.Failure, rgb):
-        self.tp, self.inp, self.fail, self.rgb = tp, inp, fail, rgb
+    def __init__(self, tp, inp: failsim.Inputs, fail: failsim.Failure, rgb, bed):
+        self.tp, self.inp, self.fail, self.rgb, self.bed = tp, inp, fail, rgb, bed
         self.kind = "detach" if fail.kind in ("detach", "topple") else fail.kind
         self.L = int(fail.layer or 0)
         self.ext = tp.extruding() & (tp.layer >= 0)
@@ -131,7 +148,9 @@ class Story:
         self.rch, self.cell = failsim.reach(inp.layer), inp.cell
         self.field = np.zeros(np.shape(inp.masks[0]))  # mm, top of what is printed or piled
         self.links: list[tuple] = []  # (from layer, A, B, width): fallen strands, for good
-        self.bent: list[tuple] = []  # (layer, points, dz, dist, droops, width)
+        self.bent: list[tuple] = []  # (layer, points, dz, dist, droops, the layer that bent first, width, height)
+        self.dz, self.far = np.zeros(self.field.shape), np.zeros(self.field.shape)  # mm down, mm past the reach
+        self.droops, self.since = np.zeros(self.field.shape, bool), np.full(self.field.shape, -1)
         self.notes: list[str] = []
         self.flow = float(np.median((tp.width * tp.height * tp.feed)[self.ext])) if self.ext.any() else 0.0
 
@@ -147,9 +166,11 @@ class Story:
         n = max(1, int(math.ceil(math.hypot(*(b[:2] - a[:2])) / step)))
         return a + (b - a) * np.linspace(0, 1, n + 1)[:, None]
 
-    def strand(self, moves, d, scale=1.0, keep=False):
-        """One layer's air moves as one strand, in print order. Returns drop_strand's frames when keep."""
+    def strand(self, moves, loose, scale=1.0, keep=False):
+        """One layer's air moves as one strand, in print order, free where loose. Returns drop_strand's frames when keep."""
         parts, printed = [], []
+        if not len(moves):
+            return []
         for j in moves:
             p = self.line(j)
             if parts:
@@ -170,7 +191,7 @@ class Story:
         s = np.linspace(0, cum[-1], len(R))
         seg = np.asarray(printed)[np.clip(np.searchsorted(cum, (s[1:] + s[:-1]) / 2, "right") - 1, 0, len(printed) - 1)]
         r, c = self.px(R)
-        pins = np.flatnonzero(d[r, c] <= self.rch)
+        pins = np.flatnonzero(~loose[r, c])
         sel = self.ext[moves]
         speed = float(np.median(self.tp.feed[moves][sel])) if sel.any() else 200.0
         flow = self.flow * scale
@@ -182,33 +203,25 @@ class Story:
                                   pins=pins[pins < m])
         rest = frs[-1] if frs else R[:0]
         tail = R[len(rest):].copy()  # past MAX_SIM, or not laid when the steps ran out: straight down
-        free = d[self.px(tail)] > self.rch
+        free = loose[self.px(tail)]
         tail[free, 2] = hf(tail[free, 0], tail[free, 1]) + rad
         rest = np.vstack([rest, tail])
         if m < len(R):
             self.notes.append(f"past the first {MAX_SIM:.0f} mm of a layer's strand, plastic drops straight down (no simulation)")
-        rr, cc = self.px(rest)
-        np.maximum.at(self.field, (rr, cc), rest[:, 2] + rad)
+        laid = rest[np.r_[seg, False] | np.r_[False, seg]]  # a travel between two pieces lays nothing
+        np.maximum.at(self.field, self.px(laid), laid[:, 2] + rad)
         self.links.append((self.layer_now, rest[:-1][seg], rest[1:][seg], 2 * rad))
         return [(f, seg[:max(0, len(f) - 1)], 2 * rad) for f in frs] if keep else []
 
-    def bend(self, i, moves, d):
-        lay = self.inp.layer
+    def bend(self, i, moves):
+        """The lines of layer i over a piece that bends, or over what bent below."""
         for j in moves:
             p = self.line(j, 0.5)
-            dd = np.minimum(d[self.px(p)], 100.0)
-            free = dd > self.rch
-            if not free.any():
-                continue
-            self.gone[j] = True
-            dz, droops = np.zeros(len(p)), np.zeros(len(p), bool)
-            if self.kind == "bridge":  # every line over the gap hangs with the span, by its distance from a side
-                span = float(self.fail.numbers.get("span_mm") or 2 * dd[free].max())
-                dz[free] = failsim.bridge_sag(span, np.minimum(dd[free], span / 2), lay)
-            else:
-                dz[free] = failsim.droop(dd[free], self.inp.material, lay, float(self.tp.width[j]))
-                droops = free
-            self.bent.append((i, p, dz, dd, droops, float(self.tp.width[j])))
+            at = self.px(p)
+            if (self.since[at] >= 0).any():
+                self.gone[j] = True
+                self.bent.append((i, p, self.dz[at], self.far[at], self.droops[at], self.since[at], float(self.tp.width[j]),
+                                  float(self.tp.height[j])))
 
     def run(self, last: int, fps: float = 30.0):
         """Steps the physics layer by layer from the failure to last. Returns the failure's own motion."""
@@ -226,23 +239,36 @@ class Story:
             moves = np.flatnonzero(self.ext & (tp.layer == i))
             if self.kind == "detach":
                 self.gone[moves] = True
-                self.strand(moves, np.full(self.field.shape, np.inf), 1 - failsim.fact("blob_stick"))
+                self.strand(moves, np.ones(self.field.shape, bool), 1 - failsim.fact("blob_stick"))
                 continue
             mk = np.asarray(inp.masks[i], bool)
-            if self.kind in ("droop", "bridge"):
-                self.bend(i, moves, _dist(np.asarray(inp.masks[i - 1], bool), self.cell) if i else np.zeros(mk.shape))
-                continue
             d = _dist(solid, self.cell)
-            solid = mk & (d <= self.rch)  # what fell supports nothing above it
+            falls, held = np.zeros(mk.shape, bool), np.zeros(mk.shape, bool)
+            self.since[~mk] = -1
+            for comp, big, kind in pieces(mk, d, inp):
+                if kind == "supports":
+                    falls |= comp
+                    continue
+                held |= comp
+                if kind != "fine":
+                    dd = d[comp]
+                    self.dz[comp] = (failsim.bridge_sag(2 * big, np.minimum(dd, big), inp.layer) if kind == "bridge" else
+                                     failsim.droop(dd, inp.material, inp.layer, _width(inp), inp.fan))
+                    self.far[comp], self.droops[comp], self.since[comp] = np.minimum(dd, 100.0), kind == "droop", i
+            solid = mk & ~falls  # what fell supports nothing above it
+            self.since[falls] = -1
             self.field[solid] = np.maximum(self.field[solid], inp.layer_z[i])
-            air = [j for j in moves if (d[self.px(self.line(j))] > self.rch).any()]
+            loose = (d > self.rch) & ~held
+            air = [j for j in moves if loose[self.px(self.line(j))].any()]
             self.gone[air] = True
-            if air:
-                got = self.strand(np.asarray(air), d, keep=i == L)
-                if i == L:
-                    motion = got
-        if self.kind == "supports":
+            got = self.strand(np.asarray(air, int), loose, keep=i == L)
+            if i == L and self.kind == "supports":
+                motion = got
+            self.bend(i, np.setdiff1d(moves, air))
+        if self.links and self.kind != "detach":
             self.notes.append(failsim.note("strand_friction"))
+        if self.bent:
+            self.notes.append("assumption: layers above a sagged or drooped piece lie on it, bent the same way")
         return motion
 
     def loose(self, fps):
@@ -268,32 +294,39 @@ class Story:
             self.notes.append("the part tips as a solid box about its footprint edge (failsim.rigid_tip)")
         else:
             reach = float(proj.max() - proj.min()) + self.cell
-            mats = failsim.rigid_slide(u, reach, MOTION)
-            self.notes.append("assumption: the nozzle drags the loose part one footprint length along its last line")
+            room = [(b - v.max() if c > 0 else v.min()) / abs(c) for b, v, c in zip(self.bed, (fx, fy), u) if abs(c) > 1e-6]
+            mats = failsim.rigid_slide(u, max(0.0, min(reach, *room)), MOTION)
+            self.notes.append("assumption: the nozzle drags the loose part one footprint length along its last line, or to the plate's edge")
         self.mats = [mats[k] for k in sorted(set(np.linspace(0, len(mats) - 1, MOTION).round().astype(int)))]
         return self.mats
 
     def items(self, layer: int, t_s: float, head, motion=None, scale=1.0) -> list[dict]:
         """The extra geometry of a frame showing layer (from the failure on)."""
-        out, A, B, W = [], [], [], []
+        out, A, B, W, H = [], [], [], [], []
+
+        def add(a, b, w, h):
+            A.append(a), B.append(b), W.append(np.full(len(a), w)), H.append(np.full(len(a), h))
+
         falling = motion is not None and self.kind == "supports"
         for i, a, b, w in self.links:
             if i <= layer and len(a) and not (falling and i == layer):  # this layer's strand is still on its way down
-                A.append(a), B.append(b), W.append(np.full(len(a), w))
+                add(a, b, w, w)
         if falling:
             f, seg, w = motion
-            A.append(f[:-1][seg]), B.append(f[1:][seg]), W.append(np.full(int(seg.sum()), w))
-        mat, lay = self.inp.material, self.inp.layer
-        for i, p, dz, dd, droops, w in self.bent:
+            add(f[:-1][seg], f[1:][seg], w, w)
+        for i, p, dz, dd, droops, since, w, h in self.bent:
             if i > layer:
                 continue
-            up = failsim.curl(dd, mat, lay, layer - i) if layer > i else 0.0
             q = p.copy()
-            q[:, 2] = np.maximum(p[:, 2] + scale * dz + np.where(droops, up, 0.0), w / 2)
-            A.append(q[:-1]), B.append(q[1:]), W.append(np.full(len(q) - 1, w))
+            q[:, 2] += scale * dz
+            for k in np.unique(since[droops]):
+                if layer > k:
+                    sel = droops & (since == k)
+                    q[sel, 2] += failsim.curl(dd[sel], self.inp.material, self.inp.layer, int(layer - k))
+            q[:, 2] = np.maximum(q[:, 2] - h / 2, h / 2)  # the middle of the line
+            add(q[:-1], q[1:], w, h)
         if A:
-            W = np.concatenate(W)
-            out.append({"mesh": timelapse.ribbons(np.vstack(A), np.vstack(B), W, W), "rgb": self.rgb})
+            out.append({"mesh": tubes(np.vstack(A), np.vstack(B), np.concatenate(W), np.concatenate(H)), "rgb": self.rgb})
         if self.kind == "detach":
             T = motion if motion is not None else self.mats[-1]
             V, Q = self.part
@@ -308,16 +341,35 @@ class Story:
         return out
 
 
-def plan(tp, inp, fail, rgb):
+def tubes(a: np.ndarray, b: np.ndarray, w: np.ndarray, h: np.ndarray):
+    """Each segment (xyz of its middle line) as a box w wide and h high along it, at any slope, stretched half a
+    width at each end so a strand has no gaps: 8 vertices, 6 quads."""
+    L = np.linalg.norm(b - a, axis=1)
+    ok = L > 1e-9
+    a, b, w, h, t = a[ok], b[ok], w[ok, None], h[ok, None], (b - a)[ok] / L[ok, None]
+    side = np.c_[-t[:, 1], t[:, 0], np.zeros(len(t))]
+    n = np.linalg.norm(side, axis=1, keepdims=True)
+    side = np.where(n > 1e-6, side / np.maximum(n, 1e-6), [1.0, 0.0, 0.0])
+    up = np.cross(t, side)
+    ends = [(a - t * w / 2, sy, sz) for sz in (-0.5, 0.5) for sy in (-0.5, 0.5)] + [
+        (b + t * w / 2, sy, sz) for sz in (-0.5, 0.5) for sy in (-0.5, 0.5)]
+    V = np.stack([e + side * w * sy + up * h * sz for e, sy, sz in ends], 1).reshape(-1, 3)
+    quads = np.array([[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]])
+    Q = (quads[None] + (np.arange(len(a)) * 8)[:, None, None]).reshape(-1, 4)
+    return V.astype(np.float32), Q.astype(np.int32)
+
+
+def plan(tp, inp, fail, rgb, bed):
     """(scene toolpath, frames, extras per frame, index of the first failure frame, story)."""
-    st = Story(tp, inp, fail, rgb)
+    st = Story(tp, inp, fail, rgb, bed)
     L, nl = st.L, len(tp.layer_z)
     last = min(nl - 1, L + AFTER)
     motion = st.run(last)
     base = {f["layer"]: f for f in timelapse.frames(tp, "per-layer")}
     lt = layer_times(tp)
-    frs, extra = [dict(base[k], note="") for k in sorted(base) if k < L], []
-    extra = [[] for _ in frs]
+    lead = [k for k in sorted(base) if k < L]
+    lead = [lead[k] for k in sorted(set(np.linspace(0, len(lead) - 1, min(LEAD, len(lead))).round().astype(int)))]
+    frs, extra = [dict(base[k], note="") for k in lead], [[] for _ in lead]
     first = len(frs)
     tag = WHAT[fail.kind]
     full = (lambda i: 1) if st.kind == "detach" else (lambda i: i + 2)
@@ -354,7 +406,10 @@ def caption(png: Path, text: str) -> None:
 
     im = Image.open(png).convert("RGB")
     d = ImageDraw.Draw(im)
-    font = ImageFont.load_default(size=max(12, im.size[1] // 28))
+    size = max(12, im.size[1] // 28)
+    while size > 8 and ImageFont.load_default(size=size).getlength(text) > im.size[0] - 16:
+        size -= 1
+    font = ImageFont.load_default(size=size)
     d.rectangle((0, im.size[1] - font.size - 10, im.size[0], im.size[1]), fill=(0, 0, 0))
     d.text((8, im.size[1] - font.size - 6), text, fill=(255, 90, 70), font=font)
     im.save(png)
@@ -394,22 +449,32 @@ def cmd(args, job, prof, out):
         out.fix("--fail draws one frame a layer; drop --mode")
         out.next = timelapse.again(args, **{"--mode": None})
         return out
-    if mode not in ("auto", "detach") and not args.gcode:
-        args.supports = "off"  # the what-if of a part printed without them
+    if args.material and args.material.upper() not in failsim.MATERIALS:
+        out.fix(f"--material {args.material}: the model has {', '.join(failsim.MATERIALS)}")
+        out.next = "ask the person: which of these is closest? Then: " + timelapse.again(args, **{"--material": "<" + "|".join(failsim.MATERIALS) + ">"})
+        return out
+    asked, without = args.supports, mode not in ("auto", "detach") and not args.gcode
+    args.supports = "off" if without else asked  # these modes draw the part without them
     got = timelapse.start(args, job, prof, out)
+    args.supports = asked
     if got is None:
         return out
     tp, what, f = got
-    mat = refs.material_for(job.request()).material.upper() if job.exists() else "PLA"
-    note = []
+    if without and asked != "off":  # a what-if when the print as asked has supports
+        from . import supports
+
+        without = asked == "on" or supports.analyze(supports.load(f), columns=True)["needed"]
+    mat = (args.material or (refs.material_for(job.request()).material if job.exists() else "PLA")).upper()
+    note = [f"material: {mat}" if args.material or job.exists() else "material: PLA is assumed; say --material PETG or ABS"]
     if mat not in failsim.MATERIALS:
-        note.append(f"failsim has no model for {mat}; PLA used")
+        note = [f"material: the model has no {mat}, so this is PLA's"]
         mat = "PLA"
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
     inp = inputs(tp, mat, clean)
     fails = failsim.predict(inp)
     fail, what_if = choose(fails, mode, inp)
-    out.add("This is a model, not a recording: failsim's physics on stone's own toolpaths.")
+    taken = without and asked != "off"
+    out.add(f"This is a model, not a recording: failsim's physics on the toolpath {what}.", f"{note[0][0].upper()}{note[0][1:]}.")
     nxt = job.status().get("next") if job.exists() else None
     if fail is None:
         if mode == "auto":
@@ -420,26 +485,33 @@ def cmd(args, job, prof, out):
             out.result = "no failure predicted"
             out.next = nxt if nxt and nxt != "stone status" else "none, no failure predicted"
         else:
-            out.add(f"This part has nothing for --fail {mode} to show. --fail detach shows a loose part anyway.")
+            out.add(f"Nothing here fails by {mode}, so there is nothing to show. --fail detach shows a loose part anyway.")
             out.result = "nothing to show"
-            args.fail = "detach"
-            out.next = timelapse.again(args)
+            out.next = "none, nothing to show"
         return out
-    dom = failsim.note("contamination") if clean < 1 and fail.kind == "detach" else failsim.note(DOMINANT[fail.kind])
-    if what_if:
-        dom = fail.assumptions[-1]
-    out.add(f"{'What-if (you asked for it, the model does not predict it)' if what_if else 'Predicted'}: "
+    loose = fail.kind in ("detach", "topple")
+    dom = failsim.note("contamination" if clean < 1 and loose else "nozzle_tip" if "hold_n" in fail.numbers else DOMINANT[fail.kind])
+    said = "What-if (drawn without supports, which this print has)" if taken else (
+        "What-if (you asked for it, the model does not predict it)" if what_if else "Predicted")
+    what_if = what_if or taken
+    real = fails[0] if fails[0].kind != "none" and (fails[0].layer or 0) < (fail.layer or 0) else None
+    if real:
+        out.add(f"Before that, the model predicts {real.kind} at layer {(real.layer or 0) + 1}; --fail shows it.")
+    out.add(f"{said}: "
             f"{fail.kind} at layer {(fail.layer or 0) + 1} (z {fail.z} mm, {timelapse.clock(fail.time or 0)} in): {WHAT[fail.kind]}.")
     out.add(f"Why: {numbers_line(fail)}.")
     out.add(f"Main assumption: {dom}")
+    done = nxt if nxt and nxt != "stone status" else "none, the failure video is made"
+    if not what_if:
+        done = f"ask the person: the model says this print fails ({fail.kind}); print it with {REMEDY[fail.kind]}?"
     no = timelapse.missing()
     if no:
         out.fix(f"no video: {no}")
-        out.next = "none, the prediction is above; the video needs that program"
+        out.next = done if not what_if else "none, the what-if is above; the video needs that program"
         return out
     dest = timelapse.out_dir(args, job, f)
     rgb = timelapse.color(job)[1]
-    scene, frs, extra, first, st = plan(tp, inp, fail, rgb)
+    scene, frs, extra, first, st = plan(tp, inp, fail, rgb, prof["build_volume_mm"][:2])
     label = "MODEL, not a recording" + (": what-if" if what_if else "") + f": {WHAT[fail.kind]}"
     mp4, png, js = dest / "fail.mp4", dest / "fail_sheet.png", dest / "fail.json"
     try:
@@ -454,7 +526,7 @@ def cmd(args, job, prof, out):
         timelapse.sheet(files, frs, png, pick=pick)
     except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as e:
         out.fix(f"no video: {timelapse.why(e)}")
-        out.next = "none, the prediction is above"
+        out.next = done if not what_if else "none, the what-if is above"
         return out
     finally:
         for x in (dest / "fail").glob("*.npz"):
@@ -474,5 +546,5 @@ def cmd(args, job, prof, out):
     out.add(f"Sheet: {png}")
     out.add(f"Data: {js} ({time.time() - t_start:.0f} s)")
     out.result = f"failure video made: {fail.kind}{' (what-if)' if what_if else ''}"
-    out.next = nxt if nxt and nxt != "stone status" else "none, the failure video is made"
+    out.next = done
     return out

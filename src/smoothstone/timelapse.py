@@ -458,7 +458,7 @@ def out_dir(args, job, f: Path) -> Path:
 def again(args, **change) -> str:
     """The command as typed, with some options changed or dropped (None)."""
     v = {"file": args.file, "--gcode": args.gcode, "--printer": args.printer, "--mode": args.mode, "--supports": args.supports,
-         "--seconds": args.seconds, **change}
+         "--seconds": args.seconds, "--material": args.material, **change}
     out = ["stone timelapse"] + ([shlex.quote(v.pop("file"))] if v.get("file") else [])
     out += [f"{k} {shlex.quote(str(x))}" for k, x in v.items() if x not in (None, "auto", "per-layer") and k.startswith("--")]
     if args.fail:
