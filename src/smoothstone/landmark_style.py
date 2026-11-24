@@ -115,7 +115,9 @@ def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, p
         trim = trim - _union(protected)
     man = (man - trim) + wall
     # Trimming the level gable around a tapered spire can leave a shaving of the old block beside its point.
-    loose = [piece for piece in man.decompose() if 0 < piece.volume() < 10 and piece.bounding_box()[2] > z0 + 1]
+    # A real part that came loose is far larger than this share of the gable, and still refuses the build.
+    shaving = 10 * max(1, (width / 80) ** 3)
+    loose = [piece for piece in man.decompose() if 0 < piece.volume() < shaving and piece.bounding_box()[2] > z0 + 1]
     if loose:
         man = man - _union(loose)
         notes.append(f"Removed {len(loose)} loose shavings of the generalized west gable.")
@@ -130,8 +132,27 @@ def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, p
         section = _section([[a * broad / 2 * across + b * 1.7 * along
                              for a, b in ((-1, -1), (-1, 1), (1, 1), (1, -1))]])
         foot = section.offset(.5).extrude(height * .09).translate([*xy, z0 - .06])
-        pier = _tapered(section, xy, shoulder + .1, .86, z0 - .04)
-        additions.extend([foot, pier])
+        # The broad piers are paired shafts: a groove up the front, and a gablet over each half.
+        halves = (-broad / 4, broad / 4) if broad >= 4.5 else (0.,)
+        if len(halves) == 2:
+            groove = [a * .45 * across + (-1.7 + b) * along for a, b in ((-1, -.1), (-1, .8), (1, .8), (1, -.1))]
+            shaft = section - _section([groove])
+        else:
+            shaft = section
+        additions.extend([foot, shaft.extrude(shoulder + .1).translate([*xy, z0 - .04])])
+        for course in facts.get("west_pier_courses", {}).get("value", []):
+            if height * .12 < course * height < shoulder - 2:
+                # Each step overhangs no more than its own rise.
+                for step in (1, 2):
+                    band = section.offset(.2 * step).extrude(.2 if step == 1 else .5)
+                    additions.append(band.translate([*xy, z0 + course * height + .2 * (step - 1)]))
+        for shift in halves:
+            # Gablets keep clear of the groove and of the pier's own faces, so no two solids meet on one edge.
+            half = (broad / 4 - .33) if len(halves) == 2 else broad / 2 - .1
+            middle_of = shift + math.copysign(.23, shift) if shift else 0.
+            gablet = _section([[(-half, -.1), (half, -.1), (0, half * 1.8)]])
+            additions.append(_place(gablet.extrude(3.2), across, -along,
+                                    [*(xy + middle_of * across - along * 1.6), z0 + shoulder]))
         for shift in (() if "spire_plan" in facts else (-1.05, 1.05)):
             spot = xy + shift * across
             tip_height = peak * height - abs(shift) * .12

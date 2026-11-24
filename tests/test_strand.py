@@ -81,6 +81,28 @@ def test_a_hanging_hot_thread_stretches_at_troutons_rate(monkeypatch):
     assert (z0 - s.points()[-1, 2]) * 240 * 1e-3 == pytest.approx(want, rel=0.05)
 
 
+def test_friction_is_mu_w_l():
+    s = st.Strand(np.c_[np.linspace(0, 100, 101), np.zeros(101), np.full(101, 0.2)], 0.4, PLA, temp=25, air=25, fan=False,
+                  ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True, flow=0.0)
+    head = np.array([100.0, 0, 0.2])
+    for _ in range(240):
+        head = head + [50 / 240, 0, 0]
+        s.step(head=head)
+    w = 1240 * math.pi / 4 * 0.4e-3 ** 2 * G * 0.1
+    assert s.force == pytest.approx(0.5 * w, rel=0.1)
+
+
+def test_a_dropped_strand_lies_still_and_keeps_its_plastic():
+    s = rod(20, ground=lambda x, y: np.zeros(np.shape(x)), temp=220)
+    vol = s.vol.sum()
+    for _ in range(960):
+        s.step()
+    p = s.points()
+    assert np.abs(s.v).max() < 2e-3
+    assert p[:, 2] == pytest.approx(np.r_[s.diameters()[0], s._nodes(s.diameters())[1:-1], s.diameters()[-1]] / 2, abs=0.01)
+    assert s.vol.sum() == pytest.approx(vol, rel=1e-9)
+
+
 def test_it_cools_as_a_strand_in_still_air(monkeypatch):
     s = rod(20, temp=220, held=range(41))
     for _ in range(240):
@@ -89,6 +111,99 @@ def test_it_cools_as_a_strand_in_still_air(monkeypatch):
     for _ in range(1000):
         t -= 4 * float(fs.h_strand(0.4, t, 35.0)) * (t - 35) / (1240 * 1400 * 0.4e-3) * 1e-3
     assert float(s.t[20]) == pytest.approx(t, rel=0.02)
+
+
+def laid(weld, speed=200.0, flow=10.0, mm=120.0):
+    """A strand from a nozzle moving along x, 5 mm over a bed; its far end welded there or free."""
+    s = st.Strand([[0, 0, 0.24], [0, 0, 5.0]], st.exit_diameter(), PLA, flow=flow, ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True,
+                  fan=False, held=(0,) if weld else ())
+    for k in range(int(mm / speed * 240)):
+        s.step(head=(speed * (k + 1) / 240, 0, 5.0))
+    return s
+
+
+def test_held_it_is_drawn_thin_and_free_it_is_dragged():
+    held, free = laid(True), laid(False)
+    assert held.points()[0] == pytest.approx([0, 0, 0.24], abs=1e-3)
+    assert np.median(held.diameters()) == pytest.approx(math.sqrt(4 * 10 / 200 / math.pi), rel=0.25)
+    assert held.lengths()[1].sum() * 1e3 == pytest.approx(120, rel=0.1)  # it spans the whole path
+    assert free.points()[0, 0] > 40  # dragged along the bed
+    assert np.median(free.diameters()) > 1.3 * np.median(held.diameters())
+    assert held.force > 3 * free.force
+
+
+def test_plastic_is_conserved_out_of_the_nozzle():
+    s = laid(False)
+    first = math.pi / 4 * st.exit_diameter() ** 2 * 4.76
+    assert s.vol.sum() * 1e9 == pytest.approx(first + 10.0 * (int(120 / 200 * 240) / 240), rel=1e-6)
+
+
+def test_it_welds_to_hot_enough_plastic_and_not_to_the_bed():
+    kw = dict(ground=lambda x, y: np.zeros(np.shape(x)))
+    on = rod(10, plastic=lambda x, y: np.ones(np.shape(x), bool), **kw)
+    bed = rod(10, plastic=lambda x, y: np.zeros(np.shape(x), bool), **kw)
+    cold = rod(10, plastic=lambda x, y: np.ones(np.shape(x), bool), temp=40, **kw)
+    for s in (on, bed, cold):
+        for _ in range(120):
+            s.step()
+    assert on.fixed.any() and not bed.fixed.any() and not cold.fixed.any()
+    assert on.points()[on.fixed, 2] == pytest.approx(0.2, abs=0.02)  # where it lies, not where it was about to land
+    step = lambda x, y: np.where(x < 10.2, 5.0, 0.0)  # noqa: E731  # plastic, 5 mm high up to its edge
+    off = st.Strand([[9.5, 0, 5.3], [10, 0, 5.3], [10.1, 0, 5.3]], 0.4, PLA, temp=220, ground=step, fan=False,
+                    plastic=lambda x, y: np.ones(np.shape(x), bool))
+    off.v[:, 0] = 0.4
+    for _ in range(24):
+        off.step()
+        assert off.points()[off.fixed, 2] == pytest.approx(step(off.points()[off.fixed, 0], 0) + 0.2, abs=0.05)
+
+
+def fence(x, y):
+    """A wall one line thick and 5 mm high, along x at y = 3."""
+    return np.where(np.abs(np.c_[x, y][:, 1] - 3) < 0.21, 5.0, 0.0)
+
+
+@pytest.mark.parametrize("z,along,across,fall", [(0.3, 0, 0.2, 0), (0.3, 0, 2, 0), (0.3, 0.3, 0.2, 0), (5.2, 0, 0.3, 0.35)])
+def test_a_wall_one_line_thick_stops_it(z, along, across, fall):
+    s = rod(10, ground=fence, temp=25, mu=0.0)
+    s.x[:, 1:] = 2.4e-3, z * 1e-3
+    s.v[:] = along, across, -fall
+    for _ in range(60):
+        s.step()
+        assert s.points()[:, 1].max() < 2.8  # it stops at the wall's side, however fast, and does not hop it
+    assert s.points()[:, 1].max() > 2.5
+    assert s.points()[0, 0] == pytest.approx(along * 250, rel=0.1, abs=0.01)  # and slides along it
+
+
+@pytest.mark.parametrize("shift", (0.0, 0.3, 0.6, 0.9))
+def test_dropped_across_a_thin_wall_it_hangs_on_it(shift):
+    y = np.arange(-12, 18, 1.2) + shift
+    s = st.Strand(np.c_[0 * y, y, 0 * y + 12], 0.4, PLA, fan=False, ground=fence, temp=220)
+    for _ in range(120):
+        s.step()
+        p = s.points()
+        assert np.interp(3.0, p[:, 1], p[:, 2]) > 4.9
+    assert p[0, 2] < 0.3 and p[-1, 2] < 0.3 and s.vol.sum() == pytest.approx(math.pi / 4 * 0.4e-3 ** 2 * 28.8e-3)
+
+
+def test_cut_over_a_corner_the_new_node_lies_on_it():
+    top = lambda x, y: np.where(x >= 0, 5.0, 0.0)  # noqa: E731
+    s = st.Strand([[3.0, 0, 5.2], [1.6, 0, 5.2], [-0.4, 0, 3.9]], 0.4, PLA, fan=False, ground=top, temp=25)
+    s._grow()
+    new = s.points()[2]
+    assert len(s.x) == 4 and new[0] == pytest.approx(0.6) and new[2] >= 5.1
+    s = rod(10, ground=top, temp=25)
+    s.x[:, 2] = 4.9e-3  # and what is inside comes out, but is not thrown
+    for _ in range(20):
+        s.step()
+        assert s.points()[:, 2] == pytest.approx(5.2, abs=0.01)
+
+
+def test_halved_the_fan_stays_where_the_nozzle_is(monkeypatch):
+    s, heads = rod(10, temp=220), []
+    step = s._step
+    monkeypatch.setattr(s, "_step", lambda dt, head, check: heads.append(head) or (not check and step(dt, head, check)))
+    s.step(head=(5.0, 0, 40.0), halve=1)
+    assert heads == [(5.0, 0, 40.0)] * 3
 
 
 def test_the_fan_blows_a_strand_down():
@@ -198,6 +313,22 @@ def test_hot_and_cold_lengths_bend_in_series(monkeypatch):
     assert some == pytest.approx(2 / 3 * droop(np.full(41, 140.0)), rel=0.15)
 
 
+def test_a_cold_strand_springs_back(monkeypatch):
+    s = bent(60, temp=25, air=25, held=range(21))
+    assert turned(s) > 80
+    s.step()
+    assert rest(s, monkeypatch) < 15
+
+
+def test_cutting_a_drawn_edge_keeps_its_plastic_and_its_bend():
+    s = bent(12, temp=25, air=25, held=range(21))
+    vol, eb = s.vol.sum(), s.eb.copy()
+    s.x *= 2  # every edge 1.9 mm
+    s._grow()
+    assert len(s.x) == 41 and s.vol.sum() == pytest.approx(vol)
+    assert s.eb[2:-2:2] == pytest.approx(eb[1:-1]) and s.eb[3:-3:2] == pytest.approx((eb[1:-2] + eb[2:-1]) / 2)
+
+
 @pytest.mark.parametrize("n", (3, 11))
 @pytest.mark.parametrize("speed", (30, 60, 110, 250))  # rad/s about its middle: 7 to 60 degrees a step
 def test_a_whipping_strand_keeps_its_length(monkeypatch, n, speed):
@@ -266,3 +397,22 @@ def test_a_set_curve_sags_sideways_by_bending_and_twisting(monkeypatch):
     twist = free ** 2 / 2 - free * math.sin(free) + math.sin(free) ** 2 / 2
     want = q * 0.02 ** 4 / (PLA.e * 1e6 * i) * (bend + twist * (1 + st.NU))
     assert (30 - s.points()[-1, 2]) * 1e-3 == pytest.approx(want, rel=0.02)
+
+
+@pytest.mark.parametrize("mat", fs.MATERIALS)
+def test_it_runs_for_each_plastic(mat):
+    s = st.Strand([[0, 0, 9.0], [0, 0, 10.0]], st.exit_diameter(), mat, flow=12, ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True)
+    for k in range(480):
+        a = k / 240 * 2 * math.pi
+        s.step(head=(20 * math.sin(a), 20 - 20 * math.cos(a), 10.0))
+    p = s.points()
+    assert np.isfinite(p).all() and (p[:, 2] > 0).all() and np.abs(p).max() < 60
+
+
+def test_a_cold_strand_torn_back_and_forth_gives_instead_of_flying():
+    """It froze with its stress, not its strain, so stiffening adds no energy, and it gives past its strength."""
+    s = laid(True)
+    for k in range(240):
+        s.step(head=(120 + 60 * math.sin(k / 6), 40 * math.sin(k / 9), 5.0))
+        assert np.abs(s.v).max() < 10 and np.abs(s.points()).max() < 400  # the nozzle reaches 2.7 m/s
+    assert (np.abs(s.tens) <= s.strength * s.vol / s.lengths()[1] * 1.2 + 1e-9).all()

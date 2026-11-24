@@ -563,6 +563,37 @@
    "checked": "2026-11-24"
   },
   {
+   "id": "failsim.die_swell",
+   "topic": "failsim",
+   "key": "die_swell",
+   "value": 1.2,
+   "unit": "ratio",
+   "note": "How much wider than the bore a strand comes out. ABS at a 0.4 mm nozzle: 1.17 (0.9 mm3/s) to 1.45 (10 mm3/s) at 200 C, 1.12 to 1.185 at 250 C.",
+   "quote": "The minimum swell ratio is 1.12, for a volumetric flow rate of 0.9 mm3/s and a hot end temperature setpoint of 250 C, and the maximum swell ratio is 1.45, for a volumetric flow rate of 10 mm3/s and a hot-end temperature setpoint of 200 C",
+   "source": "Colon, Kazmer, Peterson, Seppala, Characterization of Die-Swell in Thermoplastic Material Extrusion, Additive Manufacturing 2023 (NIST), section 3",
+   "cite": "NIST 936451 section 3",
+   "url": "https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=936451",
+   "checked": "2026-11-24",
+   "range": [
+    1.12,
+    1.45
+   ],
+   "assumption": "A strand comes out 1.2 times as wide as the bore, whatever the plastic, flow and heat (measured on ABS: 1.12 to 1.45)"
+  },
+  {
+   "id": "failsim.weld_rule",
+   "topic": "failsim",
+   "key": "weld_rule",
+   "value": 0.5,
+   "unit": "ratio",
+   "note": "Two like bodies brought together meet at the mean of their temperatures. A strand welds to the plastic it lands on when that mean is above the glass transition.",
+   "source": "stone model; the mean is Carslaw and Jaeger, Conduction of Heat in Solids, section 2.16",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "A strand stays where it lands on plastic if their mean temperature is above the glass transition; the plastic below is taken at the air's, so one just printed holds better than this says"
+  },
+  {
    "id": "failsim.fan_reach",
    "topic": "failsim",
    "key": "fan_reach",
@@ -590,7 +621,7 @@
    "cite": "assumption",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "Coulomb friction 0.5; it only changes how far a fallen strand slides, not whether it falls."
+   "assumption": "Coulomb friction 0.5 on the bed and on the part: how far a fallen strand slides, and what the nozzle drags or draws thin against."
   },
   {
    "id": "failsim.blob_stick",

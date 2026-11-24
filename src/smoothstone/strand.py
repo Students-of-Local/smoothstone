@@ -1,4 +1,4 @@
-"""One strand of melt in the air: what plastic does from the nozzle until it sets.
+"""One strand of melt in the air: what plastic does from the nozzle until it lies still.
 
 A chain of nodes, each edge holding a fixed volume of plastic, stepped implicitly (no stiffness limit):
 - it stretches and bends as a Maxwell solid: modulus E(T), relaxation time 3 eta(T) / E. Hot, it flows like
@@ -6,12 +6,17 @@ A chain of nodes, each edge holding a fixed volume of plastic, stepped implicitl
   twists freely (a discrete elastic rod: Bergou et al. 2008, twist without inertia). It thins as it stretches;
 - its weight, the air's drag on the part of the wind square to it (measured on wires: NACA TN 84) and the
   part fan's jet move it; each node cools in the wind it feels (failsim.h_strand);
+- it rests on the ground with Coulomb friction, and welds where it lands on plastic hot enough;
+- plastic comes out of the nozzle at the print's own flow, swollen past the bore, and the nozzle moves on. Held
+  behind, the hot neck is drawn thin; not held, the strand is dragged along. Which one is the neck's
+  viscosity against what holds the strand, so it differs by plastic, temperature, flow and speed.
 
-Inside: meters, kilograms, seconds, newtons. In and out: mm, C. A model, not a recording."""
+Inside: meters, kilograms, seconds, newtons. In and out: mm, mm/s, mm3/s, C. A model, not a recording."""
 
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 
 import numpy as np
 from scipy.linalg import solveh_banded
@@ -19,8 +24,8 @@ from scipy.linalg import solveh_banded
 from . import failsim
 from .strength import NU
 
-BIG = 1e7  # kg/s: a node held in place
-SEG = 1.2e-3  # m between nodes
+BIG = 1e7  # kg/s: a node held on a place or a speed
+CREEP = 1e-4  # m/s: slower than this, friction holds
 DT = 1 / 240  # s
 TURN = 0.25  # of an edge's length its ends may move against each other in one step
 SPIN = 1e-3  # m, where an edge's spin is solved as a speed
@@ -32,6 +37,16 @@ def drag_coefficient(re) -> np.ndarray:
     tab = np.asarray(failsim.fact("cylinder_drag"), float)
     lamb = 8 * math.pi / (re * (2.002 - np.log(np.minimum(re, 0.5))))
     return np.where(re < tab[0, 0], lamb, np.exp(np.interp(np.log(re), np.log(tab[:, 0]), np.log(tab[:, 1]))))
+
+
+def exit_diameter(bore: float = 0.4) -> float:
+    """mm, the strand as it leaves the nozzle: the bore times the die swell."""
+    return bore * failsim.fact("die_swell")
+
+
+def payout(flow_mm3_s: float, bore: float = 0.4) -> float:
+    """mm/s the strand leaves the nozzle at when nothing pulls it."""
+    return flow_mm3_s / (math.pi / 4 * exit_diameter(bore) ** 2)
 
 
 def _norm(v):
@@ -77,32 +92,44 @@ def _rows(way, ln):
     return m, 1 / (both * SPIN)
 
 
+@lru_cache(maxsize=64)
+def _places(count, size, rows, width):
+    p, q = np.triu_indices(size)
+    return size * p + q, ((rows - 1 - q + p) * width + 4 * np.arange(count)[:, None] + q).ravel()
+
+
 def _add(ab, e):
     """Add symmetric elements, one from each node on, to an upper band of 4 unknowns a node."""
-    p, q = np.triu_indices(e.shape[1])
-    at = (len(ab) - 1 - q + p) * ab.shape[1] + 4 * np.arange(len(e))[:, None] + q
-    ab += np.bincount(at.ravel(), e[:, p, q].ravel(), ab.size).reshape(ab.shape)
+    take, at = _places(*e.shape[:2], *ab.shape)
+    ab += np.bincount(at, e.reshape(len(e), -1)[:, take].ravel(), ab.size).reshape(ab.shape)
 
 
 class Strand:
-    """points in mm. Nodes run from the first plastic out to the nozzle."""
+    """ground(x, y) -> z and plastic(x, y) -> bool take mm. Nodes run from the first plastic out to the nozzle."""
 
-    def __init__(self, points, diameter, mat="PLA", temp=None, air=None, fan=True, held=()):
+    def __init__(self, points, diameter, mat="PLA", temp=None, air=None, flow=0.0, bore=0.4, fan=True, ground=None, plastic=None,
+                 mu=None, seg=1.2, nozzle=False, held=()):
         self.m = m = failsim._mat(mat)
         self.x = np.asarray(points, float) * 1e-3
         n = len(self.x)
         self.v = np.zeros_like(self.x)
         self.vol = math.pi / 4 * (np.full(n - 1, float(diameter)) * 1e-3) ** 2 * np.linalg.norm(np.diff(self.x, axis=0), axis=1)
         self.t = np.full(n, float(m.nozzle if temp is None else temp))
+        self.hot = float(m.nozzle if temp is None else temp)  # what comes out of the nozzle
         self.air = m.chamber if air is None else float(air)
         self.es, self.eb = np.zeros(n - 1), np.zeros((n, 4))  # elastic stretch of edges, elastic curvature and twist of nodes (1/m)
-        self.rate, self.tens = np.zeros(n - 1), np.zeros(n - 1)
+        self.rate, self.tens, self.press = np.zeros(n - 1), np.zeros(n - 1), np.zeros(n)
         self.strength = failsim._props(m.name)[0]["tensile_xy"]["value"] * 1e6  # Pa
         self.e = np.full(n - 1, np.inf)  # Pa, the modulus its elastic strains were kept at
         self.fixed = np.zeros(n, bool)
         self.fixed[list(held)] = True
+        self.nozzle, self.flow, self.area = nozzle, flow * 1e-9, math.pi / 4 * (exit_diameter(bore) * 1e-3) ** 2
         self.fan, self.reach = (failsim.fact("fan_air_speed") if fan else 0.0), failsim.fact("fan_reach") * 1e-3
+        self.ground, self.plastic = ground, plastic
+        self.mu = failsim.fact("strand_friction") if mu is None else mu
+        self.seg = seg * 1e-3
         self.rho = m.density * 1000
+        self.force = 0.0  # N at the nozzle
 
     # geometry
     def lengths(self):
@@ -130,13 +157,14 @@ class Strand:
         return out
 
     def step(self, dt: float = DT, head=None, halve: int = 4):
-        """One step. head: the nozzle's place, mm, where the fan blows. One that swings an edge too far is taken in halves."""
+        """One step. head: the nozzle's new place, mm. One that swings an edge too far is taken in halves."""
         was = {k: q.copy() if isinstance(q, np.ndarray) else q for k, q in self.__dict__.items()} if halve else None
         if self._step(dt, head, halve > 0):
             return
         self.__dict__.update(was)
-        for _ in range(2):
-            self.step(dt / 2, head, halve - 1)
+        start = self.x[-1] * 1e3
+        for part in (0.5, 1.0):
+            self.step(dt / 2, start + (np.asarray(head) - start) * part if self.nozzle and head is not None else head, halve - 1)
 
     def _step(self, dt, head, check) -> bool:
         m, n = self.m, len(self.x)
@@ -154,6 +182,9 @@ class Strand:
         lam = failsim.fact("trouton") * eta / e_mod
         soft = lam / (lam + dt)
         ks = e_mod * area * soft / ln  # N per m of new length
+        inflow = np.zeros(n - 1)
+        if self.nozzle:
+            inflow[-1] = self.flow / self.area * dt
         # the wind each node feels, across the strand
         tn = np.zeros_like(self.x)
         tn[:-1] += tan
@@ -179,7 +210,22 @@ class Strand:
         ab = np.zeros((11, 4 * n))  # upper band: 3 speeds a node and the spin of the edge after it
         _add(ab, (mass / dt)[:, None, None] * eye + drag[:, None, None] * (eye - tn[:, :, None] * tn[:, None, :]))
         ab[-1, 3::4] = np.r_[self.vol * self.rho * (d / SPIN) ** 2 / 8 / dt, 1.0]
-        ab[-1] += np.where(np.c_[self.fixed, self.fixed, self.fixed, np.r_[self.fixed[1:] & self.fixed[:-1], False]], BIG, 0.0).ravel()
+        hold = self.fixed.copy()
+        vh = np.zeros((n, 3))
+        if self.nozzle:
+            hold[-1] = True
+            vh[-1] = 0.0 if head is None else (np.asarray(head) * 1e-3 - self.x[-1]) / dt
+        big = np.where(hold, BIG, 0.0)
+        rhs += big[:, None] * vh
+        ab[-1] += np.c_[big, big, big, np.where(np.r_[self.fixed[1:] & self.fixed[:-1], False], BIG, 0.0)].ravel()
+        # ground: an active set of nodes kept from going below it, with friction
+        r = dn / 2
+        touch, floor = np.zeros(n, bool), None
+        if self.ground is not None:
+            floor = self._top(self.x) + r
+            touch = (self.x[:, 2] <= floor + 1e-6) & ~hold
+            to = (floor - self.x[:, 2]) / dt  # down onto the ground, or up out of it
+        v = self.v
         kb = _series(e_mod * soft) * math.pi * ((d[1:] + d[:-1]) / 2) ** 4 / 64 * (ln[1:] + ln[:-1]) / 2
         kb = np.stack([kb, kb, kb, kb / (1 + NU)], 1)  # G J = E I / (1 + nu)
         way, gain, rest, tens = tan, np.ones(n - 1), 1.0, self.tens
@@ -191,7 +237,7 @@ class Strand:
             edge[:, :3, 4:] = -stiff
             rh, band = np.c_[rhs, np.zeros(n)], ab.copy()
             _add(band, edge)
-            pull = (ks * self.es * ln)[:, None] * way
+            pull = (ks * (self.es * ln - inflow))[:, None] * way
             rh[:-1, :3] += pull
             rh[1:, :3] -= pull
             rows, spin = _rows(way, ln)
@@ -201,23 +247,50 @@ class Strand:
                 rh[:-2] -= push[:, :4]
                 rh[1:-1] -= push[:, 4:8]
                 rh[2:, :3] -= push[:, 8:]
-            u = solveh_banded(band, rh.ravel(), check_finite=False).reshape(n, 4)
-            v = u[:, :3]
+            for _ in range(5):
+                ab2, rh2 = band.copy(), rh.copy()
+                slip = _norm(v[:, :2])
+                if touch.any():
+                    fr = np.where(touch, self.mu * np.maximum(self.press, 0) / np.maximum(slip, CREEP), 0.0)
+                    ab2[-1, 0::4] += fr
+                    ab2[-1, 1::4] += fr
+                    ab2[-1, 2::4] += np.where(touch, BIG, 0.0)
+                    rh2[touch, 2] += BIG * to[touch]
+                u = solveh_banded(ab2, rh2.ravel(), check_finite=False).reshape(n, 4)
+                v = u[:, :3]
+                if floor is None:
+                    break
+                push = np.where(touch, BIG * (to - v[:, 2]), 0.0)
+                deep = ~hold & ~touch & (self.x[:, 2] + dt * v[:, 2] < floor - 1e-9)
+                up = touch & (push < 0)
+                self.press = np.maximum(push, 0)
+                if not deep.any() and not up.any() and (np.abs(_norm(v[:, :2]) - slip)[touch] < 0.1 * slip[touch] + 1e-3).all():
+                    break
+                touch = (touch | deep) & ~up
             move = np.diff(dt * v, axis=0)
-            far = _norm(move) / ln
-            tens = ks * (self.es * ln + gain * (way * move).sum(1))
+            far = (_norm(move) / ln)[:-1 if self.nozzle else None].max(initial=0.0)  # the nozzle's edge grows by what comes out
+            tens = ks * (self.es * ln - inflow + gain * (way * move).sum(1))
             mid = tan * ln[:, None] + move / 2
             way, gain, rest = _unit(mid), 2 * _norm(mid) / (ln + _norm(mid + move / 2)), 0.5
         x = self.x + dt * v
-        if check and far.max() > TURN:
+        if check and far > TURN:
             return False
+        if floor is not None:
+            at, f2 = self._slide(self.x, x, r, floor)
+            stop = ~hold & (at != x).any(1)
+            x[stop], v[stop, :2] = at[stop], (at - self.x)[stop, :2] / dt
+            v[touch & (to > 0), 2] = 0.0  # pushed out of the ground, not thrown
+            low = ~hold & (x[:, 2] < f2)
+            x[low, 2] = f2[low]
         old_l, old_k, old_tn = ln, self._curve(tan, ln), tn
         self.v, self.x = v, x
         tan, ln = self.lengths()
-        self.rate = (ln - old_l) / (old_l * dt)
+        self.rate = (ln - old_l - inflow) / (old_l * dt)
         limit = np.minimum(1.0, self.strength / e_mod)  # past it the plastic gives
-        self.es = np.clip(soft * (self.es + (ln - old_l) / old_l), -limit, limit)
+        self.es = np.clip(soft * (self.es + (ln - old_l - inflow) / old_l), -limit, limit)
         self.tens = np.minimum(tens, limit * e_mod * area)
+        if self.nozzle:
+            self.force = float(self.tens[-1])
         tn = np.zeros_like(x)
         tn[:-1] += tan
         tn[1:] += tan
@@ -235,23 +308,76 @@ class Strand:
         self.eb *= np.minimum(1.0, most / np.maximum(_norm(self.eb * [1, 1, 1, math.sqrt(3) / 2 / (1 + NU)]), 1e-9))[:, None]
         h = failsim.h_strand(dn * 1e3, self.t, self.air, speed, np.abs(along))
         self.t = self.air + (self.t - self.air) * np.exp(-4 * h * dt / (self.rho * m.cp * np.maximum(dn, 1e-6)))
+        if self.nozzle:
+            self.t[-1] = self.hot
+            self.vol[-1] += self.flow * dt
+        if floor is not None and self.plastic is not None:
+            on = touch & (x[:, 2] < f2 + 1e-5) & (self.air + failsim.fact("weld_rule") * (self.t - self.air) > m.tg)
+            if on.any():
+                at = self.x[on] * 1e3
+                self.fixed[np.flatnonzero(on)[np.asarray(self.plastic(at[:, 0], at[:, 1]), bool)]] = True
+            self.v[self.fixed] = 0
         self._grow()
         return True
 
+    def _top(self, p):
+        """m, the ground under p."""
+        return np.asarray(self.ground(*p[..., :2].reshape(-1, 2).T * 1e3), float).reshape(p.shape[:-1]) * 1e-3
+
+    def _slide(self, a, b, r, floor):
+        """Where nodes going from a to b get, and the ground there: ground higher than they are stops them at its side,
+        and they go on along it."""
+        for k in (slice(0, 3), 0, 1):
+            go = np.zeros_like(a)
+            go[:, k] = (b - a)[:, k]
+            s = np.linspace(0, 1, int(_norm(go[:, :2]).max() / r.min()) + 2)
+            via = a + s[:, None, None] * go
+            path = self._top(via) + r
+            clear = ~np.logical_or.accumulate((path > via[:, :, 2] + r) & (path > floor + 1e-6))
+            last = np.maximum(clear.sum(0) - 1, 0), np.arange(len(a))
+            a, floor = via[last], path[last]
+            if clear.all():
+                break
+            a[:, 2] = b[:, 2]
+        return a, floor
+
+    def _over(self, ln, f):
+        """Edges about to lie across ground higher than under their ends, and, in f, where to put a node on it."""
+        s = np.linspace(0, 1, 13)[1:-1, None]
+        top, ends = self._top(self.x[:-1] + s[:, :, None] * np.diff(self.x, axis=0)), self._top(self.x)
+        high, r = top.max(0), np.sqrt(self.vol / math.pi / ln)
+        mid = s[np.where(top == high, np.abs(s - 0.5), np.inf).argmin(0), 0]
+        z, vz = ((1 - mid) * q[:-1, 2] + mid * q[1:, 2] for q in (self.x, self.v))
+        over = (high > np.maximum(ends[:-1], ends[1:]) + r) & (z > high) & (z < high + 2 * r - DT * np.minimum(vz, 0))
+        over &= np.minimum(mid, 1 - mid) * ln > 1e-4
+        f[over] = mid[over]
+        return over
+
     def _grow(self):
-        """Cut an edge that has been drawn long."""
+        """Cut an edge that has grown: the nozzle's by what came out, a drawn one by its length. And one over a wall."""
         ln = self.lengths()[1]
-        cut = ln > 1.5 * SEG
+        cut, f = ln > 1.5 * self.seg, np.full(len(ln), 0.5)
+        if self.nozzle:
+            cut[-1] |= self.vol[-1] > 1.5 * self.area * self.seg
+            f[-1] = 2 / 3  # the edge at the nozzle stays the short one
+        if self.ground is not None:
+            cut |= self._over(ln, f)
         at = np.flatnonzero(cut)
         if not len(at):
             return
+        f = f[at]
         i = at + 1
         for k in ("x", "v", "eb"):
             q = getattr(self, k)
-            setattr(self, k, np.insert(q, i, (q[at] + q[at + 1]) / 2, 0))
-        self.t = np.insert(self.t, i, (self.t[at] + self.t[at + 1]) / 2)
-        self.fixed = np.insert(self.fixed, i, self.fixed[at] & self.fixed[at + 1])
+            setattr(self, k, np.insert(q, i, q[at] * (1 - f[:, None]) + q[at + 1] * f[:, None], 0))
+        self.t = np.insert(self.t, i, self.t[at] * (1 - f) + self.t[at + 1] * f)
+        self.press, self.fixed = np.insert(self.press, i, 0.0), np.insert(self.fixed, i, self.fixed[at] & self.fixed[at + 1])
         for k in ("es", "rate", "tens", "e"):
             setattr(self, k, np.insert(getattr(self, k), i, getattr(self, k)[at]))
-        self.vol[at] /= 2
-        self.vol = np.insert(self.vol, i, self.vol[at])
+        first = self.vol[at] * f
+        rest = self.vol[at] - first
+        self.vol[at] = first
+        self.vol = np.insert(self.vol, i, rest)
+        if self.ground is not None:  # the new node of an edge hung over a corner is not inside it
+            new = i + np.arange(len(i))
+            self.x[new, 2] = np.maximum(self.x[new, 2], self._top(self.x[new]) + np.sqrt(first / math.pi / ln[at] / f))
