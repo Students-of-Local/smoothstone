@@ -282,6 +282,8 @@ def test_the_hotend_holds_what_surface_tension_carries():
     assert pla["wets"] and pla["hold_n"] == pytest.approx(2 * math.pi * 0.5e-3 * fs.tension(220))  # hangs from the flat's edge
     assert not abs_["wets"] and abs_["hold_n"] == pytest.approx(2 * math.pi * 0.2e-3 * fs.tension(240, "ABS"))  # from the bore
     assert pla["blob_mm3"] * 1e-9 * 1240 * 9.80665 == pytest.approx(pla["hold_n"])  # its own weight is all it carries
+    assert not fs.nozzle_hold("ABS")["wets"] and "past 240 C" in fs.note("abs.contact_angle")  # 260 C, hotter than measured
+    assert all("brass" in fs.note(f"{m}.contact_angle") for m in ("pla", "petg", "abs"))
     assert 5 < pla["blob_mm3"] < 12 and abs_["blob_mm3"] < pla["blob_mm3"] / 2
 
 
