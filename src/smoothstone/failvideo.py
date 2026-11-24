@@ -28,6 +28,7 @@ import numpy as np
 
 from . import failsim, printers, strand, timelapse
 
+OFF_C = 10  # C a hotend may be off what it is set to before that is said
 MODES = ("auto", "supports", "detach", "droop", "bridge")
 AFTER = 12  # layers drawn after the failure (assumption: enough to see it; the printer would go on)
 LEAD = 30  # frames before the failure, evenly picked, so the failure is a good part of the video
@@ -652,6 +653,26 @@ def numbers_line(f) -> str:
     return ", ".join(f"{k} {v}" for k, v in n.items()) or "no numbers"
 
 
+def live(inp, prof: dict) -> failsim.Inputs:
+    """The same print at the heat the printer is at now, with what it said in notes."""
+    got, why = printers.live(prof)
+    if got is None:
+        inp.notes.append(f"live heat: {why}; this is the print's own heat, or its slicer profile's")
+        return inp
+    m, nozzle, set_to = inp.material, got.get("nozzle_c"), got.get("nozzle_target_c")
+    said = [f"{k} {got[k + '_c']:.0f} C" + (f" (set to {got[k + '_target_c']:.0f} C)" if k + "_target_c" in got else "")
+            for k in ("nozzle", "bed", "chamber") if k + "_c" in got]
+    inp.notes.append(f"live heat from {got['name']} ({got['state']}), in place of the print's own: {', '.join(said) or 'none given'}")
+    if nozzle and set_to and abs(nozzle - set_to) > OFF_C:
+        inp.notes.append(f"its nozzle is {abs(nozzle - set_to):.0f} C {'under' if nozzle < set_to else 'over'} what it is set to")
+    if nozzle and nozzle < m.set + OFF_C:
+        inp.notes.append(f"{nozzle:.0f} C is too cold for {m.name} to flow; its set heat, {m.nozzle:g} C, is used")
+        nozzle = None
+    inp = replace(inp, bed=got.get("bed_c", inp.bed), material=replace(m, nozzle=nozzle or m.nozzle, chamber=got.get("chamber_c", m.chamber)))
+    inp.material = failsim.leaving(inp)
+    return inp
+
+
 def cmd(args, job, prof, out):
     """stone timelapse --fail [mode]: fail.mp4, fail_sheet.png and fail.json."""
     from . import refs
@@ -698,6 +719,8 @@ def cmd(args, job, prof, out):
     heat = file == mat or bool(own) and not file  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
     inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat, prof)
+    if args.live:
+        inp = live(inp, prof)
     fails = failsim.predict(inp)
     fail, what_if = choose(fails, mode, inp)
     blind = inp.material.peel is None

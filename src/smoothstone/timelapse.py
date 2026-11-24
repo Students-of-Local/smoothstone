@@ -462,7 +462,7 @@ def again(args, **change) -> str:
     out = ["stone timelapse"] + ([shlex.quote(v.pop("file"))] if v.get("file") else [])
     out += [f"{k} {shlex.quote(str(x))}" for k, x in v.items() if x not in (None, "auto", "per-layer") and k.startswith("--")]
     if args.fail:
-        out += [f"--fail {args.fail}"] + (["--plate dirty"] if args.plate == "dirty" else [])
+        out += [f"--fail {args.fail}"] + (["--plate dirty"] if args.plate == "dirty" else []) + (["--live"] if args.live else [])
     return " ".join(out + (["--night"] if args.night else []))
 
 
