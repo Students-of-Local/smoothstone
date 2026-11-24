@@ -253,11 +253,32 @@ def test_every_printer_has_its_slicer_settings_for_every_plastic(pid):
     assert all(0.3 <= w <= 0.8 for w in proc["widths"].values()) and proc["shells"]["wall_loops"] >= 2
     assert all(100 <= a <= 40000 for a in proc["accels"].values()) and 0.2 <= proc["retract_mm"] <= 6
     for m in PLASTICS:
-        s = printers.settings(p, m)
-        assert 190 <= s["nozzle"] <= (p["max_hotend_c"] or 300) and 20 <= s["bed"] <= (p["max_bed_c"] or 120), (m, s)
-        assert 1 <= s["max_flow"] <= 40 and s["diameter"] == 1.75 and s["url"].startswith("https://github.com/OrcaSlicer/")
+        e = printers._settings()[f"orca.{pid}.{m}"]
+        raw, s = e["value"], printers.settings(p, m)
+        assert 190 <= raw["nozzle"] <= 320 and 20 <= raw["bed"] <= 120 and 20 <= raw.get("chamber", 20) <= 70, (m, raw)
+        assert 0 <= raw["fan_min"] <= raw["fan_max"] <= 100 and 0 <= raw["fan_max_layer_s"] <= raw["fan_min_layer_s"] <= 100, (m, raw)
+        assert 1 <= raw["max_flow"] <= 40 and raw["diameter"] == 1.75 and e["url"].startswith("https://github.com/OrcaSlicer/")
+        assert s["nozzle"] <= (p["max_hotend_c"] or 320) and s["bed"] <= (p["max_bed_c"] or 120) and (p["enclosed"] or "chamber" not in s)
     heat = {m: printers.settings(p, m)["nozzle"] for m in PLASTICS}
     assert heat["PLA"] < heat["ABS"] and heat["PLA"] < heat["PC"]
+
+
+def test_one_profile_says_one_thing_on_every_printer():
+    said = {}
+    for e in printers._settings().values():  # the bed may differ: it depends on the plate
+        said.setdefault(e["url"], set()).add(tuple(e["value"].get(k) for k in ("nozzle", "fan_min", "fan_max", "max_flow", "diameter")))
+    assert len(said) > 50 and all(len(v) == 1 for v in said.values()), {k: v for k, v in said.items() if len(v) > 1}
+
+
+def test_no_printer_takes_another_brands_product_for_the_plain_plastic():
+    odd = [e["cite"] for k, e in printers._settings().items() if not k.endswith(".process")
+           and not e["cite"].startswith("OrcaSlicer Generic") and "Filament/" in e["source"]]
+    assert odd == [] and not any(re.search(r"addnorth|INSLOGIC|rABS|LCF", e["cite"]) for e in printers._settings().values())
+
+
+def test_a_process_is_the_callers_own_copy():
+    printers.process(printers.get(OWNERS))["speeds"]["outer_wall"] = 1
+    assert printers.process(printers.get(OWNERS))["speeds"]["outer_wall"] == 200
 
 
 def test_the_k2s_process_is_the_one_the_refs_already_cite():
@@ -273,4 +294,6 @@ def test_heat_the_printer_does_not_reach_is_cut_and_said():
     s = printers.settings(printers.get("creality_k2"), "PC")  # the profile asks for 110 C
     assert s["bed"] == 100 and s["cut"] == ["OrcaSlicer Generic PC @System wants the bed at 110 C; the Creality K2 reaches 100 C"]
     assert printers.settings(printers.get("creality_k2"), "pla")["cut"] == []
+    s = printers.settings(printers.get("creality_ender3_v3"), "PLA")  # nothing around it holds the profile's 35 C air
+    assert "chamber" not in s and "open frame" in s["cut"][0] and printers.settings(printers.get("creality_k2"), "ABS")["chamber"] == 60
     assert printers.settings(printers.get("creality_k2"), "HIPS") is None and printers.settings({"id": "other"}, "PLA") is None

@@ -9,6 +9,7 @@ resumes or cancels a print.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 import shutil
@@ -42,8 +43,9 @@ def _settings() -> dict[str, dict]:
 
 def settings(p: dict, material: str) -> dict | None:
     """What this printer's slicer profile prints the plastic with (tools/orca_profiles.py), or None: nozzle, bed
-    and chamber in C, fan %, max_flow mm3/s, diameter mm, its profile and url. Heat the maker says the printer
-    does not reach is cut to what it does, and `cut` says so."""
+    and chamber in C, max_flow mm3/s, diameter mm, its profile and url, and the fan: fan_min % on layers longer than
+    fan_min_layer_s, fan_max on ones shorter than fan_max_layer_s. Heat the maker says the printer does not reach is
+    cut to what it does, the chamber's to none on an open frame, and `cut` says so."""
     e = _settings().get(f"orca.{p['id']}.{material.upper()}")
     if not e:
         return None
@@ -52,13 +54,15 @@ def settings(p: dict, material: str) -> dict | None:
         if top and out.get(k, 0) > top:
             out["cut"].append(f"{e['cite']} wants the {k} at {out[k]:g} C; the {p['name']} reaches {top:g} C")
             out[k] = top
+    if out.get("chamber") and not p.get("enclosed"):
+        out["cut"].append(f"{e['cite']} wants {out.pop('chamber'):g} C air; the {p['name']} is an open frame")
     return out
 
 
 def process(p: dict) -> dict | None:
-    """This printer's slicer process: widths, speeds, accels, shells, retract_mm, nozzle_volume_mm3 (where Orca gives it)."""
+    """This printer's slicer process: layer (mm) and widths, speeds, accels, shells, retract_mm, nozzle_volume_mm3 (where Orca gives it)."""
     e = _settings().get(f"orca.{p['id']}.process")
-    return {**e["value"], "profile": e["cite"], "url": e["url"]} if e else None
+    return {**copy.deepcopy(e["value"]), "profile": e["cite"], "url": e["url"]} if e else None
 
 
 def _key(text: str) -> str:
