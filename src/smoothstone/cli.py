@@ -2172,7 +2172,7 @@ def cmd_heat(args, job: Job) -> Out:
     out = Out(owns_next=False)
     plan = job.plan() if job.exists() else None
     pick = reftool.material_for(job.request(), rc.load(plan["recipe"]), plan["params"]) if plan else None
-    heat.report(job, args.items, out, reftool.strength_material(pick.info.name) if pick else "")
+    heat.report(job, args.items, out, pick.info.name if pick else "")
     return out
 
 
