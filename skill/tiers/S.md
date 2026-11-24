@@ -38,6 +38,20 @@ For a figure, statue or bust of a person, pet or thing, the recipe is figure. Se
 name only. stone set then says NEXT: stone find "<name>"; run that line, then run
 stone build. The build takes a few minutes.
 
+## Questions about a part
+Run the line, tell the person what it says, then run NEXT. For a file of theirs, add its path.
+- Does it need supports? stone supports
+- Will it fit? stone fit
+- Will it hold a weight? stone strength load=20N at=tip dir=down fixed=bottom, with their weight, the spot it
+  pushes on (at=) and what holds the part: fixed=holes for screws through its holes. If they gave no weight, ask.
+- Will it take the heat, or warp? stone heat where=car (or sun, dishwasher, outdoor, 70C)
+- How long, or what will it look like? stone timelapse
+- Show it failing: stone timelapse --fail. Say it is a model, not a recording.
+
+## A print failed
+Do not guess the cause. First run: stone doctor "<their words>" (with a photo: add --image <file>), then the NEXT line.
+Read every SAFETY line to the person. Never start, pause or cancel a print: they do that.
+
 ## Example
 Request: A guard for a 92 mm fan with a honeycomb grille.
 stone status -> NEXT: stone recipes

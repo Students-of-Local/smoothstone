@@ -49,6 +49,18 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   pins and checks each part (src/smoothstone/modelprint.py). build/model/parts.json has every cut,
   pin and check. Never pass a found model off as stone's own: credits.txt goes with it.
 
+## Before it prints, and when a print fails
+- A part that carries a load, lives in heat, fits something or has a ledge: run stone strength, stone heat,
+  stone fit or stone supports before you call it done, with the person's own load and place. Ask for a number you
+  don't have. Read the command's card for what it models, and pass on the limits it prints.
+- A change that helps (walls, infill, orientation, material) is a slicer setting or the person's choice: tell them
+  which one the answer depends on. A thicker part is a recipe change: stone set, build, run the check again.
+- stone timelapse shows the print and its time; stone timelapse --fail shows the predicted failure, a model and not
+  a recording.
+- A failed print: doctor.md. Give stone doctor the person's words (and what you see with --image and --looks), let it
+  rank the causes for that printer, read every SAFETY line, and record what worked. Never start, pause or
+  cancel a print.
+
 ## Recipe format
 - recipe.scad: one assignment per parameter at the top, with a comment that gives the unit, then
   the geometry. Base on z = 0, centered in X and Y, millimeters. stone passes values with -D.

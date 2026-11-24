@@ -44,6 +44,16 @@ recipe and the settings that make the part look its best, then let stone build a
   a disc: diameter and height). Sizes go to stone product add, not to the recipe. Never guess a size.
 - Phone cases: the phone_case recipe has Apple's numbers for the iPhone 17, 17 Pro, 17 Pro Max and Air; set phone to the exact model the request names, and ask if it names none.
 
+## Before it prints, and when a print fails
+- Questions about a part: stone supports, stone fit, stone strength load=20N at=tip dir=down fixed=bottom (the
+  person's load, the spot it pushes on, what holds it: fixed=holes for screws through its holes), stone heat where=car, stone timelapse, and
+  stone timelapse --fail (a model, not a recording: say so). Add a file path for an STL stone did not build.
+  Read the command's card (strength.md and so on) the first time, and pass on the limits it prints.
+- For a part that carries a load or lives in heat, run the check before you call it done, even if not asked.
+- A failed print: follow doctor.md, starting with stone doctor "<their words>" (--image for a photo). Don't name a
+  cause before stone does. Read every SAFETY line. Never start, pause or cancel a print: tell the person that they do that.
+- When NEXT says ask the person, ask that question in its own words and stop: no command in the same turn.
+
 ## Steps
 1. stone status (stone new "<request>" if there is no job; add --image PATH for a picture)
 2. stone recipes <words>, stone show <recipe>
