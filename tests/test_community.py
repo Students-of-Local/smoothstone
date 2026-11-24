@@ -59,7 +59,16 @@ def test_scrub_removes_private_details():
 
 
 SPACED = ("/Volumes/Shop Drive/Jane Doe/failed.stl", r"C:\Users\Jane Doe\Desktop\part.3mf",
-          "~/Shop Drive/Jane Doe/failed.stl", "/Users/Jane Doe/Shop Drive")
+          "~/Shop Drive/Jane Doe/failed.stl", "/Users/Jane Doe/Shop Drive",
+          "file:///Users/Jane Doe/Shop Drive/failed.stl", r"\\nas\Shop Drive\Jane Doe\failed.stl",
+          "/opt/Shop Drive/Jane Doe/failed.stl", "/run/media/jane/Shop Drive/Jane Doe/failed.stl",
+          "/Volumes/shop.drive Jane Doe/failed.stl")
+
+
+@pytest.mark.parametrize("said", ["walls at 45%/50% and a 0.2/0.4 mm nozzle", "an I/O error and/or a jam",
+                                  "PLA/PETG: 210 C, 60 C plate", "wash it w/ dish soap. Then 60 C"])
+def test_words_with_slashes_are_not_paths(said):
+    assert share.scrub(said, []) == (said, [])
 
 
 @pytest.mark.parametrize("path", SPACED)
