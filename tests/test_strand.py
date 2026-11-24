@@ -140,11 +140,11 @@ def test_a_bent_cold_strand_keeps_the_bend_past_what_its_skin_takes():
         s = st.Strand(np.c_[np.arange(len(a)), 0 * a, 0 * a], 0.5, "PLA", temp=25.0, air=25.0, fan=False)
         s.x = np.c_[radius * np.sin(a), 0 * a, radius * (1 - np.cos(a))] * 1e-3
         k = s._curve(*s.lengths())
-        s.eb = k.copy()
+        s.eb[:, :3] = k
         s.fixed[:] = True  # held bent a moment
         s.step()
         most = 2 * s.strength / (s.m.e * 1e6 * float(s.m.ratio(25.0))) / 0.5e-3
-        left = np.linalg.norm(s.eb[1:-1], axis=1) / np.linalg.norm(k[1:-1], axis=1)
+        left = np.linalg.norm(s.eb[1:-1, :3], axis=1) / np.linalg.norm(k[1:-1], axis=1)
         assert left == pytest.approx(min(1.0, most * radius * 1e-3) if stays else 1.0, rel=0.05)
 
 
@@ -152,7 +152,7 @@ def bent(radius, **kw):
     """A quarter turn, straight when it was hot."""
     a = np.linspace(0, math.pi / 2, 21)
     s = st.Strand(np.c_[radius * np.sin(a), 0 * a, 30 + radius * (1 - np.cos(a))], 0.4, "PLA", fan=False, **kw)
-    s.eb = s._curve(*s.lengths())
+    s.eb[:, :3] = s._curve(*s.lengths())
     return s
 
 
@@ -177,7 +177,7 @@ def test_a_strand_keeps_the_curve_it_set_in(monkeypatch):
     stress = []
     for _ in range(2400):
         s.step()
-        stress.append(float(np.linalg.norm(s.eb[10]) * s.m.e * float(s.m.ratio(s.t[10]))))
+        stress.append(float(np.linalg.norm(s.eb[10, :3]) * s.m.e * float(s.m.ratio(s.t[10]))))
     assert float(s.t.max()) < 40
     assert max(stress[5:]) <= stress[4] * 1.1  # E grows 300 times, the stress left in it does not
     assert rest(s, monkeypatch) == pytest.approx(was, rel=0.1)
@@ -209,3 +209,60 @@ def test_a_whipping_strand_keeps_its_length(monkeypatch, n, speed):
         for _ in range(10):
             s.step()
             assert float(s.lengths()[1].sum()) == pytest.approx(was, rel=0.02)
+
+
+def arc(radius, held=(), flat=False, n=21):
+    """A cold quarter turn, set in that curve: upright, or lying flat in the air."""
+    a = np.linspace(0, math.pi / 2, n)
+    x, y = radius * np.sin(a), radius * (1 - np.cos(a))
+    return st.Strand(np.c_[x, y, 0 * a + 30] if flat else np.c_[x, 0 * a, 30 + y], 0.4, PLA, temp=25, air=25, fan=False, held=held)
+
+
+def inertia(s, about):
+    m, r = s._nodes(s.vol * s.rho)[:, None], s.x - about
+    return m, r, np.trace(i := (m * r).T @ r) * np.eye(3) - i
+
+
+@pytest.mark.parametrize("axis", (0, 1, 2))
+@pytest.mark.parametrize("speed", (2, 10))
+def test_a_cold_strand_spins_on_in_its_own_shape(monkeypatch, axis, speed):
+    """Straight or set in a curve, turned about any axis: nothing resists turning as a whole."""
+    quiet(None, monkeypatch)
+    monkeypatch.setattr(st.failsim, "fact", lambda key, was=fs.fact: 0.0 if key == "gravity" else was(key))
+    for s in (rod(12, temp=25, air=25, n=11), arc(12)):
+        m, r, _ = inertia(s, (s._nodes(s.vol)[:, None] * s.x).sum(0) / s.vol.sum())
+        s.v = speed * np.cross(np.eye(3)[axis], r)
+        was, bend = np.cross(r, m * s.v).sum(0), s._curve(*s.lengths())
+        for _ in range(10):
+            s.step()
+        now = np.cross(s.x - (m * s.x).sum(0) / m.sum(), m * s.v).sum(0)
+        assert np.linalg.norm(now - was) <= 0.02 * np.linalg.norm(was) + 1e-15
+        assert np.linalg.norm(s._curve(*s.lengths()), axis=1) == pytest.approx(np.linalg.norm(bend, axis=1), abs=0.1)
+
+
+@pytest.mark.parametrize("dt", (st.DT, st.DT / 4))
+def test_a_hinged_cold_strand_swings_as_its_weight_turns_it(monkeypatch, dt):
+    for s in (rod(30, temp=25, air=25, held=(0,)), arc(12, held=(0,)), arc(12, held=(0,), flat=True)):
+        quiet(s, monkeypatch)
+        m, r, i = inertia(s, s.x[0].copy())
+        torque = (m * np.cross(r, [0, 0, -G])).sum(0)
+        for _ in range(round(3 * st.DT / dt)):
+            s.step(dt)
+        got = np.cross(r, m * s.v).sum(0)
+        assert np.linalg.norm(got - torque * 3 * st.DT) < 0.02 * np.linalg.norm(got)
+        assert np.linalg.norm(s.v[-1]) == pytest.approx(np.linalg.norm(np.cross(np.linalg.pinv(i) @ got, r[-1])), rel=0.1)
+
+
+def test_a_set_curve_sags_sideways_by_bending_and_twisting(monkeypatch):
+    """A quarter ring built in at one end, its weight across its plane: Castigliano, with GJ = EI / (1 + nu)."""
+    s = arc(20, held=(0, 1), flat=True, n=41)
+    quiet(s, monkeypatch)
+    for _ in range(1500):
+        s.step()
+        s.v *= 0.9
+    q, i = 1240 * math.pi / 4 * 0.4e-3 ** 2 * G, math.pi * 0.4e-3 ** 4 / 64
+    free = math.pi / 2 * 39.5 / 40  # the second node bends over half of the held edge too
+    bend = (1 - math.cos(free)) ** 2 / 2
+    twist = free ** 2 / 2 - free * math.sin(free) + math.sin(free) ** 2 / 2
+    want = q * 0.02 ** 4 / (PLA.e * 1e6 * i) * (bend + twist * (1 + st.NU))
+    assert (30 - s.points()[-1, 2]) * 1e-3 == pytest.approx(want, rel=0.02)
