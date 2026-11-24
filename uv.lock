@@ -843,7 +843,7 @@ requires-dist = [
     { name = "pyamg", marker = "(python_full_version < '3.15' and platform_machine == 'AMD64') or (python_full_version < '3.15' and platform_machine == 'x86_64') or (python_full_version < '3.15' and sys_platform == 'darwin')", specifier = ">=5.4.1" },
     { name = "rtree", marker = "platform_machine != 'AMD64' and platform_machine != 'x86_64' and sys_platform != 'darwin'", specifier = ">=1.2" },
     { name = "scikit-image", specifier = ">=0.22" },
-    { name = "scipy", specifier = ">=1.11" },
+    { name = "scipy", specifier = ">=1.12" },
     { name = "trimesh", specifier = ">=4.0" },
 ]
 
