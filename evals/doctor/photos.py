@@ -2,6 +2,7 @@
 
 uv run python evals/doctor/photos.py split                 # writes photo_split.jsonl (once; never reshuffle)
 uv run python evals/doctor/photos.py ask dev|heldout [-j 6] # a fresh responder reads each photo; appends replies
+uv run python evals/doctor/photos.py knn                   # nearest gallery photos (needs the vision extra)
 uv run python evals/doctor/photos.py score dev|heldout [--json] [--show]
 
 The photos are failures/gallery's real ones (no synthetic frames, no healthy prints). photo_split.jsonl
@@ -15,8 +16,15 @@ haiku`, never API billing), given only skill/doctor.md, the output stone prints 
 stone doctor looks, and the photo itself under a neutral name (the gallery path names the answer). It
 replies with the stone doctor command it would run. stone ranks both ways from that one reply:
 "words" drops --looks, "looks" keeps it, so before and after see the same reads. Replies are kept in
-photo_runs.jsonl, so tests/test_doctor.py rescores them without a model. The recorded replies saw one more
-line after "Photo saved", the image match's, from the change that adds it.
+photo_runs.jsonl, so tests/test_doctor.py rescores them without a model.
+
+knn searches each photo's 40 nearest gallery photos (photo_match.py; the photo and every frame of its print
+left out) and records, in photo_knn.jsonl, the ones scoring reads: down to the KNN_K-th that is not a
+held-out photo, as [file, cosine to 3 places]; a neighbor's failure is its folder. Scoring needs no model
+either; a new KNN_K means running knn again. "knn" ranks by words, --looks and the
+neighbors' vote, the way stone doctor --image does; "knn_strict" also drops every held-out photo from the
+neighbors, the bound if the gallery held only what tuning saw; dev always scores that way, so no
+held-out label reaches the tuning.
 """
 
 from __future__ import annotations
@@ -41,6 +49,7 @@ ROOT = HERE.parents[1]
 GALLERY = ROOT / "failures" / "gallery"
 SPLIT = HERE / "photo_split.jsonl"
 RUNS = HERE / "photo_runs.jsonl"
+KNN = HERE / "photo_knn.jsonl"
 SKILL = ROOT / "skill" / "doctor.md"
 SAVED = "stone-job/doctor/case/photo.jpg"
 
@@ -68,7 +77,7 @@ def prompt(photo: Path) -> str:
         "You are the agent in the skill below. Follow it.", "", "<skill>", SKILL.read_text(), "</skill>", "",
         "A person sent a photo of a 3D print and says only that it failed. They are away, so describe it yourself.",
         "You already ran these:", "", "$ stone doctor --image photo.jpg",
-        f"Photo saved (EXIF removed, at most {doctor.MAX_PX} px): {SAVED}",
+        f"Photo saved (EXIF removed, at most {doctor.MAX_PX} px): {SAVED}", doctor.IMAGE_MATCH_ON,
         "Look at it: describe what you see, and pass the ids that match it with --looks (each id and its look: "
         "stone doctor looks). If you cannot see images, ask the person what it looks like.",
         f"NEXT: {look}", "", "$ stone doctor looks", *doctor.looks_lines(),
@@ -141,6 +150,38 @@ def ask(split: str, jobs: int) -> None:
     print(f"asked {len(todo)} {split} photos")
 
 
+def knn() -> None:
+    from smoothstone import photo_match
+
+    ok, why = photo_match.available()
+    if not ok:
+        raise SystemExit(f"image match off: {why}")
+    rows = _rows(SPLIT)
+    held = {r["file"] for r in rows if r["split"] == "heldout"}
+    out = []
+    for r in rows:
+        near = keep(photo_match.neighbors(GALLERY / r["file"], 40, {r["file"]}), held)
+        out.append(json.dumps({"file": r["file"], "near": [[f, round(s, 3)] for f, _, s in near]},
+                              separators=(",", ":")) + "\n")
+    KNN.write_text("".join(out))
+    print(f"neighbors for {len(rows)} photos")
+
+
+def keep(near: list, held: set[str]) -> list:
+    """The neighbors knn and knn_strict read: through the KNN_K-th one outside held, or all of them."""
+    outside = 0
+    for i, n in enumerate(near):
+        outside += n[0] not in held
+        if outside == doctor.KNN_K:
+            return near[:i + 1]
+    return near
+
+
+def neighbors() -> dict[str, list[tuple[str, str, float]]]:
+    """Each photo's recorded neighbors as (file, failure, cosine); the failure is the file's folder."""
+    return {r["file"]: [(f, f.split("/")[0], s) for f, s in r["near"]] for r in _rows(KNN)}
+
+
 def score(split: str, skill: str | None = None) -> dict:
     """Top-1 and top-3 for each way of ranking, on the latest skill text's replies for the split."""
     truth = {r["file"]: r for r in _rows(SPLIT) if r["split"] == split}
@@ -148,12 +189,18 @@ def score(split: str, skill: str | None = None) -> dict:
     for r in _rows(RUNS):
         if r["file"] in truth and (skill is None or r["skill"] == skill):
             runs[r["file"]] = r  # the last reply for a photo wins
+    from smoothstone import photo_match
+
+    near = neighbors()
+    held = {r["file"] for r in _rows(SPLIT) if r["split"] == "heldout"}
     out = {}
-    for way in ("words", "looks", "looks_only"):
-        rows = []
+    for way in ("words", "looks", "looks_only", "knn", "knn_strict"):
+        rows, strict = [], split == "dev" or way == "knn_strict"  # tuning on dev sees no held-out label
         for f, r in sorted(runs.items()):
             said = "" if way == "looks_only" else r["words"]
-            d = doctor.diagnose(said, None, None, [] if way == "words" else r["looks"])
+            nb = [n for n in near.get(f, []) if not strict or n[0] not in held]
+            votes = photo_match.votes(nb, doctor.KNN_K) if way.startswith("knn") else {}
+            d = doctor.diagnose(said, None, None, [] if way == "words" else r["looks"], votes)
             ranked = [fid for fid, _ in d["failures"]][:3]
             want = truth[f]["failure"]
             rows.append({"file": f, "want": want, "got": ranked, "top1": ranked[:1] == [want], "top3": want in ranked})
@@ -169,7 +216,7 @@ def score(split: str, skill: str | None = None) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=("split", "ask", "score"))
+    ap.add_argument("cmd", choices=("split", "ask", "knn", "score"))
     ap.add_argument("split", nargs="?", default="dev", choices=("dev", "heldout"))
     ap.add_argument("-j", type=int, default=6)
     ap.add_argument("--json", action="store_true")
@@ -186,17 +233,20 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "ask":
         ask(a.split, a.j)
         return 0
+    if a.cmd == "knn":
+        knn()
+        return 0
     s = score(a.split)
     if a.json:
         print(json.dumps({w: {k: v for k, v in m.items() if k != "rows"} for w, m in s.items()}, indent=1))
         return 0
     for way, m in s.items():
         print(f"{a.split} {way}: n={m['n']} top-1 {m['top1']:.0%} top-3 {m['top3']:.0%}")
-    for way in ("words", "looks"):
+    for way in ("looks", "knn"):
         print(f"confusions ({way}):", ", ".join(f"{k} x{v}" for k, v in s[way]["confusions"][:10]))
     if a.show:
         replies = {r["file"]: r for r in _rows(RUNS)}
-        for r in s["looks"]["rows"]:
+        for r in s["knn"]["rows"]:
             if not r["top1"]:
                 print(f"{r['file']}: got {r['got']} | looks {replies[r['file']]['looks']} | {replies[r['file']]['words'][:160]}")
     return 0

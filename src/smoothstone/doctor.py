@@ -15,6 +15,7 @@ import datetime as _dt
 import json
 import math
 import re
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
@@ -25,6 +26,9 @@ from .job import read_json, write_json
 FAIL_DIR = Path(__file__).resolve().parent / "failures"
 CATALOG = FAIL_DIR / "catalog.json"
 LABELS = config.REPO_ROOT / "failures" / "gallery" / "labels.jsonl"  # the gallery, at the checkout root like recipes/
+# fixes people shared with stone doctor share; merged into the repo, read at load time
+COMMUNITY = config.REPO_ROOT / "failures" / "community"
+CAP = 3.0  # assumption: shared cases move a cause at most 3x up or down, so a few cases cannot swamp the catalog
 SURE = 0.70  # the top cause past this: stop asking, try its fix
 MAX_PX = 1280
 NOT_SEEN = ("clog", "heat_creep", "feeder_grinding", "multi_material_feed", "thermal_error", "other")
@@ -202,10 +206,19 @@ ROOT_SHARE = 0.5  # assumption: a described root cause leads once it carries hal
 # --looks: the agent's own read of the photo, likeliest first. Each id it names multiplies that failure's
 # weight by a likelihood ratio, P(agent names it | it is the failure) / P(agent names it | it is not);
 # a failure the words never named starts at LOOK_FLOOR of the best word match. Set on the dev photos in
-# evals/doctor/photos.py (never on the held-out ones), together with the image match of a later change.
+# evals/doctor/photos.py (never on the held-out ones), together with the image match below.
 LOOK_LR = (3.0, 1.5, 1.0)
 LOOK_FLOOR = 1.0
 LOOKS_CHECKED = "evals/doctor/photo_runs.jsonl, split dev"
+# --image: the k most similar gallery photos vote (photo_match.py); a failure's share v multiplies its
+# weight by 1 + KNN_W * v, from the same LOOK_FLOOR start. Set on the dev photos; on dev scored without
+# any held-out neighbor, 7 and 12 are within one photo of the best of 25 pairs.
+KNN_K = 7
+KNN_W = 12.0
+# a failure only the vote names stays below the KNN_HOLD likeliest described ones, so the vote can fill the
+# last of three lines and no more. 2 scored best on the dev photos (1, 2, 3, all and no cap tried).
+KNN_HOLD = 2
+KNN_CAP = 0.99  # not tuned, only below 1
 
 
 # what the screen says when the firmware stopped a heater; while one stands, nothing else gets heated
@@ -226,7 +239,8 @@ def look_ids(text: str | None) -> tuple[list[str], list[str]]:
     return [i for i in dict.fromkeys(ids) if i in known], [i for i in ids if i not in known]
 
 
-def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple[str, float]]:
+def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str, float] | None = None
+                  ) -> list[tuple[str, float]]:
     """Failures by the words said, then by what the agent saw (--looks); the top failure's differentials
     (the ones the catalog says to tell apart from it) follow at a small share, so "Also check" lists
     them even when nobody named them."""
@@ -238,17 +252,34 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple
     base = max(scores.values(), default=0.0) or 1.0
     for lr, fid in zip(LOOK_LR, looks):
         scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * lr
+    # a photo cannot show a thermal fault or a clog, so a vote for one counts for nothing
+    votes = {fid: v for fid, v in (knn or {}).items() if failure(fid) and fid not in NOT_SEEN}
+    named = set(scores)  # what the words or --looks described
+    if not named and not looks:
+        votes = {}  # a photo nobody described is looked at first; the vote alone diagnoses nothing
+    for fid, v in votes.items():
+        scores[fid] = scores.get(fid, LOOK_FLOOR * base) * (1 + KNN_W * v)  # a guessed word stays a guess
+    named |= set(looks) & set(scores)  # a look past the LR list is described too
+    # the vote reorders what was described; nothing undescribed, voted or a differential of a boosted top,
+    # passes the two likeliest of them
+    cap = low = math.inf
+    if votes and named:
+        held = sorted((scores[f] for f in named), reverse=True)
+        cap, low = held[:KNN_HOLD][-1] * KNN_CAP, held[-1] * KNN_CAP  # one id may reach cap; the rest stay under all
+        first = max((f for f in scores if f not in named), key=scores.get, default=None)
+        scores.update({f: min(s, cap if f == first else low) for f, s in scores.items() if f not in named})
     if scores:
         top = max(scores, key=scores.get)
         # root first: when a cause of the top failure is another failure the person also described
         # (the blob formed because the part came loose), that failure is what to fix
         roots = [c["failure"] for c in failure(top)["causes"]
-                 if scores.get(c.get("failure"), 0) >= ROOT_SHARE * scores[top]]
+                 if c.get("failure") in named
+                 and scores.get(c.get("failure"), 0) >= ROOT_SHARE * scores[top]]
         if roots:
             root = max(roots, key=scores.get)
             scores[root], top = scores[top] * 1.05, root
         for i, d in enumerate(failure(top).get("differentials", [])):  # the catalog lists the likeliest first
-            scores.setdefault(d["id"], scores[top] * DIFF_SHARE * (1 - 0.1 * i))
+            scores.setdefault(d["id"], min(scores[top] * DIFF_SHARE * (1 - 0.1 * i), low))
     total = sum(scores.values()) or 1.0
     ranked = sorted(((i, s / total) for i, s in scores.items()), key=lambda x: -x[1])
     if thermal_fault(said) or "thermal_error" in looks:  # a safety override, not a score: the fault comes first whatever else scores
@@ -256,10 +287,37 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple
     return ranked
 
 
+@lru_cache(maxsize=1)
+def community() -> tuple[dict, ...]:
+    """Every shared case in failures/community/*/case.json (a broken one is skipped)."""
+    out = []
+    for f in sorted(COMMUNITY.glob("*/case.json")):
+        try:
+            out.append({**json.loads(f.read_text()), "dir": str(f.parent)})
+        except (OSError, json.JSONDecodeError):
+            continue
+    return tuple(out)
+
+
+def community_counts(pid: str | None, fid: str) -> tuple[Counter, int]:
+    """How often each cause fixed this failure on this printer in the shared cases, and how many cases."""
+    rows = [c for c in community() if pid and c.get("printer") == pid and c.get("failure") == fid]
+    return Counter(c.get("cause") for c in rows), len(rows)
+
+
+def community_mult(f: dict, pid: str | None) -> dict[str, float]:
+    """Laplace smoothed share of the fixes over the even share 1/K, kept within 1/CAP and CAP: with M shared
+    cases and n of them fixed by a cause, K (n + 1) / (M + K). No cases: no change."""
+    n, m = community_counts(pid, f["id"])
+    k = len(f["causes"])
+    return {c["id"]: min(CAP, max(1 / CAP, k * (n[c["id"]] + 1) / (m + k))) for c in f["causes"]} if m else {}
+
+
 def cause_priors(f: dict, said: str, ctx: set[str]) -> dict[str, float]:
     raw = {}
+    shared = community_mult(f, next((c[8:] for c in ctx if c.startswith("printer:")), None))
     for c in f["causes"]:
-        w = c["prior"] * _mods(c.get("modifiers", {}), ctx)
+        w = c["prior"] * _mods(c.get("modifiers", {}), ctx) * shared.get(c["id"], 1.0)
         if c.get("words") and word_score(said, c["words"], guess=False) > 0:
             w *= 2.0  # the person named this cause themselves
         raw[c["id"]] = w
@@ -324,7 +382,7 @@ def described(said: str, looks: list[str] = ()) -> list[str]:
     return (["thermal_error"] + [f for f in out if f != "thermal_error"]) if thermal_fault(said) else out
 
 
-def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
+def safety_lines(seen: list[str], limit: int | None = 4) -> list[str]:
     """SAFETY for the failures the person described. A thermal fault leads with its power-off lines, which
     are never cut, and drops any step that heats the hotend while the fault stands."""
     thermal = "thermal_error" in seen
@@ -337,13 +395,14 @@ def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
     if not thermal:
         return out[:limit]
     head = failure("thermal_error")["safety"] + [HEAT_FIRST]
-    return head + [ln for ln in out if ln not in head][:max(0, limit - len(head))]
+    return head + [ln for ln in out if ln not in head][:limit and max(0, limit - len(head))]
 
 
-def diagnose(said: str, printer: dict | None = None, material: str | None = None, looks: list[str] = ()) -> dict:
+def diagnose(said: str, printer: dict | None = None, material: str | None = None, looks: list[str] = (),
+             knn: dict[str, float] | None = None) -> dict:
     """The whole first pass, with no files: used by the command and by evals/doctor/run.py."""
     ctx = context(printer, material)
-    ranked = rank_failures(said, ctx, looks)
+    ranked = rank_failures(said, ctx, looks, knn)
     out = {"failures": ranked, "causes": {}, "question": None, "described": described(said, looks)}
     if ranked:
         f = failure(ranked[0][0])
@@ -372,6 +431,8 @@ def answer_key(text: str, keys: list[str]) -> str | None:
     if any(norm(w) in t for w in words.get("unknown", [])):
         return "unknown"
     toks = t.split()
+    if {"yes", "no"} <= set(keys) and set(toks) & LEAD["yes"] and set(toks) & LEAD["no"]:
+        return None  # "yes and no": ask again
     for k, lead in LEAD.items():
         if k in keys and toks and toks[0] in lead:
             return k
@@ -395,10 +456,9 @@ def answer_key(text: str, keys: list[str]) -> str | None:
 
 
 def examples(fid: str, printer_id: str | None, n: int = 3) -> list[str]:
-    if not LABELS.is_file():
-        return []
-    rows = []
-    for ln in LABELS.read_text().splitlines():
+    rows = [{"file": str(Path(c["dir"]) / c["photo"]), "printer": c.get("printer")} for c in community()
+            if c.get("failure") == fid and c.get("photo")]
+    for ln in (LABELS.read_text().splitlines() if LABELS.is_file() else []):
         try:
             r = json.loads(ln)
         except json.JSONDecodeError:
@@ -453,13 +513,13 @@ def save_case(job, case: dict) -> Path:
     return d / "case.json"
 
 
-def save_photo(src: Path, dest: Path) -> Path:
-    """The photo as a JPEG at most MAX_PX on its long side, turned upright, with EXIF (GPS, camera) left out."""
+def save_photo(src: Path, dest: Path, px: int = MAX_PX) -> Path:
+    """The photo as a JPEG at most px (MAX_PX) on its long side, turned upright, with EXIF (GPS, camera) left out."""
     from PIL import Image, ImageOps
 
     with Image.open(src) as im:
         im = ImageOps.exif_transpose(im).convert("RGB")
-        im.thumbnail((MAX_PX, MAX_PX))
+        im.thumbnail((px, px))
         dest.parent.mkdir(parents=True, exist_ok=True)
         im.save(dest, "JPEG", quality=90)  # no exif= argument: nothing from the original carries over
     return dest
@@ -566,6 +626,23 @@ def share_payload(case: dict) -> dict:
 # what the person reads
 
 
+def image_match(photo: Path) -> tuple[dict | None, str]:
+    """The nearest gallery photos' vote, kept out of sight until the agent has described the photo, so its
+    own read stays its own; and the line that says whether the match ran."""
+    from . import photo_match
+
+    ok, why = photo_match.available()
+    if ok:
+        try:
+            return photo_match.votes(photo_match.neighbors(photo), KNN_K), IMAGE_MATCH_ON
+        except Exception as e:  # noqa: BLE001 - a broken model install must not stop the diagnosis
+            why = f"{type(e).__name__}: {e}"
+    return None, f"Image match off ({why}): stone doctor runs on your words and --looks."
+
+
+IMAGE_MATCH_ON = "Image match on: the nearest labeled gallery photos count once you describe this one."
+
+
 def _printer_lines(p: dict | None, fids: list[str], causes: list[str]) -> list[str]:
     if not p:
         return []
@@ -583,9 +660,10 @@ def report(case: dict, p: dict | None) -> list[str]:
     top = failure(ranked[0])
     lines = [f"Most likely: {top['name']} ({top['id']})"]
     described_ids = case.get("described", ranked[:1])
-    seen = [f for f in ranked[:3] if f in described_ids]
+    # every described failure's SAFETY, likeliest first, even one ranked below the top 3
+    seen = sorted(described_ids, key=lambda f: ranked.index(f) if f in ranked else len(ranked))
     if "thermal_error" in described_ids:  # power off comes before anything else stone says
-        lines += [f"SAFETY: {s}" for s in safety_lines(["thermal_error"] + seen)]
+        lines += [f"SAFETY: {s}" for s in safety_lines(["thermal_error"] + seen, limit=None)]
     tell = {d["id"]: d["tell_apart"] for d in top.get("differentials", [])}
     for fid in ranked[1:4]:
         lines.append(f"Also check: {fid}: {tell.get(fid) or failure(fid)['looks_like']['camera']}")
@@ -593,9 +671,17 @@ def report(case: dict, p: dict | None) -> list[str]:
     by_id = {c["id"]: c for c in top["causes"]}
     for i, (cid, pr) in enumerate(causes, 1):
         lines.append(f"Cause {i}: {by_id[cid]['cause']} ({cid}) {pr:.0%}")
+    n, m = community_counts(p["id"] if p else None, top["id"])
+    if n and n.most_common(1)[0][1] >= 2:
+        cid, k = n.most_common(1)[0]
+        lines.append(f"On {p['name']}, {k} of {m} shared {top['id']} cases were fixed by {cid}")
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
     if "thermal_error" not in described_ids:
-        lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
+        lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1], limit=None)]
+    if case.get("knn") is not None:
+        match = [(k, v) for k, v in case["knn"].items() if k not in NOT_SEEN][:3]
+        lines.append("Image match (nearest gallery photos): "
+                     + (", ".join(f"{k} {v:.0%}" for k, v in match) or "no failure among them"))
     for fid in ranked[:3]:
         ex = examples(fid, p["id"] if p else None)
         if ex:
@@ -609,9 +695,9 @@ def looks_lines() -> list[str]:
         ["Not seen in a photo: " + ", ".join(i for i in NOT_SEEN if i != "other") + " (ask what the printer did)"]
 
 
-# stone doctor "<what they see>" | answer "<their answer>" | try [cause] | fixed "<what worked>" | looks
+# stone doctor "<what they see>" | answer "<their answer>" | try [cause] | fixed "<what worked>" | looks | share
 
-SUBS = ("answer", "try", "fixed", "looks")
+SUBS = ("answer", "try", "fixed", "looks", "share")
 
 
 def cmd_doctor(args, job):
@@ -627,6 +713,10 @@ def cmd_doctor(args, job):
         return out
     if sub is None:
         return _new(args, job, rest, out)
+    if sub == "share":
+        from . import share
+
+        return share.cmd_share(args, job, rest, out)
     case = open_case(job)
     if case is None or not case.get("failure"):
         out.fix("no open doctor case with a description yet")
@@ -693,16 +783,19 @@ def _new(args, job, said: str, out):
         else:
             case["image"] = str(save_photo(frame, frame))
             case["camera"] = {"name": device["name"], "model": device.get("model")}
+    match_line = None
+    if case["image"] and case.get("knn") is None:  # off before: try again, the extra may be installed now
+        case["knn"], match_line = image_match(Path(case["image"]))
     case.update(said=said, looks=looks, printer=p["id"] if p else None, printer_set=cur_id, material=material)
-    d = diagnose(said, p, material, looks) if said or looks else {"failures": []}
+    d = diagnose(said, p, material, looks, case.get("knn")) if said or looks else {"failures": []}
     head = (f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
             + (f", seen: {', '.join(looks)}" if looks else ""))
-    if not d["failures"]:
+    if not d.get("described"):  # nothing said or seen matches: the photo's own vote alone never diagnoses
         case.update(state="look", failure=None, failures=[], causes={}, question=None)
         save_case(job, case)
         out.add(head)
         if case["image"]:
-            out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}",
+            out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}", *([match_line] if match_line else []),
                     "Look at it: describe what you see, and pass the ids that match it with --looks (each id and "
                     "its look: stone doctor looks). If you cannot see images, ask the person what it looks like.")
             out.next = case_next(case)
@@ -714,6 +807,8 @@ def _new(args, job, said: str, out):
                 question=d["question"], described=d["described"], asked=[], answers=[], tried=[])
     save_case(job, case)
     out.add(head, *report(case, p))
+    if match_line and match_line != IMAGE_MATCH_ON:
+        out.add(match_line)
     if case["image"]:
         out.add(f"Photo: {case['image']}")
     out.next = case_next(case)
@@ -782,7 +877,10 @@ def _fixed(job, case, text, out):
     f = save_case(job, case)
     with open(doctor_dir(job) / "outcomes.jsonl", "a") as fh:
         fh.write(json.dumps(share_payload(case)) + "\n")
-    out.add(f"Recorded: {case['failure']}, cause {cause}" + (f", fixed by: {text}" if text else "") + f" ({f})")
-    out.next = DONE
+    out.add(f"Recorded: {case['failure']}, cause {cause}" + (f", fixed by: {text}" if text else "") + f" ({f})",
+            "Sharing it (optional) helps the next person with this printer: stone doctor ranks this cause higher.")
+    from .share import ASK
+
+    out.next = ASK
     out.result = f"doctor fixed {cause}"
     return out

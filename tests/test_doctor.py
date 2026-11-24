@@ -36,6 +36,7 @@ def work(tmp_path, monkeypatch):
     w.mkdir()
     monkeypatch.chdir(w)
     monkeypatch.setenv("STONE_JOB", str(w / "stone-job"))
+    monkeypatch.setenv("STONE_IMAGE_MATCH", "off")  # no model, no cache writes in the home folder
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError(f"subprocess {a}")))
     return w
 
@@ -183,7 +184,7 @@ def test_owner_flow_photo_words_answer_try_fixed(work):
     assert "wiki.creality.com" in text and nxt.startswith("ask the person: did that fix it?")
 
     text, code, nxt = stone("doctor", "fixed", "washed the plate with dish soap")
-    assert nxt == doctor.DONE
+    assert nxt.startswith("ask the person: Share this fix") and "MIT license" in nxt  # optional, never forced
     case = json.loads((case_dir / "case.json").read_text())
     assert case["outcome"]["cause"] == "plate_contaminated" and case["outcome"]["printer"] == "creality_k2"
     shared = json.loads((work / "stone-job" / "doctor" / "outcomes.jsonl").read_text().splitlines()[-1])
@@ -402,6 +403,18 @@ def test_r2_thermal_fault_leads_whatever_else_scores(work, said):
     assert not any(h in text.lower() for h in ("heat the hotend", "with the hotend hot", "heat up and push")), text
 
 
+def test_r2_thermal_fault_keeps_heating_steps_out_of_try(work):
+    stone("doctor", "Blocked nozzle. MINTEMP.")
+    text, code, nxt = stone("doctor", "try", "debris_or_burnt")
+    assert "Heat up and push" not in text, text
+    for cid in [c["id"] for c in doctor.failure("clog")["causes"]]:
+        assert "Heat up" not in stone("doctor", "try", cid)[0]
+
+
+def test_r2_a_denied_thermal_fault_does_not_lead():
+    assert doctor.diagnose("no thermal error on the screen, just strings everywhere")["failures"][0][0] == "stringing"
+
+
 def test_r2_two_photo_cases_in_one_second_keep_their_own_folders(work, monkeypatch):
     import datetime as real
 
@@ -431,12 +444,21 @@ def test_r2_a_case_keeps_the_printer_it_was_opened_with(work):
     assert json.loads((case_dir / "case.json").read_text())["printer"] == "bambu_a1"
 
 
+def test_r2_stone_printer_set_after_open_does_change_the_case(work):
+    stone("doctor", "--image", str(_photo(work / "a.jpg")), "--printer", "bambu_a1")
+    stone("printer", "set", "prusa_mk4s")  # the person set another printer on purpose
+    text, code, nxt = stone("doctor", "the part came off the bed")
+    assert text.splitlines()[0].endswith("Original Prusa MK4S"), text
+
+
 @pytest.mark.parametrize("text,want", [
     ("I never wash it", None),  # a negator says nothing about yes or no: ask again
+    ("didn't clean it in weeks", None),
     ("it never gets washed", None),
     ("no, I wash it before every print", "no"),
     ("nope", "no"),
     ("yes it has", "yes"),
+    ("it is not", None),
 ])
 def test_r2_a_bare_negator_is_not_a_no(text, want):
     assert doctor.answer_key(text, ["yes", "no"]) == want
@@ -457,7 +479,7 @@ def test_r2_owner_flow_reads_the_wash_question_and_reaches_plate_contaminated(wo
 
 
 
-# photos: --looks and the photo floor
+# photos: --looks, the image match and the photo floor
 
 def _photos():
     spec = importlib.util.spec_from_file_location("doctor_photos", REPO / "evals" / "doctor" / "photos.py")
@@ -466,10 +488,10 @@ def _photos():
     return mod
 
 
-@pytest.mark.parametrize("suite,way", [("doctor_photos_nomodel", "looks")])
+@pytest.mark.parametrize("suite,way", [("doctor_photos", "knn"), ("doctor_photos_nomodel", "looks")])
 def test_photo_floor(suite, way):
-    """The held-out photos' recorded replies, ranked again: a change may not fall below the floor
-    (measured once, less 0.02)."""
+    """The held-out photos' recorded replies and neighbors, ranked again: a change may not fall below the
+    floor (measured once, less 0.02), with and without the image match."""
     s = _photos().score("heldout")[way]
     floor = json.loads((REPO / "evals" / "floor.json").read_text())
     assert s["n"] == floor[f"{suite}/top1"]["total"] >= 100
@@ -493,6 +515,83 @@ def test_owner_case_with_looks():
         assert doctor.top_causes(d["causes"], 1)[0][0] == "plate_contaminated"
 
 
+def test_owner_case_with_looks_and_image_match():
+    ph = _photos()
+    near = ph.neighbors()["bed_adhesion/k2-detached-plate-blob.jpg"]
+    from smoothstone import photo_match
+    votes = photo_match.votes(near, doctor.KNN_K)
+    blob = [f"SAFETY: {s}" for s in doctor.failure("blob_on_nozzle")["safety"]]
+    assert blob
+    for looks in ([], ["bed_adhesion", "blob_on_nozzle"]):
+        p = printers.get("creality_k2")
+        d = doctor.diagnose(OWNER["said"], p, "PLA", looks, votes)
+        ranked = [f for f, _ in d["failures"]]
+        assert ranked[0] == "bed_adhesion"
+        assert "blob_on_nozzle" in ranked[:3], (looks, ranked)  # the vote never lifts an undescribed id past it
+        assert doctor.top_causes(d["causes"], 1)[0][0] == "plate_contaminated"
+        lines = doctor.report({"failures": d["failures"][:5], "causes": d["causes"], "described": d["described"],
+                               "knn": votes}, p)
+        assert all(s in lines for s in blob), (looks, lines)  # never yank; heat before pulling plastic
+
+
+def _held(d):
+    """The two likeliest described failures lead: an image vote only fills the lines below them."""
+    n = min(doctor.KNN_HOLD, len(d["described"]))
+    return set(f for f, _ in d["failures"][:n]) <= set(d["described"])
+
+
+def test_image_vote_never_outranks_the_two_likeliest_described():
+    for said, looks, want in (("thin hairs of plastic between the towers", [], "stringing"),
+                              ("the print failed", ["warping"], "warping")):
+        d = doctor.diagnose(said, None, None, looks, {"spaghetti": 1.0, "layer_shift": 0.9})
+        ranked = [f for f, _ in d["failures"]]
+        assert ranked[0] == want and _held(d), ranked
+    d = doctor.diagnose("", None, None, [], {"spaghetti": 0.6})
+    assert not d["failures"]  # with nothing described, the vote alone diagnoses nothing
+
+
+@pytest.mark.parametrize("votes", [{"bed_adhesion": 1.0}, {"bed_adhesion": 0.5, "spaghetti": 0.5}, {"spaghetti": 1.0}])
+def test_a_strong_vote_lifts_no_differential_past_the_described_blob(votes):
+    for looks in ([], ["bed_adhesion", "blob_on_nozzle"]):
+        d = doctor.diagnose(OWNER["said"], printers.get("creality_k2"), "PLA", looks, votes)
+        assert _held(d) and "blob_on_nozzle" in [f for f, _ in d["failures"][:3]], (looks, d["failures"])
+
+
+def test_image_vote_stays_below_two_looks_and_takes_the_third_line():
+    d = doctor.diagnose("", None, None, ["stringing", "warping", "layer_shift", "blob_on_nozzle"], {"spaghetti": 1.0})
+    assert [f for f, _ in d["failures"][:3]] == ["stringing", "warping", "spaghetti"], d["failures"]
+
+
+def test_image_vote_stays_below_the_described_on_every_recorded_reply():
+    from smoothstone import photo_match
+    ph = _photos()
+    near, runs = ph.neighbors(), {r["file"]: r for r in ph._rows(ph.RUNS)}
+    assert len(runs) == 151
+    for f, r in runs.items():
+        d = doctor.diagnose(r["words"], None, None, r["looks"], photo_match.votes(near[f], doctor.KNN_K))
+        assert _held(d), (f, d["described"], d["failures"])
+
+
+def test_safety_lines_of_a_failure_described_below_the_top_three():
+    for looks in (["stringing", "warping", "layer_shift", "blob_on_nozzle"], ["blob_on_nozzle", "clog"],
+                  ["thermal_error", "blob_on_nozzle"]):
+        d = doctor.diagnose("", None, None, looks, {"stringing": 0.5})
+        lines = doctor.report({"failures": d["failures"][:5], "causes": d["causes"], "described": d["described"]}, None)
+        want = [f"SAFETY: {s}" for f in looks for s in doctor.failure(f).get("safety", [])]
+        if "thermal_error" in looks:  # nothing heats while a thermal fault stands
+            want = [w for w in want if not w.startswith("SAFETY: Heat the hotend")]
+        assert want and not [w for w in want if w not in lines], (looks, lines)
+
+
+def test_image_vote_for_an_unseen_failure_never_leads():
+    """A photo cannot show a thermal fault, a clog or grinding: their votes count for nothing, so only the
+    words or --looks thermal_error (the safety override) make thermal_error Most likely."""
+    for fid in doctor.NOT_SEEN:
+        for said, looks in (("", []), ("the print failed", []), ("", ["stringing"])):
+            d = doctor.diagnose(said, None, None, looks, {fid: 1.0})
+            assert not d["failures"] or d["failures"][0][0] != fid, (fid, said, looks, d["failures"][:3])
+
+
 def test_looks_names_what_the_words_do_not(work):
     text, code, nxt = stone("doctor", "the print failed", "--looks", "stringing")
     assert text.splitlines()[0].endswith("seen: stringing")
@@ -501,3 +600,66 @@ def test_looks_names_what_the_words_do_not(work):
     assert code == 1 and "FIX: unknown --looks id: spagetti" in text and nxt == "stone doctor looks"
     text, code, nxt = stone("doctor", "looks")
     assert "--looks" in nxt and "toppled: " in text and "broken stub" in text
+
+@pytest.mark.parametrize("text", ["yes and no", "yes, no", "no... well, yes"])
+def test_r2_yes_and_no_at_once_asks_again(text):
+    assert doctor.answer_key(text, ["yes", "no"]) is None
+
+
+def test_image_match_off_says_so(work):
+    text, code, nxt = stone("doctor", "--image", str(_photo(work / "a.jpg")))
+    assert "Image match off (STONE_IMAGE_MATCH=off): stone doctor runs on your words and --looks." in text
+    assert "--looks" in nxt
+
+
+def test_an_open_photo_case_run_again_prints_no_none(work, monkeypatch):
+    """Review #105 F2 and F4: the case keeps its vote, and a match that was off is tried again."""
+    from smoothstone import photo_match
+    stone("doctor", "--image", str(_photo(work / "a.jpg")))  # off: STONE_IMAGE_MATCH
+    monkeypatch.setattr(photo_match, "available", lambda: (True, ""))
+    monkeypatch.setattr(photo_match, "neighbors", lambda *a, **k: [("a.jpg", "spaghetti", 0.9)])
+    text, code, nxt = stone("doctor")
+    assert doctor.IMAGE_MATCH_ON in text
+    text, code, nxt = stone("doctor")
+    assert "None" not in text and doctor.IMAGE_MATCH_ON not in text and "--looks" in nxt
+    text, code, nxt = stone("doctor", "it went wrong")  # words that match nothing: still look at the photo first
+    assert "Most likely" not in text and "Image match (" not in text and "--looks" in nxt
+    text, code, nxt = stone("doctor", "it went wrong", "--looks", "warping")
+    assert "Most likely: " in text and "(warping)" in text.splitlines()[1]
+    assert "Also check: spaghetti" in text and "Image match (nearest gallery photos): spaghetti 100%" in text
+
+
+def test_gallery_cache_order_and_skip(tmp_path, monkeypatch):
+    """photo_match without the model: neighbors in order, a skipped print left out, the second call from disk."""
+    import numpy as np
+    from smoothstone import photo_match as pm
+    vec = {"a-1.jpg": (1, 0), "a-2.jpg": (0.9, 0.1), "b.jpg": (0, 1), "q.jpg": (1, 0)}
+    (tmp_path / "labels.jsonl").write_text("".join(json.dumps({"file": f"warping/{n}", "failure": "warping"}) + "\n"
+                                                    for n in ("b.jpg", "a-1.jpg", "a-2.jpg")))
+    calls = []
+    def embed(paths):
+        calls.append(len(paths))
+        return np.array([vec[p.name] for p in paths], float)
+    monkeypatch.setattr(pm, "GALLERY", tmp_path)
+    monkeypatch.setattr(pm, "embed", embed)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    for _ in range(2):
+        assert [f for f, _, _ in pm.neighbors(tmp_path / "q.jpg")] == [f"warping/{n}" for n in ("a-1.jpg", "a-2.jpg", "b.jpg")]
+    assert calls == [3, 1, 1]  # the gallery embedded once, then read back
+    assert [f for f, _, _ in pm.neighbors(tmp_path / "q.jpg", skip={"warping/a-1.jpg"})] == ["warping/b.jpg"]
+
+
+def test_several_votes_take_one_line_from_the_described():
+    votes = {f: 0.14 for f in ("spaghetti", "under_extrusion", "z_seam", "first_layer", "bed_adhesion")}
+    d = doctor.diagnose("", None, None, ["stringing", "warping", "layer_shift"], votes)
+    assert [f for f, _ in d["failures"][:4]] == ["stringing", "warping", "spaghetti", "layer_shift"], d["failures"]
+
+
+def test_knn_votes_and_frames_of_one_print():
+    from smoothstone import photo_match
+    near = [("a.jpg", "spaghetti", 0.9), ("b.jpg", "healthy", 0.9), ("c.jpg", "bed_adhesion", 0.2)]
+    assert photo_match.votes(near, 2) == {"spaghetti": 0.5}  # healthy counts against every id, names none
+    assert photo_match.group("spaghetti/u1-facade-spaghetti-2.jpg") == photo_match.group("spaghetti/u1-facade-spaghetti-3.jpg")
+    assert photo_match.group("spaghetti/u1-facade-spaghetti-2.jpg") != photo_match.group("spaghetti/other-2.jpg")
+    for file, near in _photos().neighbors().items():
+        assert photo_match.group(file) not in {photo_match.group(f) for f, _, _ in near}

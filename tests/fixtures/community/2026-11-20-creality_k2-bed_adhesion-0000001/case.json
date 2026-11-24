@@ -1,0 +1,15 @@
+{
+ "schema": 1,
+ "failure": "bed_adhesion",
+ "cause": "plate_contaminated",
+ "printer": "creality_k2",
+ "material": "PLA",
+ "said": "test fixture: the part slid off the plate halfway up",
+ "fixed_by": "test fixture: washed the plate with soap",
+ "answers": [],
+ "photo": null,
+ "stone_version": "0.1.0",
+ "date": "2026-11-20",
+ "license": "MIT",
+ "id": "2026-11-20-creality_k2-bed_adhesion-0000001"
+}

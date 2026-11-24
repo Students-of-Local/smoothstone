@@ -1,0 +1,60 @@
+name: Print fix
+description: A print problem you fixed with stone doctor, so other agents on the same printer learn from it.
+title: "Fixed: <failure> on <printer>"
+labels: ["print-fix"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `stone doctor share` fills this in; stone itself sends nothing. Attach the photo.jpg it names,
+        read every field, and submit it yourself. A maintainer reads it and adds the case to
+        failures/community in a pull request. Everything here, the photo included, becomes public under
+        smoothstone's MIT license.
+  - type: input
+    id: failure
+    attributes:
+      label: Failure id
+      description: From the taxonomy, such as bed_adhesion
+    validations:
+      required: true
+  - type: input
+    id: cause
+    attributes:
+      label: Cause that fixed it
+      description: The cause id stone doctor named, such as plate_contaminated
+    validations:
+      required: true
+  - type: input
+    id: printer
+    attributes:
+      label: Printer model id
+      description: An id from `stone printer`, such as creality_k2. The model only, not your printer's name.
+    validations:
+      required: true
+  - type: input
+    id: material
+    attributes:
+      label: Material
+  - type: textarea
+    id: said
+    attributes:
+      label: What you saw
+    validations:
+      required: true
+  - type: textarea
+    id: fixed_by
+    attributes:
+      label: What fixed it
+    validations:
+      required: true
+  - type: input
+    id: stone_version
+    attributes:
+      label: stone version
+  - type: checkboxes
+    id: license
+    attributes:
+      label: License
+      options:
+        - label: I share this photo and text under smoothstone's MIT license, and they show nothing private.
+          required: true
