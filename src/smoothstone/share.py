@@ -30,6 +30,9 @@ LICENSE_LINE = "The photo and the words become public on GitHub under smoothston
 ASK = ("ask the person: Share this fix (photo, printer, material, what you saw and what fixed it) publicly on GitHub "
        "so other agents learn from it? The photo and words become public under smoothstone's MIT license. "
        "(yes / no) yes: stone doctor share. no: stone doctor share no")
+# the dry run ends in a question, so --send never runs before the person has seen the words and the photo
+SEND_ASK = ("ask the person: <read them the lines above and show them the photo>; send exactly this? (yes / no) "
+            "yes: stone doctor share --send. no: stone doctor share no")
 
 # what never leaves the machine, in the order it is replaced (a link before the host inside it)
 PATTERNS = [
@@ -233,7 +236,7 @@ def cmd_share(args, job, rest: str, out):
     if gone:
         out.add("Removed first: " + ", ".join(f"{gone.count(k)} {k}" for k in dict.fromkeys(gone)))
     out.add(LICENSE_LINE, f"Where: {COMMUNITY_DIR}/{d['id']}/ in a pull request to {REPO}")
-    out.next = "stone doctor share --send"
+    out.next = SEND_ASK
     return out
 
 

@@ -21,7 +21,9 @@ Use this when someone says a print failed, shows a photo of a failed print, or a
 3. Ask the one question in NEXT. Then: `stone doctor answer "<their answer>"`.
 4. When NEXT says `stone doctor try <cause>`, run it and tell the person the steps.
 5. If it worked: `stone doctor fixed "<what worked>"`. If not: the NEXT line names the next `stone doctor try`.
-6. Sharing is optional: ask NEXT's question word for word, then run what the answer names. An issue link from `--send` goes to the person with the photo path.
+6. Sharing is optional and asks twice: first whether to share, then, after `stone doctor share` shows the bundle,
+   whether to send exactly that (read the person every line and show them the photo first). Run what each answer
+   names. An issue link from `--send` goes to the person with the photo path.
 
 Words for each failure: `stone doctor looks`.
 
@@ -69,7 +71,7 @@ $ stone doctor share
 Ready to share case 20261124-012644. Nothing is sent yet. This is all that goes public:
 Photo: stone-job/doctor/20261124-012644/share/photo.jpg (EXIF removed, at most 1024 px)
 ...
-NEXT: stone doctor share --send
+NEXT: ask the person: <read them the lines above and show them the photo>; send exactly this? (yes / no) yes: stone doctor share --send. no: stone doctor share no
 
 $ stone doctor share --send
 Sent: https://github.com/baney75/smoothstone/pull/<number>

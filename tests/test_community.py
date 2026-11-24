@@ -107,7 +107,7 @@ def test_fixed_ask_share_dry_then_send(work, monkeypatch):
     assert nxt == share.ASK and "MIT license" in nxt and "stone doctor share no" in nxt
 
     text, code, nxt = stone("doctor", "share")
-    assert gh.calls == [] and nxt == "stone doctor share --send"  # nothing leaves without --send
+    assert gh.calls == [] and nxt == share.SEND_ASK  # nothing leaves without --send
     assert "Nothing is sent yet" in text and share.LICENSE_LINE in text and "Removed first: 1 email" in text
     bundle = next((work / "stone-job" / "doctor").glob("*/share"))
     d = json.loads((bundle / "case.json").read_text())
@@ -126,6 +126,16 @@ def test_fixed_ask_share_dry_then_send(work, monkeypatch):
     assert pr[pr.index("--head") + 1] == f"somefan:fix/{d['id']}" and not (bundle / ".put.json").exists()
     text, code, nxt = stone("doctor", "share", "--send")
     assert "Already shared" in text and len([c for c in gh.calls if c[:2] == ["pr", "create"]]) == 1
+
+
+def test_dry_run_next_asks_the_person(work, monkeypatch):
+    gh = FakeGh()
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    _fixed_case(work)
+    text, code, nxt = stone("doctor", "share")
+    assert nxt.startswith("ask the person:") and "show them the photo" in nxt and "send exactly this?" in nxt
+    assert nxt.endswith("yes: stone doctor share --send. no: stone doctor share no") and gh.calls == []
 
 
 def test_owner_skips_the_fork(work, monkeypatch):
@@ -172,7 +182,7 @@ def test_a_case_without_a_printer_asks_for_one(work):
     text, code, nxt = stone("doctor", "share")
     assert code == 1 and "stone doctor share --printer" in nxt
     text, code, nxt = stone("doctor", "share", "--printer", "bambu_p1s")
-    assert "Printer: bambu_p1s" in text and nxt == "stone doctor share --send"
+    assert "Printer: bambu_p1s" in text and nxt == share.SEND_ASK
 
 
 # learning from shared cases
