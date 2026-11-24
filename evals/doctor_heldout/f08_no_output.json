@@ -1,0 +1,10 @@
+{
+ "id": "f08_no_output",
+ "said": "filament motor turns but zero comes out even using manual extrude hot, this started after switching colors",
+ "printer": "prusa_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "clog",
+  "top3_includes": []
+ }
+}

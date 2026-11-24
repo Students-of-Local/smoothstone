@@ -1,0 +1,12 @@
+{
+ "id": "h25_lumpy_roof",
+ "said": "The top of this low infill box looks like a quilt with little holes and raised humps over the empty cells. Side walls look fine, and it's still ugly after the last top layer.",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PLA",
+ "expect": {
+  "top": "pillowing",
+  "top3_includes": [
+   "poor_bridging"
+  ]
+ }
+}

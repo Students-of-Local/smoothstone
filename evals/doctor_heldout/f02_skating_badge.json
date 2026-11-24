@@ -1,0 +1,10 @@
+{
+ "id": "f02_skating_badge",
+ "said": "little badge slides around after two laps, nothing stays on the plate",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": []
+ }
+}

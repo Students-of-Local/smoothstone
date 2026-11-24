@@ -1,0 +1,10 @@
+{
+ "id": "h08_nothing_through",
+ "said": "After some dusty old filament went through, nothing comes out even with the nozzle hot and me pushing by hand with the feeder released. The drive still turns when I ask it to extrude.",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "clog",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "h05_hairy_towers",
+ "said": "My two towers print fine but there's a spiderweb between them wherever the head travels. Is the Y belt too loose or something?",
+ "printer": "prusa_mk4s",
+ "material": "PETG",
+ "expect": {
+  "top": "stringing",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "h01_corner_curl",
+ "said": "My ASA enclosure panel starts flat, then two corners curl upward halfway through even though the brim stays stuck. I figured the extruder steps must be off.",
+ "printer": "qidi_q1_pro",
+ "material": "ASA",
+ "expect": {
+  "top": "warping",
+  "top3_includes": []
+ }
+}

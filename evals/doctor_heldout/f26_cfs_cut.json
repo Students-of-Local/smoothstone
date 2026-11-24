@@ -1,0 +1,10 @@
+{
+ "id": "f26_cfs_cut",
+ "said": "cfs keeps saying cutter failed on color change, single spool prints fine",
+ "printer": "creality_k2_plus",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

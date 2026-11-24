@@ -1,0 +1,12 @@
+{
+ "id": "h23_fallen_spire",
+ "said": "The tall skinny spire was lying on its side beside its tiny footprint when I checked, with noodles piled above where it used to stand. Looks like the nozzle knocked the whole thing over.",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "toppled",
+  "top3_includes": [
+   "spaghetti"
+  ]
+ }
+}

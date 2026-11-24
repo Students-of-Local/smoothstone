@@ -1,0 +1,10 @@
+{
+ "id": "b33_sparse_petg",
+ "said": "PETG walls feel like wicker. Lines are skinny with gaps throughout the print and top never closes, even over dense infill. Flow is set to 65%.",
+ "printer": "creality_k1_max",
+ "material": "PETG",
+ "expect": {
+  "top": "under_extrusion",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "b04_hotend_meatball",
+ "said": "There is a huge plastic meatball swallowing the sock and wires. I can barely see the tip anymore. How cooked am I?",
+ "printer": "creality_ender3_v3",
+ "material": "PETG",
+ "expect": {
+  "top": "blob_on_nozzle",
+  "top3_includes": []
+ }
+}

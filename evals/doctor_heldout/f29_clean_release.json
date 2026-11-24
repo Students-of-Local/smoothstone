@@ -1,0 +1,10 @@
+{
+ "id": "f29_clean_release",
+ "said": "i washed plate and tried again but the flat token just follows nozzle around on first circle",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": []
+ }
+}

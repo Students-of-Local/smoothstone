@@ -1,0 +1,10 @@
+{
+ "id": "d34_misleading_clog",
+ "said": "I think my nozzle is clogged because the print failed, but when I look the part is still stuck to the bed, it's just that the top layers have these strings everywhere between parts",
+ "printer": "creality_k2",
+ "material": "PETG",
+ "expect": {
+  "top": "stringing",
+  "top3_includes": []
+ }
+}

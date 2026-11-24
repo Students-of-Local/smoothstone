@@ -1,0 +1,12 @@
+{
+ "id": "d32_over_extrusion",
+ "said": "the walls are fat and blobby, dimensions are too big and the top surface is overflowing with ridges of excess plastic",
+ "printer": "creality_k1c",
+ "material": "PETG",
+ "expect": {
+  "top": "over_extrusion",
+  "top3_includes": [
+   "surface_zits"
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "d17_zits",
+ "said": "lots of little zits and blobs all over the outer wall surface, random pimples",
+ "printer": "qidi_q1_pro",
+ "material": "PLA",
+ "expect": {
+  "top": "surface_zits",
+  "top3_includes": [
+   "z_seam"
+  ]
+ }
+}

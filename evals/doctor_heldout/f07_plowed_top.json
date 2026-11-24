@@ -1,0 +1,10 @@
+{
+ "id": "f07_plowed_top",
+ "said": "flow has to be too low, nozzle keeps plowing through fat raised ridges on every solid top",
+ "printer": "prusa_mk4s",
+ "material": "PLA",
+ "expect": {
+  "top": "over_extrusion",
+  "top3_includes": []
+ }
+}

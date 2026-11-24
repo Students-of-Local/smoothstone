@@ -1,0 +1,12 @@
+{
+ "id": "h22_chewed_flex",
+ "said": "My TPU stops moving and the gear just spins in a notch it chewed into the filament. There's a little pile of rubber crumbs by the drive wheel and it grabs again if I advance past that spot.",
+ "printer": "bambu_a1",
+ "material": "TPU",
+ "expect": {
+  "top": "feeder_grinding",
+  "top3_includes": [
+   "under_extrusion"
+  ]
+ }
+}

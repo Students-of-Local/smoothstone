@@ -1,0 +1,12 @@
+{
+ "id": "d38_nozzle_dragged",
+ "said": "the part detached and now there's plastic wrapped all around the hotend, a big glob stuck on the nozzle",
+ "printer": "bambu_h2d",
+ "material": "PLA",
+ "expect": {
+  "top": "blob_on_nozzle",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

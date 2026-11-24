@@ -1,0 +1,10 @@
+{
+ "id": "f34_tpu_rattle",
+ "said": "soft filament making popping sound right at nozzle and comes out foamy even when extruding into air",
+ "printer": "prusa_mini",
+ "material": "TPU",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": []
+ }
+}

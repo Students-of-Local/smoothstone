@@ -1,0 +1,10 @@
+{
+ "id": "b13_echo_letters",
+ "said": "There's a faint copy of each letter trailing sideways along the wall, fading out after a few ripples. Is my nozzle worn out?",
+ "printer": "voron_24",
+ "material": "ABS",
+ "expect": {
+  "top": "ringing",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "b36_mmu_loading_stall",
+ "said": "MMU feeds to the selector then backs out over and over. Never reaches the extruder. Normal printing works when I bypass the unit.",
+ "printer": "prusa_core_one",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

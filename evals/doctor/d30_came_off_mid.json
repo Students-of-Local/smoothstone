@@ -1,0 +1,13 @@
+{
+ "id": "d30_came_off_mid",
+ "said": "print came off the bed halfway through and got dragged around, ended up as a mess",
+ "printer": "creality_k1_max",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": [
+   "spaghetti",
+   "warping"
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "d44_first_layer_uneven",
+ "said": "first layer is perfect on one side of the bed and too high and not sticking on the other side",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

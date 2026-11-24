@@ -1,0 +1,10 @@
+{
+ "id": "b17_patchy_sheet",
+ "said": "My bottom test square has separated lines on the left and scraped transparent patches on the right. Haven't gotten past layer one yet.",
+ "printer": "elegoo_neptune_4_pro",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": []
+ }
+}

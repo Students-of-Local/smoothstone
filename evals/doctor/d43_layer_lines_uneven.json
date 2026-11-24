@@ -1,0 +1,10 @@
+{
+ "id": "d43_layer_lines_uneven",
+ "said": "my layers look inconsistent, some stick out more than others in a repeating pattern, like a wavy banding up the z",
+ "printer": "prusa_mk4s",
+ "material": "PLA",
+ "expect": {
+  "top": "z_wobble",
+  "top3_includes": []
+ }
+}

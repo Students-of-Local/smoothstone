@@ -1,0 +1,10 @@
+{
+ "id": "f03_air_nest",
+ "said": "camera shows noodles everywhere and the head is drawing stuff way above whats left of my boat",
+ "printer": "creality_k1_max",
+ "material": "PLA",
+ "expect": {
+  "top": "spaghetti",
+  "top3_includes": []
+ }
+}

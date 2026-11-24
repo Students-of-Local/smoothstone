@@ -1,0 +1,10 @@
+{
+ "id": "d42_top_holes",
+ "said": "top layer is not closed, gaps and little holes in the top skin like pillows",
+ "printer": "prusa_core_one",
+ "material": "PETG",
+ "expect": {
+  "top": "pillowing",
+  "top3_includes": []
+ }
+}

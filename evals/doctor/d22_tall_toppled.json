@@ -1,0 +1,12 @@
+{
+ "id": "d22_tall_toppled",
+ "said": "tall thin antenna part got knocked over by the nozzle about 60mm up",
+ "printer": "bambu_a1",
+ "material": "PLA",
+ "expect": {
+  "top": "toppled",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

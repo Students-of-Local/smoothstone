@@ -1,0 +1,10 @@
+{
+ "id": "f23_fallen_spire",
+ "said": "thin tower was upright till nozzle hit it, now lying whole on plate with its base still stuck",
+ "printer": "prusa_mk4s",
+ "material": "PLA",
+ "expect": {
+  "top": "toppled",
+  "top3_includes": []
+ }
+}

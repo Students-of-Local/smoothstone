@@ -1,0 +1,12 @@
+{
+ "id": "b21_enclosed_pla_jam",
+ "said": "PLA quits after 40 minutes with the door shut. Cold pull has a swollen plug above the melt zone; door open fixes it. Bad slicer update?",
+ "printer": "creality_k1c",
+ "material": "PLA",
+ "expect": {
+  "top": "heat_creep",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

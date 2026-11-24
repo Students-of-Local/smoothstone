@@ -1,0 +1,10 @@
+{
+ "id": "f30_asa_corners",
+ "said": "i think z offset changed mid print, corners of this asa tray are lifting while center holds",
+ "printer": "elegoo_centauri_carbon",
+ "material": "ASA",
+ "expect": {
+  "top": "warping",
+  "top3_includes": []
+ }
+}

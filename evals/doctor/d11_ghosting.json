@@ -1,0 +1,10 @@
+{
+ "id": "d11_ghosting",
+ "said": "there are ripples/echoes next to the letters and sharp corners on my calibration cube, like a ghost image repeating the edge",
+ "printer": "sovol_sv08",
+ "material": "PLA",
+ "expect": {
+  "top": "ringing",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "b31_pc_corner_curl",
+ "said": "PC plate starts fine, then one corner bends up hard enough for the nozzle to drag over it. Brim lifts with it. Belts are definitely loose.",
+ "printer": "qidi_q1_pro",
+ "material": "PC",
+ "expect": {
+  "top": "warping",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

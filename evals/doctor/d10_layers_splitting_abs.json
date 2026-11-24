@@ -1,0 +1,13 @@
+{
+ "id": "d10_layers_splitting_abs",
+ "said": "my ABS part split right along a layer line, cracked open on the side when it cooled, the layers just didn't bond",
+ "printer": "bambu_p1p",
+ "material": "ABS",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": [
+   "layer_separation",
+   "warping"
+  ]
+ }
+}

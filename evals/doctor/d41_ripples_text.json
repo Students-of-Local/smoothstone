@@ -1,0 +1,10 @@
+{
+ "id": "d41_ripples_text",
+ "said": "embossed text has wavy echoes after every corner, worse at high speed",
+ "printer": "creality_k1_max",
+ "material": "PLA",
+ "expect": {
+  "top": "ringing",
+  "top3_includes": []
+ }
+}

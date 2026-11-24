@@ -1,0 +1,10 @@
+{
+ "id": "b39_diagonal_step",
+ "said": "Printed a square tower and everything above layer 90 is offset diagonally, like somebody slid the upper half. No splitting, still one solid piece.",
+ "printer": "anycubic_kobra_3",
+ "material": "PETG",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

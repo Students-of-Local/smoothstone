@@ -1,0 +1,10 @@
+{
+ "id": "f40_bendy_sparse",
+ "said": "please help im new, rubber phone case has skinny broken lines everywhere, spool tangled and feeder keeps tugging hard",
+ "printer": "anycubic_kobra_3",
+ "material": "TPU",
+ "expect": {
+  "top": "under_extrusion",
+  "top3_includes": []
+ }
+}

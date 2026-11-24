@@ -1,0 +1,13 @@
+{
+ "id": "d39_spaghetti_air",
+ "said": "printer kept printing in mid air, I came back to a pile of noodles, the part wasn't there anymore",
+ "printer": "qidi_q1_pro",
+ "material": "ABS",
+ "expect": {
+  "top": "spaghetti",
+  "top3_includes": [
+   "bed_adhesion",
+   "warping"
+  ]
+ }
+}

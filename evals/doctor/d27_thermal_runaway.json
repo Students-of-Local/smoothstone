@@ -1,0 +1,10 @@
+{
+ "id": "d27_thermal_runaway",
+ "said": "printer stopped with a thermal runaway error and the hotend temp reading is jumping all over the place",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

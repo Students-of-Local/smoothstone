@@ -1,0 +1,10 @@
+{
+ "id": "f33_bridge_curtain",
+ "said": "between two towers the ceiling threads droop right into the opening, its only twenty millimeters across",
+ "printer": "bambu_p1s",
+ "material": "ABS",
+ "expect": {
+  "top": "poor_bridging",
+  "top3_includes": []
+ }
+}

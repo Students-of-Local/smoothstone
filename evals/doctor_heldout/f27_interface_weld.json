@@ -1,0 +1,10 @@
+{
+ "id": "f27_interface_weld",
+ "said": "supports print perfectly but their tops weld into the model, removing them tears chunks out of underside",
+ "printer": "bambu_h2d",
+ "material": "PETG",
+ "expect": {
+  "top": "not_sticking_supports_to_part",
+  "top3_includes": []
+ }
+}

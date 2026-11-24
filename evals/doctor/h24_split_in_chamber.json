@@ -1,0 +1,12 @@
+{
+ "id": "h24_split_in_chamber",
+ "said": "My big PC housing developed a long horizontal split with an actual open gap while it was still printing. The base never lifted, but the chamber door got left open in a cold room.",
+ "printer": "creality_k2_plus",
+ "material": "PC",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": [
+   "layer_separation"
+  ]
+ }
+}

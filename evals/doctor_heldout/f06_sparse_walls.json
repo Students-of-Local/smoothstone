@@ -1,0 +1,10 @@
+{
+ "id": "f06_sparse_walls",
+ "said": "bad model obviously, every wall has missing little stretches and i can see daylight through solid sides",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "under_extrusion",
+  "top3_includes": []
+ }
+}

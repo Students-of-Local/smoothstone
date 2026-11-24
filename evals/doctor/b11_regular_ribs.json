@@ -1,0 +1,10 @@
+{
+ "id": "b11_regular_ribs",
+ "said": "Getting horizontal ribs every few millimeters on every tall print, same heights regardless of model. Definitely wet filament, I just need a dryer.",
+ "printer": "creality_ender3_v3",
+ "material": "PLA",
+ "expect": {
+  "top": "z_wobble",
+  "top3_includes": []
+ }
+}

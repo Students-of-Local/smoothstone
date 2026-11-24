@@ -1,0 +1,10 @@
+{
+ "id": "h15_sagging_roof_span",
+ "said": "The first strands across this rectangular opening hang down like washing lines between the two walls. Both ends attach fine, but the middle of the unsupported 40 mm span sags badly.",
+ "printer": "creality_k2",
+ "material": "PETG",
+ "expect": {
+  "top": "poor_bridging",
+  "top3_includes": []
+ }
+}

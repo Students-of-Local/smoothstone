@@ -1,0 +1,12 @@
+{
+ "id": "h20_crackling_spool",
+ "said": "This nylon crackles and spits tiny bubbles at the nozzle, and the surface is rough and hairy even printing slowly. The spool has been sitting open in my damp basement for a month.",
+ "printer": "qidi_q1_pro",
+ "material": "PA",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": [
+   "stringing"
+  ]
+ }
+}
