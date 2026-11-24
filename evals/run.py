@@ -11,7 +11,8 @@ the card and the compaction change.
 Drivers:
   lfm3  a llama.cpp server (raw chat template through /apply-template, then /completion)
   next  no model: runs stone status, then every NEXT line stone prints, until it stops. This
-        is the baseline that shows what the tool does without any model.
+        is the baseline that shows what the tool does without any model. When the person speaks
+        (a follow-up), it runs stone note with their words, as the cards tell a model to.
   openai, claude, codex  any OpenAI-compatible server, Claude Code and Codex on the person's own
         sign-in (evals/drivers.py). Their condition is <driver>-<model>_card<card>.
 
@@ -215,7 +216,8 @@ def main():
             first = grade_job(job, spec, messages)
         if say:
             messages.append({"role": "user", "content": say})
-            nxt = "stone status"
+            # the next driver does what the card says to do with the person's answer: stone note it
+            nxt = f"stone note {shlex.quote(say)}" if a.driver == "next" else "stone status"
             print(f"   person: {say}", flush=True)
         if a.driver in ("claude", "codex"):
             session = cli_run(a, log, messages, system, say or user, env, job, rdir, phase, session)
@@ -240,6 +242,13 @@ def main():
                 r = drivers.openai_step(a.base_url, a.model, messages, TOOLS, a.seed, MAX_NEW, a.api_key_env)
                 calls = r["tool_calls"]
                 st.update({"generated": r["content"], "finish_reason": r["finish_reason"], "usage": r["usage"]})
+                if not calls and r["finish_reason"] != "length":
+                    # a call the model wrote as text (after a cut, LFM3 and LFM2.5 do): run it, and say so
+                    prev = log["steps"][-1] if log["steps"] and log["steps"][-1].get("finish_reason") == "length" else {}
+                    tc = drivers.text_call(prev.get("reasoning", ""), prev.get("generated", ""), r["reasoning"], r["content"])
+                    if tc:
+                        calls = [tc]
+                        st["text_call"] = True
                 if r["reasoning"]:
                     st["reasoning"] = r["reasoning"]
                 am = {"role": "assistant", "content": r["content"]}
@@ -411,10 +420,11 @@ def grade_job(job: Path, spec: dict, messages: list | None = None) -> dict:
              (not isinstance(want, list) and (got == want or (isinstance(want, (int, float)) and isinstance(got, (int, float)) and abs(got - want) < 1e-6)))
         if not ok:
             why.append(f"{k}={got!r} (want {want})")
-    for s in exp.get("sum", []):
-        tot = sum(params.get(k, 0) or 0 for k in s["params"])
-        if tot != s["eq"]:
-            why.append(f"{'+'.join(s['params'])}={tot} (want {s['eq']})")
+    for s in exp.get("sum", []):  # params added, less any in "minus": equal to "eq" or within "range"
+        tot = sum(params.get(k, 0) or 0 for k in s["params"]) - sum(params.get(k, 0) or 0 for k in s.get("minus", []))
+        if ("eq" in s and tot != s["eq"]) or ("range" in s and not s["range"][0] <= tot <= s["range"][1]):
+            name = "+".join(s["params"]) + "".join(f"-{k}" for k in s.get("minus", []))
+            why.append(f"{name}={round(tot, 2)} (want {s.get('eq', s.get('range'))})")
     if exp.get("image_used") and not params.get(exp["image_used"]):
         why.append("the picture was not used")
     res = []
@@ -627,6 +637,9 @@ def score_line(log: dict) -> dict:
             "total": 1, "judge": log.get("judge"), "likeness": log.get("likeness"), "run": log["run_id"]}
     if log["driver"] in drivers.MODEL_DRIVERS:  # lfm3 and next lines stay as they were
         line.update({"model": log.get("model"), "condition": log.get("condition")})
+        n = sum(1 for st in log.get("steps", []) if st.get("text_call"))
+        if n:  # tool calls the harness read from the model's text (drivers.text_call)
+            line["text_calls"] = n
     return line
 
 

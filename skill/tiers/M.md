@@ -35,6 +35,11 @@ recipe and the settings that make the part look its best, then let stone build a
   features lines: name them to the person. A license note (noncommercial, no derivatives) goes
   in your reply.
 - Photos with a ruler, card or coin beside the object: run stone measure first for real sizes.
+- A product stone's catalog does not have: ask the person for its width, depth and height in mm
+  and where they come from (the maker's spec page, or their ruler), stone note the answer in their
+  own words (stone converts units; never convert or round them yourself), then
+  stone product add "<name>" --size W D H --source "<URL or measured by the person>" (--round for
+  a disc: diameter and height). Sizes go to stone product add, not to the recipe. Never guess a size.
 - Phone cases: the phone_case recipe has Apple's numbers for the iPhone 17, 17 Pro, 17 Pro Max and Air; set phone to the exact model the request names, and ask if it names none.
 
 ## Steps

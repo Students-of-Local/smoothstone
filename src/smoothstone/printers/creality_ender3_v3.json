@@ -1,0 +1,57 @@
+{
+ "id": "creality_ender3_v3",
+ "name": "Creality Ender-3 V3",
+ "maker": "Creality",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  220.0,
+  220.0,
+  250.0
+ ],
+ "kinematics": "corexz",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 300,
+ "max_bed_c": 110,
+ "limits_source": "https://www.creality.com/products/creality-ender-3-v3 (300 C nozzle, 110 C bed)",
+ "bed_surface": {
+  "type": "textured PEI flexible spring steel plate",
+  "clean": "Creality's Ender-3 V3 wiki gives no plate cleaning steps (checked 2026-11-24); its sibling's steps: Hand sweat is the first cause Creality lists: wash the plate with dish soap and water; wash built-up glue off with water; then a thin layer of the included glue stick.",
+  "source": "https://wiki.creality.com/en/k2-flagship-series/k2/first-layer-adhesion-compression",
+  "clean_by": "fallback",
+  "type_source": "https://www.creality.com/products/creality-ender-3-v3"
+ },
+ "auto_level": "automatic Z offset and bed leveling",
+ "multi_material": "none",
+ "camera": {
+  "where": null,
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": null,
+  "ir_night": false,
+  "timelapse_mode": "fixed"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 20000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20Ender-3%20V3%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "clog",
+   "note": "Creality's FAQ covers filament getting stuck at the extruder motor port while printing.",
+   "source": "https://www.creality.com/support/creality-ender-3-v3"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "moonraker",
+  "gantrel_model": "creality-ender3-v3"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20Ender-3%20V3%200.4%20nozzle.json (build volume)",
+  "https://www.creality.com/support/creality-ender-3-v3"
+ ],
+ "checked": "2026-11-24"
+}

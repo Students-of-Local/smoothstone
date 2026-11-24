@@ -1,0 +1,57 @@
+{
+ "id": "sovol_sv08",
+ "name": "Sovol SV08",
+ "maker": "Sovol",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  350.0,
+  350.0,
+  345.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 300,
+ "max_bed_c": 100,
+ "limits_source": "https://www.sovol3d.com/products/sovol-sv08-3d-printer",
+ "bed_surface": {
+  "type": "PEI steel plate",
+  "clean": "Sovol's wiki gives no plate cleaning steps (checked 2026-11-24); its first-layer guide covers a hot bed that is not flat and nozzle scraping.",
+  "source": "https://wiki.sovol3d.com/en/How-to-Enhance-SV08-First-Layer-Printing",
+  "clean_by": "none",
+  "type_source": "https://www.sovol3d.com/products/sovol-sv08-3d-printer"
+ },
+ "auto_level": "inductive sensor and pressure sensor",
+ "multi_material": "none",
+ "camera": {
+  "where": "camera (included)",
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": "16:9",
+  "ir_night": false,
+  "timelapse_mode": "fixed",
+  "source": "https://www.sovol3d.com/products/sovol-sv08-3d-printer"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 40000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Sovol/machine/Sovol%20SV08%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "layer_shift",
+   "note": "Sovol documents layers lost when a print is paused and resumed.",
+   "source": "https://wiki.sovol3d.com/en/sv08-troubleshooting"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "moonraker"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Sovol/machine/Sovol%20SV08%200.4%20nozzle.json (build volume)",
+  "https://www.sovol3d.com/products/sovol-sv08-3d-printer"
+ ],
+ "checked": "2026-11-24"
+}

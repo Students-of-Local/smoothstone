@@ -1,0 +1,20 @@
+#!/bin/sh
+# Run a heavy job (the test suite, eval runs, mesh repair) in its own capped
+# cgroup, outside the slice the agent's session lives in. On a shared host,
+# systemd-oomd kills the whole session scope when its memory pressure stays
+# high; a job that outgrows the cap here is killed alone instead (exit 137).
+#   scripts/heavy uv run pytest -q -n 8 -m "not timing"
+# /tmp on that host is RAM-backed tmpfs, so a job's temp files count against
+# memory too; TMPDIR moves them to disk (HEAVY_TMP, default ~/.cache/heavy-tmp).
+# HEAVY_MEM sets the cap (default 12G). Without a systemd user session
+# (CI, macOS) the command runs as is.
+set -eu
+TMPDIR="${HEAVY_TMP:-$HOME/.cache/heavy-tmp}"
+mkdir -p "$TMPDIR"
+export TMPDIR
+if command -v systemd-run >/dev/null 2>&1 \
+  && systemctl --user show-environment >/dev/null 2>&1; then
+  exec systemd-run --user --scope --quiet --slice=background.slice \
+    -p MemoryMax="${HEAVY_MEM:-12G}" -p MemorySwapMax=0 -- "$@"
+fi
+exec "$@"

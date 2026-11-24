@@ -659,6 +659,165 @@ seed 1 on x01 and seed 3 on x02 died on Ollama HTTP 400. The scores stay out of 
 Next track: a holder, mount or case for any product given its size and source, climbed on tuning
 specs only, with these two sealed as the check.
 
+## 2026-11-23 climb 4: a part for a product stone does not know
+
+After climb 3, a request naming a product the catalog lacks ("a mount for my Mac Studio") ended with
+no engineering.json: stone asked "Which product is it, exactly?", then had nowhere to go. Now the
+size comes from the person, with its source, and every product recipe takes it.
+
+What changed:
+
+- `stone product add "<name>" --size W D H [--corner-r R] [--round] --source "<URL or measured by the
+  person>" [--open FACES]` writes job/products/<slug>.json in the catalog's schema ("set": "job", the
+  name and any model number as aliases, each size naming its source, fitted_case true for a box).
+  --round is a disc: W is the diameter. With no --source it refuses: stone never estimates a size.
+- catalog.py sees the current job's products (catalog.use_job, set by every stone command), so
+  slugs_for, kinds_for, find and get include them, and fitted_case, round_case, product_holder and
+  product_mount offer them. A build for a job product passes the CATALOG and PRODUCTS tables with -D,
+  so recipes/lib/catalog.scad and recipes/fitted_case/products.scad stay as generated.
+- When the request names a part for a product ("a mount for my X", "a cup that holds my X"), the
+  recipe stone ranks first builds from the catalog and the catalog has no X, `stone show` and
+  `stone set` stop with NEXT: ask the person: X's width, depth and height in mm, and where the
+  numbers come from (the maker's spec page, or their own ruler). stone never sets a default product.
+  `stone note "<answer>"` reads the sizes (the metric one when the maker prints two units, so
+  "7.7 inches (19.7 cm)" is 197) and the URL, keeps the answer out of the request, and NEXT is the
+  exact `stone product add` line; a missing size or source is asked for again.
+- round_case leaves the top open, with no rim, for a product whose open faces hold +z (a cup).
+- evals/run.py: after the person speaks, the next driver runs `stone note '<their words>'`, as the
+  cards tell a model to, instead of stone status. Grading is unchanged.
+- Cards S, M, L and SKILL.md: an unknown product means ask for its size and source, then
+  stone product add; never guess a size.
+
+New tuning specs, each with a follow-up where the person gives the maker's numbers and the URL:
+e11_mac_studio_mount (product_mount, 197 x 197 x 95, https://support.apple.com/en-us/122211) and
+e12_homepod_mini_cup (round_case, 97.9 across, 84.3 high, https://support.apple.com/en-us/111914).
+evals/engineering now holds 12 specs; the catalog still holds the first 10.
+
+`--driver next`, seed 1: e11 pass (status, recipes, show, ask; note, product add, set, build, 1100 s
+with the grader), e12 pass (296 s), e01 to e10 10 of 10. The new specs were not run on the code
+before this climb. The scores stay out of evals/scores.jsonl. Tests: tests/test_job_products.py, each
+failing without the change; the Garmin watch test in tests/test_fitted_case.py now expects the size
+question and, for an answer with no source, a question for the source.
+
+Open:
+- e11 holds load_n 20 (stone's default; the request names no load). Apple lists 2.74 kg (M4 Max) and
+  3.64 kg (M3 Ultra), 26.9 N and 35.7 N. The built mount reads 1.44 MPa at its weakest section under
+  20 N against 23.5 MPa allowed, so its geometry carries the real weight, but nothing makes stone
+  design for it: stone takes no weight yet.
+- e12's cup is round_case's clamshell (two half shells, a flexure loop, a 6.8 mm latch) on the
+  enclosing cylinder. Apple publishes no profile for the rounded HomePod mini and does not locate its
+  power cable, which a closed floor and walls would trap. The grader sees neither.
+- The held-out x01 and x02 were not run or read.
+
+### Round 2: what the real model runs showed
+
+Before (round 1 code, card S, Ollama, seeds 1 to 3 on e11 and e12): LFM3-1.7B 1 pass, 3 fail, 2 crashed
+(e11 s1 and s3 left no log.json; the error itself was not kept); LFM2.5-24B-A2B 0 pass, 6 fail, 0 crashed.
+The logs showed models noting stone's question instead of asking it, a round product asked for a depth
+its maker does not give, sizes set on the recipe with nowhere to go, and a call written as text.
+
+Stone's text and rules:
+
+- At the ask, NEXT comes first and the note hint after it: "After the person answers (not before):
+  stone note ...". The output contract allows that one line below an ask's NEXT, and nothing else.
+- `stone note` refuses a note that is the question: the question itself, a restatement with no number
+  or URL of its own, or a note with no number or URL that asks for a size or speaks to the person
+  ("please provide", "where did you get them"). The person answers as "I"; stone's question says
+  "you". Before this, "your own ruler" in a noted question became the source "measured by the person".
+- While the job waits on an unknown product's size, `stone set` with sizes gives FIX and NEXT = the
+  exact `stone product add` line, sourced from what the person's answer already gave through
+  stone note, else a placeholder to fill.
+- A round product (round_case on top, or the request says round, cup, puck or disc) is asked its
+  diameter and height. stone note reads "97.9 x ? x 84.3", and a width and height with no depth, as
+  diameter and height; `stone product add --round --size D H` takes the two numbers.
+
+Harness change (evals/drivers.py, evals/run.py), apart from stone's text: when a reply has no
+tool_calls, the openai driver runs a `<function=stone><parameter=command>...` call written as text,
+logs the step with "text_call": true, and the score line counts them. No after run used it.
+
+Checks on d5d2f42: `--driver next` 12 of 12 (e01 to e12); the suite and timing test pass; ratchet holds.
+
+After (same models, card S, seeds 1 to 3; out under the climb4 scratchpad after/):
+
+| Model | e11 s1 | e11 s2 | e11 s3 | e12 s1 | e12 s2 | e12 s3 | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| LFM3-1.7B | fail | fail | pass | pass | fail | crash (HTTP 500) | 2 pass, 3 fail, 1 crash |
+| LFM2.5-24B-A2B | fail | fail | fail | fail | fail | fail | 0 pass, 6 fail |
+
+LFM3 ran on 8a38fce. 24B e11 s1 ran on 8a38fce; the rest ran on 31005b6. On 8a38fce, 24B e11 s2 failed
+sources (its noted question became the source); on 31005b6 the note was refused, and it failed fit.
+24B e12 s2's source leak is what d5d2f42 fixes; it was not rerun.
+
+Why they fail now: in 11 of 12 runs the model never ran stone note after the person answered. It ran
+`stone set <recipe> width=... depth=... height=...` with its own numbers, and the redirect turned them
+into the product add line. Every run that copied the maker's metric figures (197, 97.9) passed;
+every run that rounded or converted the inches (196, 195.58, 98) failed fit, 0.7 mm into the product.
+Other fails: LFM3 e12 s2 wrote `stone product add "X" size=97.9,97.9,84.3 round open z source=...`,
+which stone read as the name; 24B e12 s1 set `size=` on round_case, which no size key reads.
+
+Open:
+- A rule for the sizes a model sets itself: while the job waits on a product's size and stone note has
+  not read an answer, the set redirect could ask for `stone note "<the person's words>"` first, so
+  stone reads the maker's metric figure. That changes what the round 2 brief asked set to print,
+  so it is not made here.
+- `stone product add` could read the name=value words stone set takes (size=, source=, round, open).
+
+### Round 3: sizes come from the person's own words
+
+- While the job waits on an unknown product's size and no stone note has read an answer, `stone set`
+  with sizes gives FIX and NEXT = `stone note "<the person's words, copied exactly>"`, never the
+  product add line, so converting units and rounding stay stone's job (the metric figure wins when a
+  page prints inches too). Once a note gave every size and a source, a set with numbers more than
+  0.05 mm off says so and keeps the noted ones, and show and set give the noted product add line
+  instead of asking again.
+- round_case reads size= (one number is the diameter) and diameter= on stone set; a size= the shell
+  split ("size=196 196 94") is read whole.
+- `stone product add` reads name=value words in any order (size=WxDxH or size=W D H, w= d= h=,
+  diameter=, source=, round, open=..., name=), and gives back the exact corrected line for a word it
+  cannot read.
+- Cards S, M and SKILL.md: note the person's words exactly; never convert or round a number.
+
+A first round 3 run, on aaf74a3, showed a full note followed by `stone set ... size=196 196 94` asking
+the person again; 01310d8 fixes that, and every check and run below is on 01310d8.
+Checks: suite 874 passed, timing passed, `--driver next` e01 to e12 12 of 12, ratchet holds.
+
+| Model (card S, e11 and e12, seeds 1 to 3) | Pass | Fail | Crash | Text calls |
+| --- | --- | --- | --- | --- |
+| LFM3-1.7B, round 3 | 3 | 1 | 2 (Ollama HTTP 400, e11 s1, e12 s3) | 0 |
+| LFM2.5-24B-A2B, round 3 | 6 | 0 | 0 | 0 |
+
+LFM3's fail (e11 s2) ran out of tokens after the person answered and made no call. In 24B e11 s2
+and s3 and e12 s3, the model still set its own numbers (196, 95), and stone sent it to note the
+person's words, which gave 197 and 97.9. Runs are under the climb4 scratchpad after3/.
+
+Open: a model that writes its own conversion into the note ("7.7 inches (196 mm)", 24B on aaf74a3)
+still gets its numbers; stone cannot tell them from the person's.
+
+### Round 4: PR 76 review round 1
+
+- A `stone set` with sizes while no note has read an answer no longer offers a `stone note
+  "<...>"` line to fill in: a model that had not asked yet filled it with its own guess. NEXT is the
+  ask itself, FIX says the sizes were not set, and the note line comes after NEXT. stone go stops on
+  the question and tells the person to run stone note with their answer, then stone go.
+- NEXT lines quote the product name, the source, a figure's name and recipe text with shlex.quote
+  where a shell would act on them; first_url stops at shell characters. Tests run the lines through
+  a real shell.
+- With several W x D x H triples in an answer, the metric one wins over inches.
+
+Checks on 885eff1: suite 891 passed, timing passed, `--driver next` e01 to e12 12 of 12. The ratchet
+holds against the merge base f2d5fa0 and on climb4 merged with origin/main, but not against
+origin/main alone: main gained floor groups (#73 to #75) since climb4 branched.
+
+| Model (card S, e11 and e12, seeds 1 to 3, run one model at a time) | Pass | Fail | Crash | Text calls |
+| --- | --- | --- | --- | --- |
+| LFM3-1.7B, round 4 | 4 | 0 | 2 (Ollama HTTP 400 e11 s2, HTTP 500 e12 s3) | 1 |
+| LFM2.5-24B-A2B, round 4 | 4 | 2 | 0 | 0 |
+
+The 24B lost two runs (e11 s1 and s3) because NEXT now asks while the person had already answered:
+after the answer it set sizes, got "ask the person" back 7 and 8 times, never ran stone note, and ran
+out of steps. In round 3 the same move led to stone note and a pass. An HTTP 400 came with one model
+alone on Ollama, so the crashes are not only from two models at once.
+
 ## 2026-11-23 models 1: a landmark no recipe makes, from the best open model
 
 What changed for the person:

@@ -1,0 +1,57 @@
+{
+ "id": "prusa_mk4s",
+ "name": "Original Prusa MK4S",
+ "maker": "Prusa Research",
+ "firmware": "prusa",
+ "build_volume_mm": [
+  250.0,
+  210.0,
+  220.0
+ ],
+ "kinematics": "bedslinger",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 290,
+ "max_bed_c": 120,
+ "limits_source": "https://www.prusa3d.com/product/original-prusa-mk4s-3d-printer-5/ (290 C nozzle, 120 C bed)",
+ "bed_surface": {
+  "type": "removable PEI spring steel sheet (smooth, satin or textured: the buyer picks)",
+  "clean": "Wipe the cold sheet with 90% isopropyl alcohol before prints; if adhesion still drops, a few drops of dish soap and warm (not hot) water, then dry well; acetone only on smooth PEI, about once a month.",
+  "source": "https://help.prusa3d.com/article/first-layer-issues_1804",
+  "clean_by": "maker",
+  "type_source": "https://www.prusa3d.com/product/original-prusa-mk4s-3d-printer-5/"
+ },
+ "auto_level": "load cell in the nozzle",
+ "multi_material": "MMU3 (optional)",
+ "camera": {
+  "where": null,
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": null,
+  "ir_night": false,
+  "timelapse_mode": "fixed"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 4000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Prusa/machine/Prusa%20MK4S%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "under_extrusion",
+   "note": "Prusa: filament debris in the extruder's primary gear grooves causes under-extrusion; clean them.",
+   "source": "https://help.prusa3d.com/article/regular-printer-maintenance-mk4-s-mk3-9-s_419000"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "prusalink",
+  "gantrel_model": "prusa-mk4"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Prusa/machine/Prusa%20MK4S%200.4%20nozzle.json (build volume)",
+  "https://www.prusa3d.com/product/original-prusa-mk4s-3d-printer-5/"
+ ],
+ "checked": "2026-11-24"
+}

@@ -1,0 +1,58 @@
+{
+ "id": "prusa_core_one",
+ "name": "Prusa CORE One",
+ "maker": "Prusa Research",
+ "firmware": "prusa",
+ "build_volume_mm": [
+  250.0,
+  220.0,
+  270.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": true,
+ "chamber_heater": true,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 290,
+ "max_bed_c": 120,
+ "limits_source": "https://www.prusa3d.com/product/prusa-core-one/ (290 C nozzle, 120 C bed, active chamber heating up to 55 C)",
+ "bed_surface": {
+  "type": "removable PEI spring steel sheet (smooth, satin or textured)",
+  "clean": "Wipe the cold sheet with 90% isopropyl alcohol before prints; if adhesion still drops, a few drops of dish soap and warm (not hot) water, then dry well; acetone only on smooth PEI, about once a month.",
+  "source": "https://help.prusa3d.com/article/first-layer-issues_1804",
+  "clean_by": "maker",
+  "type_source": "https://www.prusa3d.com/product/prusa-core-one/"
+ },
+ "auto_level": "load cell in the nozzle",
+ "multi_material": "MMU3 (optional)",
+ "camera": {
+  "where": "optional Buddy3D camera, magnet mounted in a front corner inside the chamber, IR night view",
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": "16:9",
+  "ir_night": true,
+  "timelapse_mode": "fixed",
+  "source": "https://help.prusa3d.com/article/buddy3d-camera_821264"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 10000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Prusa/machine/Prusa%20CORE%20One%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "thermal_error",
+   "note": "The CORE One pauses on chamber overheating and asks for better ventilation.",
+   "source": "https://help.prusa3d.com/article/chamber-overheating-31260-core-one-35260-core-one-l-36260-core-one-indx-17260-xl_861872"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "prusalink",
+  "notes": "Gantrel has no CORE One slicing profile yet"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Prusa/machine/Prusa%20CORE%20One%200.4%20nozzle.json (build volume)",
+  "https://www.prusa3d.com/product/prusa-core-one/"
+ ],
+ "checked": "2026-11-24"
+}

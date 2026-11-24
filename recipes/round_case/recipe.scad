@@ -35,12 +35,16 @@ assert(outer_r >= 9, "the product is too small for a hinged case (under 15 mm ac
 foot_chamfer = 0.35;
 split = 0.7;                        // the seam that frees the two half shells
 
+OPEN = R[4];
+
 // The top opening: the circle about the axis that clears every feature the maker locates on the
-// top, plus 0.2 mm; with no top feature, a rim `lip` wide.
+// top, plus 0.2 mm; with no top feature, a rim `lip` wide. A product whose top stays clear (open
+// faces +z: a cup it sits down into) gets no rim at all: the opening is the cavity itself.
 function reach(f) = norm([f[3] - W / 2, f[4] - D / 2]) +
     (f[9] ? max(f[5], f[7]) / 2 : norm([max(f[5], f[7]) / 2, max(f[6], f[8]) / 2]));
 TOP = [for (f = FEATS) if (f[2] == "+z" && f[1] != "hole") reach(f)];
-open_r = len(TOP) > 0 ? max(TOP) + 0.2 : W / 2 - lip;
+top_open = len([for (o = OPEN) if (o == "+z") 1]) > 0;
+open_r = top_open ? W / 2 + gap + 0.01 : len(TOP) > 0 ? max(TOP) + 0.2 : W / 2 - lip;
 
 // Rear flexure and front latch, scaled from the gold part's 17.685 mm outer radius.
 hinge_t = 1.4;

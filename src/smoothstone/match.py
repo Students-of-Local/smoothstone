@@ -397,3 +397,97 @@ def missing_fit_size(r: rc.Recipe, request: str, notes: list[str] | None = None)
     thing = re.sub(r"\bmy\b", "your", re.sub(r"\bour\b", "your", thing, flags=re.I), flags=re.I)
     return (f"What are the measurements of {thing}, in mm? A photo with a ruler in it works too, "
             f"or the exact product name and model.")
+
+
+# --- a product the catalog does not have: its size comes from the person ------------------------
+# "a mount for my Mac Studio (2025)", "a cup that holds my HomePod mini on a shelf": a part named for
+# a product. The product's name runs to a word that says where the part goes or a punctuation mark.
+PART_WORDS = (r"case|sleeve|holder|stand|mount|cradle|tray|dock|cover|bracket|cup|hanger|enclosure|"
+              r"shell|bumper|nest|base|rack|shelf|clip|adapter|plate|box")
+PRODUCT_RE = re.compile(
+    rf"\b(?:{PART_WORDS})(?:es|s)?\b(?:\s+(?:that|which|to|will))?\s+"
+    r"(?:for|holds?|holding|fits?|fitting|takes?)\s+(?:my|our|his|her|their|a|an|the)\s+"
+    r"(?P<x>(?:\([^)]*\)|[^,;:!?()])+?)"
+    r"(?=\s+(?:on|in|into|onto|under|over|at|to|with|so|that|which|from|by|inside|near|and|design|designed|"
+    r"using|made|printed|for)\b|\s*[,;:!?]|\.(?!\d)|\s*$)", re.I)
+
+
+def product_named(request: str) -> str | None:
+    """The product the request names a part for ("Mac Studio (2025)" in "an under desk mount for my
+    Mac Studio (2025)"), or None when it names none."""
+    m = PRODUCT_RE.search(request or "")
+    if not m:
+        return None
+    x = re.sub(r"\s+", " ", m.group("x")).strip(" .")
+    return x if re.search(r"[A-Za-z]", x) else None
+
+
+def product_size_question(name: str, round_: bool = False) -> str:
+    """What stone asks the person for a product the catalog does not have: never a guessed size. A
+    round one has a diameter and a height, no depth."""
+    what = "diameter and height" if round_ else "width, depth and height"
+    return (f"{name}'s {what} in mm, and where the numbers come from "
+            f"(the maker's spec page, or their own ruler)")
+
+
+SIZE_KEYS = {"w": r"width|wide|across|diameter|dia", "d": r"depth|deep|length|long",
+             "h": r"height|high|tall|thick|thickness"}
+QTY_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(mm|millimet(?:er|re)s?|cm|centimet(?:er|re)s?|inches|inch|in\b|\")?",
+                    re.I)
+# W x D x H; a "?" in the middle is a depth not known (a round product's)
+BY3_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(?:by|x|×)\s*(\d+(?:\.\d+)?|\?)\s*(?:by|x|×)\s*"
+                    r"(\d+(?:\.\d+)?)\s*(mm|cm|inches|inch|in\b|\")?", re.I)
+# the person says they measured it, in the past: "I measured it", "with my ruler"; never "I'll measure it"
+MEASURED_RE = re.compile(r"\bI(?:'ve|\s+have)?(?:\s+just)?\s+measured\b|\bwe(?:'ve|\s+have)?\s+measured\b|"
+                         r"\bmeasured\s+(?:it|them|this)\b|\bwith\s+(?:a|my|our)\s+(?:ruler|calipers?|tape(?:\s+measure)?)\b",
+                         re.I)
+
+
+def _mm(v: str, unit: str | None) -> float:
+    u = (unit or "mm").lower()
+    k = 10.0 if u.startswith("c") else 25.4 if u.startswith("in") or u == '"' else 1.0
+    return round(float(v) * k, 2)
+
+
+def size_answer(text: str, name: str | None = None) -> dict:
+    """The person's answer to product_size_question, read: {"w", "d", "h" in mm (those given),
+    "source" (the first URL, or "measured by the person" when they say they measured it), "round"
+    (they gave a diameter or said round)}. A size given in more than one unit ("7.7 inches (19.7 cm)")
+    is read in the metric one, as the maker printed it; a number with no unit is mm. The product's
+    own name (name) holds no size: "Mac Studio (2025)" is not 2025 mm wide."""
+    from .catalog import first_url
+
+    out = _sizes_in(text, name)
+    url = first_url(text)
+    if url:
+        out["source"] = url
+    elif MEASURED_RE.search(text or "") and not re.search(r"\?|\byou\b", text or "", re.I):
+        out["source"] = "measured by the person"  # never from a question ("Could you measure it?")
+    # round only from a diameter with no depth: "across", "round corners" or "disc" say nothing of it
+    out["round"] = bool(re.search(r"\bdiameter\b|Ø|⌀", text or "", re.I)) and not out.get("d")
+    return out
+
+
+def _sizes_in(text: str, name: str | None) -> dict:
+    """The sizes in the person's answer, in mm: {"w", "d", "h"} for those given."""
+    out: dict = {}
+    rest = re.sub(r"https?://\S+", " ", text or "")
+    if name:
+        rest = re.sub(re.escape(name), " ", rest, flags=re.I)
+    found = list(BY3_RE.finditer(rest))
+    # "3.7 x 7.7 x 7.7 in (9.5 x 19.7 x 19.7 cm)": the metric triple is the one the maker printed
+    m = next((t for t in found if t.group(4) and t.group(4).lower()[0] in "mc"), found[0] if found else None)
+    if m:
+        out.update(w=_mm(m.group(1), m.group(4)), h=_mm(m.group(3), m.group(4)))
+        if m.group(2) != "?":
+            out["d"] = _mm(m.group(2), m.group(4))
+        return out
+    for part in re.split(r"[,;\n]|\band\b", rest):
+        keys = [k for k, pat in SIZE_KEYS.items() if re.search(rf"\b(?:{pat})\b", part, re.I)]
+        qty = [(v, u) for v, u in QTY_RE.findall(part)]
+        if len(keys) != 1 or not qty:
+            continue
+        metric = [(v, u) for v, u in qty if u and u.lower()[0] in "mc"]
+        v, u = (metric or qty)[0]
+        out.setdefault(keys[0], _mm(v, u))
+    return out

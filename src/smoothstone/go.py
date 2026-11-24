@@ -39,8 +39,11 @@ def _open(path: str) -> bool:
 
 def _split(text: str) -> tuple[list[str], str]:
     lines = text.splitlines()
-    nxt = lines[-1][len("NEXT: "):] if lines and lines[-1].startswith("NEXT: ") else ""
-    return lines[:-1] if nxt else lines, nxt
+    # NEXT is the last line, or comes before a line meant for later (after an ask)
+    at = max((i for i, ln in enumerate(lines) if ln.startswith("NEXT: ")), default=None)
+    if at is None:
+        return lines, ""
+    return lines[:at] + lines[at + 1:], lines[at][len("NEXT: "):]
 
 
 def _value(lines: list[str], head: str) -> str | None:
@@ -163,7 +166,11 @@ def _go(words, run, say, live, drawn) -> int:
             say('To ask another way: stone go "<the request in other words>"')
         else:
             say(f"Needs you: {ask}")
-            say("When that is done, run: stone go")
+            if last is not None and "After the person answers" in last[1]:
+                # the answer must reach stone: stone note keeps it, then stone go goes on from it
+                say('When you have the answer, run: stone note "<your answer>", then stone go')
+            else:
+                say("When that is done, run: stone go")
     elif "<" in nxt:
         say(f"Needs you: stone needs something only you have. Run {nxt} with it filled in, then stone go.")
     elif nxt:

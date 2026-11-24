@@ -573,3 +573,72 @@ def _font():
         return True
     except video.VideoProblem:
         return False
+
+
+def test_a_series_clip_composes_in_under_1_5_gb(tmp_path):
+    """Measured 2026-11-24 on Parish1: the GPU claim test peaked at 5.9 GB, since every frame was
+    kept as a raw 6.2 MB image, and parallel video tests filled a 14 GB cap. The composition runs
+    in its own process here, two clips alive at once as in that test, so its peak RSS is its own."""
+    if not _font():
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    if not Path("/proc/self/status").exists():
+        pytest.skip("no /proc to read the peak from")
+    script = f"""
+import sys
+from pathlib import Path
+sys.path.insert(0, {str(Path(__file__).parent)!r})
+import test_video as t
+from smoothstone import video
+tmp = Path({str(tmp_path)!r})
+runs = []
+for k, (who, name) in enumerate((("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"))):
+    job, log = t._series_run(tmp, k, who, name)
+    runs.append(video.Run(video.make_plan(job, log), log, video.label_of(job), t._frames(video.SERIES_TURN, (40, 60)),
+                          t._frames(video.SERIES_TURN, (40, 60)), [("white", [240, 240, 240], 0.8)]))
+first = video.compose_series(runs)
+second = video.compose_series(runs)
+assert len(first.frames) == len(second.frames) > 500, len(first.frames)
+import re
+print(re.search(r"VmHWM:\\s+(\\d+) kB", Path("/proc/self/status").read_text()).group(1))
+"""
+    out = subprocess.run([sys.executable, "-c", script], check=True, cwd=REPO, capture_output=True, text=True).stdout
+    # VmHWM, not ru_maxrss: exec hands ru_maxrss the spawning worker's own peak from earlier tests
+    peak = int(out.split()[-1])  # KiB
+    assert peak < 1_500_000, f"composing a series clip peaked at {peak / 1e6:.2f} GB"
+
+
+def test_packed_frames_give_back_the_same_pixels_and_hold_shares_one_copy():
+    reel = video.Reel()
+    a = Image.new("RGB", (video.W, video.H), (10, 20, 30))
+    a.putpixel((5, 7), (255, 0, 0))
+    b = Image.blend(a, Image.new("RGB", (video.W, video.H), (200, 100, 50)), 0.5)
+    for im in (a, a, a, b, a):
+        reel.append(im)
+    assert len(reel) == 5
+    assert [f.tobytes() for f in reel] == [im.tobytes() for im in (a, a, a, b, a)]
+    assert list(reel.raw()) == [im.tobytes() for im in (a, a, a, b, a)]
+    assert reel._packed[0] is reel._packed[2] and reel._packed[3] is not reel._packed[2]
+
+
+def test_a_real_series_clip_encodes_and_meets_the_spec(tmp_path, monkeypatch):
+    """The packed frames go through the real soundtrack, ffmpeg encode and spec check: only the
+    paint and the Blender turntable are stand-ins."""
+    if not _font():
+        pytest.skip("JetBrains Mono Nerd Font is not installed")
+    if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
+        pytest.skip("ffmpeg is not installed")
+    items = []
+    for k, (who, name) in enumerate((("Jensen Huang", "JENSEN"), ("Elon Musk", "ELON"))):
+        job, log = _series_run(tmp_path, k, who, name)
+        (tmp_path / f"log{k}.json").write_text(json.dumps(log))
+        items.append((job, tmp_path / f"log{k}.json"))
+    monkeypatch.setattr(video, "paint_npz", lambda job_root, out: {"filaments": []})
+    monkeypatch.setattr(video, "painted_design", lambda style, npz, top, out: style)
+    monkeypatch.setattr(video, "turntable", lambda mesh, d, turn, log=None, size=None: _frames(turn, (40, 60)))
+    rep = video.make_series(items, tmp_path / "out", turn=video.SERIES_TURN)
+    assert rep["faults"] == [], rep["faults"]
+    assert (rep["spec"]["width"], rep["spec"]["height"]) == (video.W, video.H)
+    n = int(subprocess.run([video.ffprobe(), "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries",
+                            "stream=nb_read_frames", "-of", "csv=p=0", rep["clip"]],
+                           capture_output=True, text=True).stdout.strip())
+    assert n == rep["frames"]
