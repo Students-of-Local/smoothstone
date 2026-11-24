@@ -1861,10 +1861,20 @@ def cmd_note(args, job: Job) -> Out:
         out.owns_next = True
         out.next = f"stone show {st['ask_recipe']}"
         return out
-    if str(st.get("next", "")).startswith("ask the person") and st.get("ask_then"):
+    if st.get("ask_then") and asked == st.get("ask_then_q"):
+        # only the coupon question's answer calibrates; "later, carry on" drops the question instead
+        from . import fit
+
+        if "slide" in fit.parse_calibration([text], 6, 0.1):
+            out.owns_next = True
+            out.next = f"{st['ask_then']} {json.dumps(text)}"
+            return out
+        job.update(ask_then=None, ask_then_q=None)
         out.owns_next = True
-        out.next = f"{st['ask_then']} {json.dumps(text)}"
+        out.next = fit._continue(job)
         return out
+    if st.get("ask_then") and not asked.startswith("ask the person"):
+        job.update(ask_then=None, ask_then_q=None)  # the job moved on: a later answer is not the coupon's
     out.next = st.get("next") or "stone recipes"
     return out
 

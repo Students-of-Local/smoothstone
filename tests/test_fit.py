@@ -192,3 +192,26 @@ def test_fit_coupon_asks_the_person_and_their_answer_calibrates(jobenv, openscad
     assert code == 0, text
     assert fit.printer().slide == pytest.approx(0.2) and fit.printer().calibrated
     assert math.isclose(fit.printer().outer_side, (20.08 - 20 * (1 - fit.shrink("PLA")[0])) / 2, abs_tol=1e-4)
+
+
+def test_a_deferred_coupon_never_calibrates_from_a_later_answer(jobenv, openscad, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    home = config.user_config_dir() / "stone.toml"
+    _, code, nxt = stone("fit", "coupon")
+    assert code == 0 and nxt.startswith("ask the person:")
+    # the person puts the coupon off: the job carries on, nothing is calibrated
+    _, _, nxt = stone("note", "I'll print it later, carry on")
+    assert not nxt.startswith("stone fit calibrate") and not nxt.startswith("ask the person")
+    # a later question's answer mentions a slide: it is a note, never a calibration
+    from smoothstone.job import Job
+
+    Job(jobenv / "stone-job").update(next="ask the person: should the lid slide on or snap on?")
+    _, _, nxt = stone("note", "the lid should slide on, about 0.3 mm")
+    assert not nxt.startswith("stone fit calibrate")
+    assert not home.is_file() and not fit.printer().calibrated
+
+
+def test_calibrate_without_a_slide_offers_a_way_on(jobenv):
+    text, code, nxt = stone("fit", "calibrate", "not printed yet")
+    assert nxt.startswith("stone fit calibrate slide=")
+    assert "carry on without it" in text

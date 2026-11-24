@@ -762,7 +762,8 @@ def cmd_coupon(job, Out):
     out.next = (f"ask the person: Please print {stl} . Push the peg into each hole: what is the lowest label it "
                 f"slides into by hand? If you have calipers, also measure the square across the middle and the "
                 f"big {num(p['ref_d'], 0)} mm hole, in mm.")
-    host.update(ask_then="stone fit calibrate")
+    # the person's answer goes to calibrate only while this exact question is the one waiting
+    host.update(ask_then="stone fit calibrate", ask_then_q=out.next)
     out.result = "coupon built"
     return out
 
@@ -847,6 +848,7 @@ def cmd_calibrate(items: list[str], job, Out):
         out.fix("say which hole the peg slides into: stone fit calibrate slide=0.2 (label 2), "
                 "and if measured, square=<mm> hole=<mm>")
         out.next = "stone fit calibrate slide=<the lowest label it slides into, times 0.1>"
+        out.add(f"If the person has not printed the coupon yet, carry on without it: {_continue(job)}")
         return out
     problems = []
     if not 0 <= got["slide"] <= steps * step + 1e-9:
@@ -887,7 +889,7 @@ def cmd_calibrate(items: list[str], job, Out):
     if not {"square", "hole"} & set(got):
         out.add("No caliper sizes: holes and outer sizes keep the typical numbers.")
     if job.exists():
-        job.update(ask_then=None)
+        job.update(ask_then=None, ask_then_q=None)
     built = job.exists() and part_file(job) is not None and (job.plan() or {}).get("recipe") not in (None, "fit_coupon")
     out.next = "stone fit" if built else _continue(job)
     out.result = "fit calibrated"
