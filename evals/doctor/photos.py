@@ -18,8 +18,10 @@ replies with the stone doctor command it would run. stone ranks both ways from t
 "words" drops --looks, "looks" keeps it, so before and after see the same reads. Replies are kept in
 photo_runs.jsonl, so tests/test_doctor.py rescores them without a model.
 
-knn records each photo's 40 nearest gallery photos (photo_match.py; the photo and every frame of its print
-left out) in photo_knn.jsonl, so scoring needs no model either. "knn" ranks by words, --looks and the
+knn searches each photo's 40 nearest gallery photos (photo_match.py; the photo and every frame of its print
+left out) and records, in photo_knn.jsonl, the ones scoring reads: down to the KNN_K-th that is not a
+held-out photo, as [file, cosine to 3 places]; a neighbor's failure is its folder. Scoring needs no model
+either; a new KNN_K means running knn again. "knn" ranks by words, --looks and the
 neighbors' vote, the way stone doctor --image does; "knn_strict" also drops every held-out photo from the
 neighbors, the bound if the gallery held only what tuning saw.
 """
@@ -154,9 +156,29 @@ def knn() -> None:
     if not ok:
         raise SystemExit(f"image match off: {why}")
     rows = _rows(SPLIT)
-    KNN.write_text("".join(json.dumps({"file": r["file"], "near": photo_match.neighbors(
-        GALLERY / r["file"], 40, {r["file"]})}) + "\n" for r in rows))
+    held = {r["file"] for r in rows if r["split"] == "heldout"}
+    out = []
+    for r in rows:
+        near = keep(photo_match.neighbors(GALLERY / r["file"], 40, {r["file"]}), held)
+        out.append(json.dumps({"file": r["file"], "near": [[f, round(s, 3)] for f, _, s in near]},
+                              separators=(",", ":")) + "\n")
+    KNN.write_text("".join(out))
     print(f"neighbors for {len(rows)} photos")
+
+
+def keep(near: list, held: set[str]) -> list:
+    """The neighbors knn and knn_strict read: through the KNN_K-th one outside held, or all of them."""
+    outside = 0
+    for i, n in enumerate(near):
+        outside += n[0] not in held
+        if outside == doctor.KNN_K:
+            return near[:i + 1]
+    return near
+
+
+def neighbors() -> dict[str, list[tuple[str, str, float]]]:
+    """Each photo's recorded neighbors as (file, failure, cosine); the failure is the file's folder."""
+    return {r["file"]: [(f, f.split("/")[0], s) for f, s in r["near"]] for r in _rows(KNN)}
 
 
 def score(split: str, skill: str | None = None) -> dict:
@@ -168,7 +190,7 @@ def score(split: str, skill: str | None = None) -> dict:
             runs[r["file"]] = r  # the last reply for a photo wins
     from smoothstone import photo_match
 
-    near = {r["file"]: r["near"] for r in _rows(KNN)}
+    near = neighbors()
     held = {r["file"] for r in _rows(SPLIT) if r["split"] == "heldout"}
     out = {}
     for way in ("words", "looks", "looks_only", "knn", "knn_strict", "knn_only"):

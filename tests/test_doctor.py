@@ -517,7 +517,7 @@ def test_owner_case_with_looks():
 
 def test_owner_case_with_looks_and_image_match():
     ph = _photos()
-    near = {r["file"]: r["near"] for r in ph._rows(ph.KNN)}["bed_adhesion/k2-detached-plate-blob.jpg"]
+    near = ph.neighbors()["bed_adhesion/k2-detached-plate-blob.jpg"]
     from smoothstone import photo_match
     votes = photo_match.votes(near, doctor.KNN_K)
     for looks in ([], ["bed_adhesion", "blob_on_nozzle"]):
@@ -552,5 +552,5 @@ def test_knn_votes_and_frames_of_one_print():
     assert photo_match.votes(near, 2) == {"spaghetti": 0.5}  # healthy counts against every id, names none
     assert photo_match.group("spaghetti/u1-facade-spaghetti-2.jpg") == photo_match.group("spaghetti/u1-facade-spaghetti-3.jpg")
     assert photo_match.group("spaghetti/u1-facade-spaghetti-2.jpg") != photo_match.group("spaghetti/other-2.jpg")
-    for r in _photos()._rows(_photos().KNN):
-        assert photo_match.group(r["file"]) not in {photo_match.group(f) for f, _, _ in r["near"]}
+    for file, near in _photos().neighbors().items():
+        assert photo_match.group(file) not in {photo_match.group(f) for f, _, _ in near}
