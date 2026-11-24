@@ -131,4 +131,6 @@ def test_a_named_screw_comes_from_the_request():
     assert fit.request_screw("two M2.5 screw holes") == "M2.5"
     assert fit.request_screw("an m3 hole and an M4 hole") is None
     assert fit.request_screw("a 60 mm fan") is None
+    assert fit.request_screw("a cover plate with two M2.5x8 screw holes") == "M2.5"
+    assert fit.request_screw("M3x10 bolts.") == "M3"
 

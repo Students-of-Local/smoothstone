@@ -414,7 +414,7 @@ def iso_row(size: str | None) -> dict | None:
 
 def request_screw(text: str) -> str | None:
     """The one metric screw the request names ("two M2.5 screw holes"), when it names exactly one."""
-    sizes = {f"M{m}" for m in re.findall(r"\bM(\d+(?:\.\d)?)\b", text or "", re.I)}
+    sizes = {f"M{m}" for m in re.findall(r"\bM(\d+(?:\.\d)?)(?!\d)", text or "", re.I)}
     sizes = {s for s in sizes if iso_row(s)}
     return sizes.pop() if len(sizes) == 1 else None
 
