@@ -181,8 +181,8 @@ def _bead(width: float, layer: float) -> tuple[float, float]:
     return (width - layer) * layer + math.pi * layer * layer / 4, 2 * (width - layer) + math.pi * layer
 
 
-def _wind(fan: bool) -> float:
-    return fact("fan_air_speed") if fan else 0.0
+def _wind(fan: float) -> float:
+    return fan * fact("fan_air_speed")
 
 
 def _cool(m: Material, layer: float, width: float, fan: bool, n: int = 2001, air_c: float | None = None):
@@ -438,7 +438,7 @@ def column_temps(mat, area, perimeter, share, layer: float = 0.2, bed: float | N
     n = len(a)
     tb = m.bed if bed is None else bed
     ta = m.chamber if air is None else air
-    h = fact("h_part") if fan else fact("h_still")
+    h = max(fact("h_still"), fact("h_part") * math.sqrt(fan))  # goes with the root of the wind, as on a cylinder
     g = np.maximum(m.k * a * f / layer * 1e-3, 1e-12)  # W/K through one layer (mm2 / mm -> m)
     up = np.append(np.maximum(a[:-1] - a[1:], 0.0), a[-1])  # top faces the next layer leaves bare
     loss = h * (p * layer + up) * 1e-6
@@ -543,10 +543,10 @@ class Inputs:
     origin: tuple = (0.0, 0.0)  # x, y (mm) of pixel (0, 0)'s corner
     layer_z: np.ndarray | None = None  # mm, top of each layer
     layer_t: np.ndarray | None = None  # s, end of each layer
-    material: str = "PLA"
+    material: str | Material = "PLA"
     bed: float | None = None  # C, default the K2 profile's
     clean: float = 1.0  # 1 a clean plate, fact("contamination") a dirty one
-    fan: bool = True
+    fan: float = True  # its share of full speed
     enclosed: bool = True  # False: an open printer, air at fact("room_air")
     infill: float | None = None  # %, default the K2 profile's sparse infill; 100 prints solid
     supports: bool = False
@@ -557,7 +557,7 @@ class Inputs:
 
     @property
     def air(self) -> float:  # C
-        return material(self.material).chamber if self.enclosed else fact("room_air")
+        return _mat(self.material).chamber if self.enclosed else fact("room_air")
 
 
 @dataclass
@@ -592,7 +592,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     from scipy import ndimage
 
     inp = job_or_inputs if isinstance(job_or_inputs, Inputs) else inputs_from_mesh(job_or_inputs, **kw)
-    m = material(inp.material)
+    m = _mat(inp.material)
     cell, lay = inp.cell, inp.layer
     width = inp.width or fact("k2_widths")["outer_wall"]
     speed = inp.speed or fact("k2_speeds")["inner_wall"]
@@ -601,7 +601,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     bed = m.bed if inp.bed is None else inp.bed
     air = inp.air
     where_air = f"{air:g} C chamber" if inp.enclosed else f"open printer, {air:g} C room air"
-    base = [f"this is a model, not a recording; {m.name} on the K2 profile ({bed:g} C bed, {where_air})",
+    base = [f"this is a model, not a recording; {m.name} on the K2 profile ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})",
             *m.stand_ins, *inp.notes]
     if inp.clean < 1:
         base.append(note("contamination"))

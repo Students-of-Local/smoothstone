@@ -3,11 +3,12 @@ the video's frames up to it being the normal timelapse's."""
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from smoothstone import cli, failsim, failvideo, printers, timelapse, toolpaths
+from smoothstone import cli, failsim, failvideo, gcode, printers, timelapse, toolpaths
 
 from test_slicer import _box, _union
 from test_supports import _arch
@@ -276,3 +277,18 @@ def test_the_frame_before_the_failure_is_the_timelapse_frame(jobenv, tmp_path, m
     assert min(light) > 0.005 and light[-1] > 0.03  # the failure fills the close frames: no toolhead box hides it
     c = np.asarray(Image.open(d / data["first_failure_frame"]).convert("RGB"), float)
     assert np.abs(c - b).mean() > 0.5  # and the failure itself is not
+
+
+def test_the_model_runs_at_the_prints_own_settings():
+    tp = gcode.parse(Path(__file__).parent / "fixtures" / "gcode" / "prusa_screw.gcode.gz")
+    gcode.plan(tp)
+    inp = failvideo.inputs(tp, "PLA", enclosed=False)
+    assert (inp.bed, inp.material.nozzle, inp.infill, inp.fan) == (60, 200, 5, 1)
+    assert inp.speed and inp.width and "bed 60 C, nozzle 200 C" in inp.notes[0]
+    assert not any("chamber" in n for n in inp.notes)  # an open printer has none
+    base = failsim.predict(inp)[0].assumptions
+    assert base[0].startswith("this is a model, not a recording; PLA on the K2 profile (60 C bed, 200 C nozzle, open printer")
+    tp.run[:] = np.nan
+    inp = failvideo.inputs(tp, "PLA")
+    assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
+    assert "K2 profile's: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]

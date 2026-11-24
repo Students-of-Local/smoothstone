@@ -54,6 +54,29 @@ def layer_times(tp) -> np.ndarray:
     return np.maximum.accumulate(out)
 
 
+def settings(tp, material: str, enclosed: bool) -> dict:
+    """failsim.Inputs of what this print is run at: the median over its part's moves past the first layer."""
+    F = timelapse.gcode.FEATURES
+    on = tp.extruding() & (tp.layer > 0) & ~np.isin(tp.feature, [F.index(k) for k in ("skirt", "support", "support interface", "prime tower")])
+    run = np.full((1, 4), np.nan) if tp.run is None or not on.any() else tp.run[on]
+    fan, bed, nozzle, chamber = (float(np.median(c)) if np.isfinite(c).all() else None for c in run.T)
+    speed, width = (float(np.median(q[s])) if (s := on & (tp.feature == F.index(k))).any() else None
+                    for q, k in ((tp.feed, "inner wall"), (tp.width, "outer wall")))
+    m = failsim.material(material)
+    m = replace(m, nozzle=nozzle or m.nozzle, chamber=chamber if chamber and enclosed else m.chamber)
+    got = {"bed": bed, "infill": tp.infill, "speed": speed, "width": width}
+    said = [f"{k} {v:.3g} {u}" for k, v, u in (("bed", bed, "C"), ("nozzle", nozzle, "C"), ("chamber", chamber if enclosed else None, "C"),
+            ("fan", None if fan is None else 100 * fan, "%"), ("infill", tp.infill, "%"), ("inner wall", speed, "mm/s"),
+            ("line", width, "mm")) if v is not None]
+    missing = [k for k, v in (("bed", bed), ("nozzle", nozzle), ("fan", fan), ("infill", tp.infill)) if v is None]
+    if enclosed and chamber is None:
+        missing.append("chamber")
+    notes = [f"this print's own settings: {', '.join(said)}"] if said else []
+    if missing:
+        notes.append(f"not in the print file, so the K2 profile's: {', '.join(missing)}" + (" (fan full on)" if fan is None else ""))
+    return {**got, "material": m, "fan": True if fan is None else fan, "notes": notes}
+
+
 def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True) -> failsim.Inputs:
     """failsim's per-layer masks from the toolpath's extruding moves; supports count when it prints them. The gaps
     in sparse infill are filled: failsim's masks are outlines, and it counts the infill's density itself."""
@@ -65,7 +88,8 @@ def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True)
     z = np.asarray(tp.layer_z, float)
     thick = float(np.median(np.diff(z))) if len(z) > 1 else float(z[0]) if len(z) else 0.2  # the first layer may differ
     inp = failsim.inputs_from_segments(tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], tp.layer[ext], z, layer_times(tp),
-                                       layer=thick, material=material, clean=clean, supports=sup, enclosed=enclosed)
+                                       layer=thick, clean=clean, supports=sup, enclosed=enclosed)
+    inp = replace(inp, **settings(tp, material, enclosed))
     infill = ext & (tp.feature == F.index("sparse infill"))
     for i in np.unique(tp.layer[infill]):
         sel, mk = infill & (tp.layer == i), inp.masks[i]
@@ -485,8 +509,10 @@ def cmd(args, job, prof, out):
         from . import supports
 
         without = asked == "on" or supports.analyze(supports.load(f), columns=True)["needed"]
-    mat = (args.material or (refs.material_for(job.request()).material if job.exists() else "PLA")).upper()
-    note = [f"material: {mat}" if args.material or job.exists() else "material: PLA is assumed; say --material PETG or ABS"]
+    own = tp.material if not args.material else ""
+    mat = (args.material or own or (refs.material_for(job.request()).material if job.exists() else "PLA")).upper()
+    note = [f"material: {mat}, the G-code says" if own else
+            f"material: {mat}" if args.material or job.exists() else "material: PLA is assumed; say --material PETG or ABS"]
     if mat not in failsim.MATERIALS:
         note = [f"material: the model has no {mat}, so this is PLA's"]
         mat = "PLA"

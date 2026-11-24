@@ -200,3 +200,24 @@ def test_one_at_a_time_comments_in_words_and_zero_limits():
     assert tp.height[-1] == pytest.approx(0.3)
     assert gcode.FEATURES[gcode.feature_of("Support material interface")] == "support interface"
     assert gcode.parse("M566 X300\nM203 X12000\nG1 X1 F60\n").max_feed[0][0] == 200  # RepRapFirmware: mm/min
+
+
+@pytest.mark.parametrize("name,fan,bed,nozzle,chamber,infill", [
+    ("creality_washer", 1.0, 50, 230, 35, 15),  # START_PRINT EXTRUDER_TEMP=230 BED_TEMP=50, M141 S35
+    ("orca_cube", None, 60, 210, None, 12),  # M190 S60, M109 S210
+    ("prusa_screw", 1.0, 60, 200, None, 5),  # 210 C on the first layer, then M104 S200
+])
+def test_what_the_print_is_run_at(name, fan, bed, nozzle, chamber, infill):
+    tp = gcode.parse(FIX / f"{name}.gcode.gz")
+    on = tp.extruding() & (tp.layer > 1)
+    got = np.median(tp.run[on], axis=0)
+    assert got[1] == bed and got[2] == nozzle and (np.isnan(got[3]) if chamber is None else got[3] == chamber)
+    assert 0 <= got[0] <= 1 and (fan is None or got[0] == fan)
+    assert (tp.infill, tp.material) == (infill, "PLA")
+
+
+def test_a_file_that_says_nothing_of_heat_is_not_given_any():
+    tp = gcode.parse("M107 P2\nM106 P3 S255\n;LAYER_CHANGE\n;Z:0.2\nG1 X10 E1 F1200\n")
+    assert np.isnan(tp.run).all() and tp.infill is None and tp.material == ""
+    tp = gcode.parse("M140 S55\nM106 S127.5\nG1 X1 E1 F1200\nM140 S0\nM107\nG1 X10 E2\n")
+    assert tp.run[0, :2].tolist() == [0.5, 55] and tp.run[-1, :2].tolist() == [0, 55]  # S0 at the end is not the print's bed

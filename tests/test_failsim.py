@@ -337,3 +337,10 @@ def test_the_nozzle_drags_by_each_plastics_own_melt():
     drag = {m: fs.nozzle_drag(m, 300, 0.2) for m in fs.MATERIALS}
     assert drag["ABS"] == pytest.approx(tau * math.pi * 0.5e-3 ** 2, rel=1e-3)
     assert drag["PLA"] < drag["ABS"] < drag["PETG"] < 0.2
+
+
+def test_half_the_fan_is_half_the_wind():
+    one = lambda fan: fs.cooling("PLA", fan=fan)["soft_s"]
+    assert one(0.0) > one(0.5) > one(1.0) == one(True)
+    top = lambda fan: fs.column_temps("PLA", [400.0] * 20, [80.0] * 20, [1.0] * 20, bed=60, fan=fan)[-1]
+    assert top(0) > top(0.25) > top(1) and top(0.005) == top(0)  # never below still air's
