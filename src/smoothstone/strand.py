@@ -15,6 +15,7 @@ Inside: meters, kilograms, seconds, newtons. In and out: mm, mm/s, mm3/s, C. A m
 
 from __future__ import annotations
 
+import copy
 import math
 from functools import lru_cache
 
@@ -47,6 +48,51 @@ def exit_diameter(bore: float = 0.4) -> float:
 def payout(flow_mm3_s: float, bore: float = 0.4) -> float:
     """mm/s the strand leaves the nozzle at when nothing pulls it."""
     return flow_mm3_s / (math.pi / 4 * exit_diameter(bore) ** 2)
+
+
+def draw_force(mat, flow_mm3_s: float, speed_mm_s: float, nozzle_c: float | None = None,
+               neck_mm: float = 5.0, bore: float = 0.4) -> float:
+    """N it takes to draw the hot neck from payout to the nozzle's speed over neck_mm: 3 eta Q ln(D) / L. A strand
+    held by less than this is dragged by the nozzle, not drawn."""
+    m = failsim._mat(mat)
+    out = payout(flow_mm3_s, bore)
+    ratio = speed_mm_s / out
+    if ratio <= 1:
+        return 0.0
+    rate = (speed_mm_s - out) / neck_mm
+    eta = float(failsim.viscosity(m.nozzle if nozzle_c is None else nozzle_c, math.sqrt(3) * rate, m))
+    return failsim.fact("trouton") * eta * flow_mm3_s * 1e-9 * math.log(ratio) / (neck_mm * 1e-3)
+
+
+def fall_speed(mat="PLA", d_mm: float | None = None, air_c: float = 25.0) -> float:
+    """mm/s a strand lying flat falls at: where the air's drag on it equals its weight."""
+    d, p = (exit_diameter() if d_mm is None else d_mm) * 1e-3, failsim.air(air_c)
+    weight = failsim._mat(mat).density * 1000 * math.pi / 4 * d * d * failsim.fact("gravity")
+    v = np.geomspace(1e-3, 50, 4000)
+    drag = 0.5 * p["rho"] * drag_coefficient(v * d / p["nu"]) * d * v * v
+    return float(np.interp(weight, drag, v)) * 1e3
+
+
+def set_time(mat="PLA", d_mm: float | None = None, air_c: float | None = None, wind: float = 0.0, nozzle_c: float | None = None) -> float:
+    """s a strand takes from the nozzle's heat to its glass transition in that wind (m/s)."""
+    m, d = failsim._mat(mat), exit_diameter() if d_mm is None else d_mm
+    air_c = m.chamber if air_c is None else air_c
+    t = np.linspace(m.tg, m.nozzle if nozzle_c is None else nozzle_c, 400)
+    q = m.density * 1000 * m.cp * d * 1e-3 / 4 / (failsim.h_strand(d, t, air_c, wind) * (t - air_c))
+    return float(((q[1:] + q[:-1]) / 2 * np.diff(t)).sum())
+
+
+def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c: float | None = None, nozzle_c: float | None = None) -> dict:
+    """What decides where a strand goes: the hotend's hold on it, the air's, the plate's and its own heat."""
+    m = failsim._mat(mat)
+    d, air_c = exit_diameter(bore), m.chamber if air_c is None else air_c
+    grip = failsim.fact("strand_friction") * m.density * 1000 * math.pi / 4 * (d * 1e-3) ** 2 * failsim.fact("gravity") * 0.1
+    hold = failsim.nozzle_hold(m, nozzle_c, bore)
+    return {"strand_mm": round(d, 2), "payout_mm_s": round(payout(flow_mm3_s, bore), 1), "nozzle_mm_s": round(speed_mm_s, 1),
+            "draw_mn": round(draw_force(m, flow_mm3_s, speed_mm_s, nozzle_c, bore=bore) * 1e3, 2), "plate_grip_mn_per_100mm": round(grip * 1e3, 2),
+            "nozzle_hold_mn": round(hold["hold_n"] * 1e3, 3), "melt_wets_the_tip": hold["wets"], "blob_mm3": round(hold["blob_mm3"], 1),
+            "fall_mm_s": round(fall_speed(m, d, air_c)), "set_s_still_air": round(set_time(m, d, air_c, 0, nozzle_c), 2),
+            "set_s_fan": round(set_time(m, d, air_c, failsim.fact("fan_air_speed"), nozzle_c), 2)}
 
 
 def _norm(v):
@@ -130,6 +176,8 @@ class Strand:
         self.seg = seg * 1e-3
         self.rho = m.density * 1000
         self.force = 0.0  # N at the nozzle
+        self.anchor = 0.0  # N of friction under what lay() took off
+        self.touch = np.zeros(n, bool)
 
     # geometry
     def lengths(self):
@@ -250,8 +298,9 @@ class Strand:
             for _ in range(5):
                 ab2, rh2 = band.copy(), rh.copy()
                 slip = _norm(v[:, :2])
-                if touch.any():
+                if touch.any() or self.anchor:
                     fr = np.where(touch, self.mu * np.maximum(self.press, 0) / np.maximum(slip, CREEP), 0.0)
+                    fr[0] += self.anchor / max(slip[0], CREEP)
                     ab2[-1, 0::4] += fr
                     ab2[-1, 1::4] += fr
                     ab2[-1, 2::4] += np.where(touch, BIG, 0.0)
@@ -275,6 +324,7 @@ class Strand:
         x = self.x + dt * v
         if check and far > TURN:
             return False
+        self.touch = touch
         if floor is not None:
             at, f2 = self._slide(self.x, x, r, floor)
             stop = ~hold & (at != x).any(1)
@@ -371,7 +421,8 @@ class Strand:
             q = getattr(self, k)
             setattr(self, k, np.insert(q, i, q[at] * (1 - f[:, None]) + q[at + 1] * f[:, None], 0))
         self.t = np.insert(self.t, i, self.t[at] * (1 - f) + self.t[at + 1] * f)
-        self.press, self.fixed = np.insert(self.press, i, 0.0), np.insert(self.fixed, i, self.fixed[at] & self.fixed[at + 1])
+        self.press, self.touch = np.insert(self.press, i, 0.0), np.insert(self.touch, i, self.touch[at] & self.touch[at + 1])
+        self.fixed = np.insert(self.fixed, i, self.fixed[at] & self.fixed[at + 1])
         for k in ("es", "rate", "tens", "e"):
             setattr(self, k, np.insert(getattr(self, k), i, getattr(self, k)[at]))
         first = self.vol[at] * f
@@ -381,3 +432,42 @@ class Strand:
         if self.ground is not None:  # the new node of an edge hung over a corner is not inside it
             new = i + np.arange(len(i))
             self.x[new, 2] = np.maximum(self.x[new, 2], self._top(self.x[new]) + np.sqrt(first / math.pi / ln[at] / f))
+
+    def snap(self) -> list:
+        """Where it is drawn thinner than a hair it breaks: the pieces off the nozzle, without the hairs between them.
+        What is left here has one point when it broke at the nozzle."""
+        thin = np.flatnonzero(self.diameters() < failsim.fact("thread_limit"))
+        if not len(thin):
+            return []
+        cut, n, off = np.r_[-1, thin], len(self.x), []
+        for a, b in zip(cut + 1, np.r_[thin, n - 1]):  # a piece's first and last node
+            s = self if b == n - 1 else copy.copy(self)
+            if s is not self and a == b:
+                continue
+            if s is not self:
+                s.nozzle, s.force, s.anchor = False, 0.0, self.anchor if a == 0 else 0.0
+                off.append(s)
+            for q in ("x", "v", "t", "eb", "press", "touch", "fixed"):
+                setattr(s, q, getattr(self, q)[a:b + 1].copy())
+            for q in ("es", "rate", "tens", "vol", "e"):
+                setattr(s, q, getattr(self, q)[a:b].copy())
+        self.anchor = 0.0
+        return off
+
+    def lay(self, keep: float = 60.0):
+        """Take off what lies still, from the far end to at most keep mm from the nozzle; its friction goes on holding
+        the rest. Returns its points and diameters, mm."""
+        arc = np.r_[np.cumsum(self.lengths()[1][::-1])[::-1], 0.0] * 1e3
+        still = (self.fixed | self.touch & (_norm(self.v) < 20 * CREEP)) & (arc > keep)
+        k = int(np.argmin(still)) - 1 if not still.all() else len(still) - 2
+        if k < 1:
+            return np.zeros((0, 3)), np.zeros(0)
+        pts, d = self.points()[:k + 1], self.diameters()[:k]
+        self.anchor += self.mu * failsim.fact("gravity") * self.rho * float(self.vol[:k].sum())
+        welded = bool(self.fixed[:k + 1].any())
+        for q in ("x", "v", "t", "eb", "press", "touch", "fixed"):
+            setattr(self, q, getattr(self, q)[k:])
+        for q in ("es", "rate", "tens", "vol", "e"):
+            setattr(self, q, getattr(self, q)[k:])
+        self.fixed[0] |= welded
+        return pts, d

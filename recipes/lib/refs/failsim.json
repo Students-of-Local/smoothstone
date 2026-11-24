@@ -1528,6 +1528,111 @@
    "checked": "2026-11-24",
    "key": "k2_shells",
    "copy_of": "slicer.k2_shells"
+  },
+  {
+   "id": "failsim.petg.surface_tension",
+   "topic": "failsim",
+   "key": "petg.surface_tension",
+   "value": {
+    "at_20C": 44.0,
+    "per_K": -0.065
+   },
+   "unit": "mN/m, mN/(m K)",
+   "note": "PET's, which PETG is built on.",
+   "quote": "Polyethylene terephthalate (PET) 25038-59-9 39.0 44.0 -0.065 (c)",
+   "source": "Accu Dyne Test, Critical Surface Tension and Contact Angle with Water for Various Polymers, citing S. Wu, Polymer Handbook 3rd ed. 1989, VI:414",
+   "cite": "Wu 1989, PET",
+   "url": "https://www.accudynetest.com/polytable_01.html",
+   "checked": "2026-11-24",
+   "assumption": "PETG's surface tension is PET's"
+  },
+  {
+   "id": "failsim.abs.surface_tension",
+   "topic": "failsim",
+   "key": "abs.surface_tension",
+   "value": {
+    "at_20C": 42.0,
+    "per_K": -0.072
+   },
+   "unit": "mN/m, mN/(m K)",
+   "note": "ABS at 20 C; the fall with temperature is polystyrene's, its main part.",
+   "quote": "Acrylonitrile butadiene styrene (ABS) 9003-56-9 38.5 42.0 -; Polystyrene (PS) 9003-53-6 34.0 38.3 -0.072 (b)",
+   "source": "Accu Dyne Test, Critical Surface Tension and Contact Angle with Water for Various Polymers, citing S. Wu, Polymer Handbook 3rd ed. 1989, VI:414",
+   "cite": "Wu 1989, ABS and PS",
+   "url": "https://www.accudynetest.com/polytable_01.html",
+   "checked": "2026-11-24",
+   "assumption": "ABS's surface tension falls with temperature as polystyrene's does"
+  },
+  {
+   "id": "failsim.pla.surface_tension",
+   "topic": "failsim",
+   "key": "pla.surface_tension",
+   "value": {
+    "at_20C": 43.9,
+    "per_K": -0.065
+   },
+   "unit": "mN/m, mN/(m K)",
+   "note": "PLA at room temperature (43.9 +- 0.7, read in the paper's public abstract and search text; the page itself could not be opened); the fall with temperature is PET's, the closest polyester with a measured one.",
+   "quote": "room-temperature PLA value of 43.9 +- 0.7 mN/m",
+   "source": "Estimation of the surface tension and dispersive and polar components of polymers as a function of temperature, Polymer Testing 2026",
+   "cite": "Polymer Testing 2026 S0142941826000292",
+   "url": "https://www.sciencedirect.com/science/article/pii/S0142941826000292",
+   "checked": "2026-11-24",
+   "assumption": "PLA's surface tension falls with temperature as PET's does"
+  },
+  {
+   "id": "failsim.pla.contact_angle",
+   "topic": "failsim",
+   "key": "pla.contact_angle",
+   "value": [[160, 88], [180, 67], [200, 46]],
+   "unit": "C, degrees",
+   "note": "Angle a PLA melt rests at on grit-blasted aluminum, after minutes; under 90 it wets.",
+   "quote": "200 | - | 16 +- 1 | 46 +- 8 (C | ABS | PETG | PLA)",
+   "source": "Bechtel, Schweitzer, Frey, Busch, Herrmann, Material Extrusion of Structural Polymer-Aluminum Joints, Materials 2022, 15(9), 3120, contact angle table",
+   "cite": "Materials 2022 15:3120",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9105442/",
+   "checked": "2026-11-24",
+   "assumption": "No paper measured these melts on a brass nozzle; their angle on grit-blasted aluminum, at rest, stands in"
+  },
+  {
+   "id": "failsim.petg.contact_angle",
+   "topic": "failsim",
+   "key": "petg.contact_angle",
+   "value": [[120, 139], [140, 113], [160, 87], [180, 34], [200, 16], [220, 14]],
+   "unit": "C, degrees",
+   "note": "Same test, PETG.",
+   "quote": "220 | 101 +- 1 | 14 +- 2 | -",
+   "source": "Bechtel, Schweitzer, Frey, Busch, Herrmann, Material Extrusion of Structural Polymer-Aluminum Joints, Materials 2022, 15(9), 3120, contact angle table",
+   "cite": "Materials 2022 15:3120",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9105442/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.abs.contact_angle",
+   "topic": "failsim",
+   "key": "abs.contact_angle",
+   "value": [[220, 101], [240, 95]],
+   "unit": "C, degrees",
+   "note": "Same test, ABS: it does not wet.",
+   "quote": "240 | 95 +- 4 | - | -",
+   "source": "Bechtel, Schweitzer, Frey, Busch, Herrmann, Material Extrusion of Structural Polymer-Aluminum Joints, Materials 2022, 15(9), 3120, contact angle table",
+   "cite": "Materials 2022 15:3120",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9105442/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.thread_limit",
+   "topic": "failsim",
+   "key": "thread_limit",
+   "value": 0.05,
+   "unit": "mm",
+   "note": "A neck drawn thinner than this between the nozzle and what it left is gone (the hair of a print that strings): the hotend no longer holds the strand.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "range": [0.02, 0.1],
+   "assumption": "A thread thinner than 0.05 mm breaks; the hotend lets the strand go"
   }
  ]
 }

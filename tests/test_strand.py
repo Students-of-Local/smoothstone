@@ -409,6 +409,62 @@ def test_it_runs_for_each_plastic(mat):
     assert np.isfinite(p).all() and (p[:, 2] > 0).all() and np.abs(p).max() < 60
 
 
+def test_drawing_the_neck_takes_three_eta_q_ln_d_over_l():
+    flow, speed = 10.0, 200.0
+    eta = float(fs.viscosity(220, math.sqrt(3) * (speed - st.payout(flow)) / 5))
+    want = 3 * eta * flow * 1e-9 * math.log(speed / st.payout(flow)) / 5e-3
+    assert st.draw_force("PLA", flow, speed) == pytest.approx(want)
+    assert st.draw_force("PLA", flow, 10.0) == 0.0
+    # a strand lying on the bed holds far less than that, so the nozzle drags it
+    assert 0.5 * 1240 * math.pi / 4 * (st.exit_diameter() * 1e-3) ** 2 * 0.1 * G < 0.2 * want
+
+
+def test_the_falling_speed_and_setting_time_are_the_closed_forms(monkeypatch):
+    v = st.fall_speed("PLA", 0.4, 25.0) * 1e-3
+    a = fs.air(25.0)
+    assert 0.5 * a["rho"] * float(st.drag_coefficient(v * 0.4e-3 / a["nu"])) * 0.4e-3 * v * v == pytest.approx(
+        1240 * math.pi * 0.2e-3 ** 2 * G, rel=0.01)
+    assert st.set_time("PLA") > 3 * st.set_time("PLA", wind=5.0)
+    monkeypatch.setattr(fs, "h_strand", lambda d, t, air, wind=0.0: np.full(np.shape(t), 70.0))
+    want = PLA.density * 1000 * PLA.cp * 0.4e-3 / (4 * 70) * math.log((220 - 35) / (PLA.tg - 35))
+    assert st.set_time("PLA", 0.4, 35.0, nozzle_c=220) == pytest.approx(want, rel=0.01)
+
+
+def test_what_is_taken_off_keeps_holding_the_rest_and_no_plastic_is_lost():
+    s = st.Strand(np.c_[np.linspace(0, 200, 201), np.zeros(201), np.full(201, 0.2)], 0.4, PLA, temp=25, air=25, fan=False,
+                  ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True, flow=0.0)
+    head = np.array([200.0, 0, 0.2])
+    for _ in range(120):
+        s.step(head=head)
+    vol = s.vol.sum()
+    pts, d = s.lay()
+    off = float((math.pi / 4 * d ** 2 * np.linalg.norm(np.diff(pts, axis=0), axis=1)).sum()) * 1e-9
+    assert s.vol.sum() + off == pytest.approx(vol, rel=1e-6)
+    assert 130 < pts[-1, 0] <= 141 and s.points()[0] == pytest.approx(pts[-1])
+    w = 1240 * math.pi / 4 * 0.4e-3 ** 2 * G * 0.2
+    for _ in range(240):
+        head = head + [50 / 240, 0, 0]
+        s.step(head=head)
+    assert s.force == pytest.approx(0.5 * w, rel=0.1)  # as hard to drag as the whole 200 mm
+
+
+def test_a_travel_drags_a_free_strand_and_breaks_a_held_one():
+    """The hotend holds the strand by its neck: with nothing coming out it pulls the strand along, or pulls it to a hair."""
+    held, free = laid(True), laid(False)
+    for s in (held, free):
+        s.flow = 0.0
+        for k in range(120):
+            s.step(head=(120 + 1.5 * (k + 1), 0, 5.0))
+            off = s.snap()
+            if off:
+                break
+        if s is held:
+            (far,) = off  # what it left, off the nozzle
+            assert len(far.x) > 10 and not far.nozzle and min([*far.diameters(), *s.diameters()]) > 0.05
+            assert len(s.x) + len(far.x) > 10 and s.nozzle and s.x[-1] == pytest.approx(np.array([120 + 1.5 * (k + 1), 0, 5]) * 1e-3)
+    assert not off
+
+
 def test_a_cold_strand_torn_back_and_forth_gives_instead_of_flying():
     """It froze with its stress, not its strain, so stiffening adds no energy, and it gives past its strength."""
     s = laid(True)
