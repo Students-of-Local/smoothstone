@@ -126,6 +126,8 @@ def test_fixed_ask_share_dry_then_send(work, monkeypatch):
     assert pr[pr.index("--head") + 1] == f"somefan:fix/{d['id']}" and not (bundle / ".put.json").exists()
     text, code, nxt = stone("doctor", "share", "--send")
     assert "Already shared" in text and len([c for c in gh.calls if c[:2] == ["pr", "create"]]) == 1
+    text, code, nxt = stone("doctor", "share", "no")  # a decline after the send does not claim it stayed home
+    assert "Already shared" in text and "Not shared" not in text
 
 
 def test_dry_run_next_asks_the_person(work, monkeypatch):
@@ -136,6 +138,35 @@ def test_dry_run_next_asks_the_person(work, monkeypatch):
     text, code, nxt = stone("doctor", "share")
     assert nxt.startswith("ask the person:") and "show them the photo" in nxt and "send exactly this?" in nxt
     assert nxt.endswith("yes: stone doctor share --send. no: stone doctor share no") and gh.calls == []
+
+
+def test_decline_after_preview_blocks_send(work, monkeypatch):
+    gh = FakeGh()
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    _fixed_case(work)
+    stone("doctor", "share")
+    text, code, nxt = stone("doctor", "share", "no")
+    assert "Not shared" in text and not list((work / "stone-job" / "doctor").glob("*/share"))
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert not any(c[:3] == ["api", "-X", "PUT"] or c[:2] == ["pr", "create"] for c in gh.calls), gh.calls
+    assert code == 1 and "Nothing was sent" in text and nxt == "stone doctor share"
+
+
+def test_send_refuses_a_bundle_changed_after_preview(work, monkeypatch):
+    gh = FakeGh()
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    _fixed_case(work)
+    stone("doctor", "share")
+    bundle = next((work / "stone-job" / "doctor").glob("*/share"))
+    d = json.loads((bundle / "case.json").read_text())
+    (bundle / "case.json").write_text(json.dumps(d | {"said": "not what the person saw"}))
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert gh.calls == [] and code == 1 and "Nothing was sent" in text and nxt == "stone doctor share"
+    stone("doctor", "share")
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert "Sent: " in text
 
 
 def test_owner_skips_the_fork(work, monkeypatch):

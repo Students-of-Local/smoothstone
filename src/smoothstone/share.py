@@ -195,21 +195,51 @@ def send_pr(bundle: Path, d: dict) -> tuple[str | None, str]:
     return (url.splitlines()[-1], "") if code == 0 else (None, "gh could not open the pull request")
 
 
+def bundle_hash(bundle: Path) -> str:
+    """One hash over every file that would go public: what the person saw at the preview."""
+    h = hashlib.sha256()
+    for name in ("case.json", "photo.jpg", "pr.md"):
+        f = bundle / name
+        data = f.read_bytes() if f.is_file() else b""
+        h.update(f"{name}:{f.is_file()}:{len(data)}:".encode() + data)
+    return h.hexdigest()
+
+
+def previewed(case: dict, bundle: Path) -> bool:
+    """True when the bundle on disk is the one the last preview showed, with no decline since."""
+    st = case.get("share") or {}
+    if st.get("state") not in ("ready", "link") or not st.get("hash") or not (bundle / "case.json").is_file():
+        return False
+    try:
+        folder = json.loads((bundle / "case.json").read_text()).get("id")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return folder == st.get("folder") and bundle_hash(bundle) == st["hash"]
+
+
 def cmd_share(args, job, rest: str, out):
     case = last_fixed(job)
     if case is None:
         out.fix("no fixed doctor case to share")
         out.next = 'stone doctor "<what you see>"'
         return out
+    bundle = doctor.doctor_dir(job) / case["id"] / "share"
+    if (case.get("share") or {}).get("state") == "sent":
+        out.add(f"Already shared: {case['share']['url']}")
+        out.next = doctor.DONE
+        return out
     if rest.lower().startswith("no"):
+        shutil.rmtree(bundle, ignore_errors=True)  # a declined bundle can never be sent later
         case["share"] = {"state": "declined"}
         doctor.save_case(job, case)
         out.add("Not shared. The fix stays on this machine.")
         out.next = doctor.DONE
         return out
-    if (case.get("share") or {}).get("state") == "sent":
-        out.add(f"Already shared: {case['share']['url']}")
-        out.next = doctor.DONE
+    if args.send:
+        if previewed(case, bundle):
+            return _send(job, case, bundle, out)
+        out.fix("Nothing was sent: the person has not seen this bundle since it last changed or was declined")
+        out.next = "stone doctor share"
         return out
     if args.printer:
         p = printers.get(args.printer)
@@ -222,11 +252,8 @@ def cmd_share(args, job, rest: str, out):
         out.fix("the shared case needs the printer model")
         out.next = "ask the person: which printer was it? Then: stone doctor share --printer <id from stone printer>"
         return out
-    bundle = doctor.doctor_dir(job) / case["id"] / "share"
-    if args.send and (bundle / "case.json").is_file():
-        return _send(job, case, bundle, out)
     bundle, d, gone = build(job, case)
-    case["share"] = {"state": "ready", "folder": d["id"]}
+    case["share"] = {"state": "ready", "folder": d["id"], "hash": bundle_hash(bundle)}
     doctor.save_case(job, case)
     out.add(f"Ready to share case {case['id']}. Nothing is sent yet. This is all that goes public:")
     out.add(f"Photo: {bundle / 'photo.jpg'} (EXIF removed, at most {PX} px)" if d["photo"] else "Photo: none")
@@ -253,7 +280,7 @@ def _send(job, case, bundle: Path, out):
         return out
     link = issue_url(d)
     (bundle / "issue_url.txt").write_text(link + "\n")
-    case["share"] = {"state": "link", "folder": d["id"], "url": link}
+    case["share"] = {"state": "link", "folder": d["id"], "url": link, "hash": case["share"]["hash"]}
     doctor.save_case(job, case)
     out.add(f"Nothing was sent: {why}. The bundle is in {bundle}.", "Share it as a GitHub issue instead:", link)
     photo = f", attach {bundle / 'photo.jpg'}," if d["photo"] else ""
