@@ -324,6 +324,36 @@ def test_f2sol_photo_case_keeps_its_printer_and_material(work):
     assert case["printer"] == "bambu_a1" and case["material"] == "PETG"
 
 
+def _gantrel(monkeypatch, rows, calls):
+    def fake(argv, timeout=60):
+        calls.append(argv[1:])
+        if argv[1] == "list":
+            return 0, json.dumps({"printers": rows})
+        _photo(Path(argv[argv.index("--out") + 1]), (800, 600))
+        return 0, "saved"
+    monkeypatch.setattr(printers, "gantrel", lambda: "/fake/gantrel-printer")
+    monkeypatch.setattr(printers, "_run", fake)
+
+
+def test_f3sol_camera_refuses_another_printers_frame(work, monkeypatch):
+    calls = []
+    _gantrel(monkeypatch, [{"name": "mini", "type": "bambu", "model": "bambu-a1-mini"}], calls)
+    text, code, nxt = stone("doctor", "--camera", "--printer", "creality_k2")
+    assert code == 1 and "mini" in text and "Creality K2" in text
+    assert nxt.startswith("ask the person:") and "stone printer status" in nxt
+    assert not any(c[0] == "camera" for c in calls)
+
+
+def test_f3sol_camera_takes_the_matching_printer(work, monkeypatch):
+    calls = []
+    _gantrel(monkeypatch, [{"name": "mini", "type": "bambu", "model": "bambu-a1-mini"},
+                           {"name": "big", "type": "creality", "model": "creality-k2"}], calls)
+    text, code, nxt = stone("doctor", "spaghetti everywhere", "--camera", "--printer", "creality_k2")
+    assert ["camera", "big", "--out"] == [c for c in calls if c[0] == "camera"][0][:3]
+    case = doctor.open_case(cli.Job(work / "stone-job"))
+    assert case["camera"] == {"name": "big", "model": "creality-k2"}
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)

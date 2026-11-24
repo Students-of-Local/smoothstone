@@ -417,17 +417,37 @@ def save_photo(src: Path, dest: Path) -> Path:
     return dest
 
 
-def camera_frame(job, dest: Path, printer: dict | None) -> tuple[Path | None, str]:
-    """One frame from the paired printer's camera through gantrel-printer (read-only), or why not."""
+def matching_device(rows: list[dict], printer: dict | None) -> tuple[dict | None, str]:
+    """The paired Gantrel printer that is this printer model, or why there is none. Never another model's
+    camera: a frame from the wrong printer would be diagnosed as this one."""
+    if printer is None:
+        return (rows[0], "") if len(rows) == 1 else \
+            (None, "several printers are paired and no printer is set" if rows else "no printer is paired")
+    c = printer.get("connect") or {}
+    hits = [r for r in rows if r.get("model") == c["gantrel_model"]] if c.get("gantrel_model") else \
+        [r for r in rows if r.get("type") == c.get("gantrel_type")]
+    if len(hits) == 1:
+        return hits[0], ""
+    paired = ", ".join(f"{r['name']} ({r.get('model') or r.get('type')})" for r in rows) or "none"
+    if hits:
+        return None, f"{len(hits)} paired printers could be the {printer['name']}: {paired}"
+    return None, f"no paired printer is a {printer['name']} (paired: {paired})"
+
+
+def camera_frame(job, dest: Path, printer: dict | None) -> tuple[Path | None, str, dict | None, bool]:
+    """One frame from this printer's camera through gantrel-printer (read-only):
+    (frame, why not, device, refused). Refused: no paired device is this printer, so no frame is taken."""
     binary = printers.gantrel()
     if binary is None:
-        return None, f"{printers.GANTREL} is not installed: stone printer camera says how to add it"
-    row = printers.pick(printers.paired(binary), printer)
+        return None, f"{printers.GANTREL} is not installed: stone printer camera says how to add it", None, False
+    row, why = matching_device(printers.paired(binary), printer)
     if row is None:
-        return None, "no paired printer: stone printer status says how to pair it"
+        return None, why, None, True
     dest.parent.mkdir(parents=True, exist_ok=True)
     code, text = printers._run([binary, "camera", row["name"], "--out", str(dest)])
-    return (dest, "") if code == 0 and dest.is_file() else (None, f"the camera on {row['name']} did not answer")
+    if code == 0 and dest.is_file():
+        return dest, "", row, False
+    return None, f"the camera on {row['name']} did not answer", row, False
 
 
 def _question_next(q: dict) -> str:
@@ -566,11 +586,17 @@ def _new(args, job, said: str, out):
             out.next = 'stone doctor "<what you see>"'
             return out
     elif args.camera:
-        frame, why = camera_frame(job, case_dir / "camera.jpg", p)
+        frame, why, device, refused = camera_frame(job, case_dir / "camera.jpg", p)
+        if refused:
+            out.fix(f"no camera frame: {why}")
+            out.next = ("ask the person: which printer is it? Pair it (stone printer status shows how) or "
+                        'describe what you see. Then: stone doctor "<what you see>"')
+            return out
         if frame is None:
             out.add(f"No camera frame: {why}.")
         else:
             case["image"] = str(save_photo(frame, frame))
+            case["camera"] = {"name": device["name"], "model": device.get("model")}
     case.update(said=said, printer=p["id"] if p else None, material=material)
     d = diagnose(said, p, material) if said else {"failures": []}
     head = f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
