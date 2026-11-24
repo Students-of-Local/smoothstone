@@ -355,6 +355,20 @@ def test_a_short_run_lays_its_plastic_and_the_plate_past_the_grid_is_bare():
     tp.t1[run] = tp.t0[run] + 0.002  # under one step
     st.strand(5, run, np.ones(st.field.shape, bool), 60.0)
     assert st.links and st.left == 0
+    vol = lambda: sum(float((np.pi / 4 * w ** 2 * np.linalg.norm(q - p, axis=1)).sum()) for _, p, q, w in st.links)  # noqa: E731
+    due = float(st.flows[run] @ (tp.t1 - tp.t0)[run])
+    assert vol() - st.owed == pytest.approx(due, rel=0.05)
+    tp.p1[run] = tp.p0[run] + [0.4, 0, 0, 0]  # it starts on plastic and ends in air, within one step
+    xs = inp.origin[0] + (np.arange(st.field.shape[1]) + 0.5) * inp.cell
+    edge = tp.p0[run[0], 0] + 0.3
+    st.links.clear()
+    st.strand(5, run, np.broadcast_to(xs > edge, st.field.shape), 60.0)
+    assert np.linalg.norm(st.links[0][1][0] - tp.p0[run[0], :3]) < 0.5 and len(st.links) == 1  # its first end stays where it was pressed on
     st.field[:] = 0
     st.pile(5, np.array([[-30.0, 0, 0.24], [-25.0, 0, 0.24]]), np.array([0.48]))
     assert not st.field.any()
+
+
+def test_the_fans_share_is_the_winds():
+    still, half, full = (failvideo.strand.numbers("PLA", 10.0, 120.0, fan=f)["set_s_fan"] for f in (0.0, 0.4, 1.0))
+    assert still > half > full and failvideo.strand.Strand([(0, 0, 0), (0, 0, 1)], 0.48, "PLA", fan=0.4).fan == pytest.approx(0.4 * failsim.fact("fan_air_speed"))

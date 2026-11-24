@@ -35,6 +35,7 @@ MOTION = 8  # frames of the failure itself
 SIM = 60.0  # s of printing into air followed in all, shared by the layers; more is left out and said
 LIMIT = "s of printing into air is not drawn: the video follows"
 FALL = 480  # steps of strand.DT a dropped piece is followed, 2 s
+FALLS = 40000  # and all of them together
 KEEP = 60.0  # mm of strand behind the nozzle that stays free to move
 WHAT = {"supports": "lines with nothing under them print into air and fall (spaghetti)",
         "droop": "a ledge past the reach droops while soft, then curls up",
@@ -204,7 +205,8 @@ class Story:
         self.speed = np.linalg.norm((tp.p1 - tp.p0)[:, :3], axis=1) / took  # mm/s, the mean of each move
         self.flows = np.where(self.ext, tp.width * tp.height * self.speed, 0.0)  # mm3/s
         self.flew = np.zeros(tp.n, bool)  # printed into air
-        self.told, self.cut = 0.0, 0  # s of it followed; pieces drawn before they lay still
+        self.told, self.cut, self.falls = 0.0, 0, FALLS  # s of it followed; pieces drawn before they lay still; steps left for them
+        self.owed = 0.0  # mm3 a strand started with that has not come out yet
         self.mean = lambda q, of: float(np.average(q[of], weights=took[of])) if of.any() else 0.0
         self.flow, self.mean_speed = self.mean(self.flows, self.ext), self.mean(self.speed, self.ext)
 
@@ -259,6 +261,10 @@ class Story:
         for k in range(FALL):
             if len(s.x) < 2:
                 return
+            self.falls -= 1
+            if self.falls < 0:
+                self.cut += 1
+                break
             s.step()
             off = s.snap()
             for piece in off:
@@ -276,14 +282,14 @@ class Story:
         z, t0, t1 = float(self.inp.layer_z[i]), tp.t0[run], tp.t1[run]
         came = np.r_[0.0, np.cumsum(self.flows[run] * (t1 - t0))]  # mm3 out of the nozzle by each move's end
         first, snaps = len(self.links), []
-        top = lambda: np.minimum(self.field, max(z - d, 0.0))  # noqa: E731  # what lies higher, the nozzle pushes down
-        low = top()
-        ground = lambda x, y: np.where(self.off(np.c_[x, y]), 0.0, low[self.px(np.c_[x, y])])  # noqa: E731
+        high = max(z - d, 0.0)  # what lies higher, the nozzle pushes down
+        ground = lambda x, y: np.where(self.off(np.c_[x, y]), 0.0, np.minimum(self.field[self.px(np.c_[x, y])], high))  # noqa: E731
         plastic = lambda x, y: ground(x, y) > 0  # noqa: E731
         if self.rod is not None:
             self.rod.ground, self.rod.plastic = ground, plastic
         took = float(t1[-1] - t0[0])
         n = math.ceil(took / dt - 1e-9) if took <= secs else int(secs / dt)
+        was = tp.p0[run[0], :3]
         for q in range(n):
             t = t0[0] + (q + 1) * dt
             k = min(int(np.searchsorted(t1, t)), len(run) - 1)
@@ -295,20 +301,22 @@ class Story:
                 self.blob, out = self.blob + out * dt, 0.0  # the tip carries it, or it has nowhere to go
             if self.rod is None:
                 if out <= 0:
+                    was = head
                     continue
-                self.rod = strand.Strand([head - (0, 0, d), head], d, m, bore=d / failsim.fact("die_swell"), fan=self.inp.fan,
-                                         air=self.inp.air, ground=ground, plastic=plastic, nozzle=True, held=(0,) if solid else ())
-            s = self.rod
-            s.flow = out * 1e-9
+                first_up = was - (0, 0, min(d, max(was[2] - d / 2, d / 4)))
+                self.rod = strand.Strand([first_up, was], d, m, bore=d / failsim.fact("die_swell"), fan=self.inp.fan, air=self.inp.air,
+                                         ground=ground, plastic=plastic, nozzle=True, held=() if loose[self.px(was[None])][0] else (0,))
+                self.owed += float(self.rod.vol[0]) * 1e9
+            s, was, paid = self.rod, head, min(self.owed, out * dt)  # what it starts with comes out of the flow that follows
+            self.owed -= paid
+            s.flow = (out - paid / dt) * 1e-9
             s.step(dt, head)
             if solid and out > 0 and len(s.x) > 2 and not loose[self.px(s.points()[-2:-1])][0]:  # printed on plastic as usual
-                s.fixed[-2], s.v[-2], s.x[-2, 2] = True, 0.0, (z - d / 2) * 1e-3
+                s.fixed[-2], s.v[-2], s.x[-2, 2] = True, 0.0, max(z - d / 2, d / 2) * 1e-3
             if q % 40 == 0 and len(s.x) > 250:
                 self.pile(i, *s.lay(2 * KEEP), skip=3)
-                low[:] = top()
             for piece in s.snap():
                 self.drop(i, piece)
-                low[:] = top()
             if len(s.x) < 2:
                 self.rod = None
             if keep and q % max(1, n // 60) == 0:
@@ -402,9 +410,10 @@ class Story:
         if self.flew.any():
             self.flow, self.mean_speed = self.mean(self.flows, self.flew), self.mean(self.speed, self.flew)
         if self.cut:
-            self.notes.append(f"{self.cut} pieces still moved {FALL * strand.DT:.0f} s after the nozzle let them go, and are drawn as they were then")
+            self.notes.append(f"{self.cut} pieces were followed no further (2 s each, {FALLS} steps in all) and are drawn as they were then")
         if self.links:
             self.notes += [failsim.note(k) for k in ("die_swell", "strand_friction", "weld_rule", "fan_reach", "thread_limit")]
+            self.notes.append("assumption: a 0.4 mm nozzle, whatever the lines' width")
         if self.left > 0.5:
             self.notes.append(f"{self.left:.0f} {LIMIT} {self.told:.0f} s of it, the start of each layer")
         if any((b[2] != 0).any() for b in self.bent):
@@ -688,7 +697,7 @@ def cmd(args, job, prof, out):
         n = data["strand"]
         out.add(f"Strand: {n['strand_mm']} mm thick, it leaves the nozzle at {n['payout_mm_s']} mm/s while the nozzle moves at {n['nozzle_mm_s']}. "
                 f"Pulling it that fast takes {n['draw_mn']} mN; 100 mm of it on the plate holds {n['plate_grip_mn_per_100mm']} mN, so "
-                f"the hotend {'drags it along' if n['draw_mn'] > n['plate_grip_mn_per_100mm'] else 'draws it thin'} until something holds it.")
+                f"the hotend {'lets it fall slack' if not n['draw_mn'] else 'drags it along' if n['draw_mn'] > n['plate_grip_mn_per_100mm'] else 'draws it thin'} until something holds it.")
         out.add(f"Air and heat: it falls at {n['fall_mm_s'] / 1000:.1f} m/s at most, and sets in {n['set_s_still_air']} s"
                 + (f" ({n['set_s_fan']} s in the fan's air)" if inp.fan else "") + f". The nozzle's tip carries {n['blob_mm3']} mm3.")
     for x in (x for x in st.notes if LIMIT in x):
