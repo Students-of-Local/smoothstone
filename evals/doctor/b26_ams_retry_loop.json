@@ -1,0 +1,10 @@
+{
+ "id": "b26_ams_retry_loop",
+ "said": "AMS keeps doing the load unload dance at every color swap, then says failed to pull back. Single spool off the back prints fine.",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

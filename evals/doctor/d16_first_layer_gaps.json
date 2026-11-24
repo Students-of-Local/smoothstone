@@ -1,0 +1,12 @@
+{
+ "id": "d16_first_layer_gaps",
+ "said": "first layer has gaps between the lines, you can see the bed through it and the lines are round not squished",
+ "printer": "voron_24",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

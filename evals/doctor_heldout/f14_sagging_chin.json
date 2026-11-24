@@ -1,0 +1,10 @@
+{
+ "id": "f14_sagging_chin",
+ "said": "underside of this slanted chin is hanging in little curls, everything standing straight looks nice",
+ "printer": "bambu_a1",
+ "material": "PLA",
+ "expect": {
+  "top": "overhang_droop",
+  "top3_includes": []
+ }
+}

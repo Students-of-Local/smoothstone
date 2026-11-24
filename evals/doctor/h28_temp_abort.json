@@ -1,0 +1,10 @@
+{
+ "id": "h28_temp_abort",
+ "said": "It beeps and aborts with a nozzle temperature deviation message, and the graph drops from 250 to 210 even though the target stays at 250. Is my retraction too high?",
+ "printer": "qidi_q1_pro",
+ "material": "ABS",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

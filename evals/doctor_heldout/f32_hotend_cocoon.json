@@ -1,0 +1,12 @@
+{
+ "id": "f32_hotend_cocoon",
+ "said": "sock has disappeared inside a growing shiny lump around heater block, print underneath came unstuck",
+ "printer": "creality_k2",
+ "material": "PETG",
+ "expect": {
+  "top": "blob_on_nozzle",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

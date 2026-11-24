@@ -1,0 +1,10 @@
+{
+ "id": "h29_second_offset",
+ "said": "I think my bed mesh is bad because the print has two clean sideways steps, both in the same direction, several centimeters up. Nothing lifted off the plate and the entire outline moves together at each step.",
+ "printer": "voron_24",
+ "material": "ASA",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

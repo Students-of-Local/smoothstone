@@ -1,0 +1,12 @@
+{
+ "id": "h21_warm_then_stops",
+ "said": "PLA feeds great for 40 minutes in the closed enclosure, then stops even though the nozzle still reads 215. It works again after cooling down, and the pulled filament has a swollen plug above the melt zone; the heatsink fan isn't spinning.",
+ "printer": "creality_k1c",
+ "material": "PLA",
+ "expect": {
+  "top": "heat_creep",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

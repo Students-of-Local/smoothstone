@@ -1,0 +1,10 @@
+{
+ "id": "f18_random_bumps",
+ "said": "single little pimples scattered all over the vase, different spots each layer, no line down one side",
+ "printer": "creality_k2",
+ "material": "PETG",
+ "expect": {
+  "top": "surface_zits",
+  "top3_includes": []
+ }
+}

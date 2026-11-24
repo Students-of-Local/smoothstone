@@ -1,0 +1,10 @@
+{
+ "id": "d07_shifted_layers",
+ "said": "halfway up the print the whole thing shifted over to the side like a staircase, everything above is offset by a few mm",
+ "printer": "elegoo_neptune_4_pro",
+ "material": "PLA",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

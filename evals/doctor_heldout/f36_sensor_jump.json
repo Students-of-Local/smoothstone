@@ -1,0 +1,10 @@
+{
+ "id": "f36_sensor_jump",
+ "said": "thermistor short circuit warning, nozzle reading jumps from room temp to three hundred before heater even turns on",
+ "printer": "prusa_core_one",
+ "material": "PETG",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

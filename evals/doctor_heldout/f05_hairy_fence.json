@@ -1,0 +1,10 @@
+{
+ "id": "f05_hairy_fence",
+ "said": "my fence has tiny hairs between every post, posts themselves look fine",
+ "printer": "bambu_p1p",
+ "material": "PETG",
+ "expect": {
+  "top": "stringing",
+  "top3_includes": []
+ }
+}

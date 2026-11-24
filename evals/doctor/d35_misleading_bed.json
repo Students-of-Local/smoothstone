@@ -1,0 +1,10 @@
+{
+ "id": "d35_misleading_bed",
+ "said": "I'm sure my bed isn't level, the print came out with a staircase where everything above layer 40 moved over by 5 mm",
+ "printer": "sovol_sv08",
+ "material": "PLA",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

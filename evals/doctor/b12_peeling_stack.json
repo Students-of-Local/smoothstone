@@ -1,0 +1,10 @@
+{
+ "id": "b12_peeling_stack",
+ "said": "My nylon bracket looks okay but I can peel the layers apart with my thumbnail. It breaks into flat slices instead of bending.",
+ "printer": "qidi_q1_pro",
+ "material": "PA",
+ "expect": {
+  "top": "layer_separation",
+  "top3_includes": []
+ }
+}

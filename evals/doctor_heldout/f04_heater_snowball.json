@@ -1,0 +1,10 @@
+{
+ "id": "f04_heater_snowball",
+ "said": "there is a huge black plastic potato swallowing the hot end wires now",
+ "printer": "creality_k1c",
+ "material": "PETG",
+ "expect": {
+  "top": "blob_on_nozzle",
+  "top3_includes": []
+ }
+}

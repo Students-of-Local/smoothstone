@@ -1,0 +1,3772 @@
+{
+ "about": "stone doctor's failure catalog: what each failure looks like, the words people use for it, its causes with priors, printer and material modifiers, the question that tells causes apart, the fix (cheapest and safest first) and the source. Priors and multipliers are stone's modeling assumptions, not measured rates.",
+ "assumption": "prior, modifiers and answer multipliers are hand-set weights, checked only by evals/doctor",
+ "checked": "2026-11-24",
+ "sources": {
+  "prusa_first_layer": {
+   "cite": "Prusa Knowledge Base: First layer issues",
+   "url": "https://help.prusa3d.com/article/first-layer-issues_1804"
+  },
+  "prusa_warping": {
+   "cite": "Prusa Knowledge Base: Warping",
+   "url": "https://help.prusa3d.com/article/warping_2011"
+  },
+  "prusa_spaghetti": {
+   "cite": "Prusa Knowledge Base: Spaghetti monster",
+   "url": "https://help.prusa3d.com/article/spaghetti-monster_1999"
+  },
+  "prusa_blob": {
+   "cite": "Prusa Knowledge Base: Extruder blob",
+   "url": "https://help.prusa3d.com/article/extruder-blob_2005"
+  },
+  "prusa_stringing": {
+   "cite": "Prusa Knowledge Base: Stringing and oozing",
+   "url": "https://help.prusa3d.com/article/stringing-and-oozing_1805"
+  },
+  "prusa_under": {
+   "cite": "Prusa Knowledge Base: Under-extrusion",
+   "url": "https://help.prusa3d.com/article/under-extrusion_2007"
+  },
+  "prusa_clog": {
+   "cite": "Prusa Knowledge Base: Clogged nozzle (CORE One, MK4/S)",
+   "url": "https://help.prusa3d.com/article/clogged-nozzle-core-one-core-one-l-xl-mk4-s-mk3-9-s_411823"
+  },
+  "prusa_heat_creep": {
+   "cite": "Prusa Knowledge Base: Extrusion stopped mid-print (heat creep)",
+   "url": "https://help.prusa3d.com/article/extrusion-stopped-mid-print-heat-creep_1948"
+  },
+  "prusa_layer_shift": {
+   "cite": "Prusa Knowledge Base: Layer shifting",
+   "url": "https://help.prusa3d.com/article/layer-shifting_2020"
+  },
+  "prusa_elephant": {
+   "cite": "Prusa Knowledge Base: Elephant foot compensation",
+   "url": "https://help.prusa3d.com/article/elephant-foot-compensation_114487"
+  },
+  "prusa_layer_sep": {
+   "cite": "Prusa Knowledge Base: Layer separation and splitting",
+   "url": "https://help.prusa3d.com/article/layer-separation-and-splitting-fdm_1806"
+  },
+  "prusa_ghosting": {
+   "cite": "Prusa Knowledge Base: Ghosting",
+   "url": "https://help.prusa3d.com/article/ghosting_1801"
+  },
+  "prusa_bridging": {
+   "cite": "Prusa Knowledge Base: Poor bridging",
+   "url": "https://help.prusa3d.com/article/poor-bridging_1802"
+  },
+  "prusa_supports": {
+   "cite": "Prusa Knowledge Base: Failing supports",
+   "url": "https://help.prusa3d.com/article/failing-supports_1807"
+  },
+  "prusa_above_supports": {
+   "cite": "Prusa Knowledge Base: Bad looking surface above supports",
+   "url": "https://help.prusa3d.com/article/bad-looking-surface-above-supports_1803"
+  },
+  "prusa_seam": {
+   "cite": "Prusa Knowledge Base: Seam position",
+   "url": "https://help.prusa3d.com/article/seam-position_151069"
+  },
+  "prusa_drying": {
+   "cite": "Prusa Knowledge Base: Drying filament",
+   "url": "https://help.prusa3d.com/article/drying-filament_332086"
+  },
+  "prusa_tangled": {
+   "cite": "Prusa Knowledge Base: Tangled filament",
+   "url": "https://help.prusa3d.com/article/tangled-filament_421198"
+  },
+  "prusa_runaway": {
+   "cite": "Prusa Knowledge Base: Hotend thermal runaway (CORE One, MK4/S)",
+   "url": "https://help.prusa3d.com/article/hotend-thermal-runaway-31204-core-one-35204-core-one-l-26204-mk4s-13204-mk4-27204-mk3-9s-21204-mk3-9_401076"
+  },
+  "prusa_infill": {
+   "cite": "Prusa Knowledge Base: Problems with infill",
+   "url": "https://help.prusa3d.com/article/problems-with-infill_1994"
+  },
+  "prusa_brim": {
+   "cite": "Prusa Knowledge Base: Skirt and brim",
+   "url": "https://help.prusa3d.com/article/skirt-and-brim_133969"
+  },
+  "s3d_bed": {
+   "cite": "Simplify3D print quality guide: Not sticking to the bed",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/not-sticking-to-the-bed/"
+  },
+  "s3d_warping": {
+   "cite": "Simplify3D print quality guide: Warping",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/warping/"
+  },
+  "s3d_zits": {
+   "cite": "Simplify3D print quality guide: Blobs and zits",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/blobs-and-zits/"
+  },
+  "s3d_clog": {
+   "cite": "Simplify3D print quality guide: Clogged extruder",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/clogged-extruder/"
+  },
+  "s3d_curling": {
+   "cite": "Simplify3D print quality guide: Curling or rough corners",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/curling-or-rough-corners/"
+  },
+  "s3d_top_gaps": {
+   "cite": "Simplify3D print quality guide: Gaps in top layers",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/gaps-in-top-layers/"
+  },
+  "s3d_grinding": {
+   "cite": "Simplify3D print quality guide: Grinding filament",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/grinding-filament/"
+  },
+  "s3d_layer_sep": {
+   "cite": "Simplify3D print quality guide: Layer separation and splitting",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/layer-separation-and-splitting/"
+  },
+  "s3d_layer_shift": {
+   "cite": "Simplify3D print quality guide: Layer shifting",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/layer-shifting/"
+  },
+  "s3d_lines": {
+   "cite": "Simplify3D print quality guide: Lines on the side of print",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/lines-on-the-side-of-print/"
+  },
+  "s3d_over": {
+   "cite": "Simplify3D print quality guide: Over-extrusion",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/over-extrusion/"
+  },
+  "s3d_overheating": {
+   "cite": "Simplify3D print quality guide: Overheating",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/overheating/"
+  },
+  "s3d_bridging": {
+   "cite": "Simplify3D print quality guide: Poor bridging",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/poor-bridging/"
+  },
+  "s3d_above_supports": {
+   "cite": "Simplify3D print quality guide: Poor surface above supports",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/poor-surface-above-supports/"
+  },
+  "s3d_stops": {
+   "cite": "Simplify3D print quality guide: Stops extruding mid print",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/stops-extruding-mid-print/"
+  },
+  "s3d_stringing": {
+   "cite": "Simplify3D print quality guide: Stringing or oozing",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/stringing-or-oozing/"
+  },
+  "s3d_under": {
+   "cite": "Simplify3D print quality guide: Under-extrusion",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/under-extrusion/"
+  },
+  "s3d_ringing": {
+   "cite": "Simplify3D print quality guide: Vibrations and ringing",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/vibrations-and-ringing/"
+  },
+  "s3d_no_start": {
+   "cite": "Simplify3D print quality guide: Not extruding at start of print",
+   "url": "https://www.simplify3d.com/resources/print-quality-troubleshooting/not-extruding-at-start-of-print/"
+  },
+  "bambu_pei_clean": {
+   "cite": "Bambu Lab Wiki: Textured PEI Plate Cleaning Guide",
+   "url": "https://wiki.bambulab.com/en/filament-acc/acc/pei-plate-clean-guide"
+  },
+  "bambu_first_layer": {
+   "cite": "Bambu Lab Wiki: First Layer Not Sticking",
+   "url": "https://wiki.bambulab.com/en/knowledge-sharing/first-layer-not-sticking"
+  },
+  "bambu_blob": {
+   "cite": "Bambu Lab Wiki: Hotend Clumping/Blob Cleaning Instructions (A1)",
+   "url": "https://wiki.bambulab.com/en/a1-mini/maintenance/hotend_blob"
+  },
+  "creality_k2_first_layer": {
+   "cite": "Creality Wiki: K2 First Layer Adhesion and Layer Compression",
+   "url": "https://wiki.creality.com/en/k2-flagship-series/k2/first-layer-adhesion-compression"
+  },
+  "creality_k2p_clumping": {
+   "cite": "Creality Wiki: K2 Plus Hotend Clumping",
+   "url": "https://wiki.creality.com/en/k2-flagship-series/k2-plus/hotend-clumping"
+  },
+  "creality_k2_jam": {
+   "cite": "Creality Wiki: K2 Jammed Filament",
+   "url": "https://wiki.creality.com/en/k2-flagship-series/k2/jammed-filament"
+  }
+ },
+ "answers": {
+  "unknown": [
+   "not sure",
+   "dont know",
+   "don't know",
+   "no idea",
+   "dunno",
+   "cant tell",
+   "can't tell",
+   "unsure",
+   "maybe"
+  ],
+  "beads": [
+   "bead",
+   "beads",
+   "droplet",
+   "drops",
+   "drop"
+  ],
+  "film": [
+   "film",
+   "spreads",
+   "sheet of water",
+   "flat layer",
+   "wets"
+  ],
+  "no": [
+   "no",
+   "nope",
+   "nah"
+  ],
+  "yes": [
+   "yes",
+   "yeah",
+   "yep",
+   "yup",
+   "it did",
+   "it does",
+   "it is",
+   "it was",
+   "correct",
+   "true",
+   "right",
+   "sure",
+   "definitely",
+   "absolutely",
+   "i think so"
+  ]
+ },
+ "failures": [
+  {
+   "id": "bed_adhesion",
+   "name": "Part came loose from the plate",
+   "looks_like": {
+    "camera": "the part is off its spot, tilted, moved or lying loose on the plate, often with loose strands under its edges",
+    "part": "the bottom is clean or only partly printed; first layers peeled off in one piece"
+   },
+   "words": [
+    "came off the bed",
+    "came off the plate",
+    "popped off",
+    "came loose",
+    "detached",
+    "not sticking",
+    "won't stick",
+    "wont stick",
+    "doesn't stick",
+    "nothing will stick",
+    "wouldn't stick",
+    "knocked off",
+    "broke loose",
+    "unstuck",
+    "dragged around",
+    "lying tilted",
+    "tilted on the bed",
+    "moved on the bed",
+    "lifted off",
+    "pulled off the bed",
+    "adhesion",
+    "plate needing to be cleaned",
+    "plate needs cleaning",
+    "came off",
+    "loose on the bed",
+    "balls up",
+    "won't grab",
+    "wont grab",
+    "never grab",
+    "doesn't grab",
+    "not grabbing",
+    "won't adhere",
+    "not adhering",
+    "came unstuck",
+    "knocked loose",
+    "dragged along",
+    "pulled along",
+    "slid off",
+    "sliding around",
+    "loose on the plate",
+    "off the build plate",
+    "popped loose",
+    "dislodged",
+    "brim came off",
+    "skirt",
+    "skates",
+    "skate around",
+    "slides off",
+    "slide off",
+    "won't stay put",
+    "doesn't stay put",
+    "comes off intact"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "plate_contaminated",
+     "cause": "Oil from fingers, dust or old glue on the plate",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [
+      "clean",
+      "cleaned",
+      "dirty",
+      "fingerprint",
+      "fingers",
+      "oil",
+      "grease",
+      "greasy",
+      "glue",
+      "dust",
+      "wash"
+     ],
+     "tells": [
+      {
+       "ask": "Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film?",
+       "answers": {
+        "beads": 3.0,
+        "film": 0.3
+       }
+      },
+      {
+       "ask": "Has the plate gone several prints since its last wash with soap and water?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Wash the cold plate with warm water and plain dish soap (no lotion or oils), scrub, rinse, dry with a paper towel.",
+      "Do not touch the print area afterward; hold the plate by its edges.",
+      "Use the plate the slice expects and a thin glue stick layer if the maker suggests it for this filament."
+     ],
+     "source": "creality_k2_first_layer",
+     "plate": true
+    },
+    {
+     "id": "first_layer_too_high",
+     "cause": "First layer too far from the plate (leveling or Z offset)",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [
+      "level",
+      "leveling",
+      "z offset",
+      "too high",
+      "round lines"
+     ],
+     "tells": [
+      {
+       "ask": "Were the first-layer lines round and separate, instead of pressed flat into each other?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.4
+       }
+      },
+      {
+       "ask": "Was the printer moved, the plate swapped, or the firmware updated since it last printed well?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Run the printer's own bed leveling and calibration before the next print.",
+      "Lower the Z offset in small steps (0.02 mm) until the first lines press flat into each other.",
+      "Clear any plastic off the nozzle tip first: a stuck bit makes homing read the bed wrong."
+     ],
+     "source": "prusa_first_layer"
+    },
+    {
+     "id": "wrong_settings",
+     "cause": "Bed too cold for the filament, or the slicer's plate or filament setting does not match",
+     "prior": 0.15,
+     "modifiers": {
+      "material:PETG": 1.2,
+      "material:ABS": 1.3,
+      "material:ASA": 1.3
+     },
+     "words": [
+      "wrong plate",
+      "wrong filament",
+      "bed temp",
+      "temperature"
+     ],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 3.5,
+        "yes": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Pick the printer maker's preset for this exact filament and the plate type on the printer.",
+      "Use the bed temperature on the filament's label (stone refs <material> lists it)."
+     ],
+     "source": "bambu_first_layer"
+    },
+    {
+     "id": "small_footprint",
+     "cause": "Too little of the part touches the plate",
+     "prior": 0.12,
+     "modifiers": {},
+     "words": [
+      "small",
+      "thin",
+      "tiny",
+      "narrow",
+      "point"
+     ],
+     "tells": [
+      {
+       "ask": "Does the part touch the plate with only a small area, thin edges or points?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Add a brim (5 to 8 mm) or mouse ears at the corners.",
+      "Turn the part so its largest flat face is on the plate."
+     ],
+     "source": "prusa_brim"
+    },
+    {
+     "id": "cold_room",
+     "cause": "Cold or drafty room cools the part and the plate",
+     "prior": 0.08,
+     "modifiers": {
+      "enclosed:true": 0.5,
+      "enclosed:false": 1.5
+     },
+     "words": [
+      "cold",
+      "draft",
+      "garage",
+      "winter"
+     ],
+     "tells": [
+      {
+       "ask": "Is the room cold (below about 15 C) or drafty?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Close the door or lid, or move the printer out of the draft.",
+      "Below about 15 C, raise the bed 10 C (Creality's advice)."
+     ],
+     "source": "creality_k2p_clumping"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "first_layer",
+     "tell_apart": "a first-layer problem leaves the part stuck but with gaps or ridges"
+    },
+    {
+     "id": "warping",
+     "tell_apart": "warping lifts only the corners while the middle stays stuck; a loose part came off whole"
+    },
+    {
+     "id": "blob_on_nozzle",
+     "tell_apart": "a loose part often ends up stuck on the nozzle; look for a lump around the heater block"
+    },
+    {
+     "id": "toppled",
+     "tell_apart": "a tall thin part that fell over still has its first layers stuck to the plate"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "warping",
+   "name": "Corners lift off the plate (warping)",
+   "looks_like": {
+    "camera": "the corners or ends of the part curl up off the plate while the middle stays down",
+    "part": "the bottom is bowed or the corners are raised; the base is not flat"
+   },
+   "words": [
+    "warp",
+    "warping",
+    "warped",
+    "corners lift",
+    "corners lifting",
+    "corners of",
+    "corners curl",
+    "curl up",
+    "curling up",
+    "lifting at the corners",
+    "edges lift",
+    "edges lifting",
+    "corner lift",
+    "lifts at the corners",
+    "bowed",
+    "not flat",
+    "corners came up",
+    "lift and curl",
+    "corners keep lifting",
+    "lifting up off the bed",
+    "middle stays",
+    "curl upward",
+    "corners rise",
+    "corners lifted",
+    "lifted corners",
+    "rocks on the table",
+    "banana",
+    "potato chip",
+    "edges peel up",
+    "corner peel",
+    "bends up",
+    "corner bends",
+    "corner lifts",
+    "brim lifts",
+    "lifts with it"
+   ],
+   "not_words": [],
+   "modifiers": {
+    "material:ABS": 1.4,
+    "material:ASA": 1.4,
+    "material:PC": 1.4,
+    "material:PA": 1.4
+   },
+   "causes": [
+    {
+     "id": "material_shrink",
+     "cause": "The filament shrinks as it cools (ABS, ASA, PC, nylon most)",
+     "prior": 0.35,
+     "modifiers": {
+      "material:ABS": 2.5,
+      "material:ASA": 2.5,
+      "material:PC": 2.5,
+      "material:PA": 2.5,
+      "material:PLA": 0.5,
+      "enclosed:true": 0.7
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part ABS, ASA, PC or nylon printed with the door open or no enclosure?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Print it enclosed with the door closed and let the chamber warm first.",
+      "Add a brim of 5 to 10 mm.",
+      "Turn the part cooling fan down for this filament."
+     ],
+     "source": "prusa_warping"
+    },
+    {
+     "id": "plate_contaminated",
+     "cause": "Oil from fingers, dust or old glue on the plate",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [
+      "clean",
+      "dirty",
+      "fingerprint"
+     ],
+     "tells": [
+      {
+       "ask": "Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film?",
+       "answers": {
+        "beads": 3.0,
+        "film": 0.3
+       }
+      },
+      {
+       "ask": "Has the plate gone several prints since its last wash with soap and water?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Wash the cold plate with warm water and plain dish soap (no lotion or oils), scrub, rinse, dry with a paper towel.",
+      "Do not touch the print area afterward; hold the plate by its edges.",
+      "Use the plate the slice expects and a thin glue stick layer if the maker suggests it for this filament."
+     ],
+     "source": "bambu_pei_clean",
+     "plate": true
+    },
+    {
+     "id": "cold_room",
+     "cause": "Cold or drafty room, or a part fan blowing hard on the base",
+     "prior": 0.2,
+     "modifiers": {
+      "enclosed:true": 0.5,
+      "enclosed:false": 1.5
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the room cold (below about 15 C) or drafty?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Close the door or move the printer away from drafts.",
+      "Raise the bed to the top of the filament's range."
+     ],
+     "source": "s3d_warping"
+    },
+    {
+     "id": "sharp_corners_long_part",
+     "cause": "A long part with sharp corners pulls hardest at its ends",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [
+      "long",
+      "box",
+      "corners"
+     ],
+     "tells": [
+      {
+       "ask": "Does the part touch the plate with only a small area, thin edges or points?",
+       "answers": {
+        "yes": 0.7,
+        "no": 1.4
+       }
+      }
+     ],
+     "fix": [
+      "Round the corners or add mouse ears.",
+      "Add a brim.",
+      "Split a long flat part or print it at an angle."
+     ],
+     "source": "s3d_warping"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "bed_adhesion",
+     "tell_apart": "bed adhesion means the whole part came off; warping keeps the middle stuck"
+    },
+    {
+     "id": "cracking",
+     "tell_apart": "cracks split the walls between layers higher up; warping lifts the base"
+    },
+    {
+     "id": "elephant_foot",
+     "tell_apart": "elephant foot bulges out at the base; warping bends it up"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "spaghetti",
+   "name": "Spaghetti: printing into the air",
+   "looks_like": {
+    "camera": "a tangle of loose filament (a bird nest) where the part should be, often around the nozzle",
+    "part": "the part is missing, broken off, or ends in a mess of strands"
+   },
+   "words": [
+    "spaghetti",
+    "bird nest",
+    "birds nest",
+    "bird's nest",
+    "noodles",
+    "pile of noodles",
+    "mess of filament",
+    "printing in air",
+    "printed in mid air",
+    "mid air",
+    "in the air",
+    "air printing",
+    "printing in mid",
+    "pile of plastic",
+    "pile of filament",
+    "rats nest",
+    "the print is just gone",
+    "part wasn't there",
+    "spaghetti monster",
+    "ended up as a mess",
+    "loose loops",
+    "loops of filament",
+    "tangle of filament",
+    "spaghettified",
+    "noodle",
+    "noodle mess",
+    "yarn",
+    "extruding into the air",
+    "hair ball",
+    "printing on nothing",
+    "onto nothing",
+    "into thin air"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "part_came_loose",
+     "cause": "The part came loose and the printer kept going (see bed_adhesion)",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part, or its bottom layers, still stuck to the plate under the mess?",
+       "answers": {
+        "no": 3.0,
+        "yes": 0.3
+       }
+      }
+     ],
+     "fix": [
+      "Fix the adhesion first: stone doctor \"part came off the bed\" walks it.",
+      "Clean the plate."
+     ],
+     "source": "prusa_spaghetti",
+     "plate": true,
+     "failure": "bed_adhesion"
+    },
+    {
+     "id": "unsupported_overhang",
+     "cause": "An overhang or support failed and later layers printed onto nothing",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the part have overhangs or supports where the mess started?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      },
+      {
+       "ask": "Is the part, or its bottom layers, still stuck to the plate under the mess?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Turn on supports, or tree supports with more contact, where the slice shows overhangs past 45 degrees.",
+      "Turn the part so the overhangs face up."
+     ],
+     "source": "prusa_supports",
+     "failure": "support_failure"
+    },
+    {
+     "id": "extrusion_stopped",
+     "cause": "Extrusion stopped or thinned mid print, so the layers above had nothing to stand on",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the extruder click or grind while it should be pushing filament?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.6
+       }
+      },
+      {
+       "ask": "Is the part, or its bottom layers, still stuck to the plate under the mess?",
+       "answers": {
+        "yes": 1.8,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Check for a clog or a tangled spool (stone doctor \"nothing comes out\").",
+      "Dry the filament if it pops."
+     ],
+     "source": "s3d_stops",
+     "failure": "clog"
+    },
+    {
+     "id": "knocked_over",
+     "cause": "The nozzle knocked a thin part or a curled edge over",
+     "prior": 0.1,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part much taller than its footprint is wide?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Add a brim, slow down, and use Z hop on travel moves."
+     ],
+     "source": "prusa_spaghetti",
+     "failure": "toppled"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "bed_adhesion",
+     "tell_apart": "if the bottom of the part came off whole, it is bed adhesion; spaghetti is what followed"
+    },
+    {
+     "id": "support_failure",
+     "tell_apart": "if the part is still stuck and the mess starts at an overhang, the supports failed"
+    },
+    {
+     "id": "clog",
+     "tell_apart": "if little plastic came out at all, the nozzle clogged"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "blob_on_nozzle",
+   "name": "Blob of plastic around the nozzle (hotend clumping)",
+   "looks_like": {
+    "camera": "a lump of plastic stuck around the nozzle and heater block, sometimes with the part or strands hanging from it",
+    "part": "the part is usually loose or ruined; the hotend is encased"
+   },
+   "words": [
+    "blob",
+    "blob of doom",
+    "big lump",
+    "lump of plastic",
+    "ball of plastic",
+    "encased",
+    "glob",
+    "plastic wrapped",
+    "wrapped around the hotend",
+    "wrapped all around",
+    "stuck on the nozzle",
+    "stuck around the nozzle",
+    "around the nozzle",
+    "heater block",
+    "hotend is covered",
+    "silicone sock is buried",
+    "clump",
+    "clumping",
+    "plastic on the nozzle",
+    "nozzle covered",
+    "golf ball",
+    "cocoon",
+    "blobbed",
+    "covered in plastic",
+    "encased in plastic",
+    "buried in plastic",
+    "nozzle is buried",
+    "sock is buried",
+    "plastic around the hotend",
+    "hotend blob",
+    "meatball",
+    "swallowing",
+    "swallowed",
+    "sock and wires",
+    "see the tip",
+    "engulfed"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "part_came_loose",
+     "cause": "A part that came loose stuck to the nozzle, and new plastic kept piling on",
+     "prior": 0.55,
+     "modifiers": {},
+     "words": [
+      "came loose",
+      "detached",
+      "came off",
+      "popped off"
+     ],
+     "tells": [
+      {
+       "ask": "Did the part come loose from the plate before the plastic built up on the nozzle?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.3
+       }
+      },
+      {
+       "ask": "Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film?",
+       "answers": {
+        "beads": 2.0,
+        "film": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Clear the blob safely first (safety lines above).",
+      "Then fix the adhesion: clean the plate (steps below)."
+     ],
+     "source": "bambu_blob",
+     "plate": true,
+     "failure": "bed_adhesion"
+    },
+    {
+     "id": "material_mismatch",
+     "cause": "The filament loaded does not match the slicer's filament (wrong temperatures)",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 3.5,
+        "yes": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Slice with the preset for the filament that is loaded."
+     ],
+     "source": "creality_k2p_clumping"
+    },
+    {
+     "id": "no_sock_ooze",
+     "cause": "No silicone sock, so ooze and stray strands build up on the heater block",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [
+      "sock"
+     ],
+     "tells": [
+      {
+       "ask": "Is the silicone sock on the heater block missing or torn?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.4
+       }
+      }
+     ],
+     "fix": [
+      "Fit a new silicone sock for this hotend.",
+      "Wipe the nozzle before each print (the printer's wiper must be clean)."
+     ],
+     "source": "prusa_blob"
+    },
+    {
+     "id": "nozzle_too_low",
+     "cause": "The first layer was too low, so the nozzle dug in and dragged plastic",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Were the first-layer lines round and separate, instead of pressed flat into each other?",
+       "answers": {
+        "yes": 0.4,
+        "no": 1.5
+       }
+      }
+     ],
+     "fix": [
+      "Recalibrate the Z offset or run the printer's leveling."
+     ],
+     "source": "prusa_first_layer"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "bed_adhesion",
+     "tell_apart": "the blob usually starts with a part that came loose; check the plate too"
+    },
+    {
+     "id": "spaghetti",
+     "tell_apart": "spaghetti is loose strands in the air; a blob is a solid lump on the hotend"
+    },
+    {
+     "id": "thermal_error",
+     "tell_apart": "a heater or thermistor error after a blob means its wires are damaged"
+    }
+   ],
+   "safety": [
+    "Heat the hotend to about 30 C above the print temperature (PLA: about 250 C) before you pull plastic off; work in heat-resistant gloves (Prusa, Bambu and Creality guides).",
+    "The thermistor and heater wires are probably inside the blob: pull gently and never yank.",
+    "If the printer shows MINTEMP, a heater or thermistor error, a wire is already broken: power off and use a hair dryer or heat gun with care instead of the heater.",
+    "Afterward inspect the thermistor and heater wires and the silicone sock; replace what is damaged."
+   ]
+  },
+  {
+   "id": "stringing",
+   "name": "Stringing: thin hairs between parts",
+   "looks_like": {
+    "camera": "thin hairs or wisps of plastic stretched between separate parts or features, like a spider web",
+    "part": "fine strings or hairs between towers, holes or separate pieces"
+   },
+   "words": [
+    "string",
+    "strings",
+    "stringing",
+    "stringy",
+    "hairs",
+    "hairy",
+    "wisps",
+    "spider web",
+    "cobweb",
+    "whiskers",
+    "oozing",
+    "strings everywhere",
+    "strands between",
+    "spiderweb",
+    "spider webs",
+    "webs",
+    "cobwebs",
+    "strings between",
+    "fine hairs",
+    "angel hair",
+    "fuzz between",
+    "wispy",
+    "during travel",
+    "travel moves",
+    "fur",
+    "furry",
+    "stretchy strands",
+    "strands connecting",
+    "wispy hairs",
+    "hairs everywhere"
+   ],
+   "not_words": [],
+   "modifiers": {
+    "material:PETG": 1.2
+   },
+   "causes": [
+    {
+     "id": "wet_filament",
+     "cause": "Wet filament oozes and strings",
+     "prior": 0.3,
+     "modifiers": {
+      "material:PETG": 1.5,
+      "material:PA": 1.8,
+      "material:TPU": 1.5
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Has the spool been out of a dry box or bag for weeks, or do you hear popping from the nozzle?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Dry the spool (stone refs <material> gives the drying temperature).",
+      "Store it in a box with desiccant."
+     ],
+     "source": "prusa_drying"
+    },
+    {
+     "id": "too_hot",
+     "cause": "Nozzle too hot for the filament",
+     "prior": 0.25,
+     "modifiers": {
+      "material:PETG": 1.3
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Lower the nozzle temperature 5 to 10 C at a time."
+     ],
+     "source": "prusa_stringing"
+    },
+    {
+     "id": "retraction",
+     "cause": "Retraction too short or off",
+     "prior": 0.3,
+     "modifiers": {
+      "kinematics:bedslinger": 1.2
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is retraction turned off, or shorter than the slicer's profile for this printer?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Use the maker's retraction for this printer, or print a retraction test and pick the cleanest."
+     ],
+     "source": "s3d_stringing"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "wet_filament",
+     "tell_apart": "wet filament also pops and leaves a fuzzy surface"
+    },
+    {
+     "id": "surface_zits",
+     "tell_apart": "zits are dots on the wall; strings stretch across gaps"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "under_extrusion",
+   "name": "Under-extrusion: too little plastic",
+   "looks_like": {
+    "camera": "thin, gappy walls and sparse infill; layers do not touch",
+    "part": "gaps in walls, holes, weak spotty infill"
+   },
+   "words": [
+    "under extrusion",
+    "under-extrusion",
+    "underextrusion",
+    "under extruding",
+    "gaps in the walls",
+    "gaps in walls",
+    "walls have gaps",
+    "thin walls",
+    "spotty",
+    "infill looks thin",
+    "not pushing enough",
+    "not enough plastic",
+    "missing layers",
+    "weak infill",
+    "layers aren't fully fused",
+    "holes in the walls",
+    "sparse",
+    "skinny lines",
+    "lines are thin",
+    "thin lines",
+    "skinnier",
+    "missing stretches",
+    "missing lines",
+    "starved",
+    "under extruded",
+    "not enough flow",
+    "lines don't touch",
+    "weak walls",
+    "gaps in the infill",
+    "wicker",
+    "lines are skinny",
+    "flow is set",
+    "low flow",
+    "gaps throughout"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "partial_clog",
+     "cause": "Partial clog in the nozzle",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the extruder click or grind while it should be pushing filament?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Do a cold pull, or swap the nozzle (stone doctor \"nothing comes out\" covers it)."
+     ],
+     "source": "prusa_under",
+     "failure": "clog"
+    },
+    {
+     "id": "too_fast_for_hotend",
+     "cause": "Printing faster than the hotend can melt",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was it printing fast (above about 150 mm/s) or with high acceleration?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Slow down or cap the volumetric flow at the filament preset's value."
+     ],
+     "source": "prusa_under"
+    },
+    {
+     "id": "wet_or_tangled",
+     "cause": "Wet filament or a spool that drags",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the filament on the spool cross over itself or pull tight before it reaches the printer?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.6
+       }
+      },
+      {
+       "ask": "Has the spool been out of a dry box or bag for weeks, or do you hear popping from the nozzle?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Check the spool turns freely and is not tangled.",
+      "Dry the filament."
+     ],
+     "source": "prusa_tangled"
+    },
+    {
+     "id": "flow_low",
+     "cause": "Flow or extrusion multiplier set too low, or wrong filament diameter",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 2.5,
+        "yes": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Run the printer's flow calibration and use the filament's preset."
+     ],
+     "source": "s3d_under"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "clog",
+     "tell_apart": "a full clog extrudes nothing at all"
+    },
+    {
+     "id": "pillowing",
+     "tell_apart": "pillowing is holes only in the top surface"
+    },
+    {
+     "id": "feeder_grinding",
+     "tell_apart": "grinding leaves a chewed flat spot on the filament"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "over_extrusion",
+   "name": "Over-extrusion: too much plastic",
+   "looks_like": {
+    "camera": "fat, blobby walls and ridges of extra plastic on the top surface",
+    "part": "parts come out too big; surfaces look overflowing"
+   },
+   "words": [
+    "over extrusion",
+    "over-extrusion",
+    "overextrusion",
+    "too much plastic",
+    "fat walls",
+    "blobby",
+    "overflowing",
+    "excess plastic",
+    "too big",
+    "oversized",
+    "ridges of excess",
+    "overstuffed",
+    "over extruded",
+    "too much flow",
+    "nozzle plows",
+    "plows through",
+    "undersized holes",
+    "holes too small",
+    "bulging walls",
+    "fat lines",
+    "parts too big"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "flow_high",
+     "cause": "Flow or extrusion multiplier too high",
+     "prior": 0.45,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 2.5,
+        "yes": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Run the printer's flow calibration; lower flow by 2 to 5 percent at a time."
+     ],
+     "source": "s3d_over"
+    },
+    {
+     "id": "wrong_diameter",
+     "cause": "The slicer's filament diameter or preset is wrong",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 3.0,
+        "yes": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Check the slicer uses 1.75 mm (or 2.85 mm) to match the spool."
+     ],
+     "source": "prusa_under"
+    },
+    {
+     "id": "too_hot",
+     "cause": "Nozzle too hot, so plastic overflows",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Lower the nozzle temperature 5 C at a time."
+     ],
+     "source": "s3d_over"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "elephant_foot",
+     "tell_apart": "elephant foot is only the bottom layers"
+    },
+    {
+     "id": "surface_zits",
+     "tell_apart": "zits are separate dots, not fat walls"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "clog",
+   "name": "Clog: little or nothing comes out",
+   "looks_like": {
+    "camera": "the printer moves but lays down little or no plastic; the part stops growing",
+    "part": "the print stops at a height or never starts"
+   },
+   "words": [
+    "clog",
+    "clogged",
+    "nothing comes out",
+    "nothing coming out",
+    "no filament comes out",
+    "not extruding",
+    "won't extrude",
+    "wont extrude",
+    "no plastic",
+    "jammed",
+    "jam",
+    "blocked nozzle",
+    "stopped extruding",
+    "goes through the motions",
+    "no extrusion",
+    "can't push",
+    "can't push filament",
+    "won't push through",
+    "nozzle blocked",
+    "partial clog",
+    "nothing extrudes",
+    "doesn't extrude",
+    "nothing came out",
+    "nothing exits",
+    "nothing exit",
+    "won't move it",
+    "manual pushing",
+    "push by hand",
+    "pushing it by hand",
+    "released the idler"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "debris_or_burnt",
+     "cause": "Debris or burnt plastic in the nozzle",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "When you unload the filament, is its tip swollen into a bulb or mushroom shape?",
+       "answers": {
+        "yes": 0.5,
+        "no": 1.5
+       }
+      }
+     ],
+     "fix": [
+      "Heat up and push the filament by hand; do a cold pull.",
+      "Swap the nozzle if it stays blocked."
+     ],
+     "source": "prusa_clog"
+    },
+    {
+     "id": "heat_creep",
+     "cause": "Heat creep softened filament above the melt zone",
+     "prior": 0.25,
+     "modifiers": {
+      "material:PLA": 1.3,
+      "enclosed:true": 1.3
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "When you unload the filament, is its tip swollen into a bulb or mushroom shape?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.4
+       }
+      },
+      {
+       "ask": "Was the door or lid closed while printing PLA?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Check the hotend (heatsink) fan spins whenever the hotend is hot.",
+      "Open the door for PLA."
+     ],
+     "source": "prusa_heat_creep",
+     "failure": "heat_creep"
+    },
+    {
+     "id": "feeder",
+     "cause": "The extruder cannot grip or push (tension, worn gear, tangle)",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the extruder click or grind while it should be pushing filament?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      },
+      {
+       "ask": "Does the filament on the spool cross over itself or pull tight before it reaches the printer?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Check the spool is not tangled and the extruder tension; clean the gear."
+     ],
+     "source": "s3d_grinding"
+    },
+    {
+     "id": "too_cold_or_too_close",
+     "cause": "Nozzle too cold, or pressed against the plate on the first layer",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 2.5,
+        "yes": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Use the filament's nozzle temperature; recalibrate the Z offset."
+     ],
+     "source": "s3d_no_start"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "heat_creep",
+     "tell_apart": "heat creep works for a while and then stops; the unloaded tip has a bulb"
+    },
+    {
+     "id": "feeder_grinding",
+     "tell_apart": "grinding chews a flat spot in the filament"
+    },
+    {
+     "id": "under_extrusion",
+     "tell_apart": "a partial clog still extrudes, just too little"
+    }
+   ],
+   "safety": [
+    "Clear a clog with the hotend hot and the printer still; keep fingers off the nozzle and heater block."
+   ]
+  },
+  {
+   "id": "layer_shift",
+   "name": "Layer shift: the part jumped sideways",
+   "looks_like": {
+    "camera": "part of the print is offset sideways from the layers below, like a staircase",
+    "part": "a clean step in the walls where everything above moved over"
+   },
+   "words": [
+    "layer shift",
+    "shifted",
+    "shifting",
+    "staircase",
+    "offset",
+    "moved over",
+    "jumped",
+    "stepped",
+    "skipped steps",
+    "everything above",
+    "shifted over",
+    "moved to the side",
+    "shifted sideways",
+    "top half moved",
+    "slid over",
+    "offset layers",
+    "misaligned layers",
+    "jumped over",
+    "shifted to the left",
+    "shifted to the right",
+    "sideways step",
+    "suddenly moved",
+    "moved sideways"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "collision",
+     "cause": "The nozzle hit a curled edge or the part",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the nozzle hit a curled edge or the part before the shift (a knock sound)?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Turn on Z hop for travel; fix curling (fan, temperature).",
+      "Avoid crossing the part on travel."
+     ],
+     "source": "prusa_layer_shift"
+    },
+    {
+     "id": "belts",
+     "cause": "Loose or worn belts, or a loose pulley",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "When you pluck the X and Y belts with the printer off, are they slack or uneven?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Tension the belts the way the maker describes; tighten pulley set screws."
+     ],
+     "source": "prusa_layer_shift"
+    },
+    {
+     "id": "too_fast",
+     "cause": "Speed or acceleration above what the motors can hold",
+     "prior": 0.25,
+     "modifiers": {
+      "kinematics:bedslinger": 1.3
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was it printing fast (above about 150 mm/s) or with high acceleration?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Use the maker's speed and acceleration limits; lower acceleration first."
+     ],
+     "source": "s3d_layer_shift"
+    },
+    {
+     "id": "motors_hot",
+     "cause": "Motor drivers or motors overheating",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was the door or lid closed while printing PLA?",
+       "answers": {
+        "yes": 1.5,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Check the electronics fan; give the printer air."
+     ],
+     "source": "s3d_layer_shift"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "z_wobble",
+     "tell_apart": "z wobble is many small even waves; a shift is one clean step"
+    },
+    {
+     "id": "bed_adhesion",
+     "tell_apart": "if the whole part slid, it came loose; a shift keeps the base in place"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "elephant_foot",
+   "name": "Elephant foot: the base bulges out",
+   "looks_like": {
+    "camera": "the bottom few layers flare out wider than the walls above",
+    "part": "a lip or bulge at the base; parts do not fit together"
+   },
+   "words": [
+    "elephant foot",
+    "elephants foot",
+    "bulge",
+    "bulges out",
+    "base is wider",
+    "bottom flares",
+    "flared base",
+    "lip at the bottom",
+    "bottom layers bulge",
+    "flange",
+    "lip around the bottom",
+    "wider at the bottom",
+    "bottom layers wider",
+    "flared",
+    "base bulges",
+    "bulge out"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "first_layer_squish",
+     "cause": "First layer pressed too hard (Z offset low)",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the bulge only in the first few layers, with the rest of the walls straight?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Raise the Z offset slightly.",
+      "Turn on elephant foot compensation (0.1 to 0.2 mm)."
+     ],
+     "source": "prusa_elephant"
+    },
+    {
+     "id": "bed_too_hot",
+     "cause": "Bed too hot, so the bottom layers stay soft under the weight above",
+     "prior": 0.35,
+     "modifiers": {
+      "material:PETG": 1.2
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 1.5,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Lower the bed 5 to 10 C toward the low end of the filament's range."
+     ],
+     "source": "prusa_elephant"
+    },
+    {
+     "id": "no_compensation",
+     "cause": "The slicer's elephant foot compensation is off",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 1.5,
+        "yes": 0.9
+       }
+      }
+     ],
+     "fix": [
+      "Set elephant foot compensation to about 0.15 mm."
+     ],
+     "source": "prusa_elephant"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "first_layer",
+     "tell_apart": "a first-layer problem shows in the bottom surface itself"
+    },
+    {
+     "id": "over_extrusion",
+     "tell_apart": "over-extrusion makes every layer fat, not just the base"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "z_wobble",
+   "name": "Z banding: even horizontal lines up the part",
+   "looks_like": {
+    "camera": "regular horizontal bands or ridges up the side, evenly spaced",
+    "part": "a repeating pattern of lines on every wall"
+   },
+   "words": [
+    "z wobble",
+    "z banding",
+    "banding",
+    "bands",
+    "horizontal lines",
+    "evenly spaced",
+    "regular lines",
+    "ribbing",
+    "lines on the side",
+    "repeating pattern",
+    "wavy banding",
+    "layers look inconsistent",
+    "stick out more",
+    "lead screw",
+    "leadscrew",
+    "wobble",
+    "fat skinny",
+    "repeating ridges",
+    "periodic",
+    "regular ridges",
+    "evenly spaced ridges",
+    "same spacing"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "lead_screw",
+     "cause": "Lead screw bent, dirty or coupled off-center",
+     "prior": 0.4,
+     "modifiers": {
+      "kinematics:bedslinger": 1.3
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the lines repeat at an even spacing up the whole part?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Clean and grease the Z lead screws (the maker's maintenance steps)."
+     ],
+     "source": "s3d_lines"
+    },
+    {
+     "id": "temperature_swings",
+     "cause": "Bed or nozzle temperature swinging",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the lines repeat at an even spacing up the whole part?",
+       "answers": {
+        "yes": 0.6,
+        "no": 2.0
+       }
+      }
+     ],
+     "fix": [
+      "Run PID tuning for the bed and hotend; keep the printer out of drafts."
+     ],
+     "source": "s3d_lines"
+    },
+    {
+     "id": "inconsistent_extrusion",
+     "cause": "Inconsistent extrusion (filament diameter, partial clog)",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the extruder click or grind while it should be pushing filament?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Use good filament; check for a partial clog."
+     ],
+     "source": "s3d_lines"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "layer_shift",
+     "tell_apart": "a layer shift is one step; banding repeats"
+    },
+    {
+     "id": "ringing",
+     "tell_apart": "ringing is ripples after corners, sideways; banding runs horizontally around the part"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "layer_separation",
+   "name": "Layers split apart (delamination)",
+   "looks_like": {
+    "camera": "layers coming apart, splits between layers, weak bonds",
+    "part": "the part breaks along a layer line or peels apart by hand"
+   },
+   "words": [
+    "layer separation",
+    "delamination",
+    "delaminating",
+    "layers split",
+    "splits",
+    "split",
+    "layers peel apart",
+    "peel apart",
+    "weak layer adhesion",
+    "layers didn't bond",
+    "layers don't stick together",
+    "layer adhesion",
+    "snapped along a layer",
+    "peel the walls apart",
+    "layer lines",
+    "barely bonded",
+    "weak layers",
+    "breaks along the layers",
+    "snaps along the layers",
+    "layers come apart",
+    "poor layer bonding",
+    "pull apart",
+    "peel the layers",
+    "peel layers",
+    "flat slices",
+    "breaks between layers",
+    "thumbnail",
+    "fingernail"
+   ],
+   "not_words": [],
+   "modifiers": {
+    "material:PLA": 1.1
+   },
+   "causes": [
+    {
+     "id": "too_cold",
+     "cause": "Nozzle too cold for the filament or the speed",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 0.5,
+        "no": 1.8
+       }
+      }
+     ],
+     "fix": [
+      "Raise the nozzle temperature 5 to 10 C; slow down."
+     ],
+     "source": "prusa_layer_sep"
+    },
+    {
+     "id": "too_much_cooling",
+     "cause": "Too much part cooling",
+     "prior": 0.3,
+     "modifiers": {
+      "material:ABS": 1.5,
+      "material:ASA": 1.5,
+      "material:PETG": 1.2
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part cooling fan at full speed, or blowing on the part from one side only?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Lower the part fan, most of all for ABS, ASA and PETG."
+     ],
+     "source": "s3d_layer_sep"
+    },
+    {
+     "id": "under_extrusion",
+     "cause": "Too little plastic between layers",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the extruder click or grind while it should be pushing filament?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Check for a partial clog and run flow calibration."
+     ],
+     "source": "s3d_layer_sep"
+    },
+    {
+     "id": "layer_too_tall",
+     "cause": "Layer height too large for the nozzle (over about 80 percent of it)",
+     "prior": 0.15,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 1.5,
+        "yes": 0.9
+       }
+      }
+     ],
+     "fix": [
+      "Keep layer height at or below 0.28 mm on a 0.4 mm nozzle."
+     ],
+     "source": "s3d_layer_sep"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "cracking",
+     "tell_apart": "cracks from shrinkage show in ABS or ASA on their own while cooling; delamination is weak bonding"
+    },
+    {
+     "id": "under_extrusion",
+     "tell_apart": "under-extrusion shows gaps in the walls too"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "ringing",
+   "name": "Ringing (ghosting): echoes after corners",
+   "looks_like": {
+    "camera": "ripples or echoes of edges and letters repeating on the wall after sharp corners",
+    "part": "wavy ghost images next to features"
+   },
+   "words": [
+    "ringing",
+    "ghosting",
+    "ghost",
+    "echo",
+    "echoes",
+    "ripples",
+    "rippling",
+    "wavy echoes",
+    "after every corner",
+    "after corners",
+    "repeating the edge",
+    "vibration",
+    "faint copies",
+    "copies of",
+    "ghost image",
+    "shadow of",
+    "ripples after",
+    "sharp corners",
+    "repeats of the edge",
+    "waves after corners",
+    "faint copy",
+    "copy of each",
+    "fading out"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "speed_accel",
+     "cause": "Speed or acceleration too high for the frame",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was it printing fast (above about 150 mm/s) or with high acceleration?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Lower acceleration first, then speed for outer walls."
+     ],
+     "source": "prusa_ghosting"
+    },
+    {
+     "id": "input_shaping",
+     "cause": "Input shaping not calibrated (or changed since the printer was moved)",
+     "prior": 0.3,
+     "modifiers": {
+      "firmware:klipper": 1.2
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was the printer moved, the plate swapped, or the firmware updated since it last printed well?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Run the printer's input shaping or resonance calibration."
+     ],
+     "source": "prusa_ghosting"
+    },
+    {
+     "id": "loose_frame",
+     "cause": "Loose belts, frame or a wobbly table",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "When you pluck the X and Y belts with the printer off, are they slack or uneven?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Tension belts; tighten frame screws; put the printer on a solid surface."
+     ],
+     "source": "s3d_ringing"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "z_wobble",
+     "tell_apart": "banding is horizontal and even; ringing follows corners"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "overhang_droop",
+   "name": "Overhangs droop or curl",
+   "looks_like": {
+    "camera": "the underside of overhangs sags or curls upward, rough and stringy",
+    "part": "droopy, saggy or curled edges under overhangs"
+   },
+   "words": [
+    "overhang",
+    "overhangs",
+    "droop",
+    "droopy",
+    "drooping",
+    "sag",
+    "saggy",
+    "sagging underside",
+    "curl",
+    "curled edges",
+    "curling",
+    "underside",
+    "edges curl up",
+    "chin",
+    "droopy noodles",
+    "steep slope",
+    "outward slope",
+    "overhang curls",
+    "ugly underside",
+    "nothing supporting",
+    "unsupported slope",
+    "underneath"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "cooling",
+     "cause": "Not enough part cooling on the overhang",
+     "prior": 0.4,
+     "modifiers": {
+      "material:PETG": 1.2
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part cooling fan at full speed, or blowing on the part from one side only?",
+       "answers": {
+        "yes": 0.5,
+        "no": 2.0
+       }
+      }
+     ],
+     "fix": [
+      "Raise the part fan for overhangs; slow down on overhang perimeters."
+     ],
+     "source": "s3d_overheating"
+    },
+    {
+     "id": "too_steep",
+     "cause": "Overhang steeper than the filament can bridge without support",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the part have overhangs or supports where the mess started?",
+       "answers": {
+        "yes": 0.6,
+        "no": 2.0
+       }
+      }
+     ],
+     "fix": [
+      "Add supports past about 45 to 50 degrees, or turn the part."
+     ],
+     "source": "prusa_supports"
+    },
+    {
+     "id": "too_hot",
+     "cause": "Nozzle too hot, so the plastic stays soft",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Lower the nozzle temperature 5 C."
+     ],
+     "source": "s3d_overheating"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "poor_bridging",
+     "tell_apart": "bridging sags between two supports; overhangs hang off one side"
+    },
+    {
+     "id": "support_failure",
+     "tell_apart": "if supports were there and fell, it is a support failure"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "poor_bridging",
+   "name": "Bridges sag",
+   "looks_like": {
+    "camera": "strands sag or hang loose in the middle of a span between two supports",
+    "part": "droopy strands across a gap; the bottom of the bridge is messy"
+   },
+   "words": [
+    "bridge",
+    "bridges",
+    "bridging",
+    "between the two pillars",
+    "span",
+    "sags in the middle",
+    "strands hang",
+    "hang down",
+    "washing lines",
+    "across the gap",
+    "across the opening",
+    "unsupported span",
+    "span sags",
+    "bridges sag",
+    "hammock",
+    "sagging strands"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "cooling",
+     "cause": "Not enough cooling on the bridge",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part cooling fan at full speed, or blowing on the part from one side only?",
+       "answers": {
+        "yes": 0.5,
+        "no": 2.0
+       }
+      }
+     ],
+     "fix": [
+      "Run the part fan at 100 percent for bridges."
+     ],
+     "source": "prusa_bridging"
+    },
+    {
+     "id": "speed_flow",
+     "cause": "Bridge speed or flow too high",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was it printing fast (above about 150 mm/s) or with high acceleration?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Lower bridge flow to about 0.85 to 0.95; slow bridges."
+     ],
+     "source": "s3d_bridging"
+    },
+    {
+     "id": "too_long",
+     "cause": "The span is too long for the filament",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the part have overhangs or supports where the mess started?",
+       "answers": {
+        "yes": 0.6,
+        "no": 1.5
+       }
+      }
+     ],
+     "fix": [
+      "Add a support under long spans or shorten them."
+     ],
+     "source": "prusa_bridging"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "overhang_droop",
+     "tell_apart": "an overhang hangs off one side; a bridge spans between two"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "support_failure",
+   "name": "Supports failed",
+   "looks_like": {
+    "camera": "supports fell over, broke off or are missing, and the part above printed onto nothing",
+    "part": "messy or missing surface where supports should have held it"
+   },
+   "words": [
+    "supports fell",
+    "support fell",
+    "supports failed",
+    "support failed",
+    "supports broke",
+    "supports collapsed",
+    "tree supports fell",
+    "supports fell over",
+    "supports came off",
+    "supports knocked",
+    "branch snapped",
+    "branches snapped",
+    "support snapped",
+    "support broke",
+    "tree branch",
+    "support stump",
+    "supports toppled",
+    "supports detached",
+    "support tower",
+    "tree supports broke",
+    "trunks snapped",
+    "tree trunks",
+    "trunk snapped",
+    "supports snapped",
+    "branches broke",
+    "fell beside"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "thin_supports",
+     "cause": "Supports too thin or with too small a base",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part much taller than its footprint is wide?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Use a support brim or raft for tall supports; use stronger tree branches."
+     ],
+     "source": "prusa_supports"
+    },
+    {
+     "id": "bed_contact",
+     "cause": "Supports came loose from the plate",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film?",
+       "answers": {
+        "beads": 2.5,
+        "film": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Wash the cold plate with warm water and plain dish soap (no lotion or oils), scrub, rinse, dry with a paper towel."
+     ],
+     "source": "prusa_supports",
+     "plate": true
+    },
+    {
+     "id": "knocked",
+     "cause": "The nozzle knocked supports over",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the nozzle hit a curled edge or the part before the shift (a knock sound)?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Turn on Z hop; slow travel near supports."
+     ],
+     "source": "prusa_supports"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "spaghetti",
+     "tell_apart": "spaghetti is what follows a support failure"
+    },
+    {
+     "id": "not_sticking_supports_to_part",
+     "tell_apart": "if the supports held but are fused to the part, the interface is wrong"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "not_sticking_supports_to_part",
+   "name": "Support interface wrong: fused or not holding the part",
+   "looks_like": {
+    "camera": "supports welded to the part, or a rough, drooping surface right above the supports",
+    "part": "supports will not come off, or the surface above them is messy"
+   },
+   "words": [
+    "welded",
+    "fused",
+    "can't get them off",
+    "cant get them off",
+    "won't come off",
+    "supports stuck",
+    "supports are stuck",
+    "supports are welded",
+    "surface above supports",
+    "above the supports",
+    "support scars",
+    "hard to remove supports",
+    "interface",
+    "support interface",
+    "support roof",
+    "won't grab the supports",
+    "doesn't stick to the supports",
+    "on top of the supports",
+    "supports won't come off",
+    "supports fused",
+    "roof is fused",
+    "fused into",
+    "pliers",
+    "tear chunks",
+    "interface gap",
+    "dense roof"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "z_distance",
+     "cause": "Top contact Z distance too small (fused) or too big (droops)",
+     "prior": 0.5,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the gap between support and part (top Z distance) set to zero or below one layer?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Set top Z distance to about one layer height (0.2 mm for 0.2 mm layers).",
+      "Use an interface pattern the slicer suggests."
+     ],
+     "source": "prusa_above_supports"
+    },
+    {
+     "id": "same_material_hot",
+     "cause": "Hot sticky filament (PETG) bonds to its own supports",
+     "prior": 0.3,
+     "modifiers": {
+      "material:PETG": 2.0
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Raise the Z distance a little for PETG; use a different interface material if the printer has more than one."
+     ],
+     "source": "s3d_above_supports"
+    },
+    {
+     "id": "interface_too_dense",
+     "cause": "Interface layers too dense",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Do the slicer's filament and plate settings match the filament loaded and the plate on the printer?",
+       "answers": {
+        "no": 1.5,
+        "yes": 0.9
+       }
+      }
+     ],
+     "fix": [
+      "Lower interface density or layers."
+     ],
+     "source": "s3d_above_supports"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "support_failure",
+     "tell_apart": "if the supports fell or broke, it is a support failure"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "first_layer",
+   "name": "First layer wrong (gaps, too squished, uneven)",
+   "looks_like": {
+    "camera": "the first layer has gaps between lines, or is squashed see-through, or differs across the plate",
+    "part": "the bottom surface shows gaps, ridges or rough areas"
+   },
+   "words": [
+    "first layer",
+    "gaps between the lines",
+    "see the bed through",
+    "lines are round",
+    "too squished",
+    "squished",
+    "scraping",
+    "nozzle is scraping",
+    "ridges",
+    "transparent",
+    "uneven first layer",
+    "one side of the bed",
+    "too high on the other",
+    "first layer has gaps",
+    "first pass",
+    "first layer lines",
+    "round strings",
+    "daylight between",
+    "separate lines",
+    "lines not touching",
+    "bottom layer",
+    "rough first layer",
+    "see through",
+    "furrows",
+    "waves between",
+    "plastic pushes sideways"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "z_offset",
+     "cause": "Z offset or first-layer height wrong",
+     "prior": 0.45,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Were the first-layer lines round and separate, instead of pressed flat into each other?",
+       "answers": {
+        "yes": 2.0,
+        "no": 1.0
+       }
+      }
+     ],
+     "fix": [
+      "Run the printer's calibration, then adjust the Z offset in 0.02 mm steps."
+     ],
+     "source": "prusa_first_layer"
+    },
+    {
+     "id": "mesh_or_level",
+     "cause": "Bed mesh out of date, or the bed is not flat",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was the printer moved, the plate swapped, or the firmware updated since it last printed well?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Run a full bed leveling (mesh); check the plate sits flat with nothing under it."
+     ],
+     "source": "creality_k2_first_layer"
+    },
+    {
+     "id": "plate_contaminated",
+     "cause": "Dirty plate makes lines pull up",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film?",
+       "answers": {
+        "beads": 3.0,
+        "film": 0.3
+       }
+      }
+     ],
+     "fix": [
+      "Wash the cold plate with warm water and plain dish soap (no lotion or oils), scrub, rinse, dry with a paper towel.",
+      "Do not touch the print area afterward; hold the plate by its edges.",
+      "Use the plate the slice expects and a thin glue stick layer if the maker suggests it for this filament."
+     ],
+     "source": "bambu_pei_clean",
+     "plate": true
+    }
+   ],
+   "differentials": [
+    {
+     "id": "bed_adhesion",
+     "tell_apart": "if the part came off, start with bed adhesion"
+    },
+    {
+     "id": "elephant_foot",
+     "tell_apart": "a squished first layer can also flare the base out"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "surface_zits",
+   "name": "Zits and blobs on the walls",
+   "looks_like": {
+    "camera": "small bumps or pimples scattered on the outer wall",
+    "part": "random dots and blobs on the surface"
+   },
+   "words": [
+    "zits",
+    "zit",
+    "pimples",
+    "little blobs",
+    "bumps",
+    "dots on the surface",
+    "blobs on the wall",
+    "random blobs",
+    "pimple",
+    "random bumps",
+    "bumps scattered",
+    "blemishes",
+    "nubs",
+    "specks",
+    "blips",
+    "scattered"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "retraction_coast",
+     "cause": "Retraction and travel settings leave ooze where the nozzle stops",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is retraction turned off, or shorter than the slicer's profile for this printer?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Turn on wipe and adjust retraction; use a seam position that hides the starts."
+     ],
+     "source": "s3d_zits"
+    },
+    {
+     "id": "wet_filament",
+     "cause": "Wet filament spits",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Has the spool been out of a dry box or bag for weeks, or do you hear popping from the nozzle?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Dry the filament."
+     ],
+     "source": "prusa_drying"
+    },
+    {
+     "id": "too_hot",
+     "cause": "Nozzle too hot",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Lower the nozzle temperature 5 C."
+     ],
+     "source": "s3d_zits"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "z_seam",
+     "tell_apart": "a seam is one line in the same place; zits are scattered"
+    },
+    {
+     "id": "wet_filament",
+     "tell_apart": "wet filament also pops and looks fuzzy"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "z_seam",
+   "name": "Visible Z seam",
+   "looks_like": {
+    "camera": "a vertical line or scar running up one side where every layer starts",
+    "part": "one line of bumps or a groove up the wall"
+   },
+   "words": [
+    "seam",
+    "z seam",
+    "vertical line",
+    "scar",
+    "line up the side",
+    "where every layer starts",
+    "where each layer starts",
+    "zipper",
+    "seam line",
+    "where each perimeter starts",
+    "where each layer begins",
+    "bump per layer",
+    "vertical scar",
+    "one line of bumps",
+    "straight up the side"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "seam_position",
+     "cause": "The seam sits on a visible face",
+     "prior": 0.6,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the seam set to aligned or rear in the slicer?",
+       "answers": {
+        "yes": 1.5,
+        "no": 0.9
+       }
+      }
+     ],
+     "fix": [
+      "Set the seam to rear or paint it into a corner."
+     ],
+     "source": "prusa_seam"
+    },
+    {
+     "id": "pressure_advance",
+     "cause": "Pressure advance or retraction not tuned",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is retraction turned off, or shorter than the slicer's profile for this printer?",
+       "answers": {
+        "yes": 1.5,
+        "no": 0.9
+       }
+      }
+     ],
+     "fix": [
+      "Run the printer's pressure advance or linear advance calibration."
+     ],
+     "source": "prusa_seam"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "surface_zits",
+     "tell_apart": "zits are scattered; a seam lines up"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "wet_filament",
+   "name": "Wet filament",
+   "looks_like": {
+    "camera": "rough fuzzy or bubbly surface; steam or popping while it prints",
+    "part": "fuzzy, bubbly, rough walls with strings"
+   },
+   "words": [
+    "wet",
+    "moisture",
+    "popping",
+    "pops",
+    "crackling",
+    "hissing",
+    "steam",
+    "bubbles",
+    "bubbly",
+    "fuzzy",
+    "rough fuzzy",
+    "sitting out",
+    "humid",
+    "damp",
+    "rice krispies",
+    "crackle",
+    "spits",
+    "spitting",
+    "sizzle",
+    "foamy",
+    "pits",
+    "humidity",
+    "left out",
+    "sat out",
+    "garage",
+    "basement",
+    "sitting open",
+    "out in the open",
+    "hisses",
+    "opened this roll",
+    "months ago"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "absorbed_water",
+     "cause": "The filament absorbed water from the air",
+     "prior": 0.8,
+     "modifiers": {
+      "material:PA": 2.0,
+      "material:PETG": 1.5,
+      "material:TPU": 1.5
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Has the spool been out of a dry box or bag for weeks, or do you hear popping from the nozzle?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.3
+       }
+      }
+     ],
+     "fix": [
+      "Dry the spool at the maker's temperature (stone refs <material>).",
+      "Keep it in a sealed box with desiccant."
+     ],
+     "source": "prusa_drying"
+    },
+    {
+     "id": "too_hot",
+     "cause": "Nozzle too hot (boils additives)",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Lower the nozzle temperature."
+     ],
+     "source": "s3d_stringing"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "stringing",
+     "tell_apart": "strings alone, with no popping, may only be retraction"
+    },
+    {
+     "id": "surface_zits",
+     "tell_apart": "zits come from ooze at stops"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "heat_creep",
+   "name": "Heat creep: extrusion fades after a while",
+   "looks_like": {
+    "camera": "the print goes fine, then gets thinner and stops partway up",
+    "part": "the part stops at some height; the walls thin out before it"
+   },
+   "words": [
+    "heat creep",
+    "slowly stops",
+    "stops after an hour",
+    "stops partway",
+    "fine for an hour",
+    "mushroom",
+    "bulb",
+    "fat end",
+    "swollen tip",
+    "worked for a while then",
+    "then stops",
+    "works again after cooling",
+    "works after it cools",
+    "plug above",
+    "swollen",
+    "heatsink fan",
+    "heat break",
+    "heatbreak",
+    "fan isn't spinning",
+    "fan not spinning",
+    "jams after",
+    "stops after"
+   ],
+   "not_words": [],
+   "modifiers": {
+    "material:PLA": 1.2
+   },
+   "causes": [
+    {
+     "id": "enclosure_hot_pla",
+     "cause": "PLA in a closed, warm enclosure",
+     "prior": 0.4,
+     "modifiers": {
+      "material:PLA": 1.5,
+      "enclosed:true": 1.5,
+      "enclosed:false": 0.3
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was the door or lid closed while printing PLA?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.4
+       }
+      }
+     ],
+     "fix": [
+      "Open the door or lid for PLA.",
+      "Check the chamber is not above about 35 C."
+     ],
+     "source": "prusa_heat_creep"
+    },
+    {
+     "id": "heatsink_fan",
+     "cause": "Hotend heatsink fan weak, dirty or stopped",
+     "prior": 0.4,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "When you unload the filament, is its tip swollen into a bulb or mushroom shape?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Clean the hotend fan and check it spins when the hotend is hot."
+     ],
+     "source": "prusa_heat_creep"
+    },
+    {
+     "id": "retraction_long",
+     "cause": "Long retraction pulls soft plastic up into the cold zone",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is retraction turned off, or shorter than the slicer's profile for this printer?",
+       "answers": {
+        "yes": 0.6,
+        "no": 1.3
+       }
+      }
+     ],
+     "fix": [
+      "Use the maker's retraction length for this printer."
+     ],
+     "source": "prusa_heat_creep"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "clog",
+     "tell_apart": "a clog from debris blocks from the start; heat creep builds over time"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "feeder_grinding",
+   "name": "Extruder grinding or skipping",
+   "looks_like": {
+    "camera": "the extruder clicks or grinds; filament has a chewed spot; plastic dust at the gears",
+    "part": "under-extruded or stopped print"
+   },
+   "words": [
+    "grinding",
+    "grind",
+    "chewed",
+    "clicking",
+    "clicks",
+    "skipping",
+    "skips",
+    "plastic dust",
+    "flat spot",
+    "snapping",
+    "snaps",
+    "brittle",
+    "gear spins",
+    "gear just spins",
+    "drive gear spinning",
+    "notch",
+    "crumbs",
+    "shavings",
+    "dust by the gear",
+    "eaten",
+    "ground down",
+    "teeth marks",
+    "chewed into"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "blocked_downstream",
+     "cause": "The nozzle is partly blocked, so the gear chews in place",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "When you unload the filament, is its tip swollen into a bulb or mushroom shape?",
+       "answers": {
+        "yes": 1.5,
+        "no": 1.0
+       }
+      }
+     ],
+     "fix": [
+      "Clear the nozzle first (cold pull), then check the gear."
+     ],
+     "source": "s3d_grinding"
+    },
+    {
+     "id": "tension_or_tangle",
+     "cause": "Wrong extruder tension, or a tangled spool",
+     "prior": 0.35,
+     "modifiers": {
+      "material:TPU": 1.5
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the filament on the spool cross over itself or pull tight before it reaches the printer?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Untangle the spool; set the extruder tension the way the maker says."
+     ],
+     "source": "prusa_tangled"
+    },
+    {
+     "id": "brittle_filament",
+     "cause": "Brittle (old or wet) filament snaps in the path",
+     "prior": 0.3,
+     "modifiers": {
+      "material:PLA": 1.2
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Has the spool been out of a dry box or bag for weeks, or do you hear popping from the nozzle?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Dry it, or replace a brittle spool."
+     ],
+     "source": "prusa_drying"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "clog",
+     "tell_apart": "a clog stops extrusion; grinding is the extruder failing to push"
+    },
+    {
+     "id": "under_extrusion",
+     "tell_apart": "Under-extrusion alone: thin lines but the filament keeps moving; grinding: the gear chews a notch and the filament stops."
+    },
+    {
+     "id": "multi_material_feed",
+     "tell_apart": "if a CFS, AMS or MMU reports the error, start there"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "toppled",
+   "name": "Tall thin part knocked over",
+   "looks_like": {
+    "camera": "a tall thin part lying on its side, broken off at the base",
+    "part": "snapped at a height, first layers still on the plate"
+   },
+   "words": [
+    "knocked over",
+    "fell over",
+    "toppled",
+    "tipped over",
+    "broke off at",
+    "tall thin",
+    "antenna",
+    "snapped off",
+    "on its side",
+    "lying on its side",
+    "keeled over",
+    "toppled over",
+    "spire",
+    "tall skinny",
+    "knocked it over",
+    "fell sideways",
+    "nozzle smacked",
+    "nozzle hit it",
+    "smacked it",
+    "mast",
+    "lying there"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "too_tall_thin",
+     "cause": "Too tall for its footprint",
+     "prior": 0.5,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part much taller than its footprint is wide?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.4
+       }
+      }
+     ],
+     "fix": [
+      "Add a brim; print several copies together or add a support wall."
+     ],
+     "source": "prusa_brim"
+    },
+    {
+     "id": "nozzle_hit",
+     "cause": "Nozzle hit it on a travel move",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the nozzle hit a curled edge or the part before the shift (a knock sound)?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Turn on Z hop; slow travel."
+     ],
+     "source": "prusa_layer_shift"
+    },
+    {
+     "id": "bed_shaking",
+     "cause": "A bed slinger shakes tall parts",
+     "prior": 0.2,
+     "modifiers": {
+      "kinematics:bedslinger": 2.0,
+      "kinematics:corexy": 0.5
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Was it printing fast (above about 150 mm/s) or with high acceleration?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Lower Y acceleration; add a brim."
+     ],
+     "source": "prusa_brim"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "bed_adhesion",
+     "tell_apart": "if the base came off too, it is adhesion"
+    },
+    {
+     "id": "spaghetti",
+     "tell_apart": "a toppled part can turn into spaghetti"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "cracking",
+   "name": "Cracks between layers (ABS, ASA, PC)",
+   "looks_like": {
+    "camera": "cracks running along layer lines, often at corners or higher up",
+    "part": "horizontal cracks between layers that open as the part cools"
+   },
+   "words": [
+    "crack",
+    "cracks",
+    "cracked",
+    "cracking",
+    "split right along",
+    "cracked open",
+    "cracks between layers",
+    "horizontal split",
+    "open gap",
+    "cracks open",
+    "crack along",
+    "fissure",
+    "split open",
+    "split while printing",
+    "loud tick",
+    "split through",
+    "long split",
+    "during cooldown",
+    "cracked while cooling"
+   ],
+   "not_words": [],
+   "modifiers": {
+    "material:ABS": 2.0,
+    "material:ASA": 2.0,
+    "material:PC": 2.0,
+    "material:PLA": 0.4,
+    "material:PETG": 0.6
+   },
+   "causes": [
+    {
+     "id": "chamber_cold",
+     "cause": "The chamber is too cold for the filament",
+     "prior": 0.45,
+     "modifiers": {
+      "enclosed:false": 2.0,
+      "chamber_heater:true": 0.5
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part ABS, ASA, PC or nylon printed with the door open or no enclosure?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Print enclosed with the door shut; let the chamber warm before starting."
+     ],
+     "source": "prusa_layer_sep"
+    },
+    {
+     "id": "too_much_cooling",
+     "cause": "Part fan too high for the filament",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part cooling fan at full speed, or blowing on the part from one side only?",
+       "answers": {
+        "yes": 2.5,
+        "no": 0.6
+       }
+      }
+     ],
+     "fix": [
+      "Lower the part fan to 0 to 20 percent for ABS and ASA."
+     ],
+     "source": "s3d_layer_sep"
+    },
+    {
+     "id": "too_cold_nozzle",
+     "cause": "Nozzle too cold for good layer bonding",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the nozzle temperature at the high end of the filament's range?",
+       "answers": {
+        "yes": 0.5,
+        "no": 1.5
+       }
+      }
+     ],
+     "fix": [
+      "Raise the nozzle temperature 5 to 10 C."
+     ],
+     "source": "prusa_layer_sep"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "layer_separation",
+     "tell_apart": "PLA or PETG splitting is usually weak bonding, not shrinkage"
+    },
+    {
+     "id": "warping",
+     "tell_apart": "warping lifts the base; cracks open higher up"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "pillowing",
+   "name": "Pillowing: holes in the top surface",
+   "looks_like": {
+    "camera": "bumps and holes in the top surface where the infill shows through",
+    "part": "a lumpy top with gaps"
+   },
+   "words": [
+    "pillow",
+    "pillows",
+    "pillowing",
+    "holes in the top",
+    "top surface has holes",
+    "top layer is not closed",
+    "infill showing through",
+    "top skin",
+    "gaps in the top",
+    "top has gaps",
+    "quilt",
+    "quilted",
+    "humps",
+    "bumpy top",
+    "lumpy top",
+    "holes on top",
+    "top layer holes",
+    "raised humps"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "too_few_top_layers",
+     "cause": "Too few top layers or too sparse infill",
+     "prior": 0.5,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Are there fewer than about 5 top layers, or under 15 percent infill?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.4
+       }
+      }
+     ],
+     "fix": [
+      "Use at least 5 top layers (about 1 mm) and 15 percent infill or more."
+     ],
+     "source": "s3d_top_gaps"
+    },
+    {
+     "id": "cooling",
+     "cause": "Not enough cooling over the infill",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the part cooling fan at full speed, or blowing on the part from one side only?",
+       "answers": {
+        "yes": 0.6,
+        "no": 1.8
+       }
+      }
+     ],
+     "fix": [
+      "Raise the part fan for top layers."
+     ],
+     "source": "s3d_top_gaps"
+    },
+    {
+     "id": "under_extrusion",
+     "cause": "Too little plastic on the top layers",
+     "prior": 0.2,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the extruder click or grind while it should be pushing filament?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Check flow and for a partial clog."
+     ],
+     "source": "prusa_infill"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "under_extrusion",
+     "tell_apart": "under-extrusion shows in the walls too"
+    },
+    {
+     "id": "poor_bridging",
+     "tell_apart": "Poor bridging: strands sag across a gap in the walls; pillowing: the top skin over sparse infill sags between infill lines."
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "multi_material_feed",
+   "name": "CFS, AMS or MMU feed fault",
+   "looks_like": {
+    "camera": "the printer stops with a feed, load, cut or buffer error; filament stuck between the box and the head",
+    "part": "the print paused or stopped at a color change"
+   },
+   "words": [
+    "cfs",
+    "ams",
+    "mmu",
+    "feed error",
+    "failed to load",
+    "fails to load",
+    "load error",
+    "unload",
+    "cutter",
+    "cut",
+    "buffer",
+    "stuck in the tube",
+    "filament stuck",
+    "color change",
+    "colour change",
+    "tangled",
+    "can't pull",
+    "slot",
+    "swap",
+    "swaps",
+    "hub",
+    "retries the load",
+    "load fails",
+    "color swap",
+    "filament change fails",
+    "ace pro",
+    "ace"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "tangled_spool",
+     "cause": "Spool tangled or wound unevenly",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Does the filament on the spool cross over itself or pull tight before it reaches the printer?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Untangle or rewind the spool; check it turns freely."
+     ],
+     "source": "prusa_tangled"
+    },
+    {
+     "id": "bad_cut_tip",
+     "cause": "Filament tip not cut cleanly (dull cutter or a bent tip)",
+     "prior": 0.3,
+     "modifiers": {
+      "multi_material:CFS": 1.3
+     },
+     "words": [],
+     "tells": [
+      {
+       "ask": "Is the filament tip cut cleanly and straight when it unloads?",
+       "answers": {
+        "no": 3.0,
+        "yes": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Trim the tip straight before loading; check the cutter (Creality's K2 maintenance says inspect it every 5 rolls)."
+     ],
+     "source": "creality_k2_jam"
+    },
+    {
+     "id": "path_blocked",
+     "cause": "A broken piece of filament or a kinked tube in the path",
+     "prior": 0.35,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the printer's screen show an error code or message?",
+       "answers": {
+        "yes": 1.5,
+        "no": 0.8
+       }
+      }
+     ],
+     "fix": [
+      "Follow the maker's jammed filament steps: remove the tube and clear the broken piece."
+     ],
+     "source": "creality_k2_jam"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "feeder_grinding",
+     "tell_apart": "if the extruder clicks, the fault is at the head, not the box"
+    },
+    {
+     "id": "clog",
+     "tell_apart": "a clog blocks the nozzle even with one spool"
+    }
+   ],
+   "safety": []
+  },
+  {
+   "id": "thermal_error",
+   "name": "Heater or thermistor error",
+   "looks_like": {
+    "camera": "the printer stopped with a thermal runaway, heater or temperature error on the screen",
+    "part": "the print stopped; the temperature reading jumps or fails"
+   },
+   "words": [
+    "thermal runaway",
+    "thermal error",
+    "heater error",
+    "heating failed",
+    "mintemp",
+    "maxtemp",
+    "temperature error",
+    "won't heat",
+    "wont heat",
+    "won't come up to temperature",
+    "temp reading",
+    "temperature reading",
+    "jumping all over",
+    "thermistor",
+    "temperature deviation",
+    "temp deviation",
+    "aborts",
+    "temperature drop",
+    "temp drops",
+    "beeps",
+    "heater fault",
+    "thermistor error",
+    "runaway",
+    "error message",
+    "temp graph",
+    "temperature sensor",
+    "sensor fault",
+    "halts",
+    "wrong temperature"
+   ],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "thermistor_loose",
+     "cause": "Thermistor loose or its wire damaged",
+     "prior": 0.45,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Are the thermistor or heater wires at the hotend loose, pinched or broken?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "With the printer off and cool: check the thermistor is fully in the heater block and its wires are not pinched or broken."
+     ],
+     "source": "prusa_runaway"
+    },
+    {
+     "id": "cooling_on_block",
+     "cause": "A fan or a missing sock cools the heater block faster than it heats",
+     "prior": 0.3,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Did the error happen while a fan turned on, or the hotend sock was off?",
+       "answers": {
+        "yes": 3.0,
+        "no": 0.5
+       }
+      }
+     ],
+     "fix": [
+      "Fit the silicone sock; check the part fan does not blow on the heater block."
+     ],
+     "source": "prusa_runaway"
+    },
+    {
+     "id": "heater_failing",
+     "cause": "Heater cartridge or its wiring failing",
+     "prior": 0.25,
+     "modifiers": {},
+     "words": [],
+     "tells": [
+      {
+       "ask": "Are the thermistor or heater wires at the hotend loose, pinched or broken?",
+       "answers": {
+        "yes": 2.0,
+        "no": 0.7
+       }
+      }
+     ],
+     "fix": [
+      "Have the heater checked or replaced (the maker's hotend guide)."
+     ],
+     "source": "prusa_runaway"
+    }
+   ],
+   "differentials": [
+    {
+     "id": "blob_on_nozzle",
+     "tell_apart": "a recent blob often damages these wires"
+    }
+   ],
+   "safety": [
+    "Thermal errors are the firmware stopping a heater to prevent a fire: switch the printer off and let it cool before touching the hotend.",
+    "Do not restart the print until the cause is found."
+   ]
+  },
+  {
+   "id": "other",
+   "name": "Something else",
+   "looks_like": {
+    "camera": "something stone has no name for yet",
+    "part": "describe it in plain words: where on the part, what it looks like"
+   },
+   "words": [],
+   "not_words": [],
+   "modifiers": {},
+   "causes": [
+    {
+     "id": "unknown",
+     "cause": "Not in stone's catalog yet",
+     "prior": 1.0,
+     "modifiers": {},
+     "words": [],
+     "tells": [],
+     "fix": [
+      "Describe the problem in more detail, or send a photo to stone doctor --image."
+     ],
+     "source": "prusa_first_layer"
+    }
+   ],
+   "differentials": [],
+   "safety": []
+  }
+ ],
+ "needs_heat": [
+  "Heat the hotend to about 30 C above the print temperature (PLA: about 250 C) before you pull plastic off; work in heat-resistant gloves (Prusa, Bambu and Creality guides).",
+  "Clear a clog with the hotend hot and the printer still; keep fingers off the nozzle and heater block.",
+  "Heat up and push the filament by hand; do a cold pull.",
+  "Check the hotend (heatsink) fan spins whenever the hotend is hot.",
+  "Clean the hotend fan and check it spins when the hotend is hot.",
+  "Do a cold pull, or swap the nozzle (stone doctor \"nothing comes out\" covers it).",
+  "Clear the nozzle first (cold pull), then check the gear.",
+  "Run PID tuning for the bed and hotend; keep the printer out of drafts."
+ ]
+}

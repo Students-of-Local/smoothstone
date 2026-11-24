@@ -1,0 +1,10 @@
+{
+ "id": "f38_pc_cold_split",
+ "said": "pc enclosure made loud tick after door opened, now has diagonal crack across the side, bed stayed attached",
+ "printer": "qidi_q1_pro",
+ "material": "PC",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": []
+ }
+}

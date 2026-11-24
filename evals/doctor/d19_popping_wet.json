@@ -1,0 +1,12 @@
+{
+ "id": "d19_popping_wet",
+ "said": "the filament is popping and crackling as it prints and the surface comes out fuzzy and bubbly",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PETG",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": [
+   "stringing"
+  ]
+ }
+}

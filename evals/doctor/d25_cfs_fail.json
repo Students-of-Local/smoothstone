@@ -1,0 +1,10 @@
+{
+ "id": "d25_cfs_fail",
+ "said": "CFS keeps failing to load the filament, it says feed error and the cutter doesn't seem to cut cleanly",
+ "printer": "creality_k2",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

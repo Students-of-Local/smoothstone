@@ -1,0 +1,10 @@
+{
+ "id": "b25_roof_craters",
+ "said": "Top of my cube has little craters between raised humps, roughly matching the infill grid. Sides and bottom are solid. Only two roof layers.",
+ "printer": "bambu_p1p",
+ "material": "PLA",
+ "expect": {
+  "top": "pillowing",
+  "top3_includes": []
+ }
+}

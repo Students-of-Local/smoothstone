@@ -1,0 +1,10 @@
+{
+ "id": "f11_regular_stripes",
+ "said": "its wet filament definitely, smooth vertical cylinder has bulges repeating exactly every eight millimeters in height",
+ "printer": "voron_24",
+ "material": "PLA",
+ "expect": {
+  "top": "z_wobble",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "id": "r_k2_detached_plate",
+ "said": "flat plate print came loose and lies tilted on the bed with loose strands trailing from under its edges; a big lump of plastic is stuck around the nozzle and heater block. this was likely due to the plate needing to be cleaned but giving differentials also helps",
+ "printer": "creality_k2",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": [
+   "blob_on_nozzle"
+  ],
+  "causes_top3_includes": [
+   "plate_contaminated"
+  ]
+ },
+ "image": "images/k2-detached-plate-blob.jpg",
+ "why": "The owner's K2 photo: the part came loose and a blob formed on the nozzle. In his words: \"this was likely due to the plate needing to be cleaned but giving differentials also helps\"."
+}

@@ -1,0 +1,10 @@
+{
+ "id": "d28_heater_fault",
+ "said": "got a heating failed error, nozzle won't come up to temperature, screen says heater error",
+ "printer": "anycubic_kobra_3",
+ "material": "PLA",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

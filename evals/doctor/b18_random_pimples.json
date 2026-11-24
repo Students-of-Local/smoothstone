@@ -1,0 +1,10 @@
+{
+ "id": "b18_random_pimples",
+ "said": "Tiny hard pimples all over the vase wall, scattered at random heights and sides. No single line of them. Otherwise smooth and no popping sounds.",
+ "printer": "creality_k1c",
+ "material": "PLA",
+ "expect": {
+  "top": "surface_zits",
+  "top3_includes": []
+ }
+}

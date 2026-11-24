@@ -1,0 +1,12 @@
+{
+ "id": "d31_too_squished",
+ "said": "first layer is way too squished, transparent and rough, the nozzle is scraping the bed and leaving ridges",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": [
+   "elephant_foot"
+  ]
+ }
+}

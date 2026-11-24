@@ -1,0 +1,10 @@
+{
+ "id": "f12_split_layers",
+ "said": "walls unzip between layers when bent, clean horizontal splits but no lifted corners",
+ "printer": "qidi_q1_pro",
+ "material": "PA",
+ "expect": {
+  "top": "layer_separation",
+  "top3_includes": []
+ }
+}

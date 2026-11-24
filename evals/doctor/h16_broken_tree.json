@@ -1,0 +1,12 @@
+{
+ "id": "h16_broken_tree",
+ "said": "One of the tree branches snapped off halfway up and then the hand it was meant to hold turned into noodles. The broken support stump is still on the plate.",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "support_failure",
+  "top3_includes": [
+   "spaghetti"
+  ]
+ }
+}

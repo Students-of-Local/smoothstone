@@ -1,0 +1,10 @@
+{
+ "id": "h03_air_nest",
+ "said": "Came back to a giant spaghetti nest above a half finished dragon. The lower half is still sitting on the bed but everything above its shoulders is loose loops.",
+ "printer": "bambu_a1",
+ "material": "PLA",
+ "expect": {
+  "top": "spaghetti",
+  "top3_includes": []
+ }
+}

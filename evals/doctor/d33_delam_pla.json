@@ -1,0 +1,12 @@
+{
+ "id": "d33_delam_pla",
+ "said": "the layers on my bracket peel apart by hand, really weak layer adhesion, printed fast with the fan at 100",
+ "printer": "voron_24",
+ "material": "PLA",
+ "expect": {
+  "top": "layer_separation",
+  "top3_includes": [
+   "cracking"
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "b10_fat_base",
+ "said": "The first few layers bulge out like a little skirt attached to the walls. Rest measures correctly. My hole only pinches at the bottom.",
+ "printer": "bambu_p1p",
+ "material": "PLA",
+ "expect": {
+  "top": "elephant_foot",
+  "top3_includes": [
+   "first_layer"
+  ]
+ }
+}

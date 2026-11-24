@@ -1,0 +1,12 @@
+{
+ "id": "d02_corners_lift_abs",
+ "said": "printing ABS on my ender 3 v3 and the corners of the box keep lifting up off the bed, like 2mm curl at each corner",
+ "printer": "creality_ender3_v3",
+ "material": "ABS",
+ "expect": {
+  "top": "warping",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

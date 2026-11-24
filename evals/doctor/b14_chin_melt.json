@@ -1,0 +1,10 @@
+{
+ "id": "b14_chin_melt",
+ "said": "The underside of this figurine's chin is all saggy noodles. Everything vertical is clean. No supports, it's sticking out at a pretty steep angle.",
+ "printer": "bambu_a1",
+ "material": "PLA",
+ "expect": {
+  "top": "overhang_droop",
+  "top3_includes": []
+ }
+}

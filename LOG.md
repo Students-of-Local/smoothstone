@@ -817,6 +817,54 @@ The 24B lost two runs (e11 s1 and s3) because NEXT now asks while the person had
 after the answer it set sizes, got "ask the person" back 7 and 8 times, never ran stone note, and ran
 out of steps. In round 3 the same move led to stone note and a pass. An HTTP 400 came with one model
 alone on Ollama, so the crashes are not only from two models at once.
+- 2026-11-24 stone doctor floors (doctor/top1, doctor/top3, doctor_heldout/top1, doctor_heldout/top3 in
+  evals/floor.json). evals/doctor: 45 cases written before the words were tuned (d*, r_k2_detached_plate),
+  then two sets Codex (gpt-6.1-sol) wrote blind from the taxonomy alone, each scored once before its misses
+  were used to tune: h* (30) scored top-1 33%, top-3 40%; b* (40) scored top-1 57.5%, top-3 67.5%. After
+  tuning, all 115: top-1 99%, top-3 95%. evals/doctor_heldout is a third blind set (40, same model, written
+  after the tuning) scored once: top-1 60%, top-3 70%. Nobody tunes on it; a later round needs a new set.
+  SHA-256 of the sealed set, file by file:
+  be751c2c73fb09af85de3d893b220b299462196efdca3dd5564819b790689ce9  evals/doctor_heldout/f01_corner_peel.json
+  117affe787475bc0c0724a5de807c80d8bb956991f08ff9289cae7de195b46b6  evals/doctor_heldout/f02_skating_badge.json
+  866339efd69f8affde9b64ef793bdffac8efe40707f1836ed26602636f198b80  evals/doctor_heldout/f03_air_nest.json
+  e06c0cdac4b49fe9e6cfc1cfd4f56cfc280518a9135b6ab817e02b4a86fa9218  evals/doctor_heldout/f04_heater_snowball.json
+  82512f6c24eb7b2f911431e6b67461d7ce9ad909ab9d709a2de4038fcc262fc7  evals/doctor_heldout/f05_hairy_fence.json
+  d0ba2b4080169cb021b279785c5dba222dc0c00d4f61eac6510e9bc7c52c6fba  evals/doctor_heldout/f06_sparse_walls.json
+  f35cab7cd1c7313f14a6548e1dbc7f9a74b87b29afa29dcbdd53012620b1b2d8  evals/doctor_heldout/f07_plowed_top.json
+  6ee9a5646456eef995055a9cbb7071560d1741c5a579b2f1fe3dc38cefed04d5  evals/doctor_heldout/f08_no_output.json
+  415af2c2a740cae972067d4be92c120d139626bd1f8487c3e3fb6788ae394a0d  evals/doctor_heldout/f09_sideways_roof.json
+  cebc49c97d6bbc7f2b4e77a17dd560e821fd2e50c84b8a902fd29638451930f0  evals/doctor_heldout/f10_wide_base.json
+  31c816cf7c834f8df8f020c7c5757ebebd8f92516b0da3552377d122f0ff4ea3  evals/doctor_heldout/f11_regular_stripes.json
+  cffe7f5a11b703df9bc72fa2ea5e3fb125a991a02a5a28628e4e19b4a7be5a17  evals/doctor_heldout/f12_split_layers.json
+  bcd0a061400a354c02a49f97dbf386c0cabc1609f4aa163d064a657ec625f7af  evals/doctor_heldout/f13_echo_letters.json
+  1633df926b77ce29ccf4e700a5f79ee4fff00cdd7e86b51176e307d4015b8418  evals/doctor_heldout/f14_sagging_chin.json
+  b0e85e05c2d45f878af93559cee7e241d4f83fac7745f31f020b360c0a9c9760  evals/doctor_heldout/f15_sagging_span.json
+  fe361708835b12991045fbce4a7cdc386434242ec63d9300e15f14be9df36d75  evals/doctor_heldout/f16_fallen_trees.json
+  38ceb87e541c09672641edf579c4fe70d73fa6ac6cb5d7caa9a1aed9a9a65f26  evals/doctor_heldout/f17_patchy_sheet.json
+  f9ae30f57858feba29bcda72cbd2ba2b1d6514a12a5eed14443eef8f31295d95  evals/doctor_heldout/f18_random_bumps.json
+  b8fa33a81b7b24518f59efc50d4dc1cb225c381ba264126deb004b20531e7539  evals/doctor_heldout/f19_vertical_zip.json
+  d2c54d2e43605b55725d916e97410c7e34d9b210e42539ab30b91a794085f368  evals/doctor_heldout/f20_popping_spool.json
+  61848254780554485384d94174ac2298c8e4893a810899eaba8a7a0dea518fed  evals/doctor_heldout/f21_enclosed_pla.json
+  cb3f59618c403db3a1357c1e94a58a123747e88f2f12579adb038b0e6480a2da  evals/doctor_heldout/f22_chewed_tpu.json
+  8cf91a3070289b12b43366bfbb98de13809fc1e5c3ad34735004f34dc9f94fda  evals/doctor_heldout/f23_fallen_spire.json
+  4530d422326e7fa6cc8d1a0798e47cc625336f6a6ad3bbef22c587135e821651  evals/doctor_heldout/f24_abs_fissure.json
+  61a724312be6c057d65d98cb90999cb84cdfeda80e8f5d02743c29cd1c9c886f  evals/doctor_heldout/f25_holey_roof.json
+  4ff5e452dba9e6d3581ee46977c58aa7edc28983b694b45bcb88475f540e8994  evals/doctor_heldout/f26_cfs_cut.json
+  b6bccb614298a57437a5db266e9f9b861f4f39b363c54f6a8d7e209aba1404a9  evals/doctor_heldout/f27_interface_weld.json
+  61a6784b241bc477e1f6d9bd9f5be79d349e4625b290e692bfcdb00e642b3ae2  evals/doctor_heldout/f28_temp_halt.json
+  06a19f1084aa10ba38a94d2ed34f953125d1105544211ff2b42caffd824238b5  evals/doctor_heldout/f29_clean_release.json
+  6b84c144978cdc8b84b1b0100b427cdd2efed9c4511a2f8dd5fc1441268b1980  evals/doctor_heldout/f30_asa_corners.json
+  553e293d7e7c8db15099adaec5e435b5e752b48cabe3d21a9260b12a19a74981  evals/doctor_heldout/f31_ams_load_loop.json
+  fe3a1570d9974275a14a6880586cd80face51b5277c95e683d143511fc648aaa  evals/doctor_heldout/f32_hotend_cocoon.json
+  f001ddc2da0b03fd52be7f1c7e735952c39fcc4225a3c01a2d715570e1b5da53  evals/doctor_heldout/f33_bridge_curtain.json
+  3f580d2d43a026b416973b396c896077b4754de9599e6eeed841fef0fff4064b  evals/doctor_heldout/f34_tpu_rattle.json
+  c9d7688974b1da631462b1d7b1611bc33df4380215d1e7995c35e6a8aeb0e570  evals/doctor_heldout/f35_stair_step.json
+  43457417217bb4e4a61a26f640ef2e0e454acaaa94c3d2b8216edfbc58575ba7  evals/doctor_heldout/f36_sensor_jump.json
+  ba75a534a543c65aa9d835993ba4972ec7a5bdcdd42daf8c56420ca603ebb80e  evals/doctor_heldout/f37_interface_gap.json
+  b0ac3769424947812e6030e6a8c0ca3b0b65148fa66bd4def71651d776c03bb8  evals/doctor_heldout/f38_pc_cold_split.json
+  2da0319e2380c5db0d17571a6a0d61faa9c53fd8dd1db5e1b5feeedbafde3125  evals/doctor_heldout/f39_nozzle_stop.json
+  a98993443da7e3ad3f506fbe866e97a7044e6132b802e16f2c1d9b4389ebe378  evals/doctor_heldout/f40_bendy_sparse.json
+
 
 ## 2026-11-23 models 1: a landmark no recipe makes, from the best open model
 

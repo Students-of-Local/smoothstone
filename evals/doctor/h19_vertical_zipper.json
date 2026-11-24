@@ -1,0 +1,12 @@
+{
+ "id": "h19_vertical_zipper",
+ "said": "My cylinder has one ugly zipper straight up the side, one bump per layer exactly where each perimeter starts. Everywhere else is glassy smooth.",
+ "printer": "creality_k2_plus",
+ "material": "PLA",
+ "expect": {
+  "top": "z_seam",
+  "top3_includes": [
+   "surface_zits"
+  ]
+ }
+}

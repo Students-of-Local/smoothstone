@@ -1,0 +1,12 @@
+{
+ "id": "b20_sizzling_spool",
+ "said": "Opened this roll months ago. Now it hisses and pops at the tip, leaves little bubbles, and the surface looks foamy. Temp hasn't changed.",
+ "printer": "bambu_x1c",
+ "material": "PA",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": [
+   "surface_zits"
+  ]
+ }
+}

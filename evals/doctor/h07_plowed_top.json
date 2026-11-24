@@ -1,0 +1,10 @@
+{
+ "id": "h07_plowed_top",
+ "said": "Every solid layer looks overstuffed, with ridges the nozzle plows through, and my holes come out undersized. Even the upper layers do it, so it isn't just the bottom getting squashed.",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "over_extrusion",
+  "top3_includes": []
+ }
+}

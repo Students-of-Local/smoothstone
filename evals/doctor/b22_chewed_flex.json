@@ -1,0 +1,12 @@
+{
+ "id": "b22_chewed_flex",
+ "said": "The drive wheel keeps spinning in one spot and carving a notch into the flex. There's rubbery dust everywhere and it stops advancing.",
+ "printer": "prusa_mini",
+ "material": "TPU",
+ "expect": {
+  "top": "feeder_grinding",
+  "top3_includes": [
+   "under_extrusion"
+  ]
+ }
+}

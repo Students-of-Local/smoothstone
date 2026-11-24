@@ -1,0 +1,12 @@
+{
+ "id": "d15_supports_fused",
+ "said": "my supports are welded to the part and I can't get them off without wrecking the surface",
+ "printer": "creality_k2_plus",
+ "material": "PETG",
+ "expect": {
+  "top": "not_sticking_supports_to_part",
+  "top3_includes": [
+   "support_failure"
+  ]
+ }
+}

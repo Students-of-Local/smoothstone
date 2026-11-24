@@ -1,0 +1,12 @@
+{
+ "id": "d04_hairs_between_towers",
+ "said": "i think i have under extrusion? walls look ok but there are tons of fine hairs and wisps between the two towers like a spider web",
+ "printer": "prusa_mk4s",
+ "material": "PETG",
+ "expect": {
+  "top": "stringing",
+  "top3_includes": [
+   "wet_filament"
+  ]
+ }
+}

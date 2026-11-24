@@ -1,0 +1,12 @@
+{
+ "id": "h10_wide_base",
+ "said": "The bottom three layers bulge out like a little flange all around, then the sides go straight. I blamed shrinkage but the base is wider, not smaller.",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "elephant_foot",
+  "top3_includes": [
+   "first_layer"
+  ]
+ }
+}
