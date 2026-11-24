@@ -1,0 +1,1212 @@
+{
+ "about": "Facts for stone's print-failure physics (failsim.py): convection, melt viscosity, bed adhesion and the Creality K2 profile, each with its source. A value with an assumption field is a modeling choice, not a measurement. Entries with copy_of repeat Track S's materials.json and Track T's slicer.json, citations and all, until those files are on main; failsim reads the originals first.",
+ "entries": [
+  {
+   "id": "failsim.gravity",
+   "topic": "failsim",
+   "key": "gravity",
+   "value": 9.80665,
+   "unit": "m/s2",
+   "note": "Standard gravity; weight of strands, beads and parts.",
+   "quote": "It is a constant defined by ISO standard 80000 as 9.80665 m/s2",
+   "source": "Wikipedia, Standard gravity",
+   "cite": "Standard gravity (ISO 80000)",
+   "url": "https://en.wikipedia.org/wiki/Standard_gravity",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.h_still",
+   "topic": "failsim",
+   "key": "h_still",
+   "value": 10,
+   "unit": "W/(m2 K)",
+   "note": "Convection from a bead in still air (fan off). The same paper cools its PLA beads with a lumped Newton model, as stone does.",
+   "quote": "Convective heat Transfer coefficient h 10 W·m−2K−1 Natural convection of air",
+   "source": "He, Zhu, Zhang, Yang, Investigation on Bridging Defects in 3D-Printed Polylactic Acid Beams Using Fused Filament Fabrication, Polymers 2026, 18(2), 261, Table 3",
+   "cite": "Polymers 2026 18:261 PLA bridging, Table 3",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12845589/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.pla.k",
+   "topic": "failsim",
+   "key": "pla.k",
+   "value": 0.13,
+   "unit": "W/(m K)",
+   "note": "PLA thermal conductivity, same table; used only to check the bead is thin enough for a lumped model (Biot number).",
+   "quote": "Thermal conductivity k 0.13 W·m−1K−1",
+   "source": "He, Zhu, Zhang, Yang, Investigation on Bridging Defects in 3D-Printed Polylactic Acid Beams Using Fused Filament Fabrication, Polymers 2026, 18(2), 261, Table 3",
+   "cite": "Polymers 2026 18:261 PLA bridging, Table 3",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12845589/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.pla.cp",
+   "topic": "failsim",
+   "key": "pla.cp",
+   "value": 1400,
+   "unit": "J/(kg K)",
+   "note": "PLA specific heat for the lumped bead cooling.",
+   "quote": "with K = 0.20 W·m−1·K−1, ρ = 1240 kg·m−3, and C = 1400 J·kg−1·K−1",
+   "source": "Bhandari and Lopez-Anido, Discrete-Event Simulation Thermal Model for Extrusion-Based Additive Manufacturing of PLA and ABS, Materials 2020, 13(21), 4985",
+   "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7664205/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.abs.cp_k",
+   "topic": "failsim",
+   "key": "abs.cp_k",
+   "value": [
+    [
+     0,
+     0.23,
+     780
+    ],
+    [
+     50,
+     0.25,
+     1040
+    ],
+    [
+     100,
+     0.28,
+     1490
+    ],
+    [
+     150,
+     0.29,
+     1710
+    ],
+    [
+     200,
+     0.31,
+     1865
+    ],
+    [
+     250,
+     0.33,
+     2020
+    ]
+   ],
+   "unit": "C, W/(m K), J/(kg K)",
+   "note": "ABS conductivity and specific heat by temperature (their Table 5, from Zhou et al.). stone averages cp from Tg up to the nozzle temperature and k from room air up to Tg. PETG has no sourced pair here: stone uses PLA's and says so.",
+   "quote": "Temperature (°C) Thermal Conductivity Specific Heat Capacity Density 0 0.23 780 1050 50 0.25 1040 1050 100 0.28 1490 1050 150 0.29 1710 1050 200 0.31 1865 1050 250 0.33 2020 1050",
+   "source": "Bhandari and Lopez-Anido, Discrete-Event Simulation Thermal Model for Extrusion-Based Additive Manufacturing of PLA and ABS, Materials 2020, 13(21), 4985",
+   "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7664205/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.air_400k",
+   "topic": "failsim",
+   "key": "air_400k",
+   "value": {
+    "k": 0.03365,
+    "pr": 0.688,
+    "nu": 2.591e-05
+   },
+   "unit": "W/(m K), -, m2/s",
+   "note": "Dry air at 400 K (127 C), the film temperature between a fresh bead and the chamber air, for the fan-on convection.",
+   "quote": "400 1.0135 0.7264 1.395 2.286 3.365 0.688 2.591 (T K, cp, cv, k, mu 1e-5, k 1e-2 W/mK, Pr, nu 1e-5 m2/s)",
+   "source": "Engineering ToolBox, Air: thermophysical properties",
+   "cite": "Engineering ToolBox dry air properties",
+   "url": "https://www.engineeringtoolbox.com/dry-air-properties-d_973.html",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.churchill_bernstein",
+   "topic": "failsim",
+   "key": "churchill_bernstein",
+   "value": "Nu = 0.3 + 0.62 Re^0.5 Pr^(1/3) / (1 + (0.4/Pr)^(2/3))^0.25 x (1 + (Re/282000)^(5/8))^(4/5)",
+   "unit": "formula",
+   "note": "Forced convection across a cylinder for Re Pr > 0.2: the bead in the part-cooling fan's air. h = Nu k / d.",
+   "quote": "Nu_D = 0.3 + 0.62 Re_D^1/2 Pr^1/3 / [1 + (0.4/Pr)^2/3]^1/4 [1 + (Re_D/282000)^5/8]^4/5",
+   "source": "Wikipedia, Churchill-Bernstein equation",
+   "cite": "Churchill-Bernstein equation",
+   "url": "https://en.wikipedia.org/wiki/Churchill%E2%80%93Bernstein_equation",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.fan_air_speed",
+   "topic": "failsim",
+   "key": "fan_air_speed",
+   "value": 5,
+   "unit": "m/s",
+   "note": "Air speed over the bead with the part fan at full speed. No maker publishes it.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "range": [
+    2,
+    10
+   ],
+   "assumption": "Part-cooling air speed at the nozzle, 2 to 10 m/s; 5 used. It sets the fan-on h and so how long a bead stays soft."
+  },
+  {
+   "id": "failsim.pla.cross_wlf",
+   "topic": "failsim",
+   "key": "pla.cross_wlf",
+   "value": {
+    "A1": 16.71,
+    "A2_K": 51.6,
+    "D1_Pa_s": 20450000.0,
+    "D3_K_per_Pa": 0,
+    "T_star_K": 373.15,
+    "n": 0.3846,
+    "tau_star_Pa": 129000.0
+   },
+   "unit": "Cross-WLF",
+   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade; filament PLA is close but not the same. PETG and ABS have no sourced fit: stone uses PLA's and says so.",
+   "quote": "Table 2 Data-fitted Cross-WLF parameters of the PLA 3251D. A1 16.71 A2 (K) 51.60 D1 (Pa*s) 2.045 × 10^7 D3 (K/Pa) 0 T* (K) 373.15 n 0.3846 τ* (Pa) 1.29 × 10^5",
+   "source": "Pricci, Physics-Based Predictive Modeling of Gravity-Induced Sagging in Support-Free Pellet Additive Manufacturing, Polymers 2025, 17(21), 2858, Table 2",
+   "cite": "Polymers 2025 17:2858 Cross-WLF of PLA 3251D",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12608786/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.trouton",
+   "topic": "failsim",
+   "key": "trouton",
+   "value": 3,
+   "unit": "ratio",
+   "note": "A viscous beam bends like an elastic one with E replaced by 3 eta and deflection by its rate: stone's soft-bead droop.",
+   "quote": "For a Newtonian Fluid, the Trouton ratio equals three.",
+   "source": "Wikipedia, Extensional viscosity",
+   "cite": "Extensional viscosity (Trouton ratio)",
+   "url": "https://en.wikipedia.org/wiki/Extensional_viscosity",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.adhesion.pulloff",
+   "topic": "failsim",
+   "key": "adhesion.pulloff",
+   "value": 0.4,
+   "unit": "MPa",
+   "note": "Tensile pull-off strength of PLA printed on aluminum, over their 16 treatments and bed temperatures; stone uses the lowest for the tip check (force over the whole footprint). No paper measured PEI or glass this way; treated aluminum stands in.",
+   "quote": "The highest tensile adhesion strength was obtained with acid etching at 65 °C (1.71 MPa) ... The lowest value was recorded for acid etching at 85 °C (0.40 MPa)",
+   "source": "Campos-Jurado, Rodriguez-Alabanda, Guerrero-Vacas, Manufacturing of Polymer-Metal Composite by Fused Filament Fabrication: Adhesion of PLA and PETG on Aluminum, Polymers 2025, 17(16), 2210",
+   "cite": "Polymers 2025 17:2210 PLA and PETG on aluminum",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12390356/",
+   "checked": "2026-11-24",
+   "range": [
+    0.4,
+    1.71
+   ]
+  },
+  {
+   "id": "failsim.adhesion.shear",
+   "topic": "failsim",
+   "key": "adhesion.shear",
+   "value": 0.52,
+   "unit": "MPa",
+   "note": "Lap-shear strength of the same PLA on aluminum; the lowest is used for the slide check.",
+   "quote": "For PLA, the highest shear adhesion strength was obtained with acid etching at 65 °C (3.92 MPa) ... dropping to a minimum of 0.52 MPa (fine sanding, 85 °C)",
+   "source": "Campos-Jurado, Rodriguez-Alabanda, Guerrero-Vacas, Manufacturing of Polymer-Metal Composite by Fused Filament Fabrication: Adhesion of PLA and PETG on Aluminum, Polymers 2025, 17(16), 2210",
+   "cite": "Polymers 2025 17:2210 PLA and PETG on aluminum",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12390356/",
+   "checked": "2026-11-24",
+   "range": [
+    0.52,
+    3.92
+   ]
+  },
+  {
+   "id": "failsim.peel.pla",
+   "topic": "failsim",
+   "key": "peel.pla",
+   "value": 231,
+   "unit": "N",
+   "note": "Peak 90 degree peel force of a printed PLA strip on borosilicate glass (DIN EN 28510-1 style test). On Pertinax PLA peaked at 160 N. stone turns the peak into an edge stress with Hetenyi's beam on an elastic foundation (failsim.hetenyi).",
+   "quote": "The maximum was measured for PLA with a value of 231 N.",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24",
+   "range": [
+    160,
+    231
+   ]
+  },
+  {
+   "id": "failsim.peel.pp",
+   "topic": "failsim",
+   "key": "peel.pp",
+   "value": [
+    4,
+    7.8
+   ],
+   "unit": "N",
+   "note": "Polypropylene, a low surface energy plastic, on the same glass (about 4 N) and Pertinax (7.8 N maximum). Its ratio to PLA is stone's dirty-plate factor.",
+   "quote": "The adhesion forces for the material pairing PP - borosilicate glass are about 4 N ... The maximum adhesion force was measured for PLA with a value of 160 N while polypropylene (PP) only adheres with a maximum of 7.8 N.",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.peel.petg",
+   "topic": "failsim",
+   "key": "peel.petg",
+   "value": 102,
+   "unit": "N",
+   "note": "PETG (Filamentworld) on borosilicate glass, average of the peak forces.",
+   "quote": "PETG has an adhesion force between 94 N and 107 N with an average of 102 N.",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24",
+   "range": [
+    94,
+    107
+   ]
+  },
+  {
+   "id": "failsim.peel_specimen",
+   "topic": "failsim",
+   "key": "peel_specimen",
+   "value": {
+    "width": 25,
+    "thickness": 0.5
+   },
+   "unit": "mm",
+   "note": "Width and thickness of the peeled strip. The paper prints at 0.5 mm layers with a 1 mm nozzle; the strip size is only in its Fig. 52.",
+   "quote": "nozzle diameter 1.0 mm, filament diameter 1.75 mm, layer height and first layer height 0.5 mm",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24",
+   "assumption": "Strip 25 mm wide (the width of an ISO 8510-1 / DIN EN 28510-1 peel specimen) and one 0.5 mm layer thick."
+  },
+  {
+   "id": "failsim.contamination",
+   "topic": "failsim",
+   "key": "contamination",
+   "value": 0.049,
+   "unit": "ratio",
+   "note": "Dirty-plate factor: a plate with skin oil or dust holds the part the way a poorly wetting plastic holds a clean plate. Computed from the peel data: PP / PLA = 4 / 231 = 0.017 on glass, 7.8 / 160 = 0.049 on Pertinax. stone uses the milder 0.049, so a dirty plate that fails at 0.049 fails at 0.017 too.",
+   "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
+   "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9058659/",
+   "checked": "2026-11-24",
+   "range": [
+    0.017,
+    0.049
+   ],
+   "assumption": "A contaminated plate keeps the same fraction of its hold as PP keeps of PLA's on a clean plate."
+  },
+  {
+   "id": "failsim.hetenyi",
+   "topic": "failsim",
+   "key": "hetenyi",
+   "value": "end of a long beam on an elastic foundation: y = 2 P lambda / k under an end force P, y = 2 M0 lambda^2 / k under an end moment M0, lambda = (k / 4EI)^(1/4)",
+   "unit": "formula",
+   "note": "The first layer is the foundation (k = E b / t1 per unit length, E of the part itself); the stack above it is the beam. Edge peel stress = k y / b. For a peel strip of width b and thickness h pulled at its end: sigma = 2 P lambda / b. For the part's stack see failsim.warp_rule. The OCR of the scan is cleaned up in the quote.",
+   "quote": "Concentrated Force at One End ... Deflections at the end points: y = (2Pλ/k) (Sinh λl Cosh λl − sin λl cos λl) / (Sinh² λl − sin² λl) ... Concentrated Moment at One End ... y = (2M0λ²/k) (Sinh² λl + sin² λl) / (Sinh² λl − sin² λl) ... λ = ⁴√(k/4EI)",
+   "source": "M. Hetenyi, Beams on Elastic Foundation (1946), archive.org scan, eqs. 39 and 40 (finite beam, free ends; both reduce to the long-beam values when lambda l is large)",
+   "cite": "Hetenyi 1946 Beams on Elastic Foundation",
+   "url": "https://archive.org/details/in.ernet.dli.2015.73919",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.warp_rule",
+   "topic": "failsim",
+   "key": "warp_rule",
+   "value": "sigma_edge = min(2 M lambda^2, 6 M / d^2), M = sum of sigma(T) z t over the layers within d of the plate",
+   "unit": "rule",
+   "note": "Corner lift, worked on the perimeter walls, which the profile prints solid through the whole height (failsim.section_rule). A layer is stress-free while above Tg; below it, at its present temperature T (failsim.column_rule), it carries sigma(T) = alpha x integral of E dT from T up to Tg, read on the measured stiffness curve. At the free edge the plate must hold the layers' pull and its moment about the plate, M per mm of edge. Hetenyi's end moment on the stack, with the first layer at the plate temperature as the foundation, gives 2 M lambda^2 (failsim.hetenyi). That beam must be thin against its bending length 1/lambda; once the stack is deeper, the moment spreads over an edge zone at least one stack depth d long (failsim.saint_venant), and the flexure formula puts the zone's peak at 6 M / d^2 (failsim.flexure). For one stress through the stack that is sigma x min(sqrt(3 n), 3): the old sqrt(3 n) rule for the first layers, held at 3 sigma once the stack is deeper than 3 layers. Only layers within d = min(height, the footprint's narrowest width) of the plate load it. The corner lifts when the edge stress passes the bond (failsim.bond_hot) times the plate factor.",
+   "source": "stone model from failsim.hetenyi, failsim.saint_venant, failsim.flexure and materials data",
+   "cite": "stone warp rule",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "Linear elastic with no stress relaxation, the steady temperature after each layer, and the walls curling on their own footprint without help from the infill inside them: each makes stone call a lift sooner than a real print. The edge zone of a deep stack is taken as one stack depth long."
+  },
+  {
+   "id": "failsim.nozzle_tip",
+   "topic": "failsim",
+   "key": "nozzle_tip",
+   "value": 1.0,
+   "unit": "mm",
+   "note": "Flat face of a 0.4 mm nozzle that drags over the top layer; the drag is the melt's shear stress on it.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "A 0.4 mm nozzle's flat tip is about 1.0 mm across."
+  },
+  {
+   "id": "failsim.strand_friction",
+   "topic": "failsim",
+   "key": "strand_friction",
+   "value": 0.5,
+   "unit": "ratio",
+   "note": "Friction of a soft strand on the bed or the part, in the falling-strand model.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "Coulomb friction 0.5; it only changes how far a fallen strand slides, not whether it falls."
+  },
+  {
+   "id": "failsim.blob_stick",
+   "topic": "failsim",
+   "key": "blob_stick",
+   "value": 0.5,
+   "unit": "ratio",
+   "note": "Share of the plastic extruded with nothing under the nozzle that stays on the nozzle and heater block (blob_on_nozzle); the rest falls as strands.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "Half of what is extruded into air stays on the nozzle."
+  },
+  {
+   "id": "failsim.bridge_rule",
+   "topic": "failsim",
+   "key": "bridge_rule",
+   "value": "a = catenary constant with sag(L_usable) = one layer height",
+   "unit": "rule",
+   "note": "A bridge strand hangs as a catenary z = a (cosh(x/a) - 1) with one constant a for the material: the one that sags exactly one layer at the slicer's usable bridge length (failsim.max_bridge_length). Longer spans sag more than a layer: the next layer has nothing to land on.",
+   "source": "stone model from failsim.max_bridge_length",
+   "cite": "stone bridge rule",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "At the usable bridge length a bridge sags one layer height; the catenary constant is the same for every span."
+  },
+  {
+   "id": "failsim.droop_rule",
+   "topic": "failsim",
+   "key": "droop_rule",
+   "value": {
+    "supports": 1.0,
+    "droop": 0.5
+   },
+   "unit": "layers",
+   "note": "A ledge whose tip droops one layer height or more leaves the next layer nothing to print on (kind supports). Half a layer or more shows (kind droop): a line's rounded side already hides about half its height (OrcaSlicer's line is a rectangle with round ends).",
+   "source": "stone model",
+   "cite": "stone droop rule",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "Droop of one layer fails the ledge; half a layer is the smallest droop that shows."
+  },
+  {
+   "id": "failsim.pbd",
+   "topic": "failsim",
+   "key": "pbd",
+   "value": "predict positions under gravity, project segment lengths, collide with the ground, apply friction, set velocity from the position change",
+   "unit": "method",
+   "note": "The falling strand: a chain of short segments solved by position based dynamics.",
+   "source": "Mueller, Heidelberger, Hennix, Ratcliff, Position Based Dynamics, Journal of Visual Communication and Image Representation 18(2) 2007, 109-118",
+   "cite": "Mueller et al. 2007 Position Based Dynamics",
+   "url": "https://doi.org/10.1016/j.jvcir.2007.01.005",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.k2.pla",
+   "topic": "failsim",
+   "key": "k2.pla",
+   "value": {
+    "bed": 50,
+    "chamber": 35,
+    "nozzle": 220
+   },
+   "unit": "C",
+   "note": "OrcaSlicer's Creality K2 profile for Creality PLA: plate and chamber temperatures from this file, nozzle from the generic profile it inherits (fdm_filament_pla, except PETG which sets its own).",
+   "quote": "\"hot_plate_temp\": [\"50\"], \"chamber_temperature\": \"35\"",
+   "source": "OrcaSlicer resources/profiles/Creality/filament/CR-PLA @K2-all.json",
+   "cite": "OrcaSlicer K2 PLA profile",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/filament/CR-PLA%20%40K2-all.json",
+   "checked": "2026-11-24",
+   "material": "PLA"
+  },
+  {
+   "id": "failsim.k2.petg",
+   "topic": "failsim",
+   "key": "k2.petg",
+   "value": {
+    "bed": 70,
+    "chamber": 35,
+    "nozzle": 250
+   },
+   "unit": "C",
+   "note": "OrcaSlicer's Creality K2 profile for Creality PETG: plate and chamber temperatures from this file, nozzle from the generic profile it inherits (fdm_filament_petg, except PETG which sets its own).",
+   "quote": "\"hot_plate_temp\": [\"70\"], \"chamber_temperature\": \"35\"",
+   "source": "OrcaSlicer resources/profiles/Creality/filament/CR-PETG @K2-all.json",
+   "cite": "OrcaSlicer K2 PETG profile",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/filament/CR-PETG%20%40K2-all.json",
+   "checked": "2026-11-24",
+   "material": "PETG"
+  },
+  {
+   "id": "failsim.k2.abs",
+   "topic": "failsim",
+   "key": "k2.abs",
+   "value": {
+    "bed": 100,
+    "chamber": 60,
+    "nozzle": 260
+   },
+   "unit": "C",
+   "note": "OrcaSlicer's Creality K2 profile for Creality ABS: plate and chamber temperatures from this file, nozzle from the generic profile it inherits (fdm_filament_abs, except PETG which sets its own).",
+   "quote": "\"hot_plate_temp\": [\"100\"], \"chamber_temperature\": \"60\"",
+   "source": "OrcaSlicer resources/profiles/Creality/filament/CR-ABS @K2-all.json",
+   "cite": "OrcaSlicer K2 ABS profile",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/filament/CR-ABS%20%40K2-all.json",
+   "checked": "2026-11-24",
+   "material": "ABS"
+  },
+  {
+   "id": "failsim.support_threshold_angle",
+   "topic": "supports",
+   "value": 30,
+   "unit": "deg",
+   "note": "Measured from the bed: a face sloping less than 30 deg from horizontal (more than 60 deg from vertical) gets support. The Creality K2 0.20mm Standard profile keeps 30. stone turns it into a reach per layer: layer height x tan(60 deg), 0.35 mm at 0.2 mm layers.",
+   "quote": "Support will be generated for overhangs whose slope angle is below the threshold. The smaller this value is, the steeper the overhang that can be printed without support.",
+   "source": "OrcaSlicer src/libslic3r/PrintConfig.cpp, support_threshold_angle (default 30)",
+   "cite": "OrcaSlicer support threshold angle",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/src/libslic3r/PrintConfig.cpp",
+   "checked": "2026-11-24",
+   "key": "support_threshold_angle",
+   "copy_of": "slicer.support_threshold_angle"
+  },
+  {
+   "id": "failsim.max_bridge_length",
+   "topic": "supports",
+   "value": 10,
+   "unit": "mm",
+   "note": "A print profile setting, not a filament one: OrcaSlicer's K2 profiles use 10 mm for PLA and PETG alike. PETG bridges sag more than PLA in practice; stone keeps 10 mm for both and says so (assumption that the slicer's limit holds for PETG).",
+   "quote": "This is the maximum length of bridges that don't need support. Set it to 0 if you want all bridges to be supported, and set it to a very large value if you don't want any bridges to be supported.",
+   "source": "OrcaSlicer src/libslic3r/PrintConfig.cpp, max_bridge_length (default 10); resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json (10)",
+   "cite": "OrcaSlicer max bridge length",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/src/libslic3r/PrintConfig.cpp",
+   "checked": "2026-11-24",
+   "key": "max_bridge_length",
+   "copy_of": "slicer.max_bridge_length"
+  },
+  {
+   "id": "failsim.k2_widths",
+   "topic": "toolpaths",
+   "value": {
+    "outer_wall": 0.42,
+    "inner_wall": 0.45,
+    "sparse_infill": 0.45,
+    "solid_infill": 0.42,
+    "top_surface": 0.42,
+    "first_layer": 0.5,
+    "support": 0.42
+   },
+   "unit": "mm",
+   "note": "Line widths of the K2 0.20mm Standard profile, 0.4 mm nozzle.",
+   "quote": "\"outer_wall_line_width\": \"0.42\"",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, line widths",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24",
+   "key": "k2_widths",
+   "copy_of": "slicer.k2_widths"
+  },
+  {
+   "id": "failsim.k2_speeds",
+   "topic": "toolpaths",
+   "value": {
+    "outer_wall": 200,
+    "inner_wall": 300,
+    "sparse_infill": 270,
+    "solid_infill": 250,
+    "top_surface": 200,
+    "support": 150,
+    "bridge": 25,
+    "first_layer": 60,
+    "first_layer_infill": 105,
+    "travel": 500
+   },
+   "unit": "mm/s",
+   "note": "Print speeds of the K2 0.20mm Standard profile. The fastest of them (inner wall, 300 mm/s) is the max speed OrcaSlicer's auto brim uses.",
+   "quote": "\"outer_wall_speed\": \"200\"",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, speeds",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24",
+   "key": "k2_speeds",
+   "copy_of": "slicer.k2_speeds"
+  },
+  {
+   "id": "failsim.support_polygon",
+   "topic": "tipping",
+   "value": "stable while the center of mass is over the support polygon",
+   "unit": "rule",
+   "note": "A part standing on the bed stays up on its own only while its center of mass, seen from above, is inside the convex hull of its first layer. stone checks it for the part as printed so far, at every layer.",
+   "quote": "its support polygon is a horizontal region over which the center of mass must lie to achieve static stability. For example, for an object resting on a horizontal surface (e.g. a table), the support polygon is the convex hull of its \"footprint\" on the table.",
+   "source": "Wikipedia, Support polygon",
+   "cite": "Support polygon (statics)",
+   "url": "https://en.wikipedia.org/wiki/Support_polygon",
+   "checked": "2026-11-24",
+   "key": "support_polygon",
+   "copy_of": "physics.support_polygon"
+  },
+  {
+   "id": "failsim.mat.pla.e_xy",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "e_xy",
+   "value": 2580,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 2580 ± 220 MPa",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2300,
+    3426.9
+   ],
+   "others": [
+    {
+     "value": 3426.9,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 3426.9 ± 64.8 MPa"
+    },
+    {
+     "value": 2300,
+     "cite": "Prusament PLA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/7ca620c4-prusament-pla-plablend.zip",
+     "quote": "Tensile Modulus [GPa] 2.3 ± 0.1 (Horizontal)"
+    }
+   ],
+   "copy_of": "pla.e_xy"
+  },
+  {
+   "id": "failsim.mat.pla.tensile_z",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "tensile_z",
+   "value": 31,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 31 ± 3 MPa",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    17,
+    40.5
+   ],
+   "others": [
+    {
+     "value": 40.5,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 40.5 ± 0.5 MPa"
+    },
+    {
+     "value": 17,
+     "cite": "Prusament PLA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/7ca620c4-prusament-pla-plablend.zip",
+     "quote": "Interlayer Adhesion [MPa] 17 ± 3 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ],
+   "copy_of": "pla.tensile_z"
+  },
+  {
+   "id": "failsim.mat.petg.e_xy",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "e_xy",
+   "value": 1810,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 1810 ± 190 MPa",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1500,
+    2116.8
+   ],
+   "others": [
+    {
+     "value": 2116.8,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 2116.8 ± 68.1 MPa"
+    },
+    {
+     "value": 1500,
+     "cite": "Prusament PETG datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf",
+     "quote": "Tensile Modulus [GPa] 1.5 ± 0.1 (Horizontal)"
+    }
+   ],
+   "copy_of": "petg.e_xy"
+  },
+  {
+   "id": "failsim.mat.petg.tensile_z",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "tensile_z",
+   "value": 23,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 23 ± 4 MPa",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    18,
+    42.8
+   ],
+   "others": [
+    {
+     "value": 42.8,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 42.8 ± 2.8 MPa"
+    },
+    {
+     "value": 18,
+     "cite": "Prusament PETG datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf",
+     "quote": "Interlayer Adhesion [MPa] 18 ± 4 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ],
+   "copy_of": "petg.tensile_z"
+  },
+  {
+   "id": "failsim.mat.abs.e_xy",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "e_xy",
+   "value": 2200,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 2200 ± 190 MPa",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2200,
+    2246.6
+   ],
+   "others": [
+    {
+     "value": 2246.6,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 2246.6 ± 58.2 MPa"
+    }
+   ],
+   "copy_of": "abs.e_xy"
+  },
+  {
+   "id": "failsim.mat.abs.tensile_z",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "tensile_z",
+   "value": 28,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 28 ± 2 MPa",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    28,
+    29.7
+   ],
+   "others": [
+    {
+     "value": 29.7,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 29.7 ± 0.3 MPa"
+    }
+   ],
+   "copy_of": "abs.tensile_z"
+  },
+  {
+   "id": "failsim.mat.pla.density",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "density",
+   "value": 1.24,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.24 g/cm³",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.17,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.17 g/cm3 at 23°C"
+    }
+   ],
+   "copy_of": "pla.density"
+  },
+  {
+   "id": "failsim.mat.petg.density",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "density",
+   "value": 1.28,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.28 g/cm³",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.25,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.25 g/cm3 at 23°C"
+    }
+   ],
+   "copy_of": "petg.density"
+  },
+  {
+   "id": "failsim.mat.abs.density",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "density",
+   "value": 1.05,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.05 g/cm³",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.04,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.04 g/cm3 at 23 °C"
+    }
+   ],
+   "copy_of": "abs.density"
+  },
+  {
+   "id": "failsim.mat.pla.tg",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "tg",
+   "value": 61,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 61 °C",
+   "source": "Polymaker PolyLite PLA technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 60,
+     "cite": "Bambu PLA Basic datasheet",
+     "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+     "quote": "Glass Transition Temperature DSC, 10 °C/min 60 °C"
+    }
+   ],
+   "copy_of": "pla.tg"
+  },
+  {
+   "id": "failsim.mat.petg.tg",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "tg",
+   "value": 66,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass Transition Temperature DSC, 10 °C/min 66 °C",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 81,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Glass transition temperature DSC, 10°C/min 81 °C"
+    }
+   ],
+   "copy_of": "petg.tg"
+  },
+  {
+   "id": "failsim.mat.abs.tg",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "tg",
+   "value": 101,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 101 °C",
+   "source": "Polymaker PolyLite ABS technical data sheet V5.4",
+   "cite": "Polymaker PolyLite ABS datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [],
+   "copy_of": "abs.tg"
+  },
+  {
+   "id": "failsim.mat.pla.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     1.0
+    ],
+    [
+     40,
+     0.92
+    ],
+    [
+     45,
+     0.84
+    ],
+    [
+     50,
+     0.73
+    ],
+    [
+     55,
+     0.62
+    ],
+    [
+     60,
+     0.19
+    ],
+    [
+     65,
+     0.023
+    ],
+    [
+     70,
+     0.01
+    ],
+    [
+     80,
+     0.003
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (Prusament PLA (Prusa Research)), read from Figure 16 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 16. Storage and loss modulus of PLA-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24",
+   "copy_of": "pla.modulus_vs_temp"
+  },
+  {
+   "id": "failsim.mat.petg.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     0.96
+    ],
+    [
+     40,
+     0.79
+    ],
+    [
+     50,
+     0.64
+    ],
+    [
+     60,
+     0.5
+    ],
+    [
+     65,
+     0.47
+    ],
+    [
+     70,
+     0.53
+    ],
+    [
+     75,
+     0.54
+    ],
+    [
+     80,
+     0.28
+    ],
+    [
+     85,
+     0.05
+    ],
+    [
+     90,
+     0.016
+    ],
+    [
+     100,
+     0.005
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (PETG by Filament PM), read from Figure 17 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 17. Storage and loss modulus of PETG-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24",
+   "copy_of": "petg.modulus_vs_temp"
+  },
+  {
+   "id": "failsim.mat.abs.modulus_vs_temp",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     1.0
+    ],
+    [
+     40,
+     0.85
+    ],
+    [
+     50,
+     0.59
+    ],
+    [
+     60,
+     0.42
+    ],
+    [
+     70,
+     0.29
+    ],
+    [
+     80,
+     0.23
+    ],
+    [
+     90,
+     0.26
+    ],
+    [
+     100,
+     0.36
+    ],
+    [
+     110,
+     0.2
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (Prusament ABS (Prusa Research)), read from Figure 20 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 20. Storage and loss modulus of ABS-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24",
+   "copy_of": "abs.modulus_vs_temp"
+  },
+  {
+   "id": "failsim.mat.pla.cte",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "cte",
+   "value": 96,
+   "unit": "1e-6/K",
+   "note": "Printed PLA, rasters along the bar (0 deg) and across (90 deg), 25 to 50 C.",
+   "quote": "PLA 0° 25-50 96 ± 5 (CTE, 10−6/°C); 90° 25-30 99 ± 5",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "range": [
+    96,
+    99
+   ],
+   "copy_of": "pla.cte"
+  },
+  {
+   "id": "failsim.mat.abs.cte",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "cte",
+   "value": 86,
+   "unit": "1e-6/K",
+   "note": "Printed ABS, 25 to 50 C.",
+   "quote": "ABS 0° 25-50 86 ± 3 (CTE, 10−6/°C); 90° 25-50 89 ± 3",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "range": [
+    86,
+    89
+   ],
+   "copy_of": "abs.cte"
+  },
+  {
+   "id": "failsim.mat.petg.cte",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "cte",
+   "value": 59.4,
+   "unit": "1e-6/K",
+   "note": "No sourced CTE for PETG found.",
+   "quote": "Polyethylene terephthalate (PET) 59.4",
+   "source": "The Engineering ToolBox: Linear Thermal Expansion Coefficients of Materials",
+   "cite": "Engineering ToolBox thermal expansion table",
+   "url": "https://www.engineeringtoolbox.com/linear-expansion-coefficients-d_95.html",
+   "checked": "2026-11-24",
+   "assumption": "PETG is PET with glycol added; stone uses the PET value.",
+   "copy_of": "petg.cte"
+  },
+  {
+   "id": "failsim.saint_venant",
+   "topic": "failsim",
+   "key": "saint_venant",
+   "value": "a self-balanced load fades within about one section width of where it acts",
+   "unit": "rule",
+   "note": "Why the plate does not feel every layer of a tall part: a layer's shrink pull is balanced by the layers just under it, so its effect fades with distance from the layer.",
+   "quote": "the difference between the effects of two different but statically equivalent loads becomes very small at sufficiently large distances from load.",
+   "source": "Wikipedia, Saint-Venant's principle",
+   "cite": "Saint-Venant's principle",
+   "url": "https://en.wikipedia.org/wiki/Saint-Venant%27s_principle",
+   "checked": "2026-11-24",
+   "assumption": "A sufficiently large distance is the footprint's narrowest width: layers higher than that above the plate do not load it. An edge moment on a stack deeper than Hetenyi's bending length spreads over at least one stack depth."
+  },
+  {
+   "id": "failsim.flexure",
+   "topic": "failsim",
+   "key": "flexure",
+   "value": "sigma_max = M c / I = 6 M / d^2 for a strip d long under a moment M per unit width",
+   "unit": "formula",
+   "note": "The edge zone of a deep stack (d long, per mm of edge) pressed and lifted by the moment M: the peak is M / S with S = I / c, and for a d long rectangle c = d / 2, I = d^3 / 12, so S = d^2 / 6.",
+   "quote": "For the case where a beam is doubly symmetric, c1=c2 and we have one section modulus S=I/c.",
+   "source": "Wikipedia, Euler-Bernoulli beam theory",
+   "cite": "Euler-Bernoulli beam theory",
+   "url": "https://en.wikipedia.org/wiki/Euler%E2%80%93Bernoulli_beam_theory",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.column_rule",
+   "topic": "failsim",
+   "key": "column_rule",
+   "value": "steady conduction up the printed column: k x printed area / t between layers, h x exposed area to the air, the first layer's base at the plate temperature",
+   "unit": "rule",
+   "note": "The part is a fin standing on the plate. Each layer passes heat to the next through the share of it the profile prints (failsim.section_rule) and loses heat to the air through its exposed side and top faces. The temperatures after each layer are the steady solution of that chain.",
+   "quote": "the tip can be exposed to convective heat transfer, insulated, held at a constant temperature, or so far away from the base as to reach the ambient temperature.",
+   "source": "Wikipedia, Fin (extended surface)",
+   "cite": "Fin (extended surface)",
+   "url": "https://en.wikipedia.org/wiki/Fin_(extended_surface)",
+   "checked": "2026-11-24",
+   "assumption": "Steady temperatures after each layer, with no reheat from the new bead; the plate holds the first layer at its set temperature; air at the chamber temperature, or failsim.room_air on an open printer."
+  },
+  {
+   "id": "failsim.h_part",
+   "topic": "failsim",
+   "key": "h_part",
+   "value": 100,
+   "unit": "W/(m2 K)",
+   "note": "Heat loss from the faces of a printing part to the air, with the part fan on (failsim.h_still with it off). The same paper's FE model of PLA and ABS parts uses it on every exposed face.",
+   "quote": "A convective heat transfer coefficient of 100 W·m−2·K−1 was assumed for this study.",
+   "source": "Bhandari and Lopez-Anido, Discrete-Event Simulation Thermal Model for Extrusion-Based Additive Manufacturing of PLA and ABS, Materials 2020, 13(21), 4985",
+   "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7664205/",
+   "checked": "2026-11-24",
+   "assumption": "The part fan gives every exposed face of the part this h. Between 40 and 459 W/(m2 K) (the bead's fan h at full speed, failsim.churchill_bernstein) on every face, each of stone's warp test cases keeps its verdict; the closest, PLA 150 x 150 x 10 mm on an open printer, keeps a margin of 1.12 to 1.33."
+  },
+  {
+   "id": "failsim.room_air",
+   "topic": "failsim",
+   "key": "room_air",
+   "value": 25,
+   "unit": "C",
+   "note": "Air around a part on an open printer (no enclosure).",
+   "quote": "A temperature of 25 °C was used as the environmental temperature.",
+   "source": "Bhandari and Lopez-Anido, Discrete-Event Simulation Thermal Model for Extrusion-Based Additive Manufacturing of PLA and ABS, Materials 2020, 13(21), 4985",
+   "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7664205/",
+   "checked": "2026-11-24",
+   "assumption": "An open printer's air is at room temperature, 25 C, with no draft beyond the part fan."
+  },
+  {
+   "id": "failsim.section_rule",
+   "topic": "failsim",
+   "key": "section_rule",
+   "value": "solid within the wall loops' width of a layer's edge and within the top and bottom shell layers; sparse infill counts at its density",
+   "unit": "rule",
+   "note": "The printed section: walls two loops wide (0.42 + 0.45 mm), 3 bottom and 5 top solid layers over any uncovered face, and 15% grid infill elsewhere (failsim.k2_shells, failsim.k2_widths). It sets how much of each layer conducts heat up the column. The corner sits on the walls, which are solid through the whole height, so the lift is worked on a solid section.",
+   "source": "stone model from failsim.k2_shells and failsim.k2_widths",
+   "cite": "stone section rule",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "Sparse infill conducts in proportion to its density. The first layers of a part count as bottom shell."
+  },
+  {
+   "id": "failsim.bond_hot",
+   "topic": "failsim",
+   "key": "bond_hot",
+   "value": "bond = min(peel stress, tensile_z x E(T_plate) / E(20 C)) x plate factor",
+   "unit": "rule",
+   "note": "The first layer sits at the plate temperature. PLA on a 50 C plate keeps 0.73 of its stiffness, so 31 x 0.73 = 22.6 MPa; ABS on a 100 C plate keeps 0.23, so 28 x 0.23 = 6.4 MPa. The peel stress (failsim.peel_specimen) is used as measured.",
+   "source": "stone assumption from materials.json modulus_vs_temp",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "The plastic's strength between layers falls with its stiffness at the plate temperature (materials.json has no strength-vs-temperature curve)."
+  },
+  {
+   "id": "failsim.k2_shells",
+   "topic": "toolpaths",
+   "value": {
+    "wall_loops": 2,
+    "bottom_shell_layers": 3,
+    "top_shell_layers": 5,
+    "sparse_infill_density": 15,
+    "sparse_infill_pattern": "grid",
+    "infill_direction": 45
+   },
+   "unit": "count",
+   "note": "Walls, solid layers and infill of the K2 0.20mm Standard profile. OrcaSlicer's own defaults are 2 walls, 3 bottom, 4 top and 20% infill; the K2 profile raises the top to 5 and lowers infill to 15%.",
+   "quote": "This is the number of solid layers of top shell, including the top surface layer.",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, shells",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24",
+   "key": "k2_shells",
+   "copy_of": "slicer.k2_shells"
+  }
+ ]
+}
