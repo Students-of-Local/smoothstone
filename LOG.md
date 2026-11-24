@@ -1111,3 +1111,24 @@ One eval each at 5eef4d5, `next` driver, card S, all passing: Cologne 9 (was 8),
 (was 8), Notre-Dame 9, St. Vitus 8, Milan 8, St Paul's 8, Eiffel 8, Florence 8. Milan, St Paul's, the Eiffel Tower
 and Florence are the same meshes as before, byte for byte, so Milan's 8 is the judge's noise on the mesh that got
 7, 7, 7 at 1964db8. It is not progress, and Milan still counts as below the bar.
+
+## 2026-11-24 landmarks 2 review: what the grader measures and how a name finds a building
+
+The round 2 mediums on PR 116, fixed.
+
+- A name match counts first only with evidence of a building: the words before the first preposition name one,
+  or Wikidata gives a style, an architect or a floor count. The old list of place words missed "human
+  settlement". Of 29 names looked up live, 27 answer as before; Windsor now gives the castle (it gave a
+  parliament constituency) and Mont Saint-Michel gives the abbey. Still wrong, and not from this change:
+  "Pantheon" gives a building in Leipzig and "St Pauls" a church in Bristol.
+- With no pack, the west towers are sought only at the west end. A plan that runs north and south takes either end.
+- A low part mapped off the ground keeps its roof beside the outline's walls, on wall up to its own base.
+- `in_mesh` counts pinnacles in the files that print, turned back to the generator's frame. Milan: 134.
+- A spec's cited length and width are compared with the built print at scale, 4% tolerance. A linked bell tower
+  no longer moves the reference: the outline stays it. Westminster's length is 0.7% off, St. Vitus's 1.1% and
+  0.8%, Florence's length 2.5%.
+- Removed from l09: the 90 m width, which nothing compared. Wikidata does not say where it is taken, and the survey
+  outline the spec also cites is 97 m across (built: 98.4). The height to width ratio still holds the plan to the survey.
+
+Westminster, St. Vitus and Florence rebuilt from saved references are byte-identical before and after. The nine
+saved builds pass the new measurements; no judge ran, because no mesh changed.
