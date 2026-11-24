@@ -1890,6 +1890,19 @@ def cmd_note(args, job: Job) -> Out:
         out.owns_next = True
         out.next = f"stone show {st['ask_recipe']}"
         return out
+    if st.get("ask_then") and asked == st.get("ask_then_q"):
+        # only the coupon question's answer calibrates; "later, carry on" drops the question instead
+        from . import fit
+
+        out.owns_next = True
+        if fit.defers(text):
+            job.update(ask_then=None, ask_then_q=None)
+            out.next = fit._continue(job)
+        else:  # calibrate reads the answer, and asks again with a way on when it cannot
+            out.next = f"{st['ask_then']} {json.dumps(text)}"
+        return out
+    if st.get("ask_then") and not asked.startswith("ask the person"):
+        job.update(ask_then=None, ask_then_q=None)  # the job moved on: a later answer is not the coupon's
     out.next = st.get("next") or "stone recipes"
     return out
 
@@ -3328,7 +3341,7 @@ def make_parser() -> Parser:
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
     s.add_argument("items", nargs="*")
 
-    s = sub.add_parser("fit", parents=[common], help="printed size and fit of holes, pegs and clearances: stone fit")
+    s = sub.add_parser("fit", parents=[common], help="printed size and fit of holes, pegs and clearances: stone fit, stone fit coupon")
     s.add_argument("items", nargs="*")
 
     s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")
