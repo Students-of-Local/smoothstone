@@ -214,6 +214,7 @@ LOOKS_CHECKED = "evals/doctor/photo_runs.jsonl, split dev"
 # weight by 1 + KNN_W * v, from the same LOOK_FLOOR start. Set on the dev photos too.
 KNN_K = 7
 KNN_W = 12.0
+KNN_CAP = 0.99  # not tuned, only below 1: a failure only the vote names stays under every described one
 
 
 # what the screen says when the firmware stopped a heater; while one stands, nothing else gets heated
@@ -247,20 +248,29 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
     base = max(scores.values(), default=0.0) or 1.0
     for lr, fid in zip(LOOK_LR, looks):
         scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * lr
-    for fid, v in (knn or {}).items():
-        if failure(fid):
-            scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * (1 + KNN_W * v)
+    votes = {fid: v for fid, v in (knn or {}).items() if failure(fid)}
+    if votes:
+        for fid in looks[len(LOOK_LR):]:  # a look past the LR list is described too, so a vote stays below it
+            scores.setdefault(fid, LOOK_FLOOR * base)
+    named = set(scores)  # what the words or --looks described
+    for fid, v in votes.items():
+        scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * (1 + KNN_W * v)
+    # the vote reorders what was described; nothing undescribed, voted or a differential of a boosted top,
+    # passes one of them
+    cap = min(scores[f] for f in named) * KNN_CAP if votes and named else math.inf
+    scores.update({f: min(s, cap) for f, s in scores.items() if f not in named})
     if scores:
         top = max(scores, key=scores.get)
         # root first: when a cause of the top failure is another failure the person also described
         # (the blob formed because the part came loose), that failure is what to fix
         roots = [c["failure"] for c in failure(top)["causes"]
-                 if scores.get(c.get("failure"), 0) >= ROOT_SHARE * scores[top]]
+                 if (c.get("failure") in named or not named)
+                 and scores.get(c.get("failure"), 0) >= ROOT_SHARE * scores[top]]
         if roots:
             root = max(roots, key=scores.get)
             scores[root], top = scores[top] * 1.05, root
         for i, d in enumerate(failure(top).get("differentials", [])):  # the catalog lists the likeliest first
-            scores.setdefault(d["id"], scores[top] * DIFF_SHARE * (1 - 0.1 * i))
+            scores.setdefault(d["id"], min(scores[top] * DIFF_SHARE * (1 - 0.1 * i), cap))
     total = sum(scores.values()) or 1.0
     ranked = sorted(((i, s / total) for i, s in scores.items()), key=lambda x: -x[1])
     if thermal_fault(said) or "thermal_error" in looks:  # a safety override, not a score: the fault comes first whatever else scores
@@ -363,7 +373,7 @@ def described(said: str, looks: list[str] = ()) -> list[str]:
     return (["thermal_error"] + [f for f in out if f != "thermal_error"]) if thermal_fault(said) else out
 
 
-def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
+def safety_lines(seen: list[str], limit: int | None = 4) -> list[str]:
     """SAFETY for the failures the person described. A thermal fault leads with its power-off lines, which
     are never cut, and drops any step that heats the hotend while the fault stands."""
     thermal = "thermal_error" in seen
@@ -376,7 +386,7 @@ def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
     if not thermal:
         return out[:limit]
     head = failure("thermal_error")["safety"] + [HEAT_FIRST]
-    return head + [ln for ln in out if ln not in head][:max(0, limit - len(head))]
+    return head + [ln for ln in out if ln not in head][:limit and max(0, limit - len(head))]
 
 
 def diagnose(said: str, printer: dict | None = None, material: str | None = None, looks: list[str] = (),
@@ -641,7 +651,8 @@ def report(case: dict, p: dict | None) -> list[str]:
     top = failure(ranked[0])
     lines = [f"Most likely: {top['name']} ({top['id']})"]
     described_ids = case.get("described", ranked[:1])
-    seen = [f for f in ranked[:3] if f in described_ids]
+    # every described failure's SAFETY, likeliest first, even one ranked below the top 3
+    seen = sorted(described_ids, key=lambda f: ranked.index(f) if f in ranked else len(ranked))
     if "thermal_error" in described_ids:  # power off comes before anything else stone says
         lines += [f"SAFETY: {s}" for s in safety_lines(["thermal_error"] + seen)]
     tell = {d["id"]: d["tell_apart"] for d in top.get("differentials", [])}
@@ -657,7 +668,7 @@ def report(case: dict, p: dict | None) -> list[str]:
         lines.append(f"On {p['name']}, {k} of {m} shared {top['id']} cases were fixed by {cid}")
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
     if "thermal_error" not in described_ids:
-        lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
+        lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1], limit=None)]
     if case.get("knn"):
         lines.append("Image match (nearest gallery photos): "
                      + ", ".join(f"{k} {v:.0%}" for k, v in list(case["knn"].items())[:3]))
