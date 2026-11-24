@@ -121,7 +121,8 @@ def build(job, case: dict) -> tuple[Path, dict, list[str]]:
     def clean(text):  # every free-text field goes through the same scrub
         if text is None:
             return None
-        text, g = scrub(str(text), names)
+        text = re.sub(r"\s*\u2014\s*", ", ", str(text)).replace("\u2013", "-")  # em and en dashes fail the CI check
+        text, g = scrub(text, names)
         gone.extend(g)
         return text
 

@@ -24,6 +24,10 @@ PHOTO = FIXTURES / "2026-11-24-creality_k2-bed_adhesion-8cb14e6" / "photo.jpg"
 
 @pytest.mark.parametrize("case_dir", CASES, ids=[c.name for c in CASES])
 def test_every_shared_case_validates(case_dir):
+    validate(case_dir)
+
+
+def validate(case_dir):
     d = json.loads((case_dir / "case.json").read_text())
     assert set(d) == KEYS and d["schema"] == 1 and d["license"] == "MIT"
     f = doctor.failure(d["failure"])
@@ -260,6 +264,23 @@ def test_send_checks_the_bundle_once_more(work, monkeypatch):
     monkeypatch.setattr(share, "scrub", scrub)
     text, code, nxt = stone("doctor", "share", "--send")
     assert code == 1 and "Nothing was sent" in text and gh.calls == [], (text, gh.calls)
+
+
+def test_dashes_in_the_words_pass_the_community_check(work, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    _fixed_case(work)
+    job = SimpleNamespace(root=work / "stone-job")
+    case = share.last_fixed(job)
+    case["said"] = "the print came off \u2014 twice \u2014 on the 1\u20132 mm part"
+    case["outcome"]["what_worked"] = "washed the plate\u2014then dried it"
+    bundle, d, gone = share.build(job, case)
+    assert d["said"] == "the print came off, twice, on the 1-2 mm part" and d["fixed_by"] == "washed the plate, then dried it"
+    dest = tmp_path / d["id"]
+    dest.mkdir()
+    for name in ("case.json", "photo.jpg"):
+        shutil.copy(bundle / name, dest / name)
+    validate(dest)
 
 
 def test_owner_skips_the_fork(work, monkeypatch):
