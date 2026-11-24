@@ -379,3 +379,37 @@ def test_f4_shared_outcome_has_no_paths_addresses_or_emails(work):
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)
+
+
+# review round 2 (PR #92)
+
+THERMAL_SAID = [
+    "the part came off the plate and turned into a spaghetti bird nest, a big lump of plastic around the nozzle, "
+    "and the screen said thermal runaway",
+    "big lump of plastic around the nozzle, the part came off the bed, strings everywhere, and MINTEMP",
+    "nothing comes out of the nozzle and now the screen shows a thermal runaway",
+]
+
+
+@pytest.mark.parametrize("said", THERMAL_SAID)
+def test_r2_thermal_fault_leads_whatever_else_scores(work, said):
+    assert doctor.diagnose(said)["failures"][0][0] == "thermal_error"
+    text, code, nxt = stone("doctor", said)
+    lines = text.splitlines()
+    assert lines[1] == "Most likely: Heater or thermistor error (thermal_error)", text
+    first = next(i for i, ln in enumerate(lines) if ln.startswith("SAFETY: "))
+    assert lines[first].startswith("SAFETY: Thermal errors are the firmware stopping a heater"), text
+    assert first < min(i for i, ln in enumerate(lines) if ln.startswith(("Also check", "Cause 1"))), text
+    assert not any(h in text.lower() for h in ("heat the hotend", "with the hotend hot", "heat up and push")), text
+
+
+def test_r2_thermal_fault_keeps_heating_steps_out_of_try(work):
+    stone("doctor", "Blocked nozzle. MINTEMP.")
+    text, code, nxt = stone("doctor", "try", "debris_or_burnt")
+    assert "Heat up and push" not in text, text
+    for cid in [c["id"] for c in doctor.failure("clog")["causes"]]:
+        assert "Heat up" not in stone("doctor", "try", cid)[0]
+
+
+def test_r2_a_denied_thermal_fault_does_not_lead():
+    assert doctor.diagnose("no thermal error on the screen, just strings everywhere")["failures"][0][0] == "stringing"
