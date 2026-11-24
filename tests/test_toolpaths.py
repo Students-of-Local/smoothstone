@@ -59,7 +59,7 @@ def test_generated_layers_take_orcas_time_for_the_same_plate():
                        "first_layer": 500, "solid_infill": 10000, "sparse_infill": 10000},
             "shells": {"wall_loops": 3, "bottom_shell_layers": 5, "top_shell_layers": 6, "sparse_infill_density": 12},
             "support": {"line_width": .42, "base_pattern_spacing": 2.5, "top_z_distance": .2, "object_xy_distance": .35},
-            "jerk": 9.0, "max_feed": orca.max_feed, "max_accel": orca.max_accel}
+            "jerk": 9.0, "max_feed": np.atleast_2d(orca.max_feed)[-1].tolist(), "max_accel": np.atleast_2d(orca.max_accel)[-1].tolist()}
     ours = toolpaths.generate(trimesh.creation.box((side, side, 0.8)), prof, 0.2, None,
                               ((x.min() + x.max()) / 2, (y.min() + y.max()) / 2))
     assert ours.layer_z == orca.layer_z
