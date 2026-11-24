@@ -1,0 +1,10 @@
+{
+ "id": "b23_fallen_mast",
+ "said": "The skinny mast was almost finished when the nozzle smacked it and it fell sideways. Foot stayed attached to the mast, whole thing lying there.",
+ "printer": "bambu_a1",
+ "material": "PLA",
+ "expect": {
+  "top": "toppled",
+  "top3_includes": []
+ }
+}

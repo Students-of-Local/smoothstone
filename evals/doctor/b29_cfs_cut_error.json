@@ -1,0 +1,10 @@
+{
+ "id": "b29_cfs_cut_error",
+ "said": "K2 Plus won't get past the first color change. CFS retracts, tries again, then throws a cutter error. Nothing wrong with the printed layers yet.",
+ "printer": "creality_k2_plus",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "f24_abs_fissure",
+ "said": "my abs box split down one side while cooling, jagged crack crosses several layers and corners stayed down",
+ "printer": "voron_24",
+ "material": "ABS",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": []
+ }
+}

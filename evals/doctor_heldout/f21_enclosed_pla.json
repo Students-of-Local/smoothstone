@@ -1,0 +1,12 @@
+{
+ "id": "f21_enclosed_pla",
+ "said": "pla stops feeding after forty minutes with door shut, pulled end is swollen above melt zone, works again after cooling",
+ "printer": "creality_k1c",
+ "material": "PLA",
+ "expect": {
+  "top": "heat_creep",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

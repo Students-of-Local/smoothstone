@@ -1,0 +1,12 @@
+{
+ "id": "h30_flex_damp",
+ "said": "My TPU sounds like Rice Krispies coming out and leaves foamy little pits plus fuzz between everything. Turning retraction way up didn't help after the spool spent weeks out in the garage.",
+ "printer": "anycubic_kobra_3",
+ "material": "TPU",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": [
+   "stringing"
+  ]
+ }
+}

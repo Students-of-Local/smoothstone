@@ -1,0 +1,10 @@
+{
+ "id": "b32_shower_of_hairs",
+ "said": "My TPU phone case looks like it grew fur inside every opening. Thin stretchy strands connecting separate walls, no bubbles or missing lines.",
+ "printer": "bambu_a1_mini",
+ "material": "TPU",
+ "expect": {
+  "top": "stringing",
+  "top3_includes": []
+ }
+}

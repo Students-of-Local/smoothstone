@@ -1,0 +1,10 @@
+{
+ "id": "b19_vertical_zipper",
+ "said": "My cylinder has one ugly zipper straight up the back where every loop starts. I'm convinced a belt tooth is damaged.",
+ "printer": "prusa_core_one",
+ "material": "PETG",
+ "expect": {
+  "top": "z_seam",
+  "top3_includes": []
+ }
+}

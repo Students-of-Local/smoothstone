@@ -1,0 +1,10 @@
+{
+ "id": "f35_stair_step",
+ "said": "one straight wall suddenly jumps backwards then stays there for rest of print, camera says nobody touched it",
+ "printer": "sovol_sv08",
+ "material": "PC",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

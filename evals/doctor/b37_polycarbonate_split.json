@@ -1,0 +1,12 @@
+{
+ "id": "b37_polycarbonate_split",
+ "said": "Heard a loud tick during cooldown and found a long split through the side of my PC housing. It was intact when the print ended.",
+ "printer": "bambu_x1c",
+ "material": "PC",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": [
+   "layer_separation"
+  ]
+ }
+}

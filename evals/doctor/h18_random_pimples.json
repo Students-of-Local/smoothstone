@@ -1,0 +1,12 @@
+{
+ "id": "h18_random_pimples",
+ "said": "Getting random little hard pimples scattered over the outside, not in a line or at the same spot on each lap. The rest of the wall is smooth and the spool isn't popping.",
+ "printer": "anycubic_kobra_3",
+ "material": "PETG",
+ "expect": {
+  "top": "surface_zits",
+  "top3_includes": [
+   "z_seam"
+  ]
+ }
+}

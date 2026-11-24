@@ -1,0 +1,12 @@
+{
+ "id": "h27_interface_wont_catch",
+ "said": "The supports are solid and the interface roof looks complete, but the first part lines above it won't grab and get dragged into curls. It only fails right where the part starts on top of those supports.",
+ "printer": "prusa_core_one",
+ "material": "PETG",
+ "expect": {
+  "top": "not_sticking_supports_to_part",
+  "top3_includes": [
+   "support_failure"
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "b01_plate_rejection",
+ "said": "It's definitely a bad spool. Every little piece skates around the plate before the second lap, even after I changed colors.",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": [
+   "first_layer"
+  ]
+ }
+}

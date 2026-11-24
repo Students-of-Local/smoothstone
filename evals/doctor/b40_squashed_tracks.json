@@ -1,0 +1,12 @@
+{
+ "id": "b40_squashed_tracks",
+ "said": "Why is my first layer making little waves between each pass? Nozzle leaves furrows, plastic pushes sideways, and the sheet is nearly transparent.",
+ "printer": "bambu_h2d",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": [
+   "elephant_foot"
+  ]
+ }
+}

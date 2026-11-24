@@ -1,0 +1,10 @@
+{
+ "id": "b35_thermistor_nonsense",
+ "said": "Cold printer says nozzle is 340 degrees and immediately halts with a temperature sensor fault. Rebooting gives the same number. Do I recalibrate flow?",
+ "printer": "sovol_sv08",
+ "material": "ASA",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

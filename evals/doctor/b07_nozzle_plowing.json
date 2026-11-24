@@ -1,0 +1,10 @@
+{
+ "id": "b07_nozzle_plowing",
+ "said": "Calibrated Z already. Every solid layer has raised ridges, walls are chonky, and the nozzle plows through extra plastic all the way up.",
+ "printer": "creality_k2",
+ "material": "PETG",
+ "expect": {
+  "top": "over_extrusion",
+  "top3_includes": []
+ }
+}

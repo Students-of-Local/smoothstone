@@ -1,0 +1,10 @@
+{
+ "id": "h11_regular_ridges",
+ "said": "There's a repeating fat skinny pattern up every straight wall, spaced exactly 8 mm apart in height on different models. I can see the lead screw swaying once per turn too.",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "z_wobble",
+  "top3_includes": []
+ }
+}

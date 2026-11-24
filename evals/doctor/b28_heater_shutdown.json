@@ -1,0 +1,10 @@
+{
+ "id": "b28_heater_shutdown",
+ "said": "Printer stops before starting and shows heater not heating as expected. Temperature drops on the display while target stays 250. This isn't a bed leveling issue?",
+ "printer": "voron_24",
+ "material": "ABS",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

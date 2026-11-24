@@ -1,0 +1,12 @@
+{
+ "id": "f16_fallen_trees",
+ "said": "trees snapped off the bed halfway up, now the helmet above them is a mess",
+ "printer": "anycubic_kobra_3",
+ "material": "PLA",
+ "expect": {
+  "top": "support_failure",
+  "top3_includes": [
+   "spaghetti"
+  ]
+ }
+}

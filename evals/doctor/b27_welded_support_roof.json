@@ -1,0 +1,10 @@
+{
+ "id": "b27_welded_support_roof",
+ "said": "Supports printed beautifully but their roof is basically fused into the model. Pliers tear chunks out of the underside. What setting did I wreck?",
+ "printer": "prusa_mk4s",
+ "material": "PETG",
+ "expect": {
+  "top": "not_sticking_supports_to_part",
+  "top3_includes": []
+ }
+}

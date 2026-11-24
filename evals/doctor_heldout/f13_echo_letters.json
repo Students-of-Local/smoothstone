@@ -1,0 +1,10 @@
+{
+ "id": "f13_echo_letters",
+ "said": "the letters have faint copies beside them fading away along the wall, must be duplicate geometry",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PLA",
+ "expect": {
+  "top": "ringing",
+  "top3_includes": []
+ }
+}

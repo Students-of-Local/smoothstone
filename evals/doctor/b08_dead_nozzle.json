@@ -1,0 +1,10 @@
+{
+ "id": "b08_dead_nozzle",
+ "said": "At printing temp I released the idler and tried pushing by hand. Absolutely nothing exits, even with the nozzle clear of the bed.",
+ "printer": "prusa_mk4s",
+ "material": "PLA",
+ "expect": {
+  "top": "clog",
+  "top3_includes": []
+ }
+}

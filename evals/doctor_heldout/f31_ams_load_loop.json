@@ -1,0 +1,10 @@
+{
+ "id": "f31_ams_load_loop",
+ "said": "ams retracts then loads same strand over and over, cannot reach toolhead message, no print starts",
+ "printer": "bambu_x1c",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

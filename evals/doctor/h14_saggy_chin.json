@@ -1,0 +1,10 @@
+{
+ "id": "h14_saggy_chin",
+ "said": "The chin on my bust is all droopy noodles underneath while the upright face is clean. It's a steep outward slope with nothing supporting it.",
+ "printer": "bambu_x1c",
+ "material": "PLA",
+ "expect": {
+  "top": "overhang_droop",
+  "top3_includes": []
+ }
+}

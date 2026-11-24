@@ -1,0 +1,10 @@
+{
+ "id": "f22_chewed_tpu",
+ "said": "extruder gears spin in a hollow chewed into the rubber filament, pile of dust under feeder",
+ "printer": "bambu_a1",
+ "material": "TPU",
+ "expect": {
+  "top": "feeder_grinding",
+  "top3_includes": []
+ }
+}

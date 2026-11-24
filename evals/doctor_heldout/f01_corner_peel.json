@@ -1,0 +1,10 @@
+{
+ "id": "f01_corner_peel",
+ "said": "glue is defective for sure, the middle stays flat but all four corners curl up overnight",
+ "printer": "creality_k2_plus",
+ "material": "ASA",
+ "expect": {
+  "top": "warping",
+  "top3_includes": []
+ }
+}
