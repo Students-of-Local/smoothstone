@@ -2172,6 +2172,17 @@ def cmd_strength(args, job: Job) -> Out:
     return out
 
 
+def cmd_heat(args, job: Job) -> Out:
+    """Will it keep its shape where it lives, and will it warp on the bed."""
+    from . import heat
+
+    out = Out(owns_next=False)
+    plan = job.plan() if job.exists() else None
+    pick = reftool.material_for(job.request(), rc.load(plan["recipe"]), plan["params"]) if plan else None
+    heat.report(job, args.items, out, pick.info.name if pick else "")
+    return out
+
+
 def cmd_video(args, job: Job) -> Out:
     """A vertical clip of a finished painted job for X, from the run log of the model that made it.
     The log defaults to log.json beside the job folder, where evals/run.py writes it."""
@@ -3455,6 +3466,9 @@ def make_parser() -> Parser:
     s = sub.add_parser("strength", parents=[common], help="will it hold: stone strength load=20N at=tip dir=down fixed=bottom")
     s.add_argument("items", nargs="*")
 
+    s = sub.add_parser("heat", parents=[common], help="will it take the heat: stone heat where=car|sun|dishwasher|outdoor|70C")
+    s.add_argument("items", nargs="*")
+
     sub.add_parser("done", parents=[common], help="finish the job")
 
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
@@ -3526,6 +3540,7 @@ COMMANDS = {
     "product": cmd_product,
     "refs": cmd_refs,
     "strength": cmd_strength,
+    "heat": cmd_heat,
     "done": cmd_done,
     "colors": cmd_colors,
     "video": cmd_video,
