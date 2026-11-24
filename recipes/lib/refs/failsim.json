@@ -435,7 +435,7 @@
    "key": "peel.abs",
    "value": 60,
    "unit": "N",
-   "note": "ABS on borosilicate glass, the highest peel force of the series, read off Fig. 76 (bar 60 N, error bar 54 to 66).",
+   "note": "ABS on borosilicate glass, read off Fig. 76 by eye: the bar, of the peak forces, is at 60 N, its error bar 54 to 66.",
    "quote": "In Fig. 76 the observed maximum forces for each build surface and filament are plotted.",
    "source": "Laumann, Spiehl, Doersam, Device for measuring part adhesion in FFF process, HardwareX 2022, 11, e00258 (CC BY)",
    "cite": "HardwareX 2022 11:e00258 FFF adhesion device",
@@ -1346,7 +1346,7 @@
    "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7664205/",
    "checked": "2026-11-24",
-   "assumption": "The part fan gives every exposed face of the part this h. Between 40 and 459 W/(m2 K) (the bead's fan h at full speed, failsim.churchill_bernstein) on every face, each of stone's warp test cases keeps its verdict; the closest, PLA 150 x 150 x 10 mm on an open printer, keeps a margin of 1.12 to 1.33."
+   "assumption": "The part fan gives every exposed face of the part this h. Between 40 and 459 W/(m2 K) (the bead's fan h at full speed, failsim.churchill_bernstein) on every face, each of stone's warp test cases keeps its verdict but one: ABS 150 x 150 x 10 mm on an open printer comes loose from 100 up and holds at 40 (margin 1.11). PLA there keeps a margin of 1.53 to 1.83."
   },
   {
    "id": "failsim.room_air",
@@ -1425,14 +1425,14 @@
    "id": "failsim.bond_rule",
    "topic": "failsim",
    "key": "bond_rule",
-   "value": "bond = min(peel stress, tensile_z) x min(1, hold(T_plate - Tg) / hold(T_peel - Tg)) x plate factor",
+   "value": "bond = min(peel stress, tensile_z) x min(1, hold(max(T_plate, T_peel) - Tg) / hold(T_peel - Tg)) x plate factor",
    "unit": "rule",
-   "note": "hold is failsim.hold_curve. PLA was peeled at 50 C (11 C under its Tg): an 80 C plate holds 0.75 of that, and a 60 C plate counts as no better, though the curve says 1.6 times. PETG and ABS were peeled 30 and 24 C past their Tg, the weakest part of the curve, so their measured force stands at every colder plate. A plate is never credited with more than was measured.",
+   "note": "hold is failsim.hold_curve. PLA was peeled at 50 C (11 C under its Tg): an 80 C plate holds 0.82 of that, and a 60 C plate counts as no better, though the curve says 1.5 times. The curve is of parts that cooled after printing, so it says nothing of a colder plate. PETG and ABS were peeled 30 and 24 C past their Tg, the weakest part of the curve, so their measured force stands at every colder plate. A plate is never credited with more than was measured.",
    "source": "stone rule from failsim.peel.* and failsim.hold_curve",
    "cite": "assumption",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "The plate holds what the peel test on glass measured, less on a plate so warm that PLA on polyimide held less (PETG and ABS by the same curve, past their own Tg), never more than the plastic's strength between layers. How much less a first layer laid on a cold plate sticks is not modeled"
+   "assumption": "The plate holds what the peel test on glass measured, less on a plate so warm that PLA on polyimide held less (PETG and ABS by the same curve, past their own Tg), never more than the plastic's strength between layers as tested at room temperature. PETG and ABS were peeled on plates 30 and 24 C past their Tg, where they hold least, so on a colder plate 'comes loose' can be a false alarm. How much less a first layer laid on a cold plate sticks is not modeled"
   },
   {
    "id": "failsim.k2_shells",

@@ -382,12 +382,12 @@ def drop_strand(path_xyz, speed_mm_s: float = 200.0, flow_mm3_s: float = 10.0, g
 def bond_stress(mat="PLA", clean: float = 1.0, bed: float | None = None) -> float:
     """MPa the plate's bond holds at the edge: the peel force as an edge stress, 2 P lambda / b
     (Hetenyi, first layer as the foundation), capped at the plastic's own strength between layers,
-    less by how much less this plate holds than the peel test's (failsim.bond_rule), times the plate factor."""
+    less on a plate hotter than the peel test's that holds less than it did (failsim.bond_rule), times the plate factor."""
     m = _mat(mat)
     sp = fact("peel_specimen")
     lam = (3 / (sp["thickness"] * sp["thickness"] ** 3)) ** 0.25
     past, hold = np.asarray(fact("hold_curve"), float).T
-    now, then = np.interp(np.array([m.bed if bed is None else bed, m.peel_bed]) - m.tg, past, hold)
+    now, then = np.interp(np.maximum([m.bed if bed is None else bed, m.peel_bed], m.peel_bed) - m.tg, past, hold)
     return min(2 * m.peel * lam / sp["width"], m.tensile_z) * min(1.0, float(now / then)) * clean
 
 

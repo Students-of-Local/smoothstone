@@ -236,10 +236,11 @@ def test_abs_slab_on_an_open_printer_lifts_and_pla_does_not():
 
 
 @pytest.mark.parametrize("bed", [50, 55, 60, 65, 70])
-def test_pla_holds_on_the_beds_people_print_it_on_and_best_near_its_tg(bed):
+def test_pla_holds_on_the_beds_people_print_it_on_and_less_on_hotter_ones(bed):
     n = _box((60, 60, 4), 0.5, bed=bed)[0]
     assert n.kind == "none" and n.numbers["margin"] > 2  # 60 and 70 C let go when the cap fell with stiffness
-    assert fs.bond_stress("PLA", bed=60) >= fs.bond_stress("PLA", bed=bed) > fs.bond_stress("PLA", bed=90) > fs.bond_stress("PLA", bed=100)
+    assert fs.bond_stress("PLA", bed=40) == fs.bond_stress("PLA", bed=bed) > fs.bond_stress("PLA", bed=90) > fs.bond_stress("PLA", bed=100)
+    assert fs.bond_stress("PETG", bed=70) == fs.bond_stress("PETG", bed=96) >= fs.bond_stress("PETG", bed=110)
 
 
 def test_an_open_printers_ledge_droops_and_curls_in_the_same_room_air():
