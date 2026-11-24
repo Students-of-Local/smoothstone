@@ -5,7 +5,10 @@ one below, the way a slicer's support generator does:
 
 - a piece with nothing under it starts in mid air (island);
 - a part of a layer reaching farther past the layer below than one layer's reach hangs (ledge); the
-  reach is layer height x tan(90 - threshold), with OrcaSlicer's 30 deg threshold from the bed;
+  reach is layer height x tan(90 - threshold), with OrcaSlicer's 30 deg threshold from the bed. On a
+  0.1 mm grid one 0.2 mm layer's step is only 3 or 4 pixels either side of the 3.5 pixel reach, so
+  pixels alone cannot tell 58 deg from 63; a piece within a pixel of the reach (about 50 to 72 deg
+  from vertical) hangs only when a face past the threshold bounds it;
 - a hanging piece held on two opposite sides is a bridge, and prints with no support up to the
   slicer's max bridge length (10 mm in OrcaSlicer and its K2 profile).
 
@@ -25,11 +28,13 @@ from pathlib import Path
 
 import numpy as np
 
-from . import refs, slicer
+from . import config, refs, slicer
 
 LAYER = slicer.LAYER  # mm
 PX = 0.1  # mm: the grid a layer is drawn on; a bigger part gets a coarser one
 MAX_PIXELS = 2_500_000  # per layer
+MAX_SIZE = 1000.0  # mm: a part longer than this on any side is in the wrong units (no bed is that big)
+MAX_LAYERS = 10_000  # 2 m at 0.2 mm layers
 COVER = 0.9  # share of a hanging piece the lines of one direction must cross, held at both ends, to call it a bridge (stone's rule)
 LINK = 1.0  # mm: hanging pieces this close in consecutive layers are one region
 FACE_NEAR = 1.0  # mm: a face this close to a region's points belongs to it
@@ -78,9 +83,18 @@ class Grid:
 
 
 def cut(mesh, layer: float = LAYER, px: float | None = None):
-    """The grid, and an iterator over every layer's filled cross-section (h, w) cut at mid layer."""
+    """The grid, and an iterator over every layer's filled cross-section (h, w) cut at mid layer.
+    Raises ValueError for a part no printer could hold: its layers would take hours or not fit in
+    memory."""
     lo, hi = (np.asarray(b, float) for b in mesh.bounds)
     ext = hi - lo
+    if not layer > 0:
+        raise ValueError(f"layer height {layer} mm is not a layer height")
+    if float(ext.max()) > MAX_SIZE:
+        raise ValueError(f"the part is {' x '.join(f'{v:.0f}' for v in ext)} mm, too big for any bed: "
+                         "is it in the wrong units (inches, microns)?")
+    if ext[2] / layer > MAX_LAYERS:
+        raise ValueError(f"{ext[2]:.0f} mm at {layer} mm layers is {ext[2] / layer:.0f} layers, over {MAX_LAYERS}")
     px = px or max(PX, math.sqrt((ext[0] + 1) * (ext[1] + 1) / MAX_PIXELS))
     margin = 3 * px
     w = int(math.ceil((ext[0] + 2 * margin) / px))
@@ -165,6 +179,37 @@ class _Union:
         self.up[self.root(a)] = self.root(b)
 
 
+class _Steep:
+    """The faces past the threshold, to ask whether one bounds a piece the pixels cannot decide."""
+
+    def __init__(self, mesh, layer: float, tol: float):
+        ang, bed = face_angles(mesh)
+        t = np.asarray(mesh.triangles, float)[(ang > 90 - threshold()) & ~bed]
+        self.t, self.lo, self.hi = t, t.min(1), t.max(1)
+        self.half, self.tol = layer / 2, tol
+
+    def near(self, x: np.ndarray, y: np.ndarray, z: float, most: int = 400) -> bool:
+        """Whether a steep face lies within tol of any point (x, y, z); z is the middle of the slab
+        between this layer's cut and the one below, where the face that makes the step crosses."""
+        if not len(self.t):
+            return False
+        from trimesh.triangles import closest_point
+
+        tol = self.tol
+        sel = ((self.lo[:, 2] <= z + self.half + tol) & (self.hi[:, 2] >= z - self.half - tol)
+               & (self.lo[:, 0] <= x.max() + tol) & (self.hi[:, 0] >= x.min() - tol)
+               & (self.lo[:, 1] <= y.max() + tol) & (self.hi[:, 1] >= y.min() - tol))
+        if not sel.any():
+            return False
+        k = max(1, int(math.ceil(len(x) / most)))
+        p = np.c_[x[::k], y[::k], np.full(len(x[::k]), z)]
+        for t in np.array_split(self.t[sel], max(1, int(sel.sum()) * len(p) // 200_000)):
+            tt, pp = np.repeat(t, len(p), 0), np.tile(p, (len(t), 1))
+            if (np.linalg.norm(closest_point(tt, pp) - pp, axis=1) <= tol).any():
+                return True
+        return False
+
+
 def analyze(mesh, layer: float = LAYER, material: str = "PLA", px: float | None = None, columns: bool = False) -> dict:
     """Everything stone supports reports, as a dict ready for supports.json. With columns=True it also
     keeps, under "_columns", each needed region's pixels per layer for the toolpath generator."""
@@ -176,6 +221,13 @@ def analyze(mesh, layer: float = LAYER, material: str = "PLA", px: float | None 
     grid, layers = cut(mesh, layer, px)
     px, px2 = grid.px, grid.px * grid.px
     rpx = reach(layer) / px
+    # Each edge snaps to the grid, so a step of a pixels shows as floor(a) or ceil(a), and a square
+    # corner as up to sqrt(2) x (a + 1). A face past the threshold (a > rpx) therefore always shows
+    # a pixel farther than rpx - 1, and a face under it never one farther than sqrt(2) x (rpx + 1).
+    # Pixels past the first are candidates; one past the second hangs on the pixels' word; between
+    # the two (about 50 to 72 deg at 0.1 mm), the faces decide.
+    lo_px, hi_px = rpx - 1, math.sqrt(2) * (rpx + 1)
+    steep = _Steep(mesh, layer, max(px, layer))
     limit = max_bridge()
     eight = np.ones((3, 3), bool)
     link = int(math.ceil(LINK / px))
@@ -200,10 +252,17 @@ def analyze(mesh, layer: float = LAYER, material: str = "PLA", px: float | None 
             win = (slice(max(0, rows[0] - pad), rows[-1] + pad + 1), slice(max(0, cs[0] - pad), cs[-1] + pad + 1))
             lm, lp = mask[win], prev[win]
             d = ndimage.distance_transform_edt(~lp) if lp.any() else np.full(lm.shape, np.inf)
-            far = lm & (d > rpx)
+            far = lm & (d > lo_px)
             nxt = np.zeros(lm.shape, np.int32)
+            found = []
             if far.any():
-                lab, k = ndimage.label(far, eight)
+                lab, _ = ndimage.label(far, eight)
+                for c, box in enumerate(ndimage.find_objects(lab), 1):
+                    yy, xx = np.nonzero(lab[box] == c)
+                    yy, xx = yy + box[0].start, xx + box[1].start
+                    if d[yy, xx].max() > hi_px or steep.near(grid.x(xx + win[1].start), grid.y(yy + win[0].start), grid.z(i)):
+                        found.append((yy, xx))
+            if found:
                 ulab, _ = ndimage.label(lm & ~lp, eight)
                 mlab, mk = ndimage.label(lm, eight)
                 held = np.zeros(mk + 1, bool)
@@ -211,11 +270,8 @@ def analyze(mesh, layer: float = LAYER, material: str = "PLA", px: float | None 
                 held[0] = False
                 below = ndimage.grey_dilation(hang[win], footprint=slicer._disk(link)) if hang[win].any() else hang[win]
                 uboxes = ndimage.find_objects(ulab)
-                for c, box in enumerate(ndimage.find_objects(lab), 1):
-                    me = lab[box] == c
-                    r0, c0 = box[0].start, box[1].start
-                    yy, xx = np.nonzero(me)
-                    at = (yy[0] + r0, xx[0] + c0)
+                for yy, xx in found:
+                    at = (yy[0], xx[0])
                     kind, span = "ledge", None
                     if not held[mlab[at]]:
                         kind = "island"
@@ -225,10 +281,10 @@ def analyze(mesh, layer: float = LAYER, material: str = "PLA", px: float | None 
                         if got:
                             span = round(got[0], 2)
                             kind = "bridge" if got[0] <= limit else "long bridge"
-                    gr, gc = yy + r0 + win[0].start, xx + c0 + win[1].start
+                    gr, gc = yy + win[0].start, xx + win[1].start
                     need = kind != "bridge"
                     vol = float(np.clip(zb - top[gr, gc], 0, None).sum()) * px2 if need else 0.0
-                    lean = math.degrees(math.atan2(float(d[yy + r0, xx + c0].max()) * px, layer)) if kind == "ledge" else 90.0
+                    lean = math.degrees(math.atan2(float(d[yy, xx].max()) * px, layer)) if kind == "ledge" else 90.0
                     step = max(1, int(round(0.5 / px)))
                     keep = (gr % step == 0) & (gc % step == 0)
                     if not keep.any():
@@ -238,10 +294,10 @@ def analyze(mesh, layer: float = LAYER, material: str = "PLA", px: float | None 
                                    "span": span, "need": need, "mm3": vol, "lean": lean,
                                    "x": float(grid.x(gc).mean()), "y": float(grid.y(gr).mean()),
                                    "pts": np.c_[grid.x(gc[keep]), grid.y(gr[keep]), np.full(keep.sum(), grid.z(i))]})
-                    for other in np.unique(below[yy + r0, xx + c0]):
+                    for other in np.unique(below[yy, xx]):
                         if other and pieces[other - 1]["need"] == need:
                             uf.join(pid, int(other) - 1)
-                    nxt[yy + r0, xx + c0] = pid + 1
+                    nxt[yy, xx] = pid + 1
                     if columns and need:
                         cols.append((pid, i, gr, gc, np.round(top[gr, gc] / layer).astype(np.int32)))
             hang[:] = 0
@@ -363,10 +419,14 @@ def orientations(mesh) -> list[dict]:
     return out
 
 
-def advice(orients: list[dict]) -> dict:
+def advice(orients: list[dict], needed: bool = True) -> dict:
+    """The rest to suggest. A part the layers say needs no support stays as built: the face estimate
+    counts bridge ceilings, which print without support."""
+    now = orients[0]
+    if not needed:
+        return {"best": now["name"], "keep": True, "line": "Orientation: as built, it needs no support"}
     ok = [o for o in orients if o["first_layer_mm2"] >= slicer.FIRST_LAYER_MIN] or orients[:1]
     best = min(ok, key=lambda o: (o["support_mm3"], -o["first_layer_mm2"]))
-    now = orients[0]
     keep = best is now or now["support_mm3"] - best["support_mm3"] <= max(0.1 * now["support_mm3"], 50.0)
     return {"best": now["name"] if keep else best["name"], "keep": keep,
             "line": (f"Orientation: as built is best ({now['support_mm3'] / 1000:.1f} cm3 of support space)" if keep else
@@ -406,7 +466,7 @@ def _report(mesh, grid, pieces, uf, first, mass, material) -> dict:
             "threshold_deg": threshold(), "reach_mm": round(reach(grid.layer), 3), "max_bridge_mm": max_bridge(),
             "regions": need, "bridges": [r for r in regions if not r["need"]], "bands_mm2": bands,
             "support": {"space_mm3": round(vol, 1), "plastic_mm3": round(vol * fill, 1), "fill": round(fill, 3)},
-            "tipping": _tipping(mesh, grid, first, mass, material), "orientations": orients, "advice": advice(orients),
+            "tipping": _tipping(mesh, grid, first, mass, material), "orientations": orients, "advice": advice(orients, bool(need)),
             "sources": list(SOURCES), "_rgb": rgb}
 
 
@@ -490,7 +550,20 @@ def cmd(args, job, out):
         material = refs.material_for(job.request()).material
     material = (material or "PLA").upper()
     mesh = load(f)
-    rep = analyze(mesh, layer=args.layer, material=material)
+    bed = config.bed(job.root)
+    size = [round(float(v), 1) for v in mesh.extents]
+    if any(size[k] > bed[k] + 1e-6 for k in range(3)):  # as stone slice: nothing else matters until it fits
+        out.fix(f"{f.name} is {size[0]:g} x {size[1]:g} x {size[2]:g} mm and does not fit the "
+                f"{bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm bed; if it is in the wrong units (inches, "
+                "microns), export it again in mm")
+        out.next = "stone supports <file.stl>" if args.file else "stone build"
+        return out
+    try:
+        rep = analyze(mesh, layer=args.layer, material=material)
+    except ValueError as e:
+        out.fix(str(e))
+        out.next = "stone supports <file.stl>" if args.file else "stone build"
+        return out
     js, png = write(rep, mesh, job.build_dir if job.exists() and not args.file else f.parent)
     out.add(f"File: {f} ({material}, {args.layer} mm layers)")
     out.add(*lines(rep))
