@@ -278,7 +278,7 @@ class Strand:
         if floor is not None:  # what moved over higher ground this step stops at its side
             go = x[:, :2] - self.x[:, :2]
             via = np.linspace(0, 1, int(_norm(go).max() / r.min()) + 2)[1:, None, None] * go + self.x[:, :2]
-            path = np.asarray(self.ground(via[..., 0] * 1e3, via[..., 1] * 1e3), float) * 1e-3 + r
+            path = np.asarray(self.ground(*via.reshape(-1, 2).T * 1e3), float).reshape(-1, n) * 1e-3 + r
             f2 = path[-1]
             wall = ~hold & ((path > self.x[:, 2] + r) & (path > floor + 1e-6)).any(0)
             x[wall, :2] = self.x[wall, :2]

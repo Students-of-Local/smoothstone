@@ -159,7 +159,7 @@ def test_it_welds_to_hot_enough_plastic_and_not_to_the_bed():
 
 @pytest.mark.parametrize("mm_s", (200, 2000))
 def test_a_wall_one_line_thick_stops_it(mm_s):
-    s = rod(10, ground=lambda x, y: np.where(np.abs(y - 3) < 0.21, 5.0, 0.0), temp=25)
+    s = rod(10, ground=lambda x, y: np.where(np.abs(np.c_[x, y][:, 1] - 3) < 0.21, 5.0, 0.0), temp=25)
     s.x[:, 2] = 0.3e-3
     s.v[:, 1] = mm_s * 1e-3
     for _ in range(60):
