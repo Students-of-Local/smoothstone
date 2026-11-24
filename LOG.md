@@ -1024,29 +1024,34 @@ finished it, found the faults below and ran the checks.
   and the old model 50 of its 54 labels. l03 now wants 135 pinnacles, 134 in the mesh, where it wanted 50 labels.
 - New specs: l07 to l10 (no pack) and regressions/r8_milan_pinnacles.
 
-`--driver next`, seed 1, one attempt each on the final code (c3aa0d6):
+`--driver next`, seed 1, one attempt per code state. "Before review" is c3aa0d6. "After review" is the last
+state whose change can touch that spec: 626a339, fabe827 (St. Vitus, Florence) or 647c3df (Milan).
 
-| spec | landmarks 1 | landmarks 2 |
-| --- | --- | --- |
-| l01 Cologne | 8 | 9 |
-| l02 Taj Mahal | 8 | 8 |
-| l03 Milan | 6 | 8 |
-| l04 Notre-Dame | 7 | 9 |
-| l05 St Paul's | 8 | 8 |
-| l06 Eiffel Tower | 8 | 8 |
-| l07 Westminster Abbey | new | 9 |
-| l08 St. Vitus | new | 8 |
-| l09 Florence Cathedral | new | 9 |
-| l10 Sydney Opera House | new | not built: the honest FIX line and NEXT `stone models` |
-| r8 Milan pinnacles | 50 of 135 standing | 134 standing, judge 7: FAIL |
+| spec | landmarks 1 | before review | after review |
+| --- | --- | --- | --- |
+| l01 Cologne | 8 | 9 | 8 |
+| l02 Taj Mahal | 8 | 8 | 9 |
+| l03 Milan | 6 | 8 | 7: FAIL |
+| l04 Notre-Dame | 7 | 9 | 9 |
+| l05 St Paul's | 8 | 8 | 8 |
+| l06 Eiffel Tower | 8 | 8 | 8 |
+| l07 Westminster Abbey | new | 9 | 9 |
+| l08 St. Vitus | new | 8 | 8 |
+| l09 Florence Cathedral | new | 9 | 8 |
+| l10 Sydney Opera House | new | not built: the honest FIX line and NEXT `stone models` | same |
+| r8 Milan pinnacles | 50 of 135 standing | 134 standing, judge 7: FAIL | judge 7: FAIL |
 
-Milan is borderline: l03 and r8 ask for the same model, and the judge gave 8 and 7 twice (two code states).
-r8's mesh and print checks pass and its likeness fails; it stays in as an open fault. Runs during the climb
-failed first: Milan, Notre-Dame and Florence at 7, St. Vitus twice on checks.
-LFM3-1.7B with card S, one `stone landmark` call: Milan 8 on the final code; Westminster 9 and the Sydney
-fallback one commit earlier. m01 to m06 pass (found models, run before the last two commits).
-Suite 1337 passed, 2 skipped; timing passes; the ratchet holds.
+Milan is below the bar. l03, r8 and LFM3-1.7B ask for the same model: the judge gave 7, 7, 8 on fabe827 and
+7, 7, 8 on 647c3df. The steady complaint is right: the six front piers are too shallow to see. Open, next.
+LFM3-1.7B with card S, one `stone landmark` call: Milan 8 on 647c3df; Westminster 9 and the Sydney fallback at
+6963db0. m01 to m06 pass (found models, run before the review fixes).
+Suite on 647c3df 1452 passed, 2 skipped; timing passes; the ratchet holds.
 
-Open, from the judge: Milan's facade reads flat and its spires as plain rods (the middle front pair is 4 m
-short of the survey); the Taj lacks its guldastas; the Eiffel's second deck is nearly missing; St Paul's side
+From review: the pier feet hung 2 mm over the bed and made the print 2.6 mm too long; a Mughal building with no
+pack and a bell tower outside Gothic lost their facade detail; estimated pinnacle heights were filed as
+measured. Front spire tips now come from the laser survey (65 m and 55.25 m), not the map's rounder 60 and 46.
+The first fixes stopped Milan from building (626a339, a loose shaving) and split St. Vitus's low walls in 45
+pieces (judge 7); the unit tests passed on both, and only the evals caught them.
+
+Open, from the judge: Milan's piers are shallow and its spires plain rods; the Taj lacks its guldastas; the Eiffel's second deck is nearly missing; St Paul's side
 walls are blank; St. Vitus's south tower is too slim. Physical prints untested. The held-out six stay sealed.
