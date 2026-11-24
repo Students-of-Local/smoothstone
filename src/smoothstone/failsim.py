@@ -352,11 +352,13 @@ def printed_section(masks, cell: float, infill: float | None = None) -> dict:
     top, bot = np.ones_like(st), np.ones_like(st)  # covered by each of the next top / last bottom layers
     for s in range(1, sh["top_shell_layers"] + 1):
         nxt = np.zeros_like(st)
-        nxt[:n - s] = st[s:]
+        if s < n:  # a part thinner than the shells: the offset reaches past the stack
+            nxt[:n - s] = st[s:]
         top &= nxt
     for s in range(1, sh["bottom_shell_layers"] + 1):
         prv = np.zeros_like(st)
-        prv[s:] = st[:n - s]
+        if s < n:
+            prv[s:] = st[:n - s]
         bot &= prv
     area, perim, share = np.zeros(n), np.zeros(n), np.zeros(n)
     for j in range(n):

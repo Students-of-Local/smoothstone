@@ -167,6 +167,11 @@ def test_pla_parts_that_print_fine_predict_none(ext, cell, kw):
         assert n["tip_hold_nmm"] == pytest.approx(0.40 * 10 * 10 ** 2 / 2, abs=0.5)
 
 
+@pytest.mark.parametrize("h", [0.2, 0.4, 0.6, 0.8])
+def test_a_part_thinner_than_the_shells_predicts(h):
+    assert [f.kind for f in _box((30, 20, h), 0.5)] == ["none"]  # a 1 to 4 layer tag or first-layer square
+
+
 def test_clean_plate_keeps_the_flat_plate_and_a_dirty_one_lets_go():
     plate = [_rect((130, 210), 5, 125, 5, 205)] * 10  # 100 x 60 x 2 mm at 0.5 mm cells
     clean = fs.predict(fs.Inputs(plate, 0.5))
