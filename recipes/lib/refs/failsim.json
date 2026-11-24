@@ -271,12 +271,13 @@
     "tau_star_Pa": 129000.0
    },
    "unit": "Cross-WLF",
-   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade; filament PLA is close but not the same.",
+   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade: at the melt flow test of a filament PLA it is 7 times too thin, so stone keeps its shape and moves it to the filament's own index (failsim.mfi_rig).",
    "quote": "Table 2 Data-fitted Cross-WLF parameters of the PLA 3251D. A1 16.71 A2 (K) 51.60 D1 (Pa*s) 2.045 × 10^7 D3 (K/Pa) 0 T* (K) 373.15 n 0.3846 τ* (Pa) 1.29 × 10^5",
    "source": "Pricci, Physics-Based Predictive Modeling of Gravity-Induced Sagging in Support-Free Pellet Additive Manufacturing, Polymers 2025, 17(21), 2858, Table 2",
    "cite": "Polymers 2025 17:2858 Cross-WLF of PLA 3251D",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12608786/",
-   "checked": "2026-11-24"
+   "checked": "2026-11-24",
+   "assumption": "PLA's melt changes with heat and speed as an injection grade's does (NatureWorks 3251D)"
   },
   {
    "id": "failsim.abs.cross_wlf",
@@ -291,13 +292,13 @@
     "tau_star_Pa": 41070
    },
    "unit": "Cross-WLF",
-   "note": "ABS melt viscosity, capillary rheometer, Hatchbox black ABS filament. Another group fits 43,900 Pa s for a different ABS at 240 C from stretching tests (arXiv 2311.05158 Table 2), 22 times this: rubber-filled melts stiffen at slow rates, and stone does not model that.",
+   "note": "ABS melt viscosity, capillary rheometer, Hatchbox black ABS filament. It gives 1.7 times the viscosity of Polymaker's melt flow index, which stone moves it to (failsim.mfi_rig). Another group fits 43,900 Pa s for a different ABS at 240 C from stretching tests (arXiv 2311.05158 Table 2), 22 times this curve and 51 times the moved one: rubber-filled melts stiffen at slow rates, and stone does not model that.",
    "quote": "n 0.341, tau* 41070 Pa, eta_ref 2.54 x 10^12 Pa-s, T_ref 365 K, A1 28.3, A2 51.6 K",
    "source": "Colon, Kazmer, Peterson, Seppala, Characterization of Die-Swell in Thermoplastic Material Extrusion, Additive Manufacturing 2023 (NIST), Table 1",
    "cite": "NIST 936451 Table 1",
    "url": "https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=936451",
    "checked": "2026-11-24",
-   "assumption": "ABS melts as a capillary rheometer measured it (Hatchbox black ABS); stretching tests on another ABS read 22 times stiffer at slow rates, which would sag less"
+   "assumption": "ABS's melt changes with heat and speed as a capillary rheometer measured (Hatchbox black ABS); stretching tests on another ABS read 51 times stiffer at slow rates, which would sag less"
   },
   {
    "id": "failsim.petg.melt",
@@ -308,13 +309,40 @@
     "at_C": 240
    },
    "unit": "Pa s, C",
-   "note": "PETG melt viscosity at its print temperature, weight-averaged over the modes of a Giesekus fit to shear and stretch tests.",
+   "note": "PETG melt viscosity at its print temperature, weight-averaged over the modes of a Giesekus fit to shear and stretch tests: what stone's PETG, set by its flow index, is compared with.",
    "quote": "PET-G ... 240 (Table 1); Avg. eta 600 (Table 2)",
    "source": "Assessing nozzle flow dynamics in Fused Filament Fabrication through the parametric map alpha-lambda, arXiv 2311.05158, Tables 1 and 2",
    "cite": "arXiv 2311.05158 Table 2",
    "url": "https://arxiv.org/abs/2311.05158",
    "checked": "2026-11-24",
-   "assumption": "PETG's viscosity is one fit (600 Pa s at 240 C, the weighted mean of its 3 modes: the sum a slow sag feels is 600 to 1800, so it may sag less and drag on the nozzle up to 1.8 times as hard) moved to other temperatures by the universal WLF constants, thinning with speed as PLA does"
+   "assumption": "PETG's melt moves with heat by the universal WLF constants and thins with speed as PLA does; its thickness is its melt flow index, 1730 Pa s at 240 C and no speed, where a fit to shear and stretch tests of another PETG sums to 600 to 1800, so it may sag up to 2.9 times as much"
+  },
+  {
+   "id": "failsim.mfi_rig",
+   "topic": "failsim",
+   "key": "mfi_rig",
+   "value": {"die_mm": 2.095, "length_mm": 8.0, "barrel_mm": 9.5504, "piston_mm": 9.4742, "seconds": 600},
+   "unit": "mm, s",
+   "note": "The melt flow index test: a weight on a piston pushes melt through a die for ten minutes. The wall's shear stress is the weight over the mean of the barrel's and the piston's area x R / 2L, its shear rate 4Q / (pi R^3), and stress over rate is the melt's viscosity there. The index is grams of melt, read at the plastic's cold density, with the rate of an even melt and all of the weight on the bore: what the melt swells by (about a tenth), its thinning across the bore (about a tenth) and what the die's entry takes (about a sixth) would each make it thinner.",
+   "quote": "a piston 110 having a diameter of 9.4742 mm ... a barrel of diameter 9.5504 mm ... 2.095 mm and a length of 8.000 mm",
+   "source": "US Patent 12055470 B2 (the rig of ASTM D1238); ISO 1133:1997 gives the same die (2,095 mm, 8,000 mm)",
+   "cite": "US 12055470 B2; ISO 1133:1997",
+   "url": "https://patents.google.com/patent/US12055470B2/en",
+   "checked": "2026-11-24",
+   "assumption": "Each melt is as thick as its filament maker's melt flow index says (the middle of a range), read without corrections that would make it up to a third thinner at that test's speed, two fifths at rest"
+  },
+  {
+   "id": "failsim.mfi_test",
+   "topic": "failsim",
+   "key": "mfi_test",
+   "value": {"PLA": [210, 2.16], "PETG": [240, 2.16], "ABS": [220, 2.16]},
+   "unit": "C, kg",
+   "note": "The heat and weight of each plastic's melt flow index in materials.json, from the same datasheet line (each sheet's address is there).",
+   "quote": "Melt index 210\u00b0C, 2.16kg 7-11 g/10min ... Melt index 240\u00b0C, 2.16kg 10.8 g/10min ... Melt index 220\u00b0C, 2.16kg 9-14 g/10min",
+   "source": "Polymaker PolyLite PLA, PETG and ABS technical data sheets V5.4",
+   "cite": "Polymaker PolyLite datasheets",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
   },
   {
    "id": "failsim.wlf",
@@ -325,7 +353,7 @@
     "C2_K": 51.6
    },
    "unit": "log10, K",
-   "note": "Universal WLF constants, measured from the glass transition: used only to move PETG's one viscosity.",
+   "note": "Universal WLF constants, measured from the glass transition: how PETG's melt changes with heat.",
    "quote": "universal constants C1 = 17.44 and C2 = 51.6 K when the reference temperature is Tg",
    "source": "Wikipedia, Williams-Landel-Ferry equation",
    "cite": "WLF equation",

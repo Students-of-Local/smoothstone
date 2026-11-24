@@ -162,7 +162,7 @@ def test_a_tall_part_tips_about_its_edge():
 
 
 def test_a_ledge_droops_then_curls():
-    tp, inp, fail, _ = _story(_union(_box((20, 20, 2), (0, 0, 0)), _box((21.5, 20, 2), (0, 0, 2))))
+    tp, inp, fail, _ = _story(_union(_box((20, 20, 2), (0, 0, 0)), _box((23, 20, 2), (0, 0, 2))))
     assert fail.kind == "droop"
     st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))[4]
     low = min(float(b[2].min()) for b in st.bent)
