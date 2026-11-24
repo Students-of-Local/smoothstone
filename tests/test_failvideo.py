@@ -279,15 +279,21 @@ def test_the_frame_before_the_failure_is_the_timelapse_frame(jobenv, tmp_path, m
     assert np.abs(c - b).mean() > 0.5  # and the failure itself is not
 
 
-def test_the_model_runs_at_the_prints_own_settings():
-    tp = gcode.parse(Path(__file__).parent / "fixtures" / "gcode" / "prusa_screw.gcode.gz")
+def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
+    tp = gcode.parse(file := Path(__file__).parent / "fixtures" / "gcode" / "prusa_screw.gcode.gz")
     gcode.plan(tp)
     inp = failvideo.inputs(tp, "PLA", enclosed=False)
     assert (inp.bed, inp.material.nozzle, inp.infill, inp.fan) == (60, 200, 5, 1)
     assert inp.speed and inp.width and "bed 60 C, nozzle 200 C" in inp.notes[0]
     assert not any("chamber" in n for n in inp.notes)  # an open printer has none
     base = failsim.predict(inp)[0].assumptions
-    assert base[0].startswith("this is a model, not a recording; PLA on the K2 profile (60 C bed, 200 C nozzle, open printer")
+    assert base[0].startswith("this is a model, not a recording; PLA (60 C bed, 200 C nozzle, open printer")
+    tp.run[tp.layer < 3, 0] = np.nan
+    assert failvideo.inputs(tp, "PLA").fan == 1  # the file says it from layer 4 on
+    asa = tmp_path / "asa.gcode"
+    asa.write_text(gcode.read(file).replace("; filament_type = PLA", "; filament_type = ASA"))
+    text, code = cli.run(["timelapse", "--gcode", str(asa), "--fail", "bridge"])  # PLA's numbers: not at ASA's heat
+    assert "no ASA, so this is PLA's" in text and "Not taken from the print file, so the K2 profile's: bed, nozzle" in text, text
     tp.run[:] = np.nan
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle

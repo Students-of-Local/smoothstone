@@ -221,3 +221,13 @@ def test_a_file_that_says_nothing_of_heat_is_not_given_any():
     assert np.isnan(tp.run).all() and tp.infill is None and tp.material == ""
     tp = gcode.parse("M140 S55\nM106 S127.5\nG1 X1 E1 F1200\nM140 S0\nM107\nG1 X10 E2\n")
     assert tp.run[0, :2].tolist() == [0.5, 55] and tp.run[-1, :2].tolist() == [0, 55]  # S0 at the end is not the print's bed
+    tp = gcode.parse("PRINT_START BED=60 HOTEND=210 NOZZLE=0.4 EXTRUDER=0 CHAMBER_TEMP=0\nG1 X1 E1 F1200\n")
+    assert tp.run[0, 1:3].tolist() == [60, 210] and np.isnan(tp.run[0, 3])
+
+
+def test_the_tool_that_prints_the_part_says_its_heat_and_plastic():
+    line = "\nG1 X{} E{} F1200\n".format
+    text = "; filament_type = PLA;PETG\nM104 T0 S220\nM104 T1 S245\n;TYPE:Support\nT0" + line(1, 1) + ";TYPE:Inner wall\nT1" + line(9, 3)
+    tp = gcode.parse(text + "M104 T0 S150" + line(20, 5))
+    assert tp.material == "PETG" and tp.run[:, 2].tolist() == [220, 245, 245]  # T0 waits at 150 C
+    assert gcode.parse(text.replace("T0\n", "\n").replace("T1\n", "\n")).material == ""  # no tool named: not known which

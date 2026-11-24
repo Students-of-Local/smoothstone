@@ -601,14 +601,14 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     bed = m.bed if inp.bed is None else inp.bed
     air = inp.air
     where_air = f"{air:g} C chamber" if inp.enclosed else f"open printer, {air:g} C room air"
-    base = [f"this is a model, not a recording; {m.name} on the K2 profile ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})",
+    base = [f"this is a model, not a recording; {m.name} ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})",
             *m.stand_ins, *inp.notes]
     if inp.clean < 1:
         base.append(note("contamination"))
     if not inp.enclosed:
         base.append(note("room_air"))
     warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), note("bond_rule"),
-            note("h_part") if inp.fan else note("h_still")]
+            note("h_part") if fact("h_part") * math.sqrt(inp.fan) > fact("h_still") else note("h_still")]
 
     def xy(r, c):
         return (round(inp.origin[0] + (c + 0.5) * cell, 1), round(inp.origin[1] + (r + 0.5) * cell, 1))
