@@ -199,6 +199,13 @@ def _mods(mods: dict, ctx: set[str]) -> float:
 
 DIFF_SHARE = 0.10  # assumption: a differential nobody described still deserves a look, below any match
 ROOT_SHARE = 0.5  # assumption: a described root cause leads once it carries half the top failure's weight
+# --looks: the agent's own read of the photo, likeliest first. Each id it names multiplies that failure's
+# weight by a likelihood ratio, P(agent names it | it is the failure) / P(agent names it | it is not);
+# a failure the words never named starts at LOOK_FLOOR of the best word match. Set on the dev photos in
+# evals/doctor/photos.py (never on the held-out ones), together with the image match of a later change.
+LOOK_LR = (3.0, 1.5, 1.0)
+LOOK_FLOOR = 1.0
+LOOKS_CHECKED = "evals/doctor/photo_runs.jsonl, split dev"
 
 
 # what the screen says when the firmware stopped a heater; while one stands, nothing else gets heated
@@ -212,14 +219,25 @@ def thermal_fault(said: str) -> bool:
     return word_score(said, THERMAL_FAULT, guess=False) > 0
 
 
-def rank_failures(said: str, ctx: set[str]) -> list[tuple[str, float]]:
-    """Failures by the words said; the top failure's differentials (the ones the catalog says to tell
-    apart from it) follow at a small share, so "Also check" lists them even when nobody named them."""
+def look_ids(text: str | None) -> tuple[list[str], list[str]]:
+    """--looks "id1,id2": the known ids in order, and the ones stone does not know."""
+    ids = [i.strip().lower() for i in re.split(r"[,\s]+", text or "") if i.strip()]
+    known = {f["id"] for f in catalog()["failures"]} - {"other"}
+    return [i for i in dict.fromkeys(ids) if i in known], [i for i in ids if i not in known]
+
+
+def rank_failures(said: str, ctx: set[str], looks: list[str] = ()) -> list[tuple[str, float]]:
+    """Failures by the words said, then by what the agent saw (--looks); the top failure's differentials
+    (the ones the catalog says to tell apart from it) follow at a small share, so "Also check" lists
+    them even when nobody named them."""
     scores = {}
     for f in catalog()["failures"]:
         s = word_score(said, f["words"], f.get("not_words", []))
         if s > 0:
             scores[f["id"]] = s * _mods(f.get("modifiers", {}), ctx)
+    base = max(scores.values(), default=0.0) or 1.0
+    for lr, fid in zip(LOOK_LR, looks):
+        scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * lr
     if scores:
         top = max(scores, key=scores.get)
         # root first: when a cause of the top failure is another failure the person also described
@@ -233,7 +251,7 @@ def rank_failures(said: str, ctx: set[str]) -> list[tuple[str, float]]:
             scores.setdefault(d["id"], scores[top] * DIFF_SHARE * (1 - 0.1 * i))
     total = sum(scores.values()) or 1.0
     ranked = sorted(((i, s / total) for i, s in scores.items()), key=lambda x: -x[1])
-    if thermal_fault(said):  # a safety override, not a score: the fault comes first whatever else scores
+    if thermal_fault(said) or "thermal_error" in looks:  # a safety override, not a score: the fault comes first whatever else scores
         ranked = [("thermal_error", dict(ranked).get("thermal_error", 0.0))] + [r for r in ranked if r[0] != "thermal_error"]
     return ranked
 
@@ -299,9 +317,10 @@ def best_question(f: dict, post: dict[str, float], asked: list[str]) -> tuple[st
     return best if best and best[2] > 0.01 else None
 
 
-def described(said: str) -> list[str]:
-    """The failures the person's words actually describe (not differentials stone added to check)."""
-    out = [f["id"] for f in catalog()["failures"] if word_score(said, f["words"], f.get("not_words", [])) > 0]
+def described(said: str, looks: list[str] = ()) -> list[str]:
+    """The failures the words describe or the agent saw (not differentials stone added to check)."""
+    said_ids = [f["id"] for f in catalog()["failures"] if word_score(said, f["words"], f.get("not_words", [])) > 0]
+    out = list(dict.fromkeys(list(looks) + said_ids))
     return (["thermal_error"] + [f for f in out if f != "thermal_error"]) if thermal_fault(said) else out
 
 
@@ -321,11 +340,11 @@ def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
     return head + [ln for ln in out if ln not in head][:max(0, limit - len(head))]
 
 
-def diagnose(said: str, printer: dict | None = None, material: str | None = None) -> dict:
+def diagnose(said: str, printer: dict | None = None, material: str | None = None, looks: list[str] = ()) -> dict:
     """The whole first pass, with no files: used by the command and by evals/doctor/run.py."""
     ctx = context(printer, material)
-    ranked = rank_failures(said, ctx)
-    out = {"failures": ranked, "causes": {}, "question": None, "described": described(said)}
+    ranked = rank_failures(said, ctx, looks)
+    out = {"failures": ranked, "causes": {}, "question": None, "described": described(said, looks)}
     if ranked:
         f = failure(ranked[0][0])
         out["causes"] = cause_priors(f, said, ctx)
@@ -495,7 +514,8 @@ def case_next(case: dict) -> str:
     if case.get("state") == "look":
         if not case.get("image"):
             return DESCRIBE
-        return f'stone doctor "<what you see in {case["image"]}: the part, the plate, the nozzle>"'
+        return (f'stone doctor "<what you see in {case["image"]}: the part, the plate, the nozzle>" '
+                "--looks <ids from stone doctor looks that match, likeliest first>")
     if case.get("state") == "try":
         left = [k for k, _ in top_causes(case["causes"], 99) if k not in case.get("tried", [])]
         return ('ask the person: did that fix it? If it did: stone doctor fixed "<what worked>"'
@@ -603,7 +623,7 @@ def cmd_doctor(args, job):
     rest = " ".join(words[1:] if sub else words).strip()
     if sub == "looks":
         out.add(*looks_lines())
-        out.next = 'stone doctor "<what you see, in these words>"'
+        out.next = 'stone doctor "<what you see, in these words>" --looks <the ids that match, likeliest first>'
         return out
     if sub is None:
         return _new(args, job, rest, out)
@@ -626,6 +646,11 @@ def _new(args, job, said: str, out):
     if args.printer and p is None:
         out.fix(f"no printer {args.printer}; ids: stone printer")
         out.next = "stone printer"
+        return out
+    looks, unknown = look_ids(getattr(args, "looks", None))
+    if unknown:
+        out.fix(f"unknown --looks id: {', '.join(unknown)}")
+        out.next = "stone doctor looks"
         return out
     prior = open_case(job)
     reuse = prior if prior and prior.get("state") == "look" and not args.image and not args.camera else None
@@ -668,17 +693,18 @@ def _new(args, job, said: str, out):
         else:
             case["image"] = str(save_photo(frame, frame))
             case["camera"] = {"name": device["name"], "model": device.get("model")}
-    case.update(said=said, printer=p["id"] if p else None, printer_set=cur_id, material=material)
-    d = diagnose(said, p, material) if said else {"failures": []}
-    head = f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
+    case.update(said=said, looks=looks, printer=p["id"] if p else None, printer_set=cur_id, material=material)
+    d = diagnose(said, p, material, looks) if said or looks else {"failures": []}
+    head = (f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
+            + (f", seen: {', '.join(looks)}" if looks else ""))
     if not d["failures"]:
         case.update(state="look", failure=None, failures=[], causes={}, question=None)
         save_case(job, case)
         out.add(head)
         if case["image"]:
             out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}",
-                    "Look at it and describe what you see; if you cannot see images, ask the person what the print "
-                    "looks like. The words each failure goes by: stone doctor looks")
+                    "Look at it: describe what you see, and pass the ids that match it with --looks (each id and "
+                    "its look: stone doctor looks). If you cannot see images, ask the person what it looks like.")
             out.next = case_next(case)
         else:
             out.add("No failure matched those words. The words each failure goes by: stone doctor looks")

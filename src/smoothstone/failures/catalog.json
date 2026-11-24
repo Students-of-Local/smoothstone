@@ -242,7 +242,7 @@
    "id": "bed_adhesion",
    "name": "Part came loose from the plate",
    "looks_like": {
-    "camera": "the part is off its spot, tilted, moved or lying loose on the plate, often with loose strands under its edges",
+    "camera": "the whole part left the spot it printed on: moved, tilted or lying loose with a gap under it (still stuck flat: not this)",
     "part": "the bottom is clean or only partly printed; first layers peeled off in one piece"
    },
    "words": [
@@ -297,7 +297,11 @@
     "slide off",
     "won't stay put",
     "doesn't stay put",
-    "comes off intact"
+    "comes off intact",
+    "come loose",
+    "comes loose",
+    "leans off the plate",
+    "off its spot"
    ],
    "not_words": [],
    "modifiers": {},
@@ -707,7 +711,11 @@
     "hair ball",
     "printing on nothing",
     "onto nothing",
-    "into thin air"
+    "into thin air",
+    "tangle of loose",
+    "tangled mass",
+    "loose tangle",
+    "tangled filament"
    ],
    "not_words": [],
    "modifiers": {},
@@ -1129,7 +1137,7 @@
    "id": "under_extrusion",
    "name": "Under-extrusion: too little plastic",
    "looks_like": {
-    "camera": "thin, gappy walls and sparse infill; layers do not touch",
+    "camera": "walls or top with gaps, holes or missing lines you can see through; lines thinner than they should be, often ragged higher up on a part still standing",
     "part": "gaps in walls, holes, weak spotty infill"
    },
    "words": [
@@ -1166,7 +1174,13 @@
     "lines are skinny",
     "flow is set",
     "low flow",
-    "gaps throughout"
+    "gaps throughout",
+    "broken lines",
+    "dashed lines",
+    "dashed gaps",
+    "gaps between the lines",
+    "see through walls",
+    "see-through walls"
    ],
    "not_words": [],
    "modifiers": {},
@@ -1281,7 +1295,7 @@
    "id": "over_extrusion",
    "name": "Over-extrusion: too much plastic",
    "looks_like": {
-    "camera": "fat, blobby walls and ridges of extra plastic on the top surface",
+    "camera": "the whole part, many layers up, has fat bulging walls and lumps of extra plastic (only the bottom layer rough: first_layer)",
     "part": "parts come out too big; surfaces look overflowing"
    },
    "words": [
@@ -2565,7 +2579,7 @@
    "id": "first_layer",
    "name": "First layer wrong (gaps, too squished, uneven)",
    "looks_like": {
-    "camera": "the first layer has gaps between lines, or is squashed see-through, or differs across the plate",
+    "camera": "only the bottom layer on the plate is wrong: its lines have gaps, do not touch, or are ploughed and ridged, and the part has not moved",
     "part": "the bottom surface shows gaps, ridges or rough areas"
    },
    "words": [
@@ -3183,7 +3197,7 @@
    "id": "toppled",
    "name": "Tall thin part knocked over",
    "looks_like": {
-    "camera": "a tall thin part lying on its side, broken off at the base",
+    "camera": "a tall part lying on its side with a broken stub still stuck where it stood on the plate (no stub, or still standing: not this)",
     "part": "snapped at a height, first layers still on the plate"
    },
    "words": [

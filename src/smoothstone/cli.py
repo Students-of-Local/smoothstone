@@ -3368,6 +3368,7 @@ def make_parser() -> Parser:
     s.add_argument("--camera", action="store_true", help="take a frame from the paired printer's camera")
     s.add_argument("--printer", help="printer id (default: stone printer set)")
     s.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC")
+    s.add_argument("--looks", help="ids you see in the photo, likeliest first: id1,id2 (stone doctor looks)")
     return p
 
 

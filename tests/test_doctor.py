@@ -454,3 +454,50 @@ def test_r2_owner_flow_reads_the_wash_question_and_reaches_plate_contaminated(wo
     assert re.search(r"^Cause 1: .*\(plate_contaminated\)", text, re.M), text  # "I never wash it" no longer lowers it
     text, code, nxt = stone("doctor", "answer", "no, they were pressed flat")
     assert nxt == "stone doctor try plate_contaminated", nxt
+
+
+
+# photos: --looks and the photo floor
+
+def _photos():
+    spec = importlib.util.spec_from_file_location("doctor_photos", REPO / "evals" / "doctor" / "photos.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.mark.parametrize("suite,way", [("doctor_photos_nomodel", "looks")])
+def test_photo_floor(suite, way):
+    """The held-out photos' recorded replies, ranked again: a change may not fall below the floor
+    (measured once, less 0.02)."""
+    s = _photos().score("heldout")[way]
+    floor = json.loads((REPO / "evals" / "floor.json").read_text())
+    assert s["n"] == floor[f"{suite}/top1"]["total"] >= 100
+    for k in ("top1", "top3"):
+        assert s[k] >= floor[f"{suite}/{k}"]["rate"], (suite, k, s[k])
+
+
+def test_photo_split_keeps_tuning_and_heldout_apart():
+    ph = _photos()
+    rows = ph._rows(ph.SPLIT)
+    held = {r["file"] for r in rows if r["split"] == "heldout"}
+    assert len(rows) == 151 and len(held) == 110
+    assert not held & {r["file"] for r in rows if r["split"] == "dev"}
+    assert "bed_adhesion/k2-detached-plate-blob.jpg" not in held  # the owner's photo was tuned on
+
+
+def test_owner_case_with_looks():
+    for looks in ([], ["bed_adhesion", "blob_on_nozzle"]):
+        d = doctor.diagnose(OWNER["said"], printers.get("creality_k2"), "PLA", looks)
+        assert d["failures"][0][0] == "bed_adhesion", looks
+        assert doctor.top_causes(d["causes"], 1)[0][0] == "plate_contaminated"
+
+
+def test_looks_names_what_the_words_do_not(work):
+    text, code, nxt = stone("doctor", "the print failed", "--looks", "stringing")
+    assert text.splitlines()[0].endswith("seen: stringing")
+    assert "Most likely: Stringing" in text or "(stringing)" in text.splitlines()[1], text
+    text, code, nxt = stone("doctor", "the print failed", "--looks", "stringing,spagetti")
+    assert code == 1 and "FIX: unknown --looks id: spagetti" in text and nxt == "stone doctor looks"
+    text, code, nxt = stone("doctor", "looks")
+    assert "--looks" in nxt and "toppled: " in text and "broken stub" in text
