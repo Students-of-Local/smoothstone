@@ -271,7 +271,7 @@
     "tau_star_Pa": 129000.0
    },
    "unit": "Cross-WLF",
-   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade: at the melt flow test of a filament PLA it is 6.8 times too thin, so stone keeps its shape and moves it to the filament's own index (failsim.mfi_rig).",
+   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade: at the melt flow test of a filament PLA it is 7 times too thin, so stone keeps its shape and moves it to the filament's own index (failsim.mfi_rig).",
    "quote": "Table 2 Data-fitted Cross-WLF parameters of the PLA 3251D. A1 16.71 A2 (K) 51.60 D1 (Pa*s) 2.045 × 10^7 D3 (K/Pa) 0 T* (K) 373.15 n 0.3846 τ* (Pa) 1.29 × 10^5",
    "source": "Pricci, Physics-Based Predictive Modeling of Gravity-Induced Sagging in Support-Free Pellet Additive Manufacturing, Polymers 2025, 17(21), 2858, Table 2",
    "cite": "Polymers 2025 17:2858 Cross-WLF of PLA 3251D",

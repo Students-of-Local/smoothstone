@@ -111,7 +111,7 @@ def test_each_melt_passes_its_filaments_flow_index(mat):
 
 def test_two_melts_agree_with_what_others_measured_on_them():
     """What sets a curve is the flow index. ABS's own curve, another filament on another rig, comes within twice of it;
-    PETG's thickness at rest lies in the range a fit to stretch tests gave; PLA's injection grade does not (6.8 times thin)."""
+    PETG's thickness at rest lies in the range a fit to stretch tests gave; PLA's injection grade does not (7 times too thin)."""
     def published(mat, t, rate):
         p = fs.fact(mat + ".cross_wlf")
         eta0 = p["D1_Pa_s"] * math.exp(-p["A1"] * (t + 273.15 - p["T_star_K"]) / (p["A2_K"] + t + 273.15 - p["T_star_K"]))
