@@ -1,5 +1,6 @@
 """One strand of melt (strand.py), each behavior held to its textbook formula."""
 
+import copy
 import math
 
 import numpy as np
@@ -407,6 +408,207 @@ def test_it_runs_for_each_plastic(mat):
         s.step(head=(20 * math.sin(a), 20 - 20 * math.cos(a), 10.0))
     p = s.points()
     assert np.isfinite(p).all() and (p[:, 2] > 0).all() and np.abs(p).max() < 60
+
+
+def test_drawing_the_neck_takes_three_eta_q_ln_d_over_l():
+    flow, speed = 10.0, 200.0
+    eta = float(fs.viscosity(220, math.sqrt(3) * (speed - st.payout(flow)) / 5))
+    want = 3 * eta * flow * 1e-9 * math.log(speed / st.payout(flow)) / 5e-3
+    assert st.draw_force("PLA", flow, speed) == pytest.approx(want)
+    assert st.draw_force("PLA", flow, 10.0) == 0.0
+    # a strand lying on the bed holds far less than that, so the nozzle drags it
+    assert 0.5 * 1240 * math.pi / 4 * (st.exit_diameter() * 1e-3) ** 2 * 0.1 * G < 0.2 * want
+
+
+def test_the_falling_speed_and_setting_time_are_the_closed_forms(monkeypatch):
+    v = st.fall_speed("PLA", 0.4, 25.0) * 1e-3
+    a = fs.air(25.0)
+    assert 0.5 * a["rho"] * float(st.drag_coefficient(v * 0.4e-3 / a["nu"])) * 0.4e-3 * v * v == pytest.approx(
+        1240 * math.pi * 0.2e-3 ** 2 * G, rel=0.01)
+    assert st.set_time("PLA") > 3 * st.set_time("PLA", wind=5.0)
+    monkeypatch.setattr(fs, "h_strand", lambda d, t, air, wind=0.0: np.full(np.shape(t), 70.0))
+    want = PLA.density * 1000 * PLA.cp * 0.4e-3 / (4 * 70) * math.log((220 - 35) / (PLA.tg - 35))
+    assert st.set_time("PLA", 0.4, 35.0, nozzle_c=220) == pytest.approx(want, rel=0.01)
+
+
+def test_what_is_taken_off_keeps_holding_the_rest_and_no_plastic_is_lost():
+    s = st.Strand(np.c_[np.linspace(0, 200, 201), np.zeros(201), np.full(201, 0.2)], 0.4, PLA, temp=25, air=25, fan=False,
+                  ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True, flow=0.0)
+    head = np.array([200.0, 0, 0.2])
+    for _ in range(120):
+        s.step(head=head)
+    vol = s.vol.sum()
+    pts, d = s.lay()
+    off = float((math.pi / 4 * d ** 2 * np.linalg.norm(np.diff(pts, axis=0), axis=1)).sum()) * 1e-9
+    assert s.vol.sum() + off == pytest.approx(vol, rel=1e-6)
+    assert 130 < pts[-1, 0] <= 141 and s.points()[0] == pytest.approx(pts[-1])
+    w = 1240 * math.pi / 4 * 0.4e-3 ** 2 * G * 0.2
+    for _ in range(240):
+        head = head + [50 / 240, 0, 0]
+        s.step(head=head)
+    assert s.force == pytest.approx(0.5 * w, rel=0.1)  # as hard to drag as the whole 200 mm
+
+
+def _flat(n, **kw):
+    """n mm of cold strand lying still on the plate, the nozzle at its end."""
+    s = st.Strand(np.c_[np.linspace(0, n, n + 1), np.zeros(n + 1), np.full(n + 1, 0.2)], 0.4, PLA, temp=25, air=25, fan=False,
+                  ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True, flow=0.0, **kw)
+    for _ in range(20):
+        s.step(head=(n, 0, 0.2))
+    return s
+
+
+def test_slack_taken_off_is_taken_up_before_its_weld_holds_and_only_holds_one_way():
+    ours = _flat(200, held=(0,))
+    ours.lay()
+    assert not ours.fixed[0] and ours.tied and ours.tail[-1, 3] == pytest.approx(ours.x[0, 0], rel=0.01)
+    ours.tail[-1, 3] += 0.02  # as if 20 mm more of it lay there in a loop
+    end, head = ours.tail[-1, 3] * 1e3, np.array([200.0, 0, 0.2])
+
+    def to(s, at, speed):
+        while np.linalg.norm(at - head) > 1e-9:
+            head[:] += (at - head) * min(1.0, speed / 240 / np.linalg.norm(at - head))
+            s.step(head=head)
+    to(ours, (210, 0, 0.2), 50)
+    assert ours.points()[0, 0] == pytest.approx(end - 10, abs=0.1) and ours.force < 1e-3  # still slack
+    to(ours, (221, 0, 0.2), 50)
+    assert ours.points()[0, 0] == pytest.approx(end, abs=0.01) and ours.force > 0.05  # cold, and 1 mm too short
+    to(ours, (200, 0, 0.2), 50)
+    assert ours.points()[0, 0] < end - 15  # the nozzle goes back, and the end with it
+    to(ours, (218, 0, 0.2), 50)
+    to(ours, (190, 0, 70), 50)
+    assert ours.x[0, 2] > 0.005 and np.linalg.norm(ours.x[0] - ours.tail[-1, :3]) <= ours.tail[-1, 3] + 1e-6  # up in the air, no farther from its weld
+    ours.vol[-1] = 1e-15
+    off = ours.snap()[0]
+    assert off.tied and not ours.tied and ours.tail is None
+    for k in range(960):
+        off.step()
+    assert off.points()[[0, -1], 2].max() < 3  # down from 19 mm (it set bent): nothing holds it up in the air
+
+
+@pytest.mark.parametrize("loops", (True, False))
+def test_a_heap_taken_off_holds_as_it_did_whole(loops):
+    """600 mm of set plastic in loops 10 mm wide, which drag as one, and in folds 20 mm wide, which open one by one:
+    what the nozzle feels pulling its end, with and without lay()."""
+    a = np.arange(600)
+    p = np.c_[5 * np.cos(a / 5) + a / 30, 5 * np.sin(a / 5)] if loops else np.c_[a / 20, np.abs((a + 10) % 40 - 20)]
+    out = np.c_[p[-1, 0] + np.arange(1, 131), np.full(130, p[-1, 1])]
+    pts, got = np.c_[np.r_[p, out], np.full(730, 0.2)], []
+    for lay in (False, True):
+        s = st.Strand(pts, 0.4, PLA, temp=25, air=25, fan=False, ground=lambda x, y: np.zeros(np.shape(x)), nozzle=True)
+        head, pull = pts[-1], []
+        for _ in range(20):
+            s.step(head=head)
+        if lay:
+            assert len(s.lay()[0]) > 600
+        for k in range(240):
+            head = head + [40 / 240, 0, 0]
+            s.step(head=head)
+            pull.append(s.force)
+        got.append(np.array(pull).reshape(8, 30).mean(1))  # every 5 mm
+    live, ours = got
+    assert ours[5:] == pytest.approx(live[5:], rel=0.1)
+    assert (ours[:5] < 1.2 * live[:5]).all() and (loops or ours[0] < 0.5 * ours[-1])
+
+
+def test_taking_it_off_twice_adds_up_and_a_broken_strand_shares_it_out():
+    s, once = _flat(400), _flat(400)
+    once.lay()
+    s.lay(200)
+    s.step(head=(400, 0, 0.2))
+    s.lay()
+    assert s.points()[0] == pytest.approx(once.points()[0], abs=1e-3)
+    assert s.tail[-1, 3:] == pytest.approx(once.tail[-1, 3:], rel=0.02)
+    s.vol[[15, 30]] = 1e-15
+    assert [q.tail is None for q in [*s.snap(), s]] == [False, True, True]
+
+
+@pytest.mark.parametrize("loose", (0, 4, 30))
+def test_a_built_in_end_stays_built_in_when_the_weld_before_it_is_taken_off(loose):
+    """Cold, welded along its first 100 mm, some of it loose after that, 80 mm of it out in the air off the edge: it
+    sags as a cantilever, not a hinge."""
+    n = 181 + loose
+
+    def beam(lay):
+        s = st.Strand(np.c_[np.arange(n), np.zeros(n), np.full(n, 20.2)], 0.4, PLA, temp=25, air=25, fan=False,
+                      ground=lambda x, y: np.where(np.asarray(x) <= 100.5 + loose, 20.0, 0.0), held=range(101))
+        s.step()
+        if lay:
+            assert len(s.lay()[0]) > 90 and s.fixed[:2].all() and s.tail is None
+        for _ in range(240):
+            s.step()
+        return s.points()[-1]
+    was, now = beam(False), beam(True)
+    assert now == pytest.approx(was, abs=0.1) and now[2] > 10
+
+
+def test_what_hangs_between_two_rests_is_taken_off_too():
+    """Over a step: on the part, down its side in the air, along the plate. And with its first tip curled up."""
+    x = np.r_[np.linspace(0, 40, 41), np.linspace(40.2, 42, 9), np.linspace(43, 200, 158)]
+    z = np.r_[np.full(41, 5.2), np.linspace(4.7, 0.7, 9), np.full(158, 0.2)]
+    z[:4] += [1.5, 1.0, 0.6, 0.2]
+    s = st.Strand(np.c_[x, 0 * x, z], 0.4, PLA, temp=25, air=25, fan=False, nozzle=True,
+                  ground=lambda x, y: np.where(np.asarray(x) < 41, 5.0, 0.0))
+    for _ in range(240):
+        s.step(head=(200, 0, 0.2))
+    pts, _ = s.lay()
+    rests = np.linalg.norm(np.diff(pts, axis=0), axis=1)[(pts[:-1, 0] > 42) | (pts[1:, 0] < 40)].sum() * 1e-3  # not what hangs
+    assert 0 < s.tail[-1, 4] < 0.5 * 1240 * math.pi / 4 * 0.4e-3 ** 2 * G * (rests + 1e-4)
+    assert len(pts) and 100 < pts[-1, 0] <= 141 and pts[-1, 2] < 0.3
+
+
+def test_a_lifted_end_has_no_friction_and_nothing_to_rest_on_is_no_error():
+    with_, free = _flat(200), _flat(200)
+    for s in (with_, free):
+        s.lay()
+        assert s.tail[-1, 4] > 0
+        s.ground = lambda x, y: np.where(np.asarray(x) < 160, -500.0, 0.0)  # the plate is gone from under its end
+    free.tail = None
+    for k in range(60):
+        for s in (with_, free):
+            s.step(head=(200 + 50 / 240 * k, 0, 0.2))
+    assert with_.points() == pytest.approx(free.points(), abs=1e-9)
+    s = st.Strand(np.c_[np.linspace(0, 200, 201), np.zeros((201, 2))], 0.4, PLA, temp=25, air=25, held=range(101), nozzle=True)
+    s.lay()
+    s.step(head=(200, 0, 0))
+    assert s.tail is None
+
+
+def test_one_that_breaks_at_the_nozzle_starts_again_when_plastic_comes():
+    s = laid(True)
+    s.vol[-1] = 1e-15  # a hair at the nozzle
+    s.force = 1.0
+    off = s.snap()
+    assert len(off) == 1 and len(s.x) == 1 and not len(s.vol) and s.force == 0
+    s.flow = 0.0
+    s.step(head=(125, 0, 5))
+    assert s.points()[-1] == pytest.approx([125, 0, 5]) and not s.snap()
+    s.flow = 10e-9
+    for _ in range(60):
+        s.step(head=(125, 0, 5))
+    assert len(s.x) > 2 and np.isfinite(s.x).all() and s.vol.sum() == pytest.approx(10e-9 * 60 * st.DT, rel=0.01)
+
+
+def test_the_closed_forms_where_nothing_flows_or_nothing_sets():
+    assert st.draw_force("PLA", 0.0, 200) == 0.0 and st.numbers("PLA", 0.0, 200)["draw_mn"] == 0.0
+    assert st.set_time("PLA", air_c=70) == math.inf
+
+
+def test_a_travel_drags_a_free_strand_and_breaks_a_held_one():
+    """The hotend holds the strand by its neck: with nothing coming out it pulls the strand along, or pulls it to a hair."""
+    held, free = laid(True), laid(False)
+    for s in (held, free):
+        s.flow = 0.0
+        for k in range(120):
+            s.step(head=(120 + 1.5 * (k + 1), 0, 5.0))
+            off = s.snap()
+            if off:
+                break
+        if s is held:
+            (far,) = off  # what it left, off the nozzle
+            assert len(far.x) > 10 and not far.nozzle and min([*far.diameters(), *s.diameters()]) > 0.05
+            assert len(s.x) + len(far.x) > 10 and s.nozzle and s.x[-1] == pytest.approx(np.array([120 + 1.5 * (k + 1), 0, 5]) * 1e-3)
+    assert not off
 
 
 def test_a_cold_strand_torn_back_and_forth_gives_instead_of_flying():

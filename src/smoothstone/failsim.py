@@ -484,6 +484,28 @@ def nozzle_drag(mat="PLA", speed_mm_s: float | None = None, layer: float = 0.2) 
     return tau * math.pi * (fact("nozzle_tip") / 2) ** 2
 
 
+def tension(t_c, mat="PLA") -> float:
+    """N/m, the melt's surface tension: the 20 C value falling with temperature (Wu)."""
+    q = fact(_mat(mat).name.lower() + ".surface_tension")
+    return (q["at_20C"] + q["per_K"] * (t_c - 20)) * 1e-3
+
+
+def wetting(t_c, mat="PLA") -> float:
+    """Degrees, the angle a drop of the melt rests at on metal: under 90 it spreads over the nozzle's tip."""
+    tab = np.asarray(fact(_mat(mat).name.lower() + ".contact_angle"), float)
+    return float(np.interp(t_c, tab[:, 0], tab[:, 1]))
+
+
+def nozzle_hold(mat="PLA", nozzle_c: float | None = None, bore: float = 0.4) -> dict:
+    """What the hotend's tip carries before it falls: surface tension around the edge of the melt, 2 pi r gamma (Tate).
+    Melt that wets the tip spreads to the edge of its flat and hangs from there; melt that does not hangs from the bore."""
+    m = _mat(mat)
+    t = m.nozzle if nozzle_c is None else nozzle_c
+    wets = wetting(t, m) < 90
+    newtons = math.pi * (fact("nozzle_tip") if wets else bore) * 1e-3 * tension(t, m)
+    return {"hold_n": newtons, "wets": wets, "blob_mm3": newtons / (m.density * 1000 * fact("gravity")) * 1e9}
+
+
 def blob_volume(flow_mm3_s, t_s, stick: float | None = None) -> np.ndarray:
     """mm3 stuck on the nozzle after t_s seconds of extruding into air (grows with flow)."""
     s = fact("blob_stick") if stick is None else stick

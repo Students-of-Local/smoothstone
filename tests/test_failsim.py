@@ -275,6 +275,18 @@ def test_rigid_tip_ends_on_its_side_and_slide_moves_the_distance():
     assert fs.blob_volume(8.0, 10.0) == pytest.approx(0.5 * 80.0)
 
 
+def test_the_hotend_holds_what_surface_tension_carries():
+    assert fs.tension(240, "PETG") == pytest.approx(29.7e-3) and fs.tension(20, "ABS") == pytest.approx(42e-3)
+    assert fs.wetting(200, "PLA") == 46 and fs.wetting(240, "ABS") == 95
+    pla, abs_ = fs.nozzle_hold("PLA", 220), fs.nozzle_hold("ABS", 240)
+    assert pla["wets"] and pla["hold_n"] == pytest.approx(2 * math.pi * 0.5e-3 * fs.tension(220))  # hangs from the flat's edge
+    assert not abs_["wets"] and abs_["hold_n"] == pytest.approx(2 * math.pi * 0.2e-3 * fs.tension(240, "ABS"))  # from the bore
+    assert pla["blob_mm3"] * 1e-9 * 1240 * 9.80665 == pytest.approx(pla["hold_n"])  # its own weight is all it carries
+    assert not fs.nozzle_hold("ABS")["wets"] and "past 240 C" in fs.note("abs.contact_angle")  # 260 C, hotter than measured
+    assert all("brass" in fs.note(f"{m}.contact_angle") for m in ("pla", "petg", "abs"))
+    assert 5 < pla["blob_mm3"] < 12 and abs_["blob_mm3"] < pla["blob_mm3"] / 2
+
+
 def test_nozzle_drag_is_small():
     drag = fs.nozzle_drag("PLA", 200, 0.2)
     eta = fs.viscosity(220, 1000.0)
