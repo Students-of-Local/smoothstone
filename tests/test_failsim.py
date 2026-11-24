@@ -330,6 +330,14 @@ def test_an_open_printer_cools_a_bead_in_room_air():
     assert soft[1]["soft_s"] == pytest.approx(round(room["soft_s"], 2)) and soft[1]["soft_s"] < soft[0]["soft_s"]
 
 
+@pytest.mark.parametrize("mat", fs.MATERIALS)
+def test_the_melt_thickens_without_end_as_it_cools(mat):
+    t = np.arange(20.0, 200.0, 0.01)
+    for rate in (0.0, 1.0, 180.0):
+        eta = fs.viscosity(t, rate, fs.material(mat))
+        assert (eta[1:] <= eta[:-1]).all() and eta[0] > 1e12  # no hole where the numbers overflow next to the pole
+
+
 def test_the_nozzle_drags_by_each_plastics_own_melt():
     """300 mm/s over a 0.2 mm layer is 1500 1/s: ABS's Cross-WLF stress there on the 1 mm tip, by hand."""
     eta0 = 2.54e12 * math.exp(-28.3 * (260 + 273.15 - 365) / (51.6 + 260 + 273.15 - 365))
