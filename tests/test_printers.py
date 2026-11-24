@@ -26,7 +26,7 @@ def stone(*argv):
     assert lines[-1].startswith("NEXT: "), text
     assert sum(ln.startswith("NEXT:") for ln in lines) == 1, text
     assert "Traceback" not in text and "ERROR" not in text, text
-    assert "—" not in text and "–" not in text
+    assert "\u2014" not in text and "\u2013" not in text
     return text, code, lines[-1][len("NEXT: "):]
 
 
@@ -87,7 +87,7 @@ def test_profile_contract(pid):
     assert p["sources"] and all(URL.match(u) for u in p["sources"])
     assert p["checked"] == "2026-11-24"
     text = json.dumps(p, ensure_ascii=False)
-    assert "—" not in text and "–" not in text
+    assert "\u2014" not in text and "\u2013" not in text
 
 
 def test_owners_k2():
