@@ -27,6 +27,7 @@ from .strength import NU
 
 BIG = 1e7  # kg/s: a node held on a place or a speed
 CREEP = 1e-4  # m/s: slower than this, friction holds
+HEAP = 30.0  # mm of a set heap that follow each mm its end is pulled: folds 20 mm wide, stepped whole; loops 10 mm wide follow at once
 DT = 1 / 240  # s
 TURN = 0.25  # of an edge's length its ends may move against each other in one step
 SPIN = 1e-3  # m, where an edge's spin is solved as a speed
@@ -180,8 +181,8 @@ class Strand:
         self.seg = seg * 1e-3
         self.rho = m.density * 1000
         self.force = 0.0  # N at the nozzle
-        self.anchor = 0.0  # N of friction under what lay() took off
-        self.leash = None  # (where that was welded, m of it loose since): the rest can go no farther
+        self.tail = None  # what lay() took off: rows of x, y, z, m along it from the cut, N of friction between
+        self.tied = False  # that its far end is welded
         self.came = 0.0  # m3 out of the nozzle since it broke there
         self.touch = np.zeros(n, bool)
 
@@ -224,8 +225,10 @@ class Strand:
 
     def _restart(self, dt, head):
         """It broke at the nozzle: nothing hangs there until enough has come out."""
+        if not self.nozzle:
+            return
         self.x[-1] = self.x[-1] if head is None else np.asarray(head) * 1e-3
-        self.came += self.flow * dt if self.nozzle else 0.0
+        self.came += self.flow * dt
         ln = self.came / self.area
         if ln < self.seg / 6:
             return
@@ -233,7 +236,7 @@ class Strand:
         self.v, self.eb, self.t = np.zeros((2, 3)), np.zeros((2, 4)), np.full(2, self.hot)
         self.press, self.touch, self.fixed = np.zeros(2), np.zeros(2, bool), np.zeros(2, bool)
         self.es, self.rate, self.tens, self.e = np.zeros(1), np.zeros(1), np.zeros(1), np.full(1, np.inf)
-        self.vol, self.came, self.anchor, self.leash = np.array([self.came]), 0.0, 0.0, None
+        self.vol, self.came = np.array([self.came]), 0.0
 
     def _step(self, dt, head, check) -> bool:
         m, n = self.m, len(self.x)
@@ -280,6 +283,11 @@ class Strand:
         _add(ab, (mass / dt)[:, None, None] * eye + drag[:, None, None] * (eye - tn[:, :, None] * tn[:, None, :]))
         ab[-1, 3::4] = np.r_[self.vol * self.rho * (d / SPIN) ** 2 / 8 / dt, 1.0]
         hold = self.fixed.copy()
+        drawn = 0.0  # N, what was taken off holds with: the friction of what is straight or has had time to follow
+        if self.tail is not None:
+            apart = np.linalg.norm(self.x[0] - self.tail[:, :3], axis=1)
+            out, left = _unit(self.x[:1] - self.tail[-1, :3]), (self.tail[-1, 3] - apart[-1]) / dt  # from its weld, and how fast it may go
+            drawn = float(self.tail[(apart >= 0.98 * self.tail[:, 3]) | (self.tail[:, 3] <= HEAP * apart[0]), 4].max())
         vh = np.zeros((n, 3))
         if self.nozzle:
             hold[-1] = True
@@ -297,7 +305,7 @@ class Strand:
         v = self.v
         kb = _series(e_mod * soft) * math.pi * ((d[1:] + d[:-1]) / 2) ** 4 / 64 * (ln[1:] + ln[:-1]) / 2
         kb = np.stack([kb, kb, kb, kb / (1 + NU)], 1)  # G J = E I / (1 + nu)
-        way, gain, rest, tens = tan, np.ones(n - 1), 1.0, self.tens
+        way, gain, rest, tens, taut = tan, np.ones(n - 1), 1.0, self.tens, False
         for _ in range(2):  # solved again along the mean of the edges' old and new directions: turning strains nothing
             tt = way[:, :, None] * way[:, None, :]
             stiff = dt * (ks * gain)[:, None, None] * tt + (rest * dt * np.maximum(tens, 0) / ln)[:, None, None] * (eye - tt)
@@ -319,22 +327,28 @@ class Strand:
             for _ in range(5):
                 ab2, rh2 = band.copy(), rh.copy()
                 slip = _norm(v[:, :2])
+                if tied := self.tied and (taut or v[0] @ out[0] > left):  # no farther; nearer, or round it
+                    _add(ab2, BIG * (out[:, :, None] * out[:, None, :]))
+                    rh2[0, :3] += BIG * left * out[0]
                 if touch.any():
                     fr = np.where(touch, self.mu * np.maximum(self.press, 0) / np.maximum(slip, CREEP), 0.0)
-                    fr[0] += touch[0] * self.anchor / max(slip[0], CREEP)
+                    fr[0] += touch[0] * drawn / max(slip[0], CREEP)
                     ab2[-1, 0::4] += fr
                     ab2[-1, 1::4] += fr
                     ab2[-1, 2::4] += np.where(touch, BIG, 0.0)
                     rh2[touch, 2] += BIG * to[touch]
                 u = solveh_banded(ab2, rh2.ravel(), check_finite=False).reshape(n, 4)
                 v = u[:, :3]
-                if floor is None:
+                taut, was = self.tied and bool(v[0] @ out[0] > left), tied
+                if floor is None and taut == was:
                     break
+                if floor is None:
+                    continue
                 push = np.where(touch, BIG * (to - v[:, 2]), 0.0)
                 deep = ~hold & ~touch & (self.x[:, 2] + dt * v[:, 2] < floor - 1e-9)
                 up = touch & (push < 0)
                 self.press = np.maximum(push, 0)
-                if not deep.any() and not up.any() and (np.abs(_norm(v[:, :2]) - slip)[touch] < 0.1 * slip[touch] + 1e-3).all():
+                if taut == was and not deep.any() and not up.any() and (np.abs(_norm(v[:, :2]) - slip)[touch] < 0.1 * slip[touch] + 1e-3).all():
                     break
                 touch = (touch | deep) & ~up
             move = np.diff(dt * v, axis=0)
@@ -353,12 +367,9 @@ class Strand:
             v[touch & (to > 0), 2] = 0.0  # pushed out of the ground, not thrown
             low = ~hold & (x[:, 2] < f2)
             x[low, 2] = f2[low]
-        if self.leash is not None and not self.fixed[0]:
-            at, most = self.leash
-            gap = x[0] - at
-            if np.linalg.norm(gap) >= most:  # taut back to its weld
-                x[0], v[0] = at + gap * most / np.linalg.norm(gap), 0.0
-                self.fixed[0] = True
+        if self.tied:
+            gap = x[0] - self.tail[-1, :3]
+            x[0] = self.tail[-1, :3] + gap * min(1.0, self.tail[-1, 3] / max(float(np.linalg.norm(gap)), 1e-12))
         old_l, old_k, old_tn = ln, self._curve(tan, ln), tn
         self.v, self.x = v, x
         tan, ln = self.lengths()
@@ -473,38 +484,47 @@ class Strand:
                 continue
             if s is not self:
                 s.nozzle, s.force = False, 0.0
-                s.anchor, s.leash = (self.anchor, self.leash) if a == 0 else (0.0, None)
+                if a:
+                    s.tail, s.tied = None, False
                 off.append(s)
             for q in ("x", "v", "t", "eb", "press", "touch", "fixed"):
                 setattr(s, q, getattr(self, q)[a:b + 1].copy())
             for q in ("es", "rate", "tens", "vol", "e"):
                 setattr(s, q, getattr(self, q)[a:b].copy())
             s.eb[[0, -1]] = 0.0  # an end carries no bend
-        self.anchor, self.leash = 0.0, None
+        self.tail, self.tied = None, False
+        if len(self.x) < 2:
+            self.force = 0.0
         return off
 
     def lay(self, keep: float = 60.0):
-        """Take off what lies still, from the far end to at most keep mm from the nozzle. Its friction goes on holding
-        the rest, and its weld once the slack between them is taken up. Returns its points and diameters, mm; they
-        stay where they lay, whatever the rest does."""
-        ln = self.lengths()[1]
-        arc = np.r_[np.cumsum(ln[::-1])[::-1], 0.0] * 1e3
+        """Take off what lies still, from the far end to at most keep mm from the nozzle. It is cut between two welded
+        nodes, or where as much lies behind the cut as hangs anywhere after it. What was taken off goes on holding the
+        rest: its friction as the pull reaches it (HEAP), and its weld once it is straight. Returns its points and diameters, mm;
+        they stay where they lay, whatever the rest does."""
+        ln, n = self.lengths()[1], len(self.x)
+        arc = np.r_[np.cumsum(ln[::-1])[::-1], 0.0]
         lies = self.fixed | self.touch
-        still = (lies | (self.t < self.m.tg)) & (_norm(self.v) < 20 * CREEP) & (arc > keep)
-        k = int(np.argmin(still)) - 1
-        k = int(np.flatnonzero(lies[:k + 1]).max(initial=0))  # cut where it is held up
-        welds = np.flatnonzero(self.fixed[:k + 1])
-        if len(welds) > 1 and welds[-1] == k and self.fixed[k - 1]:
-            k -= 1  # two held nodes clamp its direction
+        still = (lies | (self.t < self.m.tg)) & (_norm(self.v) < 20 * CREEP) & (arc > keep * 1e-3)
+        ends = np.r_[np.flatnonzero(~lies), n - 1]  # of the run of lying nodes a node is in, and the next one that lies
+        run = arc - arc[ends[np.searchsorted(ends, np.arange(n))]]
+        rests = np.flatnonzero(lies)
+        hang = np.r_[-np.diff(arc[np.r_[rests, n - 1]]) * (np.diff(np.r_[rests, n - 1]) > 1), 0.0]
+        most = np.maximum.accumulate(hang[::-1])[::-1][np.searchsorted(rests, np.arange(n))]
+        clamp = np.r_[self.fixed[:-1] & self.fixed[1:], False]
+        k = int(np.flatnonzero((clamp | (lies & (run > most)))[:int(np.argmin(still))]).max(initial=0))
         if k < 1:
             return np.zeros((0, 3)), np.zeros(0)
         pts, d = self.points()[:k + 1], self.diameters()[:k]
-        w = int(welds[-1]) if len(welds) else 0  # only what lies past the last weld still slides
-        if len(welds):
-            self.anchor, self.leash = 0.0, None if w >= k else (self.x[w].copy(), 0.0)
-        self.anchor += self.mu * failsim.fact("gravity") * self.rho * float((self.vol[:k] * (lies[:k] & lies[1:k + 1]))[w:].sum())
-        if self.leash is not None:
-            self.leash = (self.leash[0], self.leash[1] + float(ln[w:k].sum()))
+        welds = np.flatnonzero(self.fixed[:k + 1])
+        rub = self.mu * failsim.fact("gravity") * self.rho * self.vol[:k] * (lies[:k] & lies[1:k + 1])
+        tail = np.c_[self.x[:k + 1], arc[:k + 1] - arc[k], np.r_[np.cumsum(rub[::-1])[::-1], 0.0]][::-1]
+        if len(welds):  # only what lies past the last weld still slides
+            tail = tail[:k + 1 - welds[-1]]
+        elif self.tail is not None:
+            tail = np.r_[tail, self.tail[1:] + [0, 0, 0, tail[-1, 3], tail[-1, 4]]]
+        self.tied = (self.tied or len(welds) > 0) and not clamp[k]
+        self.tail = None if clamp[k] else tail
         for q in ("x", "v", "t", "eb", "press", "touch", "fixed"):
             setattr(self, q, getattr(self, q)[k:].copy())
         for q in ("es", "rate", "tens", "vol", "e"):
