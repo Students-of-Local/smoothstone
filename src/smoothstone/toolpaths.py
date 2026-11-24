@@ -18,7 +18,7 @@ import math
 
 import numpy as np
 
-from . import gcode, refs, supports
+from . import gcode, printers, refs, supports
 
 FIL_AREA = math.pi * (1.75 / 2) ** 2  # mm2, 1.75 mm filament
 # outline smoothing and simplifying, pixels (assumption: about a slicer's 0.0125 to 0.05 mm resolution
@@ -34,11 +34,15 @@ def spacing(width: float, height: float) -> float:
 
 
 def profile(prof: dict | None = None) -> dict:
-    """Widths, speeds, accelerations and shells for generated toolpaths: OrcaSlicer's K2 profile. Given a
-    printer profile (its speeds), speeds, travel too, scale down and accelerations are capped for a slower
-    printer (assumption: same proportions)."""
+    """Widths, speeds, accelerations and shells for generated toolpaths: the printer's own slicer process
+    (printers.process). A printer without one gets OrcaSlicer's K2 profile: speeds, travel too, scale down and
+    accelerations are capped for a slower printer (assumption: same proportions)."""
     prof = prof or {}
     v = lambda k: refs.get(k)["value"]  # noqa: E731
+    if own := printers.process(prof) if "id" in prof else None:
+        ac = {**own["accels"], **{k: own["accels"]["default"] for k in ("sparse_infill", "solid_infill")}}
+        return {**{k: own[k] for k in ("layer", "widths", "speeds", "shells")}, "accels": ac, "support": v("slicer.support_spacing"),
+                "jerk": v("slicer.k2_accels")["jerk_walls"], "whose": f"OrcaSlicer's {printers.short_name(prof)} speeds"}
     sp, ac = dict(v("slicer.k2_speeds")), dict(v("slicer.k2_accels"))
     typical = float((prof.get("speeds") or {}).get("typical_print_mm_s") or sp["inner_wall"])
     cap = float((prof.get("speeds") or {}).get("max_accel_mm_s2") or v("slicer.k2_machine")["max_accel"])
@@ -46,8 +50,8 @@ def profile(prof: dict | None = None) -> dict:
     speeds = {k: x * f for k, x in sp.items()}
     accels = {k: min(x, cap) for k, x in ac.items() if not k.startswith("jerk")}
     accels.update({"sparse_infill": accels["default"], "solid_infill": accels["default"]})
-    return {"widths": v("slicer.k2_widths"), "speeds": speeds, "accels": accels, "shells": v("slicer.k2_shells"),
-            "support": v("slicer.support_spacing"), "jerk": ac["jerk_walls"], "scaled": f < 1.0}
+    return {"layer": 0.2, "widths": v("slicer.k2_widths"), "speeds": speeds, "accels": accels, "shells": v("slicer.k2_shells"),
+            "support": v("slicer.support_spacing"), "jerk": ac["jerk_walls"], "whose": "OrcaSlicer's K2 speeds" + (" scaled to this printer" if f < 1 else "")}
 
 
 def _scan(region: np.ndarray, deg: float, spacing_px: float, offset_px: float = 0.0):
