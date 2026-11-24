@@ -3362,12 +3362,13 @@ def make_parser() -> Parser:
     s.add_argument("--out", help="camera: where to save the frame")
     s.add_argument("--name", help="status, camera: the printer's name in gantrel-printer")
     s = sub.add_parser("doctor", parents=[common],
-                       help='a failed print: stone doctor "<what you see>" [--image p.jpg] | answer | try | fixed | looks')
+                       help='a failed print: stone doctor "<what you see>" [--image p.jpg] | answer | try | fixed | looks | share')
     s.add_argument("words", nargs="*")
     s.add_argument("--image", help="a photo of the failed print")
     s.add_argument("--camera", action="store_true", help="take a frame from the paired printer's camera")
     s.add_argument("--printer", help="printer id (default: stone printer set)")
     s.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC")
+    s.add_argument("--send", action="store_true", help="share: send the shown bundle to GitHub")
     return p
 
 

@@ -183,7 +183,7 @@ def test_owner_flow_photo_words_answer_try_fixed(work):
     assert "wiki.creality.com" in text and nxt.startswith("ask the person: did that fix it?")
 
     text, code, nxt = stone("doctor", "fixed", "washed the plate with dish soap")
-    assert nxt == doctor.DONE
+    assert nxt.startswith("ask the person: Share this fix") and "MIT license" in nxt  # optional, never forced
     case = json.loads((case_dir / "case.json").read_text())
     assert case["outcome"]["cause"] == "plate_contaminated" and case["outcome"]["printer"] == "creality_k2"
     shared = json.loads((work / "stone-job" / "doctor" / "outcomes.jsonl").read_text().splitlines()[-1])

@@ -1,0 +1,20 @@
+{
+ "schema": 1,
+ "failure": "bed_adhesion",
+ "cause": "plate_contaminated",
+ "printer": "creality_k2",
+ "material": "PLA",
+ "said": "flat plate print came loose and lies tilted on the bed with loose strands trailing from under its edges; a big lump of plastic is stuck around the nozzle and heater block. this was likely due to the plate needing to be cleaned but giving differentials also helps",
+ "fixed_by": "washed the plate with dish soap and water",
+ "answers": [
+  {
+   "ask": "Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film?",
+   "key": "beads"
+  }
+ ],
+ "photo": "photo.jpg",
+ "stone_version": "0.1.0",
+ "date": "2026-11-24",
+ "license": "MIT",
+ "id": "2026-11-24-creality_k2-bed_adhesion-8cb14e6"
+}
