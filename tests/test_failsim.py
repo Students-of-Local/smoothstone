@@ -120,7 +120,11 @@ def test_two_melts_agree_with_what_others_measured_on_them():
         return eta0 / (1 + (eta0 * rate / p["tau_star_Pa"]) ** (1 - p["n"]))
     ratio = {m: fs.flow_index(m)[2] / published(m.lower(), *fs.flow_index(m)[:2]) for m in ("PLA", "ABS")}
     assert 0.5 < ratio["ABS"] < 2 and 6 < ratio["PLA"] < 8
+    q = fs.fact("petg.melt")
+    assert q["eta0_Pa_s"] < float(fs.viscosity(q["at_C"], 0, "PETG")) < 3 * q["eta0_Pa_s"]
     assert float(fs.viscosity(240, 0, "PETG")) == pytest.approx(1730, rel=0.01)  # what its note says
+    for m, own in (("PLA", "pla.cross_wlf"), ("PETG", "petg.melt"), ("ABS", "abs.cross_wlf")):  # whose curve it is, once each
+        assert [n for n in fs.material(m).stand_ins if "changes with heat" in n or "moves with heat" in n] == [fs.note(own)]
     assert 43900 / float(fs.viscosity(240, 0, "ABS")) == pytest.approx(51, rel=0.01)  # and ABS's
     for m, a1, t_star, tau, n in (("PLA", 16.71, 373.15, 1.29e5, 0.3846), ("ABS", 28.3, 365, 41070, 0.341)):  # its shape is its own
         bend = [a1 * (t + 273.15 - t_star) / (51.6 + t + 273.15 - t_star) for t in (200, 240)]

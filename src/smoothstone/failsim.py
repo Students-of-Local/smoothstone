@@ -100,7 +100,7 @@ def material(name: str = "PLA") -> Material:
     curve = np.asarray(p["modulus_vs_temp"]["value"], float)
     curve[:, 1] = np.minimum.accumulate(curve[:, 1])  # Track S's rule: no credit for a rise on heating
     k2 = fact(f"k2.{m.lower()}")
-    stand = [note("mfi_rig")]
+    stand = [note("mfi_rig"), note("petg.melt" if m == "PETG" else f"{m.lower()}.cross_wlf")]
     if m == "ABS":  # average cp from Tg to the nozzle on Bhandari's table
         tab = np.asarray(fact("abs.cp_k"), float)
         ts = np.linspace(p["tg"]["value"], k2["nozzle"], 50)
@@ -109,9 +109,7 @@ def material(name: str = "PLA") -> Material:
     else:
         cp, k = fact("pla.cp"), fact(f"{m.lower()}.k")
         if m == "PETG":
-            stand += ["PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity", note("petg.melt")]
-    if m == "ABS":
-        stand.append(note("abs.cross_wlf"))
+            stand += ["PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity"]
     return Material(m, p["density"]["value"], p["tg"]["value"], p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
                     tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k,
                     fact(f"peel.{m.lower()}"), fact("peel_bed")[m], k2["bed"], k2["chamber"],

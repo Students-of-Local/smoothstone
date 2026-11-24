@@ -276,7 +276,8 @@
    "source": "Pricci, Physics-Based Predictive Modeling of Gravity-Induced Sagging in Support-Free Pellet Additive Manufacturing, Polymers 2025, 17(21), 2858, Table 2",
    "cite": "Polymers 2025 17:2858 Cross-WLF of PLA 3251D",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12608786/",
-   "checked": "2026-11-24"
+   "checked": "2026-11-24",
+   "assumption": "PLA's melt changes with heat and speed as an injection grade's does (NatureWorks 3251D)"
   },
   {
    "id": "failsim.abs.cross_wlf",
@@ -328,7 +329,7 @@
    "cite": "US 12055470 B2; ISO 1133:1997",
    "url": "https://patents.google.com/patent/US12055470B2/en",
    "checked": "2026-11-24",
-   "assumption": "Each melt is as thick as its filament maker's melt flow index says (the middle of a range), read without corrections that would make it up to a third thinner; how it changes with heat and speed is its published curve's"
+   "assumption": "Each melt is as thick as its filament maker's melt flow index says (the middle of a range), read without corrections that would make it up to a third thinner at that test's speed, two fifths at rest"
   },
   {
    "id": "failsim.mfi_test",
