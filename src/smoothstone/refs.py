@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import config
 
-FILES = ("filament", "standards", "design", "fit")
+FILES = ("filament", "standards", "design", "fit", "materials")
 
 
 def refs_dir() -> Path:
@@ -30,6 +30,8 @@ def load() -> dict[str, dict]:
     out: dict[str, dict] = {}
     for f in FILES:
         for e in json.loads((refs_dir() / f"{f}.json").read_text())["entries"]:
+            if e["id"] in out:  # one id, one fact: a second would silently replace the first
+                raise ValueError(f"refs id {e['id']} is in both {out[e['id']]['file']}.json and {f}.json")
             out[e["id"]] = {**e, "file": f}
     return out
 
@@ -46,14 +48,16 @@ def num(v) -> str:
 def value_text(e: dict) -> str:
     """An entry's value as one short phrase."""
     v, unit = e["value"], e.get("unit") or ""
-    if isinstance(v, list) and len(v) == 2:
+    if isinstance(v, list) and v and all(isinstance(x, list) for x in v):
+        s = ", ".join(f"{num(a)} C {num(b)}" for a, b in v)  # a curve: temperature, value
+    elif isinstance(v, list) and len(v) == 2:
         s = f"{num(v[0])} to {num(v[1])}"
     elif isinstance(v, dict):
         s = ", ".join(f"{k.replace('_', ' ')} {value_text({'value': x})}" for k, x in v.items() if x is not None)
         unit = unit if unit in ("mm", "in", "C") else ""
     else:
         s = num(v)
-    return f"{s} {unit}".strip() if unit and unit not in ("rule", "formula", "hex", "thread") else s
+    return f"{s} {unit}".strip() if unit and unit not in ("rule", "formula", "hex", "thread", "ratio") else s
 
 
 # materials
@@ -409,6 +413,32 @@ def build_lines(recipe, params: dict, request: str) -> list[str]:
     return pick.lines() + [r.line() for r in standards_for(recipe, params, request) if r.flag]
 
 
+# strength and heat: materials.json, printed-part properties by material
+
+STRENGTH = {"PLA": "pla", "PETG": "petg", "ABS": "abs", "ASA": "asa", "TPU": "tpu", "PA": "pa", "PC": "pc",
+            "PLA-CF": "pla-cf", "PETG-CF": "petg-cf"}
+
+
+def strength_material(word: str) -> str | None:
+    """A STRENGTH name from what a person or model types: petg, PLA-CF, nylon, PLA+ (read as PLA)."""
+    w = re.sub(r"[\s_]+", "-", (word or "").strip().lower())
+    for k in STRENGTH:
+        if w in (k.lower(), STRENGTH[k]):
+            return k
+    m = re.fullmatch(r"(pla|petg)-?(cf|carbon(-fiber)?)", w)
+    if m:
+        return m.group(1).upper() + "-CF"
+    named = named_material(re.sub(r"[-_\s]+", " ", (word or "").strip().lower()))  # its patterns read spaces: pc blend, pa 11
+    return {"PLA+": "PLA"}.get(named, named) if named else None
+
+
+def props(material: str) -> dict[str, dict]:
+    """Every entry for a STRENGTH name, by key (e_xy, tensile_z, hdt_045, cte, creep, nozzle, ...)."""
+    pre = STRENGTH[material] + "."
+    found = [e for k, e in load().items() if k.startswith(pre)]
+    return {e["key"]: e for e in sorted(found, key=lambda e: e["file"] == "materials")}  # materials.json wins
+
+
 # stone refs
 
 TOPICS = {
@@ -425,6 +455,8 @@ TOPICS = {
 def topic_entries(topic: str) -> list[dict]:
     t = (topic or "").strip().lower()
     lib = load()
+    if t in ("pla-cf", "petg-cf"):
+        return [e for k, e in lib.items() if k.startswith(t + ".")]
     mat = next((m for k, m in MATERIALS.items() if k.lower() == t or m.key == t), None)
     if mat is None:
         mat = MATERIALS.get(named_material(t) or "")
@@ -439,7 +471,10 @@ def topic_entries(topic: str) -> list[dict]:
 
 
 KEY_LABELS = {"hdt": "heat deflection", "flex": "flexibility", "uv": "UV", "moisture": "drying",
-              "food": "food contact"}
+              "food": "food contact", "e_xy": "stiffness X-Y", "e_z": "stiffness Z", "tensile_xy": "strength X-Y",
+              "tensile_z": "strength between layers", "hdt_045": "heat deflection at 0.45 MPa", "tg": "glass transition",
+              "cte": "thermal expansion", "modulus_vs_temp": "stiffness kept when hot", "mfi": "melt flow",
+              "k": "thermal conductivity", "cp": "specific heat"}
 
 
 def entry_line(e: dict) -> str:
