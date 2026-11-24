@@ -56,15 +56,54 @@ def test_droop_is_zero_within_the_reach_and_grows_with_the_span():
     # a cantilever under its own weight: the tip goes as the free length to the fourth power
     assert tips[3] / tips[1] == pytest.approx(16.0, rel=1e-9)
     # still air keeps the bead soft longer than the fan does
-    assert -fs.droop([reach + 1.0], fan=False)[0] > 10 * tips[1]
+    assert -fs.droop([reach + 1.0], fan=False)[0] > 3 * tips[1]
+
+
+def test_air_and_a_hot_wire_match_lienhard():
+    a = fs.air(26.85)  # 300 K, Table A.6
+    assert [float(a[k]) for k in ("rho", "nu", "k", "pr")] == pytest.approx([1.177, 1.575e-5, 0.0264, 0.707])
+    assert float(fs.air(101.85)["k"]) == pytest.approx((0.0300 + 0.0335) / 2)  # 375 K, halfway
+    assert float(fs.nusselt(457.0, 0.712)) == pytest.approx(10.69, rel=0.002)  # example 7.8: a 0.1 mm wire in an air stream
+    lo, hi = fs.nusselt(0.2 * 0.999 / 0.7, 0.7), fs.nusselt(0.2 * 1.001 / 0.7, 0.7)
+    assert float(lo) == pytest.approx(float(hi), rel=0.2)  # the two fits meet near Re Pr = 0.2
+    assert float(fs.nusselt(1e-3 / 0.7, 0.7)) == pytest.approx(1 / (0.8237 - math.log(1e-3 ** 0.5)))
+
+
+def test_a_strand_in_still_air_loses_heat_by_rising_air_and_radiation():
+    d, t, ta = 0.42e-3, 127.0, 25.0
+    film = fs.air(76.0)
+    ra = 9.80665 * (t - ta) / (76.0 + 273.15) * d ** 3 / (film["nu"] ** 2 / film["pr"])
+    nu = 0.36 + 0.518 * ra ** 0.25 / (1 + (0.559 / film["pr"]) ** (9 / 16)) ** (4 / 9)
+    rad = 0.92 * 5.670374e-8 * ((t + 273.15) ** 4 - (ta + 273.15) ** 4) / (t - ta)
+    assert float(fs.h_strand(0.42, t, ta)) == pytest.approx(nu * film["k"] / d + rad, rel=1e-6)
+    assert 50 < float(fs.h_strand(0.42, t, ta)) < 80  # a flat wall's 10 is for the part, not a strand
+    assert fs.h_strand(0.42, t, ta, wind=5.0) > 3 * fs.h_strand(0.42, t, ta)
 
 
 def test_bead_cooling_matches_the_hand_numbers():
-    c = fs.cooling("PLA", 0.2, 0.42, fan=False)
     area, per = (0.42 - 0.2) * 0.2 + math.pi * 0.04 / 4, 2 * 0.22 + math.pi * 0.2
-    tau = 1240 * 1400 * (area / per * 1e-3) / 10  # rho cp (A / P) / h
-    assert c["tau_s"] == pytest.approx(tau, rel=1e-9)
-    assert c["soft_s"] == pytest.approx(tau * math.log((220 - 35) / (61 - 35)), rel=1e-9)
+    for fan, wind in ((False, 0.0), (True, 5.0)):
+        t, s = 220.0, 0.0  # step it down by hand, 1 ms at a time
+        while t > 61:
+            h = float(fs.h_strand(4 * area / per, t, 35.0, wind))
+            t -= h * (t - 35) / (1240 * 1400 * area / per * 1e-3) * 1e-3
+            s += 1e-3
+        assert fs.cooling("PLA", 0.2, 0.42, fan)["soft_s"] == pytest.approx(s, rel=0.01)
+    still, blown = fs.cooling("PLA", fan=False), fs.cooling("PLA", fan=True)
+    assert blown["soft_s"] < still["soft_s"] / 3
+    assert still["tau_s"] == pytest.approx(1240 * 1400 * area / per * 1e-3 / still["h"])
+
+
+def test_each_plastic_melts_by_its_own_numbers():
+    assert float(fs.viscosity(240, 0, "PETG")) == pytest.approx(600, rel=1e-9)
+    shift = 17.44 * (240 - 66) / (51.6 + 240 - 66) - 17.44 * (200 - 66) / (51.6 + 200 - 66)
+    assert float(fs.viscosity(200, 0, "PETG")) == pytest.approx(600 * 10 ** shift, rel=1e-9)
+    abs0 = 2.54e12 * math.exp(-28.3 * (513.15 - 365) / (51.6 + 513.15 - 365))  # NIST Table 1 at 240 C
+    assert float(fs.viscosity(240, 0, "ABS")) == pytest.approx(abs0, rel=1e-9) and 1500 < abs0 < 2500
+    thin = abs0 / (1 + (abs0 * 500 / 41070) ** (1 - 0.341))
+    assert float(fs.viscosity(240, 500, "ABS")) == pytest.approx(thin, rel=1e-9)
+    assert fs.material("PETG").k == 0.21
+    assert not any("viscosity" in s for s in fs.material("ABS").stand_ins)
 
 
 def test_curl_lifts_the_ledge_by_the_bilayer_curvature():

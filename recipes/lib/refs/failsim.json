@@ -20,7 +20,7 @@
    "key": "h_still",
    "value": 10,
    "unit": "W/(m2 K)",
-   "note": "Convection from a bead in still air (fan off). The same paper cools its PLA beads with a lumped Newton model, as stone does.",
+   "note": "Convection from the part's walls in still air (fan off). A strand loses far more; failsim.churchill_chu.",
    "quote": "Convective heat Transfer coefficient h 10 W·m−2K−1 Natural convection of air",
    "source": "He, Zhu, Zhang, Yang, Investigation on Bridging Defects in 3D-Printed Polylactic Acid Beams Using Fused Filament Fabrication, Polymers 2026, 18(2), 261, Table 3",
    "cite": "Polymers 2026 18:261 PLA bridging, Table 3",
@@ -38,6 +38,19 @@
    "source": "He, Zhu, Zhang, Yang, Investigation on Bridging Defects in 3D-Printed Polylactic Acid Beams Using Fused Filament Fabrication, Polymers 2026, 18(2), 261, Table 3",
    "cite": "Polymers 2026 18:261 PLA bridging, Table 3",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12845589/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.petg.k",
+   "topic": "failsim",
+   "key": "petg.k",
+   "value": 0.21,
+   "unit": "W/(m K)",
+   "note": "PETG thermal conductivity, printed solid, at 50 to 60 C (0.211 and 0.207).",
+   "quote": "50.05 +- 0.25 0.211 +- 0.006; 59.78 +- 0.31 0.207 +- 0.006 (T C, k W/mK, PET G 100%)",
+   "source": "Experimental Investigation of Thermal Conductivity of Selected 3D-Printed Materials, Materials 2025, 18(17), 3950, the 100% infill table",
+   "cite": "Materials 2025 18:3950",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12428860/",
    "checked": "2026-11-24"
   },
   {
@@ -90,7 +103,7 @@
     ]
    ],
    "unit": "C, W/(m K), J/(kg K)",
-   "note": "ABS conductivity and specific heat by temperature (their Table 5, from Zhou et al.). stone averages cp from Tg up to the nozzle temperature and k from room air up to Tg. PETG has no sourced pair here: stone uses PLA's and says so.",
+   "note": "ABS conductivity and specific heat by temperature (their Table 5, from Zhou et al.). stone averages cp from Tg up to the nozzle temperature and k from room air up to Tg. PETG has no sourced specific heat for its melt: stone uses PLA's and says so.",
    "quote": "Temperature (°C) Thermal Conductivity Specific Heat Capacity Density 0 0.23 780 1050 50 0.25 1040 1050 100 0.28 1490 1050 150 0.29 1710 1050 200 0.31 1865 1050 250 0.33 2020 1050",
    "source": "Bhandari and Lopez-Anido, Discrete-Event Simulation Thermal Model for Extrusion-Based Additive Manufacturing of PLA and ABS, Materials 2020, 13(21), 4985",
    "cite": "Materials 2020 13:4985 PLA and ABS thermal model",
@@ -98,33 +111,131 @@
    "checked": "2026-11-24"
   },
   {
-   "id": "failsim.air_400k",
+   "id": "failsim.air",
    "topic": "failsim",
-   "key": "air_400k",
-   "value": {
-    "k": 0.03365,
-    "pr": 0.688,
-    "nu": 2.591e-05
-   },
-   "unit": "W/(m K), -, m2/s",
-   "note": "Dry air at 400 K (127 C), the film temperature between a fresh bead and the chamber air, for the fan-on convection.",
-   "quote": "400 1.0135 0.7264 1.395 2.286 3.365 0.688 2.591 (T K, cp, cv, k, mu 1e-5, k 1e-2 W/mK, Pr, nu 1e-5 m2/s)",
-   "source": "Engineering ToolBox, Air: thermophysical properties",
-   "cite": "Engineering ToolBox dry air properties",
-   "url": "https://www.engineeringtoolbox.com/dry-air-properties-d_973.html",
+   "key": "air",
+   "value": [
+    [
+     300,
+     1.177,
+     1.575e-05,
+     0.0264,
+     0.707
+    ],
+    [
+     310,
+     1.139,
+     1.67e-05,
+     0.0271,
+     0.706
+    ],
+    [
+     320,
+     1.103,
+     1.766e-05,
+     0.0279,
+     0.705
+    ],
+    [
+     350,
+     1.009,
+     2.069e-05,
+     0.03,
+     0.702
+    ],
+    [
+     400,
+     0.8823,
+     2.613e-05,
+     0.0335,
+     0.699
+    ],
+    [
+     450,
+     0.7842,
+     3.204e-05,
+     0.0368,
+     0.698
+    ],
+    [
+     500,
+     0.7058,
+     3.839e-05,
+     0.0399,
+     0.698
+    ]
+   ],
+   "unit": "K, kg/m3, m2/s, W/(m K), -",
+   "note": "Dry air at 1 atmosphere by temperature, taken at the mean of the strand's and the air's (the film temperature).",
+   "quote": "300 1.177 1.575e-5 0.0264 0.707 ... 400 0.8823 2.613e-5 0.0335 0.699 (T K, rho, nu, k, Pr)",
+   "source": "Lienhard and Lienhard, A Heat Transfer Textbook, version 6.00, MIT, Table A.6",
+   "cite": "Lienhard 2024 Table A.6",
+   "url": "https://ahtt.mit.edu/wp-content/uploads/2024/04/AHTTv600.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.churchill_chu",
+   "topic": "failsim",
+   "key": "churchill_chu",
+   "value": "Nu = 0.36 + 0.518 Ra^(1/4) / (1 + (0.559/Pr)^(9/16))^(4/9)",
+   "unit": "formula",
+   "note": "Free convection off a horizontal cylinder, 1e-6 <= Ra <= 1e9: a strand in still air. A 0.4 mm strand loses about six times what a flat wall does, so the 10 W/(m2 K) of failsim.h_still is kept for the part's walls only.",
+   "quote": "Churchill and Chu recommend that eqn. (8.28) be used in the range 10^-6 <= RaD <= 10^9",
+   "source": "Lienhard and Lienhard, A Heat Transfer Textbook, version 6.00, MIT, eq. 8.28",
+   "cite": "Lienhard 2024 eq. 8.28",
+   "url": "https://ahtt.mit.edu/wp-content/uploads/2024/04/AHTTv600.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.nakai_okazaki",
+   "topic": "failsim",
+   "key": "nakai_okazaki",
+   "value": "Nu = 1 / (0.8237 - ln(Pe^(1/2)))",
+   "unit": "formula",
+   "note": "Forced convection across a cylinder at Pe = Re Pr <= 0.2, where Churchill-Bernstein stops.",
+   "quote": "For Pe <= 0.2, the Nakai-Okazaki relation should be used",
+   "source": "Lienhard and Lienhard, A Heat Transfer Textbook, version 6.00, MIT, eq. 7.67",
+   "cite": "Lienhard 2024 eq. 7.67",
+   "url": "https://ahtt.mit.edu/wp-content/uploads/2024/04/AHTTv600.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.emissivity",
+   "topic": "failsim",
+   "key": "emissivity",
+   "value": 0.92,
+   "unit": "ratio",
+   "note": "How well a printed plastic radiates; about the same for ABS and PLA, and used for every plastic.",
+   "quote": "The emissivity of common 3D printing materials such as ABS and PLA were measured using a reflectivity meter and have the measured value of approximately 0.92.",
+   "source": "Emissivity Measurements of Additively Manufactured Materials, Los Alamos (OSTI 1341825)",
+   "cite": "OSTI 1341825 emissivity",
+   "url": "https://www.osti.gov/servlets/purl/1341825",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.stefan_boltzmann",
+   "topic": "failsim",
+   "key": "stefan_boltzmann",
+   "value": 5.670374e-08,
+   "unit": "W/(m2 K4)",
+   "note": "Radiation constant.",
+   "quote": "5.670374419...e-8 W/(m2 K4)",
+   "source": "Wikipedia, Stefan-Boltzmann law",
+   "cite": "Stefan-Boltzmann constant",
+   "url": "https://en.wikipedia.org/wiki/Stefan%E2%80%93Boltzmann_law",
    "checked": "2026-11-24"
   },
   {
    "id": "failsim.churchill_bernstein",
    "topic": "failsim",
    "key": "churchill_bernstein",
-   "value": "Nu = 0.3 + 0.62 Re^0.5 Pr^(1/3) / (1 + (0.4/Pr)^(2/3))^0.25 x (1 + (Re/282000)^(5/8))^(4/5)",
+   "value": "Nu = 0.3 + 0.62 Re^0.5 Pr^(1/3) / (1 + (0.4/Pr)^(2/3))^0.25",
    "unit": "formula",
-   "note": "Forced convection across a cylinder for Re Pr > 0.2: the bead in the part-cooling fan's air. h = Nu k / d.",
-   "quote": "Nu_D = 0.3 + 0.62 Re_D^1/2 Pr^1/3 / [1 + (0.4/Pr)^2/3]^1/4 [1 + (Re_D/282000)^5/8]^4/5",
-   "source": "Wikipedia, Churchill-Bernstein equation",
-   "cite": "Churchill-Bernstein equation",
-   "url": "https://en.wikipedia.org/wiki/Churchill%E2%80%93Bernstein_equation",
+   "note": "Forced convection across a cylinder for Re Pr > 0.2 and Re < 4000, a strand's range: the bead in the part-cooling fan's air. h = Nu k / d. Lienhard's worked example 7.8 (0.1 mm wire, Re 457) gives 10.69.",
+   "quote": "Below Re_D = 4000, the bracketed term [1 + (Re_D/282,000)^5/8]^4/5 is ~ 1",
+   "source": "Lienhard and Lienhard, A Heat Transfer Textbook, version 6.00, MIT, eq. 7.66",
+   "cite": "Lienhard 2024 eq. 7.66",
+   "url": "https://ahtt.mit.edu/wp-content/uploads/2024/04/AHTTv600.pdf",
    "checked": "2026-11-24"
   },
   {
@@ -158,11 +269,64 @@
     "tau_star_Pa": 129000.0
    },
    "unit": "Cross-WLF",
-   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade; filament PLA is close but not the same. PETG and ABS have no sourced fit: stone uses PLA's and says so.",
+   "note": "PLA melt viscosity by temperature and shear rate: eta0 = D1 exp(-A1 (T - T*) / (A2 + T - T*)), eta = eta0 / (1 + (eta0 rate / tau*)^(1 - n)). Fitted to NatureWorks Ingeo 3251D, an injection grade; filament PLA is close but not the same.",
    "quote": "Table 2 Data-fitted Cross-WLF parameters of the PLA 3251D. A1 16.71 A2 (K) 51.60 D1 (Pa*s) 2.045 × 10^7 D3 (K/Pa) 0 T* (K) 373.15 n 0.3846 τ* (Pa) 1.29 × 10^5",
    "source": "Pricci, Physics-Based Predictive Modeling of Gravity-Induced Sagging in Support-Free Pellet Additive Manufacturing, Polymers 2025, 17(21), 2858, Table 2",
    "cite": "Polymers 2025 17:2858 Cross-WLF of PLA 3251D",
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12608786/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.abs.cross_wlf",
+   "topic": "failsim",
+   "key": "abs.cross_wlf",
+   "value": {
+    "A1": 28.3,
+    "A2_K": 51.6,
+    "D1_Pa_s": 2540000000000.0,
+    "T_star_K": 365,
+    "n": 0.341,
+    "tau_star_Pa": 41070
+   },
+   "unit": "Cross-WLF",
+   "note": "ABS melt viscosity, capillary rheometer, Hatchbox black ABS filament. Another group fits 43,900 Pa s for a different ABS at 240 C from stretching tests (arXiv 2311.05158 Table 2), 22 times this: rubber-filled melts stiffen at slow rates, and stone does not model that.",
+   "quote": "n 0.341, tau* 41070 Pa, eta_ref 2.54 x 10^12 Pa-s, T_ref 365 K, A1 28.3, A2 51.6 K",
+   "source": "Colon, Kazmer, Peterson, Seppala, Characterization of Die-Swell in Thermoplastic Material Extrusion, Additive Manufacturing 2023 (NIST), Table 1",
+   "cite": "NIST 936451 Table 1",
+   "url": "https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=936451",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.petg.melt",
+   "topic": "failsim",
+   "key": "petg.melt",
+   "value": {
+    "eta0_Pa_s": 600,
+    "at_C": 240
+   },
+   "unit": "Pa s, C",
+   "note": "PETG melt viscosity at its print temperature, weight-averaged over the modes of a Giesekus fit to shear and stretch tests.",
+   "quote": "PET-G ... 240 (Table 1); Avg. eta 600 (Table 2)",
+   "source": "Assessing nozzle flow dynamics in Fused Filament Fabrication through the parametric map alpha-lambda, arXiv 2311.05158, Tables 1 and 2",
+   "cite": "arXiv 2311.05158 Table 2",
+   "url": "https://arxiv.org/abs/2311.05158",
+   "checked": "2026-11-24",
+   "assumption": "PETG's viscosity is one measured point (600 Pa s at 240 C) moved to other temperatures by the universal WLF constants, thinning with speed as PLA does"
+  },
+  {
+   "id": "failsim.wlf",
+   "topic": "failsim",
+   "key": "wlf",
+   "value": {
+    "C1": 17.44,
+    "C2_K": 51.6
+   },
+   "unit": "log10, K",
+   "note": "Universal WLF constants, measured from the glass transition: used only to move PETG's one viscosity.",
+   "quote": "universal constants C1 = 17.44 and C2 = 51.6 K when the reference temperature is Tg",
+   "source": "Wikipedia, Williams-Landel-Ferry equation",
+   "cite": "WLF equation",
+   "url": "https://en.wikipedia.org/wiki/Williams%E2%80%93Landel%E2%80%93Ferry_equation",
    "checked": "2026-11-24"
   },
   {
