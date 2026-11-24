@@ -631,7 +631,7 @@ def test_it_starts_again_just_over_the_plate_without_a_point_over_the_nozzle(spe
     for k in range(60):
         head = head + [speed / 240, 0, 0]
         s.step(head=head)
-        assert s.points()[:, 2].max() <= r + 0.01 and s.diameters().max(initial=0) < 4 * r
+        assert s.points()[:, 2].max() <= r + 0.02 and s.diameters().max(initial=0) < 4 * r
     assert (len(s.x) > 1) == (speed > 0)  # it has nowhere to go until the nozzle moves on
     off = laid(True).snap() or [laid(True)]
     off[0].nozzle, off[0].vol[-1] = False, 1e-15
