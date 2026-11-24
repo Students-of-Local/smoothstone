@@ -298,6 +298,23 @@ def test_f2_answers_read_negation_and_ask_again_when_mixed(text, keys, want):
     assert doctor.answer_key(text, keys) == want
 
 
+@pytest.mark.parametrize("said", ["thermal runaway", "the printer stopped with a thermal runaway error",
+                                  "heater error and it shut down"])
+def test_f1sol_no_blob_steps_for_a_thermal_fault(work, said):
+    text, code, nxt = stone("doctor", said)
+    assert "Most likely: " in text and "(thermal_error)" in text.splitlines()[1]
+    safety = [ln for ln in text.splitlines() if ln.startswith("SAFETY: ")]
+    assert safety and "switch the printer off" in safety[0]
+    assert not any(ln.startswith("SAFETY: Heat the hotend") for ln in safety), text
+
+
+def test_f1sol_a_blob_with_a_thermal_fault_keeps_power_off_first(work):
+    text, code, nxt = stone("doctor", "big blob of plastic on the nozzle and now a thermal runaway error")
+    safety = [ln for ln in text.splitlines() if ln.startswith("SAFETY: ")]
+    assert "switch the printer off" in safety[0]
+    assert not any("Heat the hotend" in ln for ln in safety), text
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)
