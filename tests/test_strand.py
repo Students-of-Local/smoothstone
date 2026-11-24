@@ -618,3 +618,24 @@ def test_a_cold_strand_torn_back_and_forth_gives_instead_of_flying():
         s.step(head=(120 + 60 * math.sin(k / 6), 40 * math.sin(k / 9), 5.0))
         assert np.abs(s.v).max() < 10 and np.abs(s.points()).max() < 400  # the nozzle reaches 2.7 m/s
     assert (np.abs(s.tens) <= s.strength * s.vol / s.lengths()[1] * 1.2 + 1e-9).all()
+
+
+@pytest.mark.parametrize("speed", (0, 20, 200))
+def test_it_starts_again_just_over_the_plate_without_a_point_over_the_nozzle(speed):
+    s = laid(True)
+    s.ground, s.flow = lambda x, y: np.zeros(np.shape(x)), 10e-9
+    s.force, s.vol[-1] = 1.0, 1e-15
+    s.snap()
+    assert s.force == 0
+    r, head = math.sqrt(s.area / math.pi) * 1e3, np.array([*s.points()[-1, :2], 0.2])
+    for k in range(60):
+        head = head + [speed / 240, 0, 0]
+        s.step(head=head)
+        assert s.points()[:, 2].max() <= r + 0.01 and s.diameters().max(initial=0) < 4 * r
+    assert (len(s.x) > 1) == (speed > 0)  # it has nowhere to go until the nozzle moves on
+    off = laid(True).snap() or [laid(True)]
+    off[0].nozzle, off[0].vol[-1] = False, 1e-15
+    off[0].snap()
+    was = off[0].points()
+    off[0].step(head=(0, 0, 50))
+    assert off[0].points() == pytest.approx(was)  # a scrap off the nozzle stays where it fell
