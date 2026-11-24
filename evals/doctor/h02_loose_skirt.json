@@ -1,0 +1,12 @@
+{
+ "id": "h02_loose_skirt",
+ "said": "The skirt just gets dragged around behind the nozzle and the little circles never grab the plate. Cleaned it with a paper towel but still no luck.",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": [
+   "first_layer"
+  ]
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "f19_vertical_zip",
+ "said": "one dotted zipper runs up the back of every cup, elsewhere walls are smooth",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "z_seam",
+  "top3_includes": []
+ }
+}

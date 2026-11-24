@@ -1,0 +1,12 @@
+{
+ "id": "b03_midair_nest",
+ "said": "Woke up to a bird nest and the actual print sitting loose behind the bed. It just kept going for six hours.",
+ "printer": "elegoo_neptune_4_pro",
+ "material": "PLA",
+ "expect": {
+  "top": "spaghetti",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "f20_popping_spool",
+ "said": "must be loose belts, fresh extrusion crackles and spits steam with bubbles, spool sat open beside shower",
+ "printer": "prusa_core_one",
+ "material": "PA",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": []
+ }
+}

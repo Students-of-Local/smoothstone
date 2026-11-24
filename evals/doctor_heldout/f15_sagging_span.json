@@ -1,0 +1,10 @@
+{
+ "id": "f15_sagging_span",
+ "said": "across the rectangular window the straight strands sag like washing lines, both ends still attached",
+ "printer": "creality_ender3_v3",
+ "material": "PETG",
+ "expect": {
+  "top": "poor_bridging",
+  "top3_includes": []
+ }
+}

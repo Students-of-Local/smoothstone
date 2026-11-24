@@ -1,0 +1,10 @@
+{
+ "id": "h12_peelable_walls",
+ "said": "This nylon bracket looks complete but I can peel the walls apart along the layer lines with my fingernail. It isn't cracked on the bed, it's just barely bonded when I bend it.",
+ "printer": "prusa_core_one",
+ "material": "PA",
+ "expect": {
+  "top": "layer_separation",
+  "top3_includes": []
+ }
+}

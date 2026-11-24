@@ -1,0 +1,10 @@
+{
+ "id": "h09_stair_step",
+ "said": "The bed must have slipped because the top half of this box is suddenly 8 mm to the left. The bottom is still firmly stuck in its original spot and the layers above the jump look normal.",
+ "printer": "sovol_sv08",
+ "material": "ABS",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

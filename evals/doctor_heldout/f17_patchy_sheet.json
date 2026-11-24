@@ -1,0 +1,10 @@
+{
+ "id": "f17_patchy_sheet",
+ "said": "bed glue issue i reckon, first pass has clear gaps on left and scraped transparent plastic on right",
+ "printer": "elegoo_neptune_4_pro",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": []
+ }
+}

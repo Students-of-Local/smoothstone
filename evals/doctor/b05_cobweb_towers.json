@@ -1,0 +1,10 @@
+{
+ "id": "b05_cobweb_towers",
+ "said": "Why do my two towers have cobwebs between them? Walls look great, just wispy hairs everywhere it travels across the gap.",
+ "printer": "prusa_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "stringing",
+  "top3_includes": []
+ }
+}

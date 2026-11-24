@@ -1,0 +1,10 @@
+{
+ "id": "h13_echo_letters",
+ "said": "Every raised letter has faint copies of its edge trailing across the wall beside it. I thought wet filament made those ripples but they only show after sharp corners and get worse at speed.",
+ "printer": "voron_24",
+ "material": "ABS",
+ "expect": {
+  "top": "ringing",
+  "top3_includes": []
+ }
+}

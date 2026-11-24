@@ -1,0 +1,10 @@
+{
+ "id": "b15_dangling_ceiling",
+ "said": "Why does the ceiling over my rectangular window hang down like loose guitar strings? Both ends attach fine, it's the middle of the span.",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PETG",
+ "expect": {
+  "top": "poor_bridging",
+  "top3_includes": []
+ }
+}

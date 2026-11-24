@@ -1,0 +1,12 @@
+{
+ "id": "b24_split_enclosure",
+ "said": "Big ASA enclosure has a sharp split opening across the middle as it cools, corners still flat. Obviously I used the wrong infill pattern.",
+ "printer": "creality_k2_plus",
+ "material": "ASA",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": [
+   "layer_separation"
+  ]
+ }
+}

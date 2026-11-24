@@ -1,0 +1,10 @@
+{
+ "id": "b34_lifted_nameplate",
+ "said": "Clean looking first layer, then my entire little nameplate slides off intact on layer three. No curled corners. Glue should be illegal, fix the firmware.",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PLA",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "h26_swap_wont_load",
+ "said": "Single color prints are fine, but every time it swaps from slot 1 to slot 3 the filament stops in the hub and it keeps retrying the load. No new color ever reaches the toolhead.",
+ "printer": "bambu_x1c",
+ "material": "PLA",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "f10_wide_base",
+ "said": "bottom two layers stick out wider like little shoes, rest of cube measures right",
+ "printer": "bambu_x1c",
+ "material": "ABS",
+ "expect": {
+  "top": "elephant_foot",
+  "top3_includes": []
+ }
+}

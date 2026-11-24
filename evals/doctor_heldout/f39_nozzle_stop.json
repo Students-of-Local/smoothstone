@@ -1,0 +1,10 @@
+{
+ "id": "f39_nozzle_stop",
+ "said": "this is firmware for sure, hot nozzle gives nothing when i push filament by hand after removing feeder pressure",
+ "printer": "creality_ender3_v3",
+ "material": "PETG",
+ "expect": {
+  "top": "clog",
+  "top3_includes": []
+ }
+}

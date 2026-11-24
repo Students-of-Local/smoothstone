@@ -1,0 +1,10 @@
+{
+ "id": "h17_bottom_gaps",
+ "said": "The first pass stays attached but it's a bunch of separate round strings with daylight between them, not one smooth sheet. Later layers mostly hide it.",
+ "printer": "prusa_mk4s",
+ "material": "PLA",
+ "expect": {
+  "top": "first_layer",
+  "top3_includes": []
+ }
+}

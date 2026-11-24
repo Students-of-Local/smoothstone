@@ -1,0 +1,10 @@
+{
+ "id": "f25_holey_roof",
+ "said": "roof has little holes over the infill squares and soft raised pillows between them",
+ "printer": "creality_k1_max",
+ "material": "PLA",
+ "expect": {
+  "top": "pillowing",
+  "top3_includes": []
+ }
+}

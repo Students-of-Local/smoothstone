@@ -1,0 +1,12 @@
+{
+ "id": "f37_interface_gap",
+ "said": "support towers finish intact but model starts two millimeters above their tops and curls loose instead of catching",
+ "printer": "bambu_h2d",
+ "material": "PLA",
+ "expect": {
+  "top": "not_sticking_supports_to_part",
+  "top3_includes": [
+   "overhang_droop"
+  ]
+ }
+}

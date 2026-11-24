@@ -1,0 +1,10 @@
+{
+ "id": "f09_sideways_roof",
+ "said": "belt tension cant be it, slicer moved the whole upper half six millimeters left in one layer",
+ "printer": "sovol_sv08",
+ "material": "ABS",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}

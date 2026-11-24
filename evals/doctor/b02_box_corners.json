@@ -1,0 +1,10 @@
+{
+ "id": "b02_box_corners",
+ "said": "My box starts flat but all four corners slowly curl upward. Pretty sure the belts need tightening, right?",
+ "printer": "creality_k1_max",
+ "material": "ABS",
+ "expect": {
+  "top": "warping",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "h04_hotend_cocoon",
+ "said": "There's a golf ball sized blob of doom wrapped around the heater block and the silicone sock is buried in it. The print never got past the bottom few layers.",
+ "printer": "creality_k1c",
+ "material": "PETG",
+ "expect": {
+  "top": "blob_on_nozzle",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

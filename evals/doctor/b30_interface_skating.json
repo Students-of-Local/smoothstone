@@ -1,0 +1,10 @@
+{
+ "id": "b30_interface_skating",
+ "said": "Support towers stay perfectly upright, but the first model lines above their dense roof curl up and skate around instead of attaching. Interface gap is 0.6.",
+ "printer": "bambu_h2d",
+ "material": "PLA",
+ "expect": {
+  "top": "not_sticking_supports_to_part",
+  "top3_includes": []
+ }
+}

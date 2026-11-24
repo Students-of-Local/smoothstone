@@ -1,0 +1,10 @@
+{
+ "id": "f28_temp_halt",
+ "said": "screen says heater verification failed and stops heating before any plastic moves",
+ "printer": "qidi_q1_pro",
+ "material": "PC",
+ "expect": {
+  "top": "thermal_error",
+  "top3_includes": []
+ }
+}

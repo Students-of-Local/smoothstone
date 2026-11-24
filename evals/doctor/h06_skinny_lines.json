@@ -1,0 +1,12 @@
+{
+ "id": "h06_skinny_lines",
+ "said": "The walls have little missing stretches and the infill lines are way skinnier than they should be. It does it from the start, but slowing the print down makes it less bad.",
+ "printer": "elegoo_centauri_carbon",
+ "material": "PLA",
+ "expect": {
+  "top": "under_extrusion",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

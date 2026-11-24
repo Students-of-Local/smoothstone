@@ -1,0 +1,12 @@
+{
+ "id": "b16_broken_trees",
+ "said": "Tree trunks snapped halfway up and fell beside the model. Now the arms are printing onto nothing. Surely this is a retraction problem.",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "support_failure",
+  "top3_includes": [
+   "spaghetti"
+  ]
+ }
+}

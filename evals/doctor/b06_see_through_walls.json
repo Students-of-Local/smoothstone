@@ -1,0 +1,10 @@
+{
+ "id": "b06_see_through_walls",
+ "said": "This has to be too much cooling. Walls have missing stretches and I can see daylight between lines, but plastic is still coming out.",
+ "printer": "sovol_sv08",
+ "material": "PLA",
+ "expect": {
+  "top": "under_extrusion",
+  "top3_includes": []
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "b38_no_plastic_after_change",
+ "said": "Changed to ASA and now nothing exits during purge. Feeder clicks, manual pushing at 260 won't move it either. It is definitely a leveling problem.",
+ "printer": "creality_k2",
+ "material": "ASA",
+ "expect": {
+  "top": "clog",
+  "top3_includes": []
+ }
+}

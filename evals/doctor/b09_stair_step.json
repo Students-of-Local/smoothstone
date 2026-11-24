@@ -1,0 +1,10 @@
+{
+ "id": "b09_stair_step",
+ "said": "Must be the STL being corrupted. Halfway up, the whole model jumps sideways 8mm, then prints perfectly straight from that new spot.",
+ "printer": "anycubic_kobra_3",
+ "material": "PLA",
+ "expect": {
+  "top": "layer_shift",
+  "top3_includes": []
+ }
+}
