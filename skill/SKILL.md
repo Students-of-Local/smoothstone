@@ -103,6 +103,33 @@ When a photo has a ruler, a bank card or a US quarter beside the object, `stone 
 <photo>` (with `--ref card` or `--ref coin-us-quarter` for those) finds the object's real size,
 and stone show fills it in. `--known 120mm` works when you know the long side.
 
+## Before it prints
+
+After a passing build, stone answers what people ask before they press print. Each question has its own
+card: read it when the question comes up, run the command, tell the person what it says, then run NEXT.
+
+- Does it need supports, and where? `stone supports` (supports.md)
+- Will it fit the screw, bearing, shaft or lid? `stone fit` (fit.md)
+- Will it hold the load? `stone strength load=3kg at=tip dir=down fixed=bottom` with the person's own load and unit (20N, 3kg, 5lb),
+  the spot it pushes on and what holds the part, `fixed=holes` for screws through its holes. Add `material=`, `walls=`
+  and `infill=` when they said them (strength.md)
+- Will it survive a car, the sun, a dishwasher, or warp on the bed? `stone heat where=car` (heat.md)
+- How long will it take, and what will it look like printing? `stone timelapse` (timelapse.md)
+- What would go wrong without supports, or if it came loose? `stone timelapse --fail` (fail.md): a model,
+  not a recording; say so.
+
+These are models, checked against hand numbers and slicers, not against this person's printer. Pass on
+the limits they print.
+
+## When a print fails
+
+Follow doctor.md: `stone doctor "<what the print looks like>"`, with `--image photo.jpg` for a photo or
+`--camera` for the printer's own camera. It asks for the printer when it needs it: `stone printer` lists the
+profiles and `stone printer set <id>` keeps it. stone ranks the causes for that printer, asks the one question that tells
+them apart, and gives the maker's fix. Read every SAFETY line to the person. When they say it worked:
+`stone doctor fixed "<what worked>"`. Sharing the fix is their choice, and stone sends nothing: `stone doctor
+share` gives a link they open and submit themselves. stone never starts, pauses or cancels a print.
+
 ## Start
 
 stone status
