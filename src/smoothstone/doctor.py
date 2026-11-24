@@ -302,13 +302,37 @@ def top_causes(causes: dict[str, float], n: int = 3) -> list[tuple[str, float]]:
     return sorted(causes.items(), key=lambda x: -x[1])[:n]
 
 
+ANSWER_NEGATE = NEGATE | {stem(w) for w in ("doesn't", "doesnt", "don't", "dont", "won't", "wont", "isnt", "aren't")}
+LEAD = {"yes": {"yes", "yeah", "yep", "yup", "sure", "correct"}, "no": {"no", "nope", "nah"}}
+
+
 def answer_key(text: str, keys: list[str]) -> str | None:
-    """The answer key the person's words mean, by the catalog's answer words; "unknown" when they cannot tell."""
+    """The answer key the person's words mean for this question, or None to ask again.
+    "can't tell" words give "unknown". A reply that starts with yes or no is that. Otherwise each key's
+    words count unless "not", "doesn't" or "never" comes just before them ("it doesn't bead" is not beads);
+    with two keys, a denied one means the other. Two keys at once is unclear: ask again, never guess."""
     t = norm(text)
     words = catalog()["answers"]
-    for k in ["unknown"] + [k for k in words if k in keys]:
-        if any(norm(w) in t for w in words.get(k, [])):
+    if any(norm(w) in t for w in words.get("unknown", [])):
+        return "unknown"
+    toks = t.split()
+    for k, lead in LEAD.items():
+        if k in keys and toks and toks[0] in lead:
             return k
+    said, denied = set(), set()
+    for part in re.split(r"[,.;:!?]|\bbut\b|\band\b", text.lower()):  # a "not" reaches only its own clause
+        c = norm(part)
+        for k in keys:
+            for w in words.get(k, []):
+                p, at = norm(w), 0
+                while (at := c.find(p, at)) >= 0:
+                    before = set(c[:at].split()[-3:])
+                    (denied if k != "no" and before & ANSWER_NEGATE else said).add(k)
+                    at += 1
+    if len(said) == 1:
+        return next(iter(said))
+    if not said and len(denied) == 1 and len(keys) == 2:
+        return next(k for k in keys if k not in denied)
     return None
 
 

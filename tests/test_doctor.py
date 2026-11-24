@@ -284,6 +284,20 @@ def test_f1_configured_printer_wins_over_a_guess(work):
     assert text.splitlines()[0].endswith("Creality K2 Plus"), text
 
 
+@pytest.mark.parametrize("text,keys,want", [
+    ("yes, I never wash it", ["yes", "no"], "yes"),
+    ("no, it never gets washed", ["yes", "no"], "no"),
+    ("it doesn't bead, it spreads", ["beads", "film"], "film"),
+    ("it doesn't bead", ["beads", "film"], "film"),
+    ("it does not spread at all", ["beads", "film"], "beads"),
+    ("the water beads up", ["beads", "film"], "beads"),
+    ("it is not", ["yes", "no"], None),  # yes and no both: ask again
+    ("not sure", ["yes", "no"], "unknown"),
+])
+def test_f2_answers_read_negation_and_ask_again_when_mixed(text, keys, want):
+    assert doctor.answer_key(text, keys) == want
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)
