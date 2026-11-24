@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 import subprocess
 import time
@@ -25,7 +26,7 @@ import numpy as np
 
 from . import config, gcode, refs
 
-BLENDER = ("/opt/homebrew/bin/blender", "/Applications/Blender.app/Contents/MacOS/Blender", "blender")
+BLENDER = ("blender", "/opt/homebrew/bin/blender", "/Applications/Blender.app/Contents/MacOS/Blender")
 FPS = 30  # frames a second in the video (assumption: a common phone and printer video rate)
 SECONDS = 10.0  # realtime mode's default video length
 MIN_SECONDS = 4.0  # a per-layer video of a short print plays slower than FPS, to last this long (assumption: watchable)
@@ -164,7 +165,7 @@ def _extras(items: list[dict], path: Path) -> Path | None:
 
 
 def blender() -> str | None:
-    for b in BLENDER:
+    for b in (os.environ.get("STONE_BLENDER") or "", *BLENDER):
         found = shutil.which(b) or (b if Path(b).is_file() else None)
         if found:
             return found
@@ -176,7 +177,7 @@ def render(tp: gcode.Toolpath, frs: list[dict], prof: dict, cam: dict, out: Path
     """Render every frame to out/f_0000.png ... with Blender. Returns the frame files."""
     b = blender()
     if not b:
-        raise RuntimeError("Blender is not installed (stone looks in /opt/homebrew/bin and /Applications)")
+        raise RuntimeError("Blender not found; install it or set STONE_BLENDER")
     out.mkdir(parents=True, exist_ok=True)
     for f in out.glob("f_*.png"):
         f.unlink()
