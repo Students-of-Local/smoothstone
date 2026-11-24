@@ -409,6 +409,19 @@ def open_case(job) -> dict | None:
     return read_json(doctor_dir(job) / ptr.read_text().strip() / "case.json")
 
 
+def new_case_id(job, now) -> str:
+    """The time to the second, with -2, -3... when a case already took it; the folder is claimed here, so a
+    second case in the same second never writes into the first one's."""
+    base, n = now.strftime("%Y%m%d-%H%M%S"), 1
+    while True:
+        cid = base if n == 1 else f"{base}-{n}"
+        try:
+            (doctor_dir(job) / cid).mkdir(parents=True, exist_ok=False)
+            return cid
+        except FileExistsError:
+            n += 1
+
+
 def save_case(job, case: dict) -> Path:
     d = doctor_dir(job) / case["id"]
     d.mkdir(parents=True, exist_ok=True)
@@ -623,7 +636,7 @@ def _new(args, job, said: str, out):
     p = p or (named if clear else None) or kept or printers.current(job.root) or named
     material = (args.material or find_material(said) or (reuse or {}).get("material") or "").upper() or None
     now = _dt.datetime.now()
-    case = reuse or {"id": now.strftime("%Y%m%d-%H%M%S"), "created": now.isoformat(timespec="seconds"),
+    case = reuse or {"id": new_case_id(job, now), "created": now.isoformat(timespec="seconds"),
                      "image": None, "asked": [], "answers": [], "tried": []}
     case_dir = doctor_dir(job) / case["id"]
     if args.image:
