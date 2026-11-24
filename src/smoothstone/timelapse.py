@@ -20,11 +20,12 @@ import os
 import shutil
 import subprocess
 import time
+import zlib
 from pathlib import Path
 
 import numpy as np
 
-from . import config, gcode, refs
+from . import config, gcode, printers
 
 BLENDER = ("blender", "/opt/homebrew/bin/blender", "/Applications/Blender.app/Contents/MacOS/Blender")
 FPS = 30  # frames a second in the video (assumption: a common phone and printer video rate)
@@ -35,49 +36,45 @@ HEAD_MM = (50.0, 50.0, 60.0)  # the toolhead box drawn in fixed mode (assumption
 NOZZLE_MM = 12.0  # nozzle tip to the bottom of the head (assumption: heater block and nozzle)
 SHEET = 9
 FIT_PX = 3.0  # a camera fit whose corners land farther off than this gets a warning
-# The K2's chamber camera, until the printer profiles (Track D) carry it or the person fits theirs with
-# --camera-from: low at the front left, looking back across the bed, from the owner's own K2 night
-# snapshot (ss-assets/k2-detached-plate-blob.jpg). An assumption, not a measured pose.
-K2_CAMERA = {"where": "front left, low, inside the chamber", "pos_mm": [-10.0, -20.0, 70.0],
-             "look_at_mm": [150.0, 170.0, 10.0], "hfov_deg": 80.0, "aspect": 4 / 3, "ir_night": True,
-             "timelapse_mode": "fixed",
-             "assumption": "pose read by eye from one K2 night snapshot; fit yours with --camera-from"}
-
-
-def builtin_k2() -> dict:
-    m = refs.get("slicer.k2_machine")["value"]
-    return {"id": "creality_k2", "name": "Creality K2", "maker": "Creality", "firmware": "klipper",
-            "build_volume_mm": [m["bed_x"], m["bed_y"], m["height"]], "nozzle_mm": 0.4, "camera": dict(K2_CAMERA),
-            "speeds": {"typical_print_mm_s": refs.get("slicer.k2_speeds")["value"]["inner_wall"], "max_accel_mm_s2": m["max_accel"]},
-            "builtin": True}
+# A camera for a printer whose profile gives no pose: low at the front left, looking back across the bed
+# (assumption: where most enclosed printers put it; --camera-from fits the real one). pos and look_at are
+# shares of the bed's width and depth, then mm up.
+ANY_CAMERA = {"pos": (-0.04, -0.08, 70.0), "look_at": (0.58, 0.65, 10.0), "hfov_deg": 80.0}
 
 
 def printer(job, pid: str | None) -> dict:
-    """The printer profile: --printer, else the job's or the machine's (Track D's printers module, when
-    present), else the built-in K2."""
-    try:
-        from . import printers  # Track D
-    except ImportError:
-        printers = None
-    p = None
-    if printers is not None:
-        try:
-            p = printers.get(pid) if pid else printers.current(job)
-        except Exception:
-            p = None
-    if p is None and pid and pid != "creality_k2":
-        raise ValueError(f"no printer profile {pid}")
-    return p or builtin_k2()
+    """The printer profile: --printer, else the one `stone printer set` keeps, else the Creality K2."""
+    if pid:
+        p = printers.get(pid)
+        if p is None:
+            raise ValueError(f"no printer profile {pid}; stone printer lists them")
+        return p
+    p = printers.current(job.root if job.exists() else None)
+    return p or {**printers.get("creality_k2"), "assumed": True}
+
+
+def aspect(v) -> float:
+    """A camera's width over height, from a number or "16:9"."""
+    if isinstance(v, str) and ":" in v:
+        w, h = v.split(":")
+        return float(w) / float(h)
+    return float(v or 4 / 3)
 
 
 def camera(job, prof: dict) -> dict:
-    """The camera: a pose fit with --camera-from (the job's, then the machine's), else the profile's."""
+    """The camera: a pose fit with --camera-from (the job's, then the machine's), else the profile's, else ANY_CAMERA."""
+    cam = dict(prof.get("camera") or {})
     for f in (job.root / "camera.json", config.user_config_dir() / "camera.json"):
         if f.is_file():
             c = json.loads(f.read_text())
             if c.get("printer") in (None, prof.get("id")):
-                return {**(prof.get("camera") or {}), **c, "from": str(f)}
-    return dict(prof.get("camera") or K2_CAMERA)
+                return {**cam, **c, "from": str(f)}
+    if not (cam.get("pos_mm") and cam.get("look_at_mm") and cam.get("hfov_deg")):
+        bx, by = prof["build_volume_mm"][:2]
+        at = {k: [v[0] * bx, v[1] * by, v[2]] for k, v in ANY_CAMERA.items() if k != "hfov_deg"}
+        cam.update(pos_mm=at["pos"], look_at_mm=at["look_at"], hfov_deg=ANY_CAMERA["hfov_deg"],
+                   assumption="pose not in the profile; assumed low at the front left")
+    return cam
 
 
 # frames
@@ -212,14 +209,14 @@ def render(tp: gcode.Toolpath, frs: list[dict], prof: dict, cam: dict, out: Path
 
 
 def ir(png: Path) -> None:
-    """The K2's night view: an infrared camera sees plastic bright and gray, the chamber dark, with
-    sensor grain (a look, matched by eye to the owner's night snapshot)."""
+    """The night view: an infrared camera sees plastic bright and gray, the chamber dark, with sensor
+    grain (a look, matched by eye to one K2 night snapshot)."""
     from PIL import Image
 
     a = np.asarray(Image.open(png).convert("RGB"), float) / 255.0
     g = a @ [0.299, 0.587, 0.114]
     g = np.clip((g - 0.06) * 1.35, 0, 1) ** 0.9
-    rng = np.random.default_rng(abs(hash(png.name)) % (2 ** 32))
+    rng = np.random.default_rng(zlib.crc32(png.name.encode()))
     g = np.clip(g + rng.normal(0, 0.025, g.shape), 0, 1)
     Image.fromarray((np.repeat(g[..., None], 3, 2) * 255).astype(np.uint8)).save(png)
 
@@ -315,7 +312,7 @@ def parse_corners(text: str) -> list[tuple[float, float]]:
 
 def color(job) -> tuple[str, tuple]:
     """The filament color: slot 1 of stone.toml [filaments], white when the name is not a plain color."""
-    from . import colors, config
+    from . import colors
 
     name = (config.filaments(job.root if job.exists() else None) or ["white"])[0].lower()
     for word in name.replace("-", " ").split():
@@ -361,9 +358,13 @@ def fit_from(args, job, prof, out) -> dict | None:
         out.fix('--camera-from needs the bed corners: --bed-corners "x1,y1 x2,y2 x3,y3 x4,y4" '
                 "(front left, front right, back right, back left, in pixels)")
         return None
-    with Image.open(snap) as im:
-        size = im.size
-    cam = fit_camera(parse_corners(args.bed_corners), size, prof["build_volume_mm"])
+    try:
+        with Image.open(snap) as im:
+            size = im.size
+        cam = fit_camera(parse_corners(args.bed_corners), size, prof["build_volume_mm"])
+    except (OSError, ValueError) as e:
+        out.fix(f"--camera-from: {e}")
+        return None
     cam.update({"printer": prof.get("id"), "timelapse_mode": (prof.get("camera") or {}).get("timelapse_mode", "fixed"),
                 "ir_night": (prof.get("camera") or {}).get("ir_night", False), "source": f"fit to {snap.name}"})
     dests = ([job.root / "camera.json"] if job.exists() else []) + ([config_camera()] if args.save_camera else [])
@@ -383,8 +384,6 @@ def fit_from(args, job, prof, out) -> dict | None:
 
 
 def config_camera() -> Path:
-    from . import config
-
     return config.user_config_dir() / "camera.json"
 
 
@@ -413,7 +412,16 @@ def cmd(args, job, out):
         out.fix(f"no G-code at {args.gcode}")
         out.next = "stone timelapse --gcode <file.gcode>"
         return out
-    tp, what, f = toolpath_from(args, job, prof)
+    if args.seconds is not None and not 0 < args.seconds <= 600:
+        out.fix("--seconds: give 1 to 600")
+        out.next = "stone timelapse"
+        return out
+    try:
+        tp, what, f = toolpath_from(args, job, prof)
+    except ValueError as e:
+        out.fix(str(e))
+        out.next = "stone timelapse"
+        return out
     total = tp.total_s()
     est = f" (the slicer says {clock(tp.estimate_s)})" if tp.estimate_s else ""
     cname, rgb = color(job)
@@ -429,17 +437,23 @@ def cmd(args, job, out):
     dest.mkdir(parents=True, exist_ok=True)
     frs = frames(tp, args.mode, args.seconds)
     w = SIZE[0]
-    size = (w, int(round(w / float(cam.get("aspect") or 4 / 3) / 2)) * 2)
+    size = (w, int(round(w / aspect(cam.get("aspect")) / 2)) * 2)
     night = args.night
     t_render = time.time()
-    files = render(tp, frs, prof, cam, dest / "timelapse", rgb, night, size, log=job.log if job.exists() else None)
+    try:
+        files = render(tp, frs, prof, cam, dest / "timelapse", rgb, night, size, log=job.log if job.exists() else None)
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        out.add(f"Toolpaths: {what}.", print_time)
+        out.fix(f"no video: {e}")
+        out.next = "none, the print time is above"
+        return out
     render_s = time.time() - t_render
     mp4, png, js = dest / "timelapse.mp4", dest / "timelapse_sheet.png", dest / "timelapse.json"
     secs = video(files, mp4, args.seconds or (SECONDS if args.mode == "realtime" else None))
     sheet(files, frs, png)
     for x in (dest / "timelapse").glob("*.npz"):
         x.unlink()
-    data = {"source": what, "input": str(f), "printer": prof.get("id"), "printer_builtin": bool(prof.get("builtin")),
+    data = {"source": what, "input": str(f), "printer": prof.get("id"), "printer_assumed": bool(prof.get("assumed")),
             "mode": args.mode, "night": night, "color": cname, "print_s": round(total, 1), "slicer_estimate_s": tp.estimate_s,
             "layers": len(tp.layer_z), "video_s": round(secs, 2), "render_s": round(render_s, 1), "size_px": list(size),
             "camera": cam, "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"],
@@ -447,7 +461,7 @@ def cmd(args, job, out):
     js.write_text(json.dumps(data, indent=1))
     out.add(f"Toolpaths: {what}.")
     pname = prof.get("name") or prof.get("id")
-    out.add(f"Printer: {pname}{' (built-in profile)' if prof.get('builtin') else ''}; camera "
+    out.add(f"Printer: {pname}{' (none set; stone printer set <id>)' if prof.get('assumed') else ''}; camera "
             + (f"from {Path(cam['from']).name}" if cam.get("from") else cam.get("source") or "pose from the profile, an assumption"))
     out.add(print_time)
     out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s, {args.mode}{', night view' if night else ''})")

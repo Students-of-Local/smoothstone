@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from smoothstone import cli, gcode, timelapse
+from smoothstone import cli, gcode, printers, timelapse
 
 from test_gcode import _layer_zs
 from test_slicer import _box, _union
@@ -95,6 +95,19 @@ def test_bed_corners_parse():
         timelapse.parse_corners("1,2 3,4")
 
 
+def test_every_printer_profile_gives_a_camera_and_the_set_one_is_used(jobenv, tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    job = cli.Job(jobenv / "stone-job")
+    assert timelapse.printer(job, None)["assumed"]
+    for pid, p in printers.load().items():
+        cam = timelapse.camera(job, timelapse.printer(job, pid))
+        assert len(cam["pos_mm"]) == len(cam["look_at_mm"]) == 3 and 1 <= timelapse.aspect(cam.get("aspect")) < 3, (pid, cam)
+    printers.set_model("bambu_x1c")
+    assert timelapse.printer(job, None)["id"] == "bambu_x1c"
+    with pytest.raises(ValueError):
+        timelapse.printer(job, "no_such_printer")
+
+
 def test_without_blender_the_print_time_still_comes_out(jobenv, tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setattr(timelapse, "blender", lambda: None)
@@ -157,12 +170,12 @@ def test_stone_timelapse_on_a_part_writes_video_sheet_and_frames(jobenv, tmp_pat
 
 @needs_blender
 def test_extras_draw_extra_geometry_into_frames(tmp_path):
-    """Injected per-frame geometry (Track P's failure view) shows up only in the frames that carry it."""
+    """Injected per-frame geometry (stone timelapse --fail) shows up only in the frames that carry it."""
     from PIL import Image
 
     tp = gcode.load(FIX / "creality_washer.gcode.gz")
     frs = timelapse.frames(tp, "per-layer")[:2]
-    prof = timelapse.builtin_k2()
+    prof = printers.get("creality_k2")
     cam = {**prof["camera"], "timelapse_mode": "head-parked"}  # no toolhead in the way
     blob = trimesh.creation.icosphere(radius=25).apply_translation((130, 130, 30))
 
