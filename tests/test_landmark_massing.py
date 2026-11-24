@@ -63,5 +63,5 @@ def test_low_walls_fill_only_the_unmapped_plan():
         {"tags": {"height": "30"}, "source": "s"}, {}, {"mode": "max", "mm": 200.}, set())
     (low, plan), = [(r, p) for r, p in zip(records, plans) if r["feature" if "feature" in r else "id"] == "lower_walls"]
     assert low["height"]["metres"] == 30
-    assert plan.area() == pytest.approx(20 * 40, rel=.02)
-    assert (plan ^ sections[2]).area() < 3
+    assert (plan ^ sections[2]).area() < 8
+    assert (box(80, 0, 100, 40) - plan).area() < 1

@@ -81,6 +81,24 @@ def test_west_piers_stand_on_the_bed_where_the_plinth_follows_the_plan():
     assert np.isclose(-solid.bounding_box()[0], WEST_PIER_REACH, atol=.02)
 
 
+def test_a_shaving_left_by_the_gable_trim_is_dropped():
+    from smoothstone.landmark_style import _surveyed_west_facade
+
+    facts = {"west_facade_profile": {"value": [[-.5, .5], [0, .9], [.5, .5]]},
+             "west_buttress_spires": {"value": [[-.45, .7], [.45, .7]]}, "spire_plan": {}}
+    along, across = np.array([1., 0.]), np.array([0., 1.])
+
+    def box(x0, y0, x1, y1, z0, z1):
+        return m3.CrossSection([[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]]).extrude(z1 - z0).translate([0, 0, z0])
+
+    block = box(0, -43, 40, 43, 0, 60) - box(-1, 10, 4, 14, 0, 52)
+    notes = []
+    solid = _surveyed_west_facade(block, 86., 60., .2, 0., along, across, facts,
+                                  [box(1, 11, 1.5, 13, 0, 62)], notes)
+    assert sum(piece.volume() > 0 for piece in solid.decompose()) == 1
+    assert any("shavings" in note for note in notes)
+
+
 def test_the_print_size_leaves_room_for_the_west_piers():
     from smoothstone.landmark import _scale
 

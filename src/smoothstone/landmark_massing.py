@@ -170,9 +170,14 @@ def infer_massing(records, sections, outline, data, refs, target, styles):
         ground_spans = np.ptp(np.concatenate(ground.to_polygons()) @ frame.T, axis=0)
         if np.any(ground_spans < .97 * spans) or (outline - ground).area() > .12 * outline.area():
             source = data["source"]
-            # Mapped ground parts keep their own heights. A gap too narrow to print is map noise, not wall.
-            grain = .3 / size
-            missing = (outline - ground).offset(-grain).offset(grain + .05) ^ outline
+            # A part mapped lower than these walls keeps its height. Taller parts simply stand in them.
+            # A gap too narrow to print beside a low part is map noise, not wall.
+            low = m3.CrossSection.batch_boolean([cs for p, cs in parts if p["min_height"]["metres"] <= .1
+                                                 and p["height"]["metres"] < height], m3.OpType.Add)
+            missing = outline - low
+            if not low.is_empty():
+                grain = .3 / size
+                missing = missing.offset(-grain).offset(grain + .05) ^ outline
             if not missing.is_empty():
                 parts.append((_new_part("outline-lower-walls", missing, 0, height, 0, "flat", source, "lower_walls"), missing))
                 notes.append("Kept the building outline's mapped low walls where the taller roof parts leave the plan incomplete.")

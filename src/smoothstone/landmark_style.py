@@ -114,6 +114,11 @@ def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, p
     if protected:
         trim = trim - _union(protected)
     man = (man - trim) + wall
+    # Trimming the level gable around a tapered spire can leave a shaving of the old block beside its point.
+    loose = [piece for piece in man.decompose() if 0 < piece.volume() < 10 and piece.bounding_box()[2] > z0 + 1]
+    if loose:
+        man = man - _union(loose)
+        notes.append(f"Removed {len(loose)} loose shavings of the generalized west gable.")
 
     additions, cuts = [], []
     widths = facts.get("west_buttress_widths", {}).get("value", [])
