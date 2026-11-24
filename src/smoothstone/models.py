@@ -825,9 +825,12 @@ BUILDING = re.compile(r"\b(?:cathedral|basilica|church|chapel|abbey|minster|duom
                       r"stadium|opera house|capitol|parliament|mausoleum|tomb|kremlin|cathedrale|kathedrale|"
                       r"catedral|sagrada|mahal|notre)\b", re.I)
 # "find me a model of", "download a model", "an open model", "on Printables": the person wants a made model
-FIND_MODEL = re.compile(r"\b(?:find|download|get)(?:\s+me)?\s+(?:an?\s+|the\s+)?(?:\w+\s+)?models?\b|"
-                        r"\b(?:existing|open|someone['’]s)\s+models?\b|\bon\s+(?:printables|thingiverse)\b", re.I)
-PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica"}
+FILE_WORD = r"(?:models?|stls?|3mfs?|files?|meshe?s?)"
+FIND_MODEL = re.compile(r"\b(?:find|download|get|grab)(?:\s+me)?\s+(?:an?\s+|the\s+)?(?:\w+\s+)?" + FILE_WORD + r"\b|"
+                        r"\b(?:existing|open|someone['’]s)\s+" + FILE_WORD + r"\b|"
+                        r"\b(?:on|from)\s+(?:printables|thingiverse|myminifactory|cults3?d?)\b", re.I)
+PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica",
+               "Find", "Download", "Get", "Grab", "STL", "Printables", "Thingiverse"}
 
 
 # "St. Basil's Cathedral": the period is an abbreviation's, not the end of the subject
@@ -842,7 +845,7 @@ def subject_of(request: str) -> str | None:
 
     req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("’", "'"))
     req = re.sub(r"^\s*(?:can|could|would) you\s+(?:please\s+)?", "", req, flags=re.I)
-    m = re.search(r"\b(?:model|replica|miniature|version|print)s?\s+of\s+(?:the\s+)?(.+)", req, re.I)
+    m = re.search(r"\b(?:model|replica|miniature|version|print|stl|3mf|file|mesh)(?:e?s)?\s+of\s+(?:the\s+)?(.+)", req, re.I)
     if m:
         s = find._phrase(m.group(1))
         if s:
@@ -850,8 +853,9 @@ def subject_of(request: str) -> str | None:
     caps = find._capitals(req)
     if caps:
         caps = " ".join(w for w in caps.split() if w not in PRINT_WORDS)
+        caps = re.sub(r"^(?:the|a|an)\s+", "", caps.strip(" ,."), flags=re.I)
         if caps:
-            return caps.strip(" ,.")
+            return caps
     m = re.search(r"\b((?:\w+\s+){0,2}(?:cathedral|basilica|tower|castle|palace|temple|bridge|mosque))\b", req, re.I)
     if m:
         w = [x for x in m.group(1).split() if x.lower() not in ("a", "an", "the", "my", "of", "tall", "mm")]
@@ -866,7 +870,8 @@ def names_landmark(request: str) -> str | None:
     s = subject_of(request)
     if not s:
         return None
-    return s if BUILDING.search(s) else None
+    # Someone asking for an existing file of a named thing wants that search, building word or not.
+    return s if BUILDING.search(s) or asks_found_model(request) else None
 
 
 def asks_found_model(request: str) -> bool:

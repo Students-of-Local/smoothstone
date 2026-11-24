@@ -168,3 +168,29 @@ def test_no_parts_returns_models_fallback(recorded, jobenv, monkeypatch):
     assert "FIX" in text
     assert text.splitlines()[-1] == "NEXT: stone models 'Cologne Cathedral'"
     assert not list((jobenv / "stone-job").rglob("*.stl"))
+
+
+@pytest.mark.parametrize("unit, amount, metres", [
+    ("Q11573", "+157", 157.0),        # metre
+    ("Q3710", "+515", 156.972),       # foot
+    ("Q218593", "+6180", 156.972),    # inch
+    ("Q174789", "+157000", 157.0),    # millimetre
+    ("Q174728", "+15700", 157.0),     # centimetre
+    ("Q99999999", "+157", None),      # a unit we do not know is dropped, not read as metres
+])
+def test_wikidata_lengths_convert_to_metres(unit, amount, metres):
+    value = {"amount": amount, "unit": f"http://www.wikidata.org/entity/{unit}"}
+    got = landmark_refs._quantity(value)
+    assert got == (None if metres is None else pytest.approx(metres, rel=1e-6))
+
+
+def test_an_unexpected_build_error_gives_fix_and_next(recorded, jobenv, monkeypatch):
+    from smoothstone import cli, landmark
+
+    def broken(*a, **k):
+        raise ValueError("need at least one array to concatenate")
+
+    monkeypatch.setattr(landmark, "generate", broken)
+    text, code = cli.run(["landmark", "Cologne Cathedral"])
+    assert "FIX" in text and "ValueError" in text
+    assert text.splitlines()[-1] == "NEXT: stone models 'Cologne Cathedral'"

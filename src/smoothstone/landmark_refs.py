@@ -44,13 +44,19 @@ def _value(entity, prop):
     return None
 
 
+# Wikidata unit items: metre, centimetre, millimetre, kilometre, foot, inch, yard.
+# A length in a unit not listed here is dropped rather than read as metres.
+METRES_PER_UNIT = {'Q11573': 1.0, 'Q174728': 0.01, 'Q174789': 0.001, 'Q828224': 1000.0,
+                   'Q3710': 0.3048, 'Q218593': 0.0254, 'Q482798': 0.9144}
+
+
 def _quantity(value):
     if not isinstance(value, dict) or 'amount' not in value:
         return None
     amount = float(value['amount'])
     unit = value.get('unit', '').rsplit('/', 1)[-1]
-    return amount * {'Q11573': 1, 'Q174728': 0.01, 'Q218593': 0.001,
-                     'Q3710': 1000, 'Q174789': 0.3048}.get(unit, 1)
+    factor = METRES_PER_UNIT.get(unit)
+    return None if factor is None else amount * factor
 
 
 def resolve(name: str, job_root: Path) -> dict:

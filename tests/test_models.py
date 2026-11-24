@@ -395,8 +395,14 @@ def _route(monkeypatch, request_):
     return shlex.split(nxt)[:2], text
 
 
-def test_a_find_request_routes_to_stone_models(jobenv, monkeypatch):
-    cmd, text = _route(monkeypatch, "Find me an open model of the Eiffel Tower")
+@pytest.mark.parametrize("request_", [
+    "Find me an open model of the Eiffel Tower",
+    "Download an STL of the Taj Mahal",
+    "Find the Eiffel Tower on Thingiverse",
+    "Grab the Cologne Cathedral file from Printables",
+])
+def test_a_find_request_routes_to_stone_models(jobenv, monkeypatch, request_):
+    cmd, text = _route(monkeypatch, request_)
     assert cmd == ["stone", "models"], text
 
 

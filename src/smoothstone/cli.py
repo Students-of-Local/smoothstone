@@ -2253,7 +2253,10 @@ def cmd_landmark(args, job: Job) -> Out:
     try:
         options = {"ref_pack": args.refs} if args.refs else {}
         info = landmark.generate(subject, job.root, bed, size, args.detail, **options)
-    except landmark.LandmarkProblem as e:
+    except Exception as e:
+        if not isinstance(e, landmark.LandmarkProblem):
+            job.log("landmark failed:\n" + traceback.format_exc())
+            e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
         out.fix(str(e))
         out.next = _landmark_command("stone models", subject)
         out.stage = "landmark_failed"
