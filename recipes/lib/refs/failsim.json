@@ -501,6 +501,36 @@
    "assumption": "A 0.4 mm nozzle's flat tip is about 1.0 mm across."
   },
   {
+   "id": "failsim.cylinder_drag",
+   "topic": "failsim",
+   "key": "cylinder_drag",
+   "value": [[0.5, 17.5], [1, 10.5], [2, 6.6], [5, 3.95], [10, 2.75], [20, 2.02], [50, 1.6], [100, 1.42], [200, 1.32], [500, 1.08], [1000, 0.97], [2000, 0.92]],
+   "unit": "Re, -",
+   "note": "Drag coefficient of a long cylinder across an air stream, read off the curve through his points by stone (about 3%): wires of 0.05, 0.1 and 0.3 mm, a strand's size, below Re 600. Below Re 0.5 it follows Lamb's formula, Cd = 8 pi / (Re (2.002 - ln Re)), as his figure does.",
+   "quote": "The drag of small cylinders (up to 8 mm. in diameter) was determined by suspending each one vertically in the air stream as a long wire",
+   "source": "C. Wieselsberger, New Data on the Laws of Fluid Resistance, NACA Technical Note 84, 1922, Fig. 1",
+   "cite": "NACA TN 84 Fig. 1",
+   "url": "https://ntrs.nasa.gov/citations/19930080855",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.fan_reach",
+   "topic": "failsim",
+   "key": "fan_reach",
+   "value": 10,
+   "unit": "mm",
+   "note": "How far from the nozzle the part fan's air still blows at failsim.fan_air_speed; past it the air is still. No maker publishes it.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "range": [
+    5,
+    30
+   ],
+   "assumption": "The part fan blows straight down at full speed within 10 mm of the nozzle and not at all past it"
+  },
+  {
    "id": "failsim.strand_friction",
    "topic": "failsim",
    "key": "strand_friction",
