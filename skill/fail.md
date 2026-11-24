@@ -22,8 +22,9 @@ physics model, not a recording. It does not print.
   1. It is a model, not a recording.
   2. What fails and when, from the "Predicted:" or "What-if" line.
   3. The "Main assumption:" line, in plain words.
-- The video is fail.mp4. Look at fail_sheet.png before you describe it: the first 2 frames are
-  the normal print, the rest are the failure.
+- The video is fail.mp4, in build/ or in <file name>-timelapse/. Look at fail_sheet.png before you
+  describe it: the first 2 frames are the normal print, the rest are the failure, closer in and
+  without the toolhead, which would hide it.
 - The words: supports = lines print into air and fall (spaghetti). droop = an edge sags down.
   bridge = a long bridge sags. detach = the part comes loose and slides. topple = it tips over.
 - Then run the NEXT line it printed.
@@ -32,14 +33,15 @@ physics model, not a recording. It does not print.
 Request: What happens if I print the T without supports?
 stone timelapse t.stl --supports off --fail ->
   This is a model, not a recording: failsim's physics on stone's own toolpaths.
-  Predicted: supports at layer 21 (z 4.2 mm, 22 s in): lines with nothing under them print into
+  Predicted: supports at layer 21 (z 4.2 mm, 20 s in): lines with nothing under them print into
   air and fall (spaghetti).
   Why: ledge 12.0 mm past the layer below droops 11.654 mm.
   Main assumption: Droop of one layer fails the ledge; half a layer is the smallest droop that
   shows. (failsim.droop_rule)
-  Video: .../fail.mp4 (33 frames, 4.0 s; frames from layer 21 on are the model)
-  Sheet: .../fail_sheet.png
-  Data: .../fail.json (11 s)
+  Video: .../t.stl-timelapse/fail.mp4 (32 frames, 4.0 s; from layer 21 on: the model, closer in,
+  only the nozzle drawn)
+  Sheet: .../t.stl-timelapse/fail_sheet.png
+  Data: .../t.stl-timelapse/fail.json (16 s)
   NEXT: none, the failure video is made
 Reply: Here is a model of it (fail.mp4), not a real recording. Without supports, the arms of the
 T start at layer 21 (4.2 mm up) with nothing under them. Those lines fall to the bed and pile up

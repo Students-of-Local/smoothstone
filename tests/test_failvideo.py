@@ -54,6 +54,9 @@ def test_spaghetti_falls_from_the_layer_and_rests_on_what_is_below():
     assert np.median(fell[:, 2]) < 1.0  # the arms' lines lie on the bed, 4 mm below where they were laid
     assert st.gone.any() and not st.gone[tp.layer < fail.layer].any()  # the scene up to the failure is untouched
     assert [f["layer"] for f in frs[:first]] == list(range(fail.layer))
+    lines = [sum(len(it["mesh"][0]) for it in e) for e in extra[first:]]
+    falling = [n for n, f in zip(lines, frs[first:]) if f["layer"] == fail.layer]
+    assert len(falling) > 3 and falling == sorted(falling) and falling[0] < falling[-1] / 3  # laid bit by bit, not there at once
     ts = [f["t_s"] for f in frs]
     assert ts == sorted(ts) and [f["layer"] for f in frs] == sorted(f["layer"] for f in frs)
 
@@ -131,6 +134,7 @@ def test_the_frame_before_the_failure_is_the_timelapse_frame(jobenv, tmp_path, m
     a = np.asarray(Image.open(d / data["pre_failure_frame"]).convert("RGB"), float)
     b = np.asarray(Image.open(d / want).convert("RGB"), float)
     assert np.abs(a - b).mean() < 0.5 and (np.abs(a - b).max(2) > 16).mean() < 0.001
-    assert (np.abs(a - a[0, 0]).max(2) > 60).mean() < 0.01  # in the whole view the failing part is a speck; close in it is not
+    light = [(np.asarray(Image.open(d / f["frame"]).convert("L"))[:320] > 120).mean() for f in data["frames"] if f["failing"]]
+    assert min(light) > 0.005 and light[-1] > 0.03  # the failure fills the close frames: no toolhead box hides it
     c = np.asarray(Image.open(d / data["first_failure_frame"]).convert("RGB"), float)
     assert np.abs(c - b).mean() > 0.5  # and the failure itself is not

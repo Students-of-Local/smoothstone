@@ -276,10 +276,11 @@ class Story:
     def items(self, layer: int, t_s: float, head, motion=None, scale=1.0) -> list[dict]:
         """The extra geometry of a frame showing layer (from the failure on)."""
         out, A, B, W = [], [], [], []
+        falling = motion is not None and self.kind == "supports"
         for i, a, b, w in self.links:
-            if i <= layer and len(a):
+            if i <= layer and len(a) and not (falling and i == layer):  # this layer's strand is still on its way down
                 A.append(a), B.append(b), W.append(np.full(len(a), w))
-        if motion is not None and self.kind == "supports":
+        if falling:
             f, seg, w = motion
             A.append(f[:-1][seg]), B.append(f[1:][seg]), W.append(np.full(int(seg.sum()), w))
         mat, lay = self.inp.material, self.inp.layer
