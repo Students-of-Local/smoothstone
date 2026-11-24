@@ -6,7 +6,7 @@ import json
 import numpy as np
 import pytest
 
-from smoothstone import cli, failsim, failvideo, timelapse, toolpaths
+from smoothstone import cli, failsim, failvideo, printers, timelapse, toolpaths
 
 from test_slicer import _box, _union
 from test_supports import _arch
@@ -18,7 +18,7 @@ def _t():
 
 
 def _toolpath(mesh):
-    prof = timelapse.builtin_k2()
+    prof = printers.get("creality_k2")
     lo, hi = mesh.bounds
     bx, by = prof["build_volume_mm"][:2]
     return toolpaths.generate(mesh, toolpaths.profile(prof), 0.2, None, (bx / 2 - (lo[0] + hi[0]) / 2, by / 2 - (lo[1] + hi[1]) / 2))
@@ -86,6 +86,12 @@ def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
     text, code = cli.run(["timelapse", str(stl), "--fail"])
     assert code == 0 and "No failure predicted; nothing to show. --fail detach shows a loose part anyway." in text
     assert "model, not a recording" in text and not (tmp_path / "fail.mp4").exists()
+    again, code = cli.run(["timelapse", "--fail", str(stl)])  # the file after --fail is the part, not a mode
+    assert code == 0 and "No failure predicted" in again, again
+    text, code = cli.run(["timelapse", str(stl), "--fail", "bridge"])
+    assert f"NEXT: stone timelapse {stl} --fail detach" in text, text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "melt"])
+    assert code == 1 and "FIX: --fail melt: one of auto" in text, text
     assert text.strip().splitlines()[-1].startswith("NEXT: ")
 
 

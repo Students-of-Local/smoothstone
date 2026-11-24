@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import json
 import math
+import shlex
+import subprocess
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -370,21 +372,50 @@ def numbers_line(f) -> str:
     return ", ".join(f"{k} {v}" for k, v in n.items()) or "no numbers"
 
 
+def again(args, mode: str) -> str:
+    """This command with another mode."""
+    words = ["stone", "timelapse", *([args.file] if args.file else []), "--fail", mode]
+    for name in ("gcode", "printer"):
+        if getattr(args, name):
+            words += [f"--{name}", getattr(args, name)]
+    return shlex.join(words + (["--plate", "dirty"] if args.plate == "dirty" else []))
+
+
 def cmd(args, job, out):
     """stone timelapse --fail [mode]: build/fail.mp4, fail_sheet.png and fail.json."""
     from . import refs
 
     t_start = time.time()
     mode = args.fail
+    if mode not in MODES and not args.file and mode.lower().endswith(".stl"):  # stone timelapse --fail part.stl
+        args.file, mode = mode, "auto"
+    if mode not in MODES:
+        out.fix(f"--fail {mode}: one of {', '.join(MODES)}")
+        out.next = again(args, "auto")
+        return out
     if mode != "auto" and mode != "detach":
         args.supports = "off"  # the what-if of a part printed without them
-    prof = timelapse.printer(job, args.printer)
+    try:
+        prof = timelapse.printer(job, args.printer)
+    except ValueError as e:
+        out.fix(str(e))
+        out.next = "stone printer"
+        return out
     f = Path(args.file).expanduser().resolve() if args.file else job.build_dir / "part.stl"
     if not args.gcode and not f.is_file():
         out.fix(f"no file at {f}" if args.file else "no built part yet; build first, or name an STL or --gcode file")
         out.next = "stone build" if not args.file else "stone timelapse <file.stl> --fail"
         return out
-    tp, what, f = timelapse.toolpath_from(args, job, prof)
+    if args.gcode and not Path(args.gcode).expanduser().is_file():
+        out.fix(f"no G-code at {args.gcode}")
+        out.next = "stone timelapse --gcode <file.gcode> --fail"
+        return out
+    try:
+        tp, what, f = timelapse.toolpath_from(args, job, prof)
+    except ValueError as e:
+        out.fix(str(e))
+        out.next = "stone timelapse --fail"
+        return out
     mat = refs.material_for(job.request()).material.upper() if job.exists() else "PLA"
     note = []
     if mat not in failsim.MATERIALS:
@@ -407,7 +438,7 @@ def cmd(args, job, out):
         else:
             out.add(f"This part has nothing for --fail {mode} to show. --fail detach shows a loose part anyway.")
             out.result = "nothing to show"
-            out.next = "stone timelapse --fail detach" + (f" {args.file}" if args.file else "")
+            out.next = again(args, "detach")
         return out
     dom = failsim.note("contamination") if clean < 1 and fail.kind == "detach" else failsim.note(DOMINANT[fail.kind])
     if what_if:
@@ -426,11 +457,16 @@ def cmd(args, job, out):
     dest.mkdir(parents=True, exist_ok=True)
     cname, rgb = timelapse.color(job)
     w = timelapse.SIZE[0]
-    size = (w, int(round(w / float(cam.get("aspect") or 4 / 3) / 2)) * 2)
+    size = (w, int(round(w / timelapse.aspect(cam.get("aspect")) / 2)) * 2)
     scene, frs, extra, first, st = plan(tp, inp, fail, rgb)
     label = "MODEL, not a recording" + (": what-if" if what_if else "") + f": {WHAT[fail.kind]}"
-    files = timelapse.render(scene, frs, prof, cam, dest / "fail", rgb, args.night, size, extras=lambda k, fr: extra[k],
-                             log=job.log if job.exists() else None)
+    try:
+        files = timelapse.render(scene, frs, prof, cam, dest / "fail", rgb, args.night, size, extras=lambda k, fr: extra[k],
+                                 log=job.log if job.exists() else None)
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        out.fix(f"no video: {e}")
+        out.next = "none, the prediction is above"
+        return out
     for p in files[first:]:
         caption(p, label)
     mp4, png, js = dest / "fail.mp4", dest / "fail_sheet.png", dest / "fail.json"
