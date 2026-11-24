@@ -93,6 +93,10 @@ def test_stone_heat_resolves_a_load(jobenv, monkeypatch):
     d = json.loads((jobenv / "heat.json").read_text())
     assert d["load"]["deflection_hot_mm"] == pytest.approx(d["load"]["deflection_room_mm"] / heat.retention("PETG", 50), rel=1e-2)
     assert not np.isnan(d["clamped_stress_mpa"])
+    text, code, nxt = stone("heat", str(jobenv / "bar.stl"), "where=40C", "material=PC", "load=5N", "at=left", "fixed=left")
+    assert "Load not checked: the load at left sits on the held place" in text and nxt.startswith("ask the person: "), text
+    text, code, nxt = stone("heat", str(jobenv / "bar.stl"), "where=40C", "load=heavy")
+    assert code == 1 and "FIX: " in text and "load" in text, text
 
 
 def test_enclosure_comes_from_the_printer_profile(jobenv, monkeypatch):

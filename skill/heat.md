@@ -41,9 +41,9 @@ $ stone heat where=outdoor
 Part: part.stl, PLA.
 Hot summer shade: 41.5 C. PLA softens at 55 C (HDT at 0.45 MPa), glass at 61 C: 13.5 C to spare.
 At 41.5 C PLA keeps about 90% of its stiffness and strength.
-Load 20 N (the load from the last stone strength): deflection 1.09 mm at room temperature -> 1.21 mm at 41.5 C, safety factor 1.9, little margin. PETG: 2.02 mm, fine.
+Load 20 N (the load from the last stone strength): deflection 1.14 mm at room temperature -> 1.27 mm at 41.5 C, safety factor 1.8, little margin. PETG: 2.11 mm, fine.
 Creep: within 20 C of its HDT a load held for days slowly bends it (rule of thumb).
 Expansion: it grows 0.14 mm over its 77 mm; held tight at both ends it pushes with 4.4 MPa, 14% of its hot strength.
 Warp risk on the bed: low (0.28 mm corner lift from 0.35% shrink over 80 mm). Fix: none needed.
-NEXT: ask the person: hot summer shade reaches 41.5 C, the 20 N load leaves a safety factor of 1.9 there (2 is fine); print it in PETG?
+NEXT: ask the person: hot summer shade reaches 41.5 C, the 20 N load leaves a safety factor of 1.8 there (2 is fine); print it in PETG?
 ```

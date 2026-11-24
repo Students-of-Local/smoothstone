@@ -174,6 +174,8 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     extra = [r for r in rest if not r.lower().endswith(".stl")]
     if not loaded and extra and not bad:
         bad.append(f"{' '.join(extra)}: load words need load=, like load=20N")
+    if loaded:
+        bad += strength.parse(extra)[2]
     if bad:
         out.fix("; ".join(bad))
         out.next = usage
@@ -212,19 +214,25 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
             base = strength.material(name)
             props = strength.Props(name, base.e_xy * r, base.e_z * r, base.s_xy * r, base.s_z * r, base.exponent, base.ids)
             st, hot = strength.solve(mesh, case, props, case.voxels)
-        if hot is not None:
+        if hot is None:
+            flag, why = "close" if flag == "fine" else flag, why or "the load could not be checked"
+            lines.append(f"Load not checked: {'; '.join(cbad) or st.problem}.")
+        else:
             cold = abs(hot.deflection) * r
-            sag = "it will sag" if hot.sf < 1 else ("little margin" if hot.sf < strength.FINE else "fine")
+            sf = strength.shown(hot.sf)
+            sag = "it will sag" if sf < 1 else ("not sure, the loaded spot is too thin for this model" if hot.thin else
+                                                "little margin" if sf < strength.FINE else "fine")
             alt, alt_ok = _better(name, temp, cold, base.e_xy, hot.limit)
             cap = max(1.0, 0.1 * st.lever)  # past a tenth of the lever a linear model only says "a lot"
             hot_d = f"{abs(hot.deflection):.2f} mm" if abs(hot.deflection) <= cap else f"more than {cap:.0f} mm"
             src = "" if loaded else " (the load from the last stone strength)"
             lines.append(f"Load {case.load:.0f} N{src}: deflection {cold:.2f} mm at room temperature -> {hot_d} at "
-                         f"{temp:g} C, safety factor {hot.sf:.1f}, {sag}.".replace("factor 0.0,", "factor under 0.1,") + (f" {alt}" if alt else ""))
-            if hot.sf < strength.FINE:
-                flag = "too hot" if hot.sf < 1 else ("close" if flag == "fine" else flag)
+                         f"{temp:g} C, safety factor {sf:.1f}, {sag}.".replace("factor 0.0,", "factor under 0.1,") + (f" {alt}" if alt else ""))
+            if hot.thin or sf < strength.FINE:
+                flag = "too hot" if sf < 1 else ("close" if flag == "fine" else flag)
                 if hdt is None or temp < hdt:
-                    why = f"the {case.load:.0f} N load leaves a safety factor of {hot.sf:.1f} there (2 is fine)"
+                    why = (f"the {case.load:.0f} N load leaves a safety factor of {sf:.1f} there (2 is fine)" if sf < strength.FINE else
+                           f"the spot under the {case.load:.0f} N load is too thin for this model to judge")
     if hdt is not None and hdt - CREEP_BAND <= temp < hdt:
         lines.append(f"Creep: within {CREEP_BAND:g} C of its HDT a load held for days slowly bends it (rule of thumb).")
     alpha = float(p["cte"]["value"]) * 1e-6
