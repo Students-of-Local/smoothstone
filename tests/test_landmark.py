@@ -265,8 +265,8 @@ def test_supplied_facts_do_not_switch_off_the_inferred_massing(recorded, tmp_pat
 
 @pytest.mark.parametrize("direction, down", [("90", (1, 0)), ("ENE", (.92, .38)), ("SSW", (-.38, -.92)), ("n", (0, 1))])
 def test_a_shed_roof_descends_the_way_the_map_says(direction, down):
-    # 202 of 202 directed shed roofs on six landmarks descend along roof:direction, away from the taller wall;
-    # every one was built high at the wrong side, and ENE and its kind were not read at all
+    # the 202 directed skillion parts in five landmarks' maps agree with OSM's sense; a roof built from one was
+    # high at the wrong side, and ENE and its kind were not read at all
     import manifold3d as m3
     from smoothstone import landmark
 

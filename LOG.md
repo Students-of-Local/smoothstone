@@ -1094,3 +1094,20 @@ What the close pictures showed, as things to build, not scores: Milan's crossing
 its pinnacles blunt rods; Cologne's two west towers do not match, and its choir walls are loose slabs; the Taj's
 iwans are smeared and its minarets differ; St. Vitus's great tower steps in above the eaves; Florence's tribune
 half-domes and lantern are plain; St Paul's side walls are nearly blank.
+
+## 2026-11-24 landmarks 3: roof directions, repeated parts and twin towers
+
+- `roof:direction` is the way a roof face looks, so a skillion roof is high behind it. We built it the other way
+  and did not read ENE and its kind. The maps of five landmarks carry 202 directed skillion parts (Cologne 6,
+  Notre-Dame 28, the Eiffel Tower 8, Westminster 120, St. Vitus 40), and all agree with OSM's sense. Not all became
+  shed roofs: the tower is a lattice, Notre-Dame's pack turns some into flying buttresses, and some of Cologne's
+  came out right by luck.
+- A part with no height takes the level its same-plan twins share, or is dropped when that level is already drawn.
+  The Taj's south-west minaret had three such parts standing as 40 m columns.
+- Where the map details only one of two matched west towers, the other gets the same details, mirrored and marked
+  guessed. Cologne's map draws its gables and pinnacles on the south tower only.
+
+One eval each at 5eef4d5, `next` driver, card S, all passing: Cologne 9 (was 8), Taj 9 (was 8), Westminster 9
+(was 8), Notre-Dame 9, St. Vitus 8, Milan 8, St Paul's 8, Eiffel 8, Florence 8. Milan, St Paul's, the Eiffel Tower
+and Florence are the same meshes as before, byte for byte, so Milan's 8 is the judge's noise on the mesh that got
+7, 7, 7 at 1964db8. It is not progress, and Milan still counts as below the bar.
