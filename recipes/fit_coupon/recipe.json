@@ -1,0 +1,97 @@
+{
+ "name": "fit_coupon",
+ "title": "Fit test coupon",
+ "summary": "A small clearance test print: one peg and a row of labeled holes, each roomier than the last, plus a square and a round hole to measure. stone fit coupon builds it; stone fit calibrate stores what it shows about the printer.",
+ "tags": [
+  "coupon",
+  "calibration",
+  "tolerance"
+ ],
+ "makes": [
+  "fit test",
+  "fit coupon",
+  "tolerance test",
+  "clearance test"
+ ],
+ "tier": "S",
+ "max_bodies": 2,
+ "max_overhang": 0.05,
+ "params": [
+  {
+   "name": "peg_d",
+   "type": "number",
+   "default": 6,
+   "min": 4,
+   "max": 10,
+   "unit": "mm",
+   "help": "test peg diameter"
+  },
+  {
+   "name": "steps",
+   "type": "int",
+   "default": 6,
+   "min": 3,
+   "max": 8,
+   "help": "holes, one per clearance step from 0"
+  },
+  {
+   "name": "step",
+   "type": "number",
+   "default": 0.1,
+   "min": 0.05,
+   "max": 0.2,
+   "unit": "mm",
+   "help": "each hole is this much roomier than the last, per side"
+  },
+  {
+   "name": "thickness",
+   "type": "number",
+   "default": 4,
+   "min": 3,
+   "max": 8,
+   "unit": "mm",
+   "help": "hole plate thickness"
+  },
+  {
+   "name": "square",
+   "type": "number",
+   "default": 20,
+   "min": 15,
+   "max": 30,
+   "unit": "mm",
+   "help": "square block side, to measure with calipers"
+  },
+  {
+   "name": "ref_d",
+   "type": "number",
+   "default": 10,
+   "min": 6,
+   "max": 14,
+   "unit": "mm",
+   "help": "the hole to measure with calipers"
+  },
+  {
+   "name": "label_size",
+   "type": "number",
+   "default": 6,
+   "min": 6,
+   "max": 10,
+   "unit": "mm",
+   "help": "label height"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 96,
+   "min": 32,
+   "max": 192,
+   "help": "circle smoothness"
+  }
+ ],
+ "examples": [
+  {
+   "name": "default",
+   "params": {}
+  }
+ ]
+}

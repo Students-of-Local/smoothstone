@@ -1861,6 +1861,10 @@ def cmd_note(args, job: Job) -> Out:
         out.owns_next = True
         out.next = f"stone show {st['ask_recipe']}"
         return out
+    if str(st.get("next", "")).startswith("ask the person") and st.get("ask_then"):
+        out.owns_next = True
+        out.next = f"{st['ask_then']} {json.dumps(text)}"
+        return out
     out.next = st.get("next") or "stone recipes"
     return out
 
@@ -3066,7 +3070,7 @@ def make_parser() -> Parser:
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
     s.add_argument("items", nargs="*")
 
-    s = sub.add_parser("fit", parents=[common], help="printed size and fit of holes, pegs and clearances: stone fit")
+    s = sub.add_parser("fit", parents=[common], help="printed size and fit of holes, pegs and clearances: stone fit, stone fit coupon")
     s.add_argument("items", nargs="*")
 
     s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")

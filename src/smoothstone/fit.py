@@ -5,7 +5,7 @@ FDM prints miss the model in known ways: a round hole is a polygon whose flats s
 modeled circle (exact geometry, from the side count OpenSCAD's $fn, $fa and $fs give), holes print
 small, outer sizes print close to true, the first layer squashes out, and some materials shrink.
 Every number comes from recipes/lib/refs/fit.json with its source, or from this printer's own
-numbers under [fit] in ~/.config/smoothstone/stone.toml.
+coupon (stone fit coupon, then stone fit calibrate), stored in ~/.config/smoothstone/stone.toml.
 
 The round features come from the mesh: it is cut across each axis with slicer.py's own
 cross-section, each closed loop is followed by the mesh edges it crosses, straight runs merge into
@@ -14,8 +14,12 @@ the polygon's sides, and a loop that is a regular polygon is a hole or a peg.
 
 from __future__ import annotations
 
+import datetime
+import json
 import math
 import re
+import shutil
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -660,6 +664,11 @@ def report(job, path: Path | None = None) -> tuple[list[str], list[Line], dict]:
 def cmd(args, job):
     Out = _out()
     items = list(getattr(args, "items", []) or [])
+    sub = items[0].lower() if items else ""
+    if sub == "coupon":
+        return cmd_coupon(job, Out)
+    if sub == "calibrate":
+        return cmd_calibrate(items[1:], job, Out)
     return cmd_check(items, job, Out)
 
 
@@ -670,7 +679,7 @@ def _continue(job) -> str:
         return NEW_NEXT
     st = job.status()
     nxt = str(st.get("next") or "")
-    if not nxt or nxt.startswith("stone fit"):
+    if not nxt or nxt.startswith("stone fit") or nxt.startswith("ask the person"):
         return DONE_NEXT if st.get("passed") else ("stone build" if job.plan() else "stone recipes")
     return nxt
 
@@ -700,6 +709,8 @@ def cmd_check(items: list[str], job, Out):
         from .job import write_json
 
         write_json(job.build_dir / "fit.json", {**info, "lines": [vars(x) for x in lines]})
+    if not info["calibrated"]:
+        out.add("For this printer's own numbers: stone fit coupon")
     fixes = {ln.param: ln.value for ln in lines if ln.param and ln.value is not None and ln.verdict in ("tight", "loose")}
     out.result = f"fit: {sum(ln.verdict in ('tight', 'loose') for ln in lines)} to change"
     if fixes and info["recipe"]:
@@ -709,6 +720,175 @@ def cmd_check(items: list[str], job, Out):
         out.next = "none, the fit report is done"
     else:
         out.next = _continue(job)
+        # a job sent here by stone fit calibrate goes on from here, also after a compaction
         out.owns_next = str(job.status().get("next") or "").startswith("stone fit")
     return out
 
+
+# coupon
+
+COUPON_REQUEST = "A fit test coupon: a peg and holes from 0.0 to 0.5 mm per side, a 20 mm square and a 10 mm hole"
+
+
+def coupon_dir(job) -> Path:
+    return job.root / "fit-coupon" if job.exists() else job.root
+
+
+def cmd_coupon(job, Out):
+    """Build the coupon through stone's own recipe path (new, set, build) and ask the person to try it."""
+    from . import cli
+    from .job import Job
+
+    out = Out()
+    d = coupon_dir(job)
+    if d != job.root and d.exists():
+        shutil.rmtree(d)
+    cj = Job(d)
+    cj.create(COUPON_REQUEST, force=True)
+    for argv in (["set", "fit_coupon"], ["build"]):
+        text, code = cli.run(["--job", str(d), *argv])
+        if code:
+            out.add(*[ln for ln in text.splitlines() if ln.startswith(("FIX", "ERROR"))][:4])
+            out.fix(f"the coupon did not build (stone {' '.join(argv)}); details in {cj.log_file}")
+            out.next = "stone fit coupon"
+            return out
+    stl = d / "fit_coupon.stl"
+    host = job if job.exists() else cj
+    p = coupon_params(host)
+    out.add(f"Coupon: {stl}",
+            f"One peg on a {num(p['square'], 0)} mm square, holes labeled 0 to {p['steps'] - 1}: "
+            f"label x {p['step']:g} mm of room per side. All print checks pass.",
+            "Print it in the filament the part will use, with the printer's usual settings.")
+    out.next = (f"ask the person: Please print {stl} . Push the peg into each hole: what is the lowest label it "
+                f"slides into by hand? If you have calipers, also measure the square across the middle and the "
+                f"big {num(p['ref_d'], 0)} mm hole, in mm.")
+    host.update(ask_then="stone fit calibrate")
+    out.result = "coupon built"
+    return out
+
+
+def coupon_params(job) -> dict:
+    from . import recipes as rc
+    from .job import read_json
+
+    r = rc.load("fit_coupon")
+    params = r.defaults() if r else {"peg_d": 6, "steps": 6, "step": 0.1, "square": 20, "ref_d": 10, "quality": 96}
+    bases = [job.root / "fit-coupon"]
+    if (job.plan() or {}).get("recipe") == "fit_coupon":
+        bases.append(job.root)  # the coupon is the job itself
+    for base in bases:
+        got = (read_json(base / "build" / "params.json") or {}).get("params")
+        if got:
+            params.update(got)
+            break
+    return params
+
+
+# calibrate
+
+def parse_calibration(items: list[str], steps: int, step: float) -> dict:
+    """slide=0.2 square=20.12 hole=9.78, or the person's words ("the 2 hole slides, square 20.12")."""
+    text = " ".join(items).lower().replace(",", " ")
+    got: dict = {}
+    for key, pat in (("square", r"square\D{0,12}?(\d+(?:\.\d+)?)"), ("hole", r"hole\s*=\s*(\d+(?:\.\d+)?)|"
+                     r"(?:big|10 mm|reference)?\s*hole\D{0,12}?(\d{1,2}\.\d+)"),
+                     ("material", r"material\s*=\s*([a-z+]+)")):
+        m = re.search(pat, text)
+        if m:
+            g = next(x for x in m.groups() if x)
+            got[key] = g.upper() if key == "material" else float(g)
+    m = re.search(r"slide\w*\s*=\s*(none|\d+(?:\.\d+)?)", text) or re.search(r"(\d+(?:\.\d+)?)\D{0,24}slid", text) \
+        or re.search(r"slid\w*\D{0,24}?(\d+(?:\.\d+)?)", text) or re.search(r"label\D{0,4}(\d)", text)
+    if re.search(r"\bnone\b|no hole|not? (?:any|one)", text) and not (m and m.group(1) != "none"):
+        got["slide"] = round(steps * step, 3)
+        got["none"] = True
+    elif m:
+        v = float(m.group(1))
+        if v >= 1 and v.is_integer() and v < steps:
+            v = v * step  # a label: tenths of a mm on the default coupon
+        got["slide"] = round(v, 3)
+    return got
+
+
+def _toml_value(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(round(float(v), 4))
+    return json.dumps(str(v))
+
+
+def write_table(path: Path, table: str, values: dict) -> None:
+    """Set one [table] in a stone.toml, keeping every other line as it is."""
+    text = path.read_text() if path.is_file() else ""
+    keep, skip = [], False
+    hdr = f"[{table}]"
+    for ln in text.splitlines():
+        s = ln.strip()
+        if s.startswith("["):
+            skip = s == hdr
+        if not skip:
+            keep.append(ln)
+    while keep and not keep[-1].strip():
+        keep.pop()
+    block = [hdr] + [f"{k} = {_toml_value(v)}" for k, v in values.items()]
+    new = "\n".join(keep + ([""] if keep else []) + block) + "\n"
+    tomllib.loads(new)  # never write a file stone could not read back
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new)
+
+
+def cmd_calibrate(items: list[str], job, Out):
+    out = Out()
+    p = coupon_params(job) if job.exists() else {"steps": 6, "step": 0.1, "square": 20, "ref_d": 10, "quality": 96}
+    steps, step = int(p["steps"]), float(p["step"])
+    got = parse_calibration(items, steps, step)
+    if "slide" not in got:
+        out.fix("say which hole the peg slides into: stone fit calibrate slide=0.2 (label 2), "
+                "and if measured, square=<mm> hole=<mm>")
+        out.next = "stone fit calibrate slide=<the lowest label it slides into, times 0.1>"
+        return out
+    problems = []
+    if not 0 <= got["slide"] <= steps * step + 1e-9:
+        problems.append(f"slide={got['slide']:g} is outside the coupon's 0 to {steps * step:g} mm")
+    if "square" in got and abs(got["square"] - float(p["square"])) > 1.5:
+        problems.append(f"square={got['square']:g} is far from the {float(p['square']):g} mm square")
+    if "hole" in got and abs(got["hole"] - float(p["ref_d"])) > 1.5:
+        problems.append(f"hole={got['hole']:g} is far from the {float(p['ref_d']):g} mm hole")
+    if problems:
+        out.fix("; ".join(problems))
+        out.next = "ask the person: Please measure the coupon again: the lowest label the peg slides into, the square and the big hole, in mm."
+        return out
+    material = got.get("material") or (reftool.material_for(job.request(), None).material if job.exists() else "PLA")
+    s, _ = shrink(material)
+    values: dict = {"slide": got["slide"]}
+    if "square" in got:
+        values["outer_side"] = round((got["square"] - float(p["square"]) * (1 - s)) / 2, 4)
+    if "hole" in got:
+        values["hole_side"] = round((printed_hole(float(p["ref_d"]), int(p["quality"]), Printer(0, 0, 0, 0), s)
+                                     - got["hole"]) / 2, 4)
+    values["material"] = material
+    values["date"] = datetime.date.today().isoformat()
+    values["coupon"] = " ".join(f"{k}={got[k]:g}" for k in ("slide", "square", "hole") if k in got)
+    model = printer_model(job.root if job.exists() else None)
+    table = f"fit.{model}" if model else "fit"
+    f = config.user_config_dir() / "stone.toml"
+    write_table(f, table, values)
+    pr = printer(job.root if job.exists() else None)
+    shift = pr.shift
+    out.add(f"Saved [{table}] in {f}",
+            f"Tightest slide: {got['slide']:g} mm per side ({'none of the holes: more than ' if got.get('none') else ''}"
+            f"a typical printer slides at {val('fit.slide_ref'):g}), so every fit moves {shift:+.2f} mm per side.")
+    if "outer_side" in values:
+        o = 2 * values["outer_side"]
+        out.add(f"Outer sizes: {num(abs(o))} mm {'big' if o >= 0 else 'small'} ({got['square']:g} on the {float(p['square']):g} mm square).")
+    if "hole_side" in values:
+        out.add(f"Holes: {num(2 * values['hole_side'])} mm small ({got['hole']:g} for {float(p['ref_d']):g}).")
+    if not {"square", "hole"} & set(got):
+        out.add("No caliper sizes: holes and outer sizes keep the typical numbers.")
+    if job.exists():
+        job.update(ask_then=None)
+    built = job.exists() and part_file(job) is not None and (job.plan() or {}).get("recipe") not in (None, "fit_coupon")
+    out.next = "stone fit" if built else _continue(job)
+    out.result = "fit calibrated"
+    return out

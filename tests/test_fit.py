@@ -1,5 +1,7 @@
-"""stone fit: what each hole and peg prints at, and what it fits. Holes print small by their
-facets (an n-sided polygon inscribed in the circle) plus the printer's own error."""
+"""stone fit: what each hole and peg prints at, what it fits, and a coupon that calibrates one printer.
+Holes print small by their facets (an n-sided polygon inscribed in the circle) plus the printer's
+own error; calibration replaces the typical numbers with this printer's."""
+import math
 import os
 import subprocess
 
@@ -7,6 +9,7 @@ import pytest
 
 from smoothstone import config, fit
 from test_cli import REPO, stone
+from test_round_case import build_checked
 
 
 def mesh_of(tmp_path, openscad, body: str):
@@ -134,3 +137,58 @@ def test_a_named_screw_comes_from_the_request():
     assert fit.request_screw("a cover plate with two M2.5x8 screw holes") == "M2.5"
     assert fit.request_screw("M3x10 bolts.") == "M3"
 
+
+# calibration
+
+def test_calibration_round_trips_and_changes_the_prediction(jobenv):
+    home = config.user_config_dir() / "stone.toml"
+    assert str(home).startswith(os.environ["XDG_CONFIG_HOME"])  # never the real home config
+    before = fit.printer()
+    assert not before.calibrated
+    p0 = fit.printed_hole(3.6, 96, before, 0)
+    text, code, nxt = stone("fit", "calibrate", "slide=0.3", "square=20.14", "hole=9.74")
+    assert code == 0, text
+    assert home.is_file() and "[fit]" in home.read_text()
+    after = fit.printer()
+    s = fit.shrink("PLA")[0]
+    assert after.calibrated and after.slide == 0.3
+    assert after.outer_side == pytest.approx((20.14 - 20 * (1 - s)) / 2, abs=1e-4)
+    assert after.hole_side == pytest.approx((fit.inscribed(10, 96) * (1 - s) - 9.74) / 2, abs=1e-4)
+    assert fit.printed_hole(3.6, 96, after, 0) < p0 - 0.04  # this printer's holes print smaller
+    assert fit.band("slide", after, "PLA")[0] == pytest.approx(fit.band("slide", before, "PLA")[0] + 0.1)
+    # a second calibration replaces the table, other tables stay
+    home.write_text(home.read_text() + '\n[printer]\nmodel = "mk4"\n')
+    stone("fit", "calibrate", "slide=0.2")
+    got = config._toml(None)
+    assert got["printer"]["model"] == "mk4" and got["fit"]["mk4"]["slide"] == 0.2
+    assert fit.printer().model == "mk4" and fit.printer().slide == 0.2
+
+
+def test_the_persons_words_read_as_a_calibration():
+    got = fit.parse_calibration(["Label 3 is the first one it slides into. Square is 20.14, big hole 9.74"], 6, 0.1)
+    assert got == {"slide": pytest.approx(0.3), "square": 20.14, "hole": 9.74}
+    assert fit.parse_calibration(["none", "of", "them"], 6, 0.1)["slide"] == pytest.approx(0.6)
+    assert fit.parse_calibration(["slide=0"], 6, 0.1)["slide"] == 0
+
+
+# the coupon
+
+def test_the_fit_coupon_builds_and_passes_every_print_check():
+    built, bad, _, err = build_checked("fit_coupon", {})
+    assert built and not bad, (err, bad)
+
+
+def test_fit_coupon_asks_the_person_and_their_answer_calibrates(jobenv, openscad, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    text, code, nxt = stone("fit", "coupon")
+    assert code == 0, text
+    assert (jobenv / "stone-job" / "fit_coupon.stl").is_file()
+    assert nxt.startswith("ask the person:") and "slides into" in nxt
+    _, _, nxt = stone("note", "the peg slides into label 2, square 20.08")
+    assert nxt.startswith("stone fit calibrate ")
+    import shlex
+
+    text, code, _ = stone(*shlex.split(nxt)[1:])
+    assert code == 0, text
+    assert fit.printer().slide == pytest.approx(0.2) and fit.printer().calibrated
+    assert math.isclose(fit.printer().outer_side, (20.08 - 20 * (1 - fit.shrink("PLA")[0])) / 2, abs_tol=1e-4)

@@ -29,6 +29,32 @@ Holes print small: a round hole is made of flat sides, and plastic squeezes inwa
 
 Clearance is always per side: 0.2 mm per side makes a hole 0.4 mm wider than the peg.
 
+## 3. Tune it to this printer: the coupon
+
+The numbers start from a typical printer, good to about 0.2 mm. For a fit that matters, ask
+once for a test print:
+
+```
+stone fit coupon
+```
+
+It builds a small plate with labeled holes 0 to 5 (each 0.1 mm per side roomier than the last),
+a 10 mm hole, and a separate block with a peg. NEXT asks the person to print it and say the
+lowest label the peg slides into. Do not print or order anything yourself: ask.
+
+Write down what they say with `stone note "..."`. NEXT then runs `stone fit calibrate` with their
+words. You can also type the numbers:
+
+```
+stone fit calibrate slide=0.2 square=20.12 hole=9.78
+```
+
+- slide: the label times 0.1 (label 2 is 0.2). If it slides in none of them, say none.
+- square and hole: only if they have calipers. Measure the square across the middle.
+
+This saves the numbers in the person's own stone.toml, for this printer model when one is set.
+Every later `stone fit` uses them.
+
 ## Example
 
 ```
@@ -37,6 +63,7 @@ Fit on a typical printer: holes 0.20 mm small, outer sizes true, sizes +/- 0.20 
 PLA shrinks 0.06%
 1 hole_d=3, 2 holes, 96 sides: prints 2.80 mm; M3 screw takes 3.2 to 3.6 mm (ISO 273): tight.
   Change: set hole_d=3.6, prints 3.40 mm (ISO 273 medium for M3: 3.4 mm)
+For this printer's own numbers: stone fit coupon
 NEXT: stone set panel hole_d=3.6
 $ stone set panel hole_d=3.6
 $ stone build
@@ -49,4 +76,4 @@ NEXT: none, the part is ready
 
 - Only round holes and pegs are measured, plus teardrop holes printed on their side. Slots,
   square holes and snap clips are judged only through the recipe's own settings.
-- Every number is a typical printer's, good to about 0.2 mm. Say so if the fit matters.
+- Without a coupon, every number is a typical printer's. Say so if the fit matters.
