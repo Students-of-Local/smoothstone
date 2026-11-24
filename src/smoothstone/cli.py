@@ -25,6 +25,7 @@ from . import measure as measuretool
 from . import find as findtool
 from . import figure as figuretool
 from . import catalog
+from . import doctor
 from . import fitted
 from . import recipes as rc
 from . import printable
@@ -199,10 +200,14 @@ def need_job(job: Job, out: Out) -> bool:
 def cmd_status(args, job: Job) -> Out:
     out = Out(owns_next=False)
     t = config.tier(job.root)
+    dr = doctor.status_hook(job)  # an open stone doctor case: (line, NEXT)
     if not job.exists():
         out.add(f"No job in {job.root}.")
         out.add(*tier_lines(t))
         out.next = NEW_NEXT
+        if dr:
+            out.add(dr[0])
+            out.next = dr[1]
         return out
     s = job.status()
     out.add(f"Job: {job.root}")
@@ -250,6 +255,10 @@ def cmd_status(args, job: Job) -> Out:
         out.add(f"Colors: {col.get('shares', '')} (stone colors {col.get('mapping', '')})")
         out.add(f"3MF: {col.get('file', '')}")
     out.next = s.get("next") or "stone recipes"
+    if dr:
+        out.add(dr[0])
+        if str(s.get("last_command", "")).startswith("stone doctor"):
+            out.next = dr[1]
     return out
 
 
@@ -2599,6 +2608,13 @@ def make_parser() -> Parser:
     s.add_argument("id", nargs="?")
     s.add_argument("--out", help="camera: where to save the frame")
     s.add_argument("--name", help="status, camera: the printer's name in gantrel-printer")
+    s = sub.add_parser("doctor", parents=[common],
+                       help='a failed print: stone doctor "<what you see>" [--image p.jpg] | answer | try | fixed | looks')
+    s.add_argument("words", nargs="*")
+    s.add_argument("--image", help="a photo of the failed print")
+    s.add_argument("--camera", action="store_true", help="take a frame from the paired printer's camera")
+    s.add_argument("--printer", help="printer id (default: stone printer set)")
+    s.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC")
     return p
 
 
@@ -2631,6 +2647,7 @@ COMMANDS = {
     "colors": cmd_colors,
     "video": cmd_video,
     "printer": printers.cmd_printer,
+    "doctor": doctor.cmd_doctor,
 }
 
 
@@ -2685,7 +2702,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "usage", "error")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "doctor", "usage", "error")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:
