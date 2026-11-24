@@ -166,6 +166,21 @@
    "cite": "Support polygon (statics)",
    "url": "https://en.wikipedia.org/wiki/Support_polygon",
    "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.flow_spacing",
+   "topic": "toolpaths",
+   "value": {
+    "spacing": "width - height * (1 - pi/4)",
+    "mm3_per_mm": "height * (width - height * (1 - pi/4))"
+   },
+   "unit": "mm, mm3/mm",
+   "note": "A printed line is modeled as a rectangle with round ends: neighbouring lines sit one spacing apart, a little under the line width, and each mm of line lays height x spacing of plastic. stone's generated toolpaths space and meter their lines this way.",
+   "quote": "// Rectangle with semicircles at the ends. ~ h (w - 0.215 h)",
+   "source": "OrcaSlicer src/libslic3r/Flow.cpp, Flow::rounded_rectangle_extrusion_spacing and Flow::mm3_per_mm",
+   "cite": "OrcaSlicer extrusion flow model",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/src/libslic3r/Flow.cpp",
+   "checked": "2026-11-24"
   }
  ]
 }
