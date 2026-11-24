@@ -1,11 +1,12 @@
-"""stone fit's feature finder: round holes and pegs in a built mesh, with their exact facets."""
+"""stone fit: what each hole and peg prints at, and what it fits. Holes print small by their
+facets (an n-sided polygon inscribed in the circle) plus the printer's own error."""
 import os
 import subprocess
 
 import pytest
 
 from smoothstone import config, fit
-from test_cli import REPO
+from test_cli import REPO, stone
 
 
 def mesh_of(tmp_path, openscad, body: str):
@@ -64,4 +65,72 @@ def test_a_peg_is_a_peg_and_a_teardrop_is_a_hole(tmp_path, openscad):
     got = {(f.kind, f.shape, round(f.d, 2)) for f in fit.find_features(m)}
     assert ("peg", "round", 6.0) in got
     assert ("hole", "teardrop", 4.5) in got
+
+
+# an M3 hole drawn at 3.0 mm is tight; the fix is ISO 273 medium
+
+def test_an_m3_hole_at_3_mm_is_tight_and_the_fix_is_iso_medium():
+    pr = fit.printer()
+    row = fit.lib()["iso273.m3"]["value"]
+    assert row["medium"] == 3.4
+    ln = fit.screw_line("hole", 3.0, 96, pr, 0.0006, "M3", row, "hole_d")
+    assert ln.verdict == "tight"
+    assert ln.param == "hole_d"
+    assert fit.printed_hole(ln.value, 96, pr, 0.0006) == pytest.approx(3.4, abs=0.03)
+    assert "ISO 273 medium for M3: 3.4 mm" in ln.text
+
+
+@pytest.mark.parametrize("size", ["M2.5", "M3", "M4"])
+def test_following_stone_fit_next_ends_at_a_hole_that_fits_the_screw(jobenv, openscad, monkeypatch, size):
+    """A hole drawn at the screw's own size is tight; stone's fix fits, and the next run keeps the
+    same screw (it is not guessed again from the size the fix just changed)."""
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    medium = fit.lib()[f"iso273.{size.lower()}"]["value"]["medium"]
+    stone("new", f"A 60 by 40 mm cover plate with two {size} screw holes")
+    stone("set", "panel", f"hole_d={size[1:]}", "cutouts=0")
+    _, code, _ = stone("build")
+    assert code == 0
+    text, code, nxt = stone("fit")
+    assert code == 0
+    assert "tight" in text and f"ISO 273 medium for {size}: {medium:g} mm" in text, text
+    assert nxt.startswith("stone set panel hole_d="), nxt
+    stone(*nxt.split()[1:])
+    stone("build")
+    text, _, nxt = stone("fit")
+    assert f"{size} screw" in text and "fits" in text and "tight" not in text and "loose" not in text, text
+    assert nxt.startswith("none, the part is ready"), nxt
+
+
+def _panel(**params):
+    from types import SimpleNamespace
+
+    from smoothstone import recipes as rc
+
+    r = rc.load("panel", REPO / "recipes")
+    full = {p.name: p.default for p in r.params} | params
+    return SimpleNamespace(name="panel", summary=r.summary, params=r.params), full
+
+
+def test_a_guessed_screw_is_kept_when_the_hole_changes():
+    pr, known = fit.printer(), {}
+    r, params = _panel(hole_d=3.6)
+    lines, _ = fit.recipe_lines(r, params, [], pr, 0, "PLA", None, known)
+    assert known == {"hole_d": "M3"} and lines[0].verdict == "fits"
+    r, params = _panel(hole_d=2.9)  # now nearest M2.5 by size, but the job's screw is M3
+    lines, _ = fit.recipe_lines(r, params, [], pr, 0, "PLA", None, known)
+    assert "M3 screw" in lines[0].text and lines[0].verdict == "tight" and lines[0].value == 3.6
+
+
+def test_the_recipes_screw_setting_judges_its_hole():
+    r, params = _panel(hole_d=3.4)
+    lines, _ = fit.recipe_lines(r, params, [], fit.printer(), 0, "PLA", "M4", {})
+    assert "M4 screw" in lines[0].text and lines[0].verdict == "tight", lines[0].text
+
+
+def test_a_named_screw_comes_from_the_request():
+    assert fit.request_screw("two M2.5 screw holes") == "M2.5"
+    assert fit.request_screw("an m3 hole and an M4 hole") is None
+    assert fit.request_screw("a 60 mm fan") is None
+    assert fit.request_screw("a cover plate with two M2.5x8 screw holes") == "M2.5"
+    assert fit.request_screw("M3x10 bolts.") == "M3"
 

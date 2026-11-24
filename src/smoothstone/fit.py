@@ -1,7 +1,11 @@
-"""stone fit: the round holes and pegs in a part, found in its mesh.
+"""stone fit: what a part's mating features print at, and whether they fit what they mate with.
 
-A round hole is a polygon whose flats sit inside the modeled circle (exact geometry, from the
-side count OpenSCAD's $fn, $fa and $fs give).
+A part that takes a screw, a peg, a bearing or a lid fits only if its printed size is right, and
+FDM prints miss the model in known ways: a round hole is a polygon whose flats sit inside the
+modeled circle (exact geometry, from the side count OpenSCAD's $fn, $fa and $fs give), holes print
+small, outer sizes print close to true, the first layer squashes out, and some materials shrink.
+Every number comes from recipes/lib/refs/fit.json with its source, or from this printer's own
+numbers under [fit] in ~/.config/smoothstone/stone.toml.
 
 The round features come from the mesh: it is cut across each axis with slicer.py's own
 cross-section, each closed loop is followed by the mesh edges it crosses, straight runs merge into
@@ -11,11 +15,13 @@ the polygon's sides, and a loop that is a regular polygon is a hole or a peg.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
+from . import config
 from . import refs as reftool
 from . import slicer
 
@@ -284,4 +290,425 @@ def load_mesh(path: Path):
     from .check import _load
 
     return _load(path)
+
+
+# this printer's numbers
+
+@dataclass
+class Printer:
+    hole_side: float  # mm per side a hole prints small
+    outer_side: float  # mm per side an outer size prints large (negative: small)
+    slide: float  # per side, the tightest coupon hole the peg slides in
+    band: float  # plus or minus on a predicted size
+    calibrated: bool = False
+    model: str | None = None
+    material: str | None = None  # what the coupon was printed in
+    cites: list[str] = field(default_factory=list)
+
+    @property
+    def shift(self) -> float:
+        """How much looser this printer needs every fit than a typical one."""
+        return self.slide - float(val("fit.slide_ref"))
+
+
+def printer_model(job_root: Path | None) -> str | None:
+    try:  # the printer profiles (track D), when present
+        from . import printers  # type: ignore
+
+        cur = printers.current(job_root)
+        if isinstance(cur, dict) and cur.get("id"):
+            return str(cur["id"])
+    except Exception:
+        pass
+    raw = config._toml(job_root).get("printer")
+    m = raw.get("model") if isinstance(raw, dict) else None
+    return str(m) if m else None
+
+
+def _stored(job_root: Path | None, model: str | None) -> dict:
+    raw = config._toml(job_root).get("fit")
+    if not isinstance(raw, dict):
+        return {}
+    if model and isinstance(raw.get(model), dict):
+        return raw[model]
+    return {k: v for k, v in raw.items() if not isinstance(v, dict)}
+
+
+def printer(job_root: Path | None = None) -> Printer:
+    model = printer_model(job_root)
+    got = _stored(job_root, model)
+    typical = Printer(float(val("fit.hole_error")) / 2, float(val("fit.outer_error")), float(val("fit.slide_ref")),
+                      float(val("fit.accuracy")), model=model,
+                      cites=[cite("fit.hole_error"), cite("fit.accuracy")])
+    if not isinstance(got.get("slide"), (int, float)):
+        return typical
+    return Printer(float(got.get("hole_side", typical.hole_side)), float(got.get("outer_side", typical.outer_side)),
+                   float(got["slide"]), CALIBRATED_BAND, True, model, got.get("material"),
+                   ["this printer's coupon" + (f", {got['date']}" if got.get("date") else "")])
+
+
+def shrink(material: str | None) -> tuple[float, str | None]:
+    """XY shrink as a fraction, and its cite (None: no sourced value, 0 assumed)."""
+    key = SHRINK.get((material or "PLA").upper())
+    if not key:
+        return 0.0, None
+    e = lib()[f"fit.shrink.{key}"]
+    return float(e["value"]) / 100, e["cite"]
+
+
+def printed_hole(d: float, n: int, pr: Printer, s: float) -> float:
+    return inscribed(d, n) * (1 - s) - 2 * pr.hole_side
+
+
+def printed_peg(d: float, pr: Printer, s: float) -> float:
+    return d * (1 - s) + 2 * pr.outer_side
+
+
+def model_hole_for(target: float, n: int, pr: Printer, s: float) -> float:
+    """The modeled diameter that prints a hole at target, to the nearest STEP."""
+    raw = (target + 2 * pr.hole_side) / (math.cos(math.pi / n) * (1 - s))
+    return round(round(raw / STEP) * STEP, 2)
+
+
+# what a feature fits
+
+CLASSES = ("press", "snug", "slide", "loose")
+
+
+def band(cls: str, pr: Printer, material: str | None) -> tuple[float, float]:
+    """Per side modeled clearance this fit takes on this printer: the class's band moved by how far
+    this printer's tightest sliding peg sits from a typical printer's."""
+    lo, hi = val("fit.class.tpu") if (material or "").upper() == "TPU" else val(f"fit.class.{cls}")
+    return lo + pr.shift, hi + pr.shift
+
+
+def verdict(c: float, b: tuple[float, float]) -> str:
+    if c < b[0] - 1e-6:
+        return "tight"
+    if c > b[1] + 1e-6:
+        return "loose"
+    return "fits"
+
+
+def target(b: tuple[float, float]) -> float:
+    return round(round((b[0] + b[1]) / 2 / STEP) * STEP, 2)
+
+
+def iso273(printed: float) -> tuple[str, dict] | None:
+    """The metric screw a hole that prints at this size is most likely for: the one whose ISO 273
+    fine to coarse range is nearest, within 0.5 mm. A guess only; a screw the recipe or the request
+    names, or the one recorded on the job's first stone fit, comes first (screw_for)."""
+    best, gap = None, 0.5 + 1e-9
+    for k, e in lib().items():
+        if k.startswith("iso273."):
+            v = e["value"]
+            g = max(v["fine"] - printed, printed - v["coarse"], 0.0)
+            if g < gap:
+                best, gap = (k.split(".", 1)[1].upper(), v), g
+    return best
+
+
+def iso_row(size: str | None) -> dict | None:
+    return lib().get(f"iso273.{size.lower()}", {}).get("value") if size else None
+
+
+def request_screw(text: str) -> str | None:
+    """The one metric screw the request names ("two M2.5 screw holes"), when it names exactly one."""
+    sizes = {f"M{m}" for m in re.findall(r"\bM(\d+(?:\.\d)?)(?!\d)", text or "", re.I)}
+    sizes = {s for s in sizes if iso_row(s)}
+    return sizes.pop() if len(sizes) == 1 else None
+
+
+def screw_size(help_text: str) -> str | None:
+    """The screw a setting names for its holes ("screw size, M (4 = M4)" names none by itself)."""
+    m = re.search(r"\bfor (?:an? )?M(\d+(?:\.\d)?) screw", help_text or "")
+    return f"M{m.group(1)}" if m else None
+
+
+@dataclass
+class Line:
+    text: str
+    verdict: str = ""  # fits | tight | loose | "" (size only)
+    param: str | None = None
+    value: float | None = None
+
+
+def screw_line(what: str, d: float, n: int, pr: Printer, s: float, size: str, row: dict,
+               param: str | None) -> Line:
+    p = printed_hole(d, n, pr, s)
+    v = "tight" if p < row["fine"] - 0.02 else ("loose" if p > row["coarse"] + 0.02 else "fits")
+    text = (f"{what}: prints {num(p)} mm; {size} screw takes {num(row['fine'], 1)} to {num(row['coarse'], 1)} mm "
+            f"(ISO 273): {v}")
+    if v == "fits":
+        return Line(text, v)
+    new = model_hole_for(row["medium"], n, pr, s)
+    how = f"set {param}={new:g}" if param else f"model it at {new:g} mm or drill it to {num(row['medium'], 1)} mm"
+    return Line(f"{text}. Change: {how}, prints {num(printed_hole(new, n, pr, s))} mm "
+                f"(ISO 273 medium for {size}: {num(row['medium'], 1)} mm)", v, param, new)
+
+
+def bearing_line(f: Feature, pr: Printer, s: float, material: str | None) -> Line | None:
+    b = val("bearing.608")
+    if f.kind == "hole" and abs(f.size - b["outside"]) <= 0.8:
+        c, what = (f.size - b["outside"]) / 2, f"608 bearing seat ({num(b['outside'], 0)} mm)"
+    elif f.kind == "peg" and abs(f.size - b["bore"]) <= 0.4:
+        c, what = (b["bore"] - f.size) / 2, f"608 bearing bore ({num(b['bore'], 0)} mm)"
+    else:
+        return None
+    bd = band("press", pr, material)
+    v = verdict(c, bd)
+    text = f"{what}: {num(c)} mm per side, a press takes {num(bd[0])} to {num(bd[1])}: {v}"
+    if v != "fits":
+        t = target(bd)
+        new = b["outside"] + 2 * t if f.kind == "hole" else b["bore"] - 2 * t
+        if f.kind == "hole":
+            new = new / math.cos(math.pi / f.n)
+        text += f". Change: model it at {num(new)} mm"
+    return Line(text, v)
+
+
+# recipe parameters
+
+def param_kind(p) -> str | None:
+    """What a recipe setting means for fit: press, clearance, screw (size M), hole or None."""
+    words = f"{p.name} {p.help}".lower()
+    if p.type not in ("number", "int"):
+        return None
+    if re.search(r"\bpress\b|smaller than the shaft", words):
+        return "press"
+    if re.search(r"room per side|gap between|\bclearance\b|^fit\b", words) and (p.unit == "mm" or "gap" in words):
+        return "clearance"
+    if re.search(r"screw size, m", words):
+        return "screw"
+    if p.unit == "mm" and re.search(r"diameter|\bbore\b", words) and re.search(r"hole|\bbore\b|shaft", words):
+        return "hole"
+    return None
+
+
+def intended(p, summary: str = "") -> str:
+    words = f"{p.name} {p.help}".lower()
+    if re.search(r"\bpress\b|smaller than", words):
+        return "press"
+    if re.search(r"\blid\b|\bcap\b", words):
+        return "snug"
+    return "slide"
+
+
+def recipe_lines(r, params: dict, feats: list[Feature], pr: Printer, s: float, material: str | None,
+                 screw: str | None = None, known: dict | None = None) -> tuple[list[Line], set]:
+    """One line per fit setting, and the features those settings made (so they are not listed twice).
+    screw is the one the recipe or request names; known holds the screws guessed on an earlier run,
+    by setting, and gets this run's guesses: the guess must not follow the size stone's fix changes."""
+    known = {} if known is None else known
+    out: list[Line] = []
+    used: set[int] = set()
+    n_default = int(params.get("quality") or 0)
+    for p in r.params:
+        kind = param_kind(p)
+        v = params.get(p.name)
+        if kind is None or not isinstance(v, (int, float)) or isinstance(v, bool):
+            continue
+        v = float(v)
+        if kind in ("hole", "screw") and v <= 0:
+            continue  # 0 = none, or sized by the recipe from something else
+        if kind in ("press", "clearance"):
+            cls = "press" if kind == "press" else intended(p, r.summary)
+            c = -v if kind == "press" else v
+            bd = band(cls, pr, material)
+            vd = verdict(c, bd)
+            text = f"{p.name}={v:g} ({p.help}): {num(c)} mm per side, {cls} takes {num(bd[0])} to {num(bd[1])}: {vd}"
+            if vd != "fits":
+                t = target(bd)
+                new = -t if kind == "press" else t
+                if p.min is not None:
+                    new = max(new, p.min)
+                if p.max is not None:
+                    new = min(new, p.max)
+                out.append(Line(f"{text}. Change: set {p.name}={new:g}", vd, p.name, new))
+            else:
+                out.append(Line(text, vd))
+            continue
+        if kind == "screw":
+            continue  # its holes are read from the mesh below, with the screw it names
+        match = [i for i, f in enumerate(feats) if f.kind == "hole" and abs(f.d - v) <= 0.05]
+        used.update(match)
+        n = feats[match[0]].n if match else (n_default or fragments(v / 2))
+        count = sum(feats[i].count for i in match)
+        what = f"{p.name}={v:g}" + (f", {count} hole{'s' if count != 1 else ''}" if count else "") + f", {n} sides"
+        if re.search(r"shaft", f"{p.help}".lower()):
+            shaft = math.floor(v * 2 + 1e-6) / 2
+            c = (inscribed(v, n) - shaft) / 2
+            bd = band("snug", pr, material)
+            vd = verdict(c, bd)
+            text = f"{what}: on a {shaft:g} mm shaft {num(c)} mm per side, snug takes {num(bd[0])} to {num(bd[1])}: {vd}"
+            if vd != "fits":
+                new = round(round((shaft + 2 * target(bd)) / math.cos(math.pi / n) / STEP) * STEP, 2)
+                out.append(Line(f"{text}. Change: set {p.name}={new:g}", vd, p.name, new))
+            else:
+                out.append(Line(text, vd))
+            continue
+        size = next((x for x in (screw_size(p.help), screw, known.get(p.name))
+                     if iso_row(x) and float(x[1:]) - 1 <= v <= iso_row(x)["coarse"] + 1.5), None)
+        row = iso_row(size)
+        if row is None:
+            got = iso273(printed_hole(v, n, pr, s))
+            if got:
+                size, row = got
+                known[p.name] = size
+        if row is None:
+            out.append(Line(f"{what}: prints {num(printed_hole(v, n, pr, s))} mm"))
+            continue
+        out.append(screw_line(what, v, n, pr, s, size, row, p.name))
+    return out, used
+
+
+def feature_line(f: Feature, pr: Printer, s: float, material: str | None, screw: str | None = None) -> Line:
+    many = f"{f.count} {f.kind}s" if f.count > 1 else f"{f.kind}"
+    side = " teardrop" if f.shape == "teardrop" else ("" if f.axis == "z" else " on its side")
+    what = f"{many} {num(f.d)} mm, {f.n} sides, {num(f.depth, 1)} mm deep{side}"
+    b = bearing_line(f, pr, s, material)
+    if b:
+        b.text = f"{what}: {b.text}"
+        return b
+    if f.kind == "hole":
+        got = None
+        if screw:
+            row = lib().get(f"iso273.{screw.lower()}", {}).get("value")
+            if row and float(screw[1:]) <= f.d + 0.05 <= row["coarse"] + 1.0:
+                got = (screw, row)
+        if got:
+            return screw_line(what, f.d, f.n, pr, s, got[0], got[1], None)
+        p = printed_hole(f.d, f.n, pr, s)
+        text = f"{what}: prints {num(p)} mm"
+        got = iso273(p)
+        if got:  # nothing says a screw goes here: what it would mean for one, with no change asked
+            size, row = got
+            v = "tight" if p < row["fine"] - 0.02 else ("loose" if p > row["coarse"] + 0.02 else "fits")
+            text += f"; if it is for an {size} screw: {v} (ISO 273 takes {num(row['fine'], 1)} to {num(row['coarse'], 1)} mm)"
+        return Line(text)
+    return Line(f"{what}: prints {num(printed_peg(f.d, pr, s))} mm")
+
+
+# the command
+
+def _out():
+    from .cli import Out
+
+    return Out
+
+
+def part_file(job) -> Path | None:
+    for name in ("part.off", "part.stl"):
+        f = job.build_dir / name
+        if f.is_file():
+            return f
+    return None
+
+
+def report(job, path: Path | None = None) -> tuple[list[str], list[Line], dict]:
+    """The fit lines for the job's part (or any STL): what each feature prints at and what it fits."""
+    from . import recipes as rc
+    from .job import read_json
+
+    r, params, request = None, {}, ""
+    if path is None:
+        path = part_file(job)
+        plan = job.plan() or {}
+        r = rc.load(plan["recipe"]) if plan.get("recipe") else None
+        built = read_json(job.build_dir / "params.json") or {}
+        params = built.get("params") or (r.merged(plan.get("params") or {}) if r else {})
+        request = job.request()
+    mesh = load_mesh(path)
+    feats = find_features(mesh, axes=("z",) if len(mesh.faces) > 400_000 else ("z", "x", "y"))
+    pr = printer(job.root if job.exists() else None)
+    material = reftool.material_for(request, r, params).material if r else "PLA"
+    s, s_cite = shrink(material)
+    head = []
+    who = f"this printer ({pr.model})" if pr.model and pr.calibrated else ("this printer" if pr.calibrated else "a typical printer")
+    o = 2 * pr.outer_side
+    outer = f"{num(abs(o))} mm {'big' if o > 0.005 else 'small'}" if abs(o) > 0.005 else "true"
+    head.append(f"Fit on {who}: holes {num(2 * pr.hole_side)} mm small, outer sizes {outer}, sizes +/- {num(pr.band)} mm "
+                f"({'; '.join(pr.cites)})")
+    head.append(f"{reftool.MATERIALS[material].name if material in reftool.MATERIALS else material} shrinks "
+                + (f"{num(s * 100)}% ({s_cite})" if s_cite else "by no sourced amount: 0 assumed"))
+    lines: list[Line] = []
+    used: set[int] = set()
+    screw = request_screw(request)
+    if r is not None:
+        for p in r.params:
+            if param_kind(p) == "screw" and isinstance(params.get(p.name), (int, float)) and params[p.name] > 0:
+                screw = f"M{params[p.name]:g}"
+        st = job.status() if job.exists() else {}
+        known = dict((st.get("fit_screws") or {}).get(r.name) or {})
+        before = dict(known)
+        rl, used = recipe_lines(r, params, feats, pr, s, material, screw, known)
+        lines.extend(rl)
+        if known != before and job.exists():
+            job.update(fit_screws={**(st.get("fit_screws") or {}), r.name: known})
+    for i, f in enumerate(feats):
+        if i not in used:
+            lines.append(feature_line(f, pr, s, material, screw))
+    bed = [f for f in feats if f.at_bed and f.kind == "hole"]
+    if bed and not all(f.flare for f in bed):
+        lines.append(Line(f"Holes open on the bed: the first layer squashes in about {num(val('fit.elephant_foot'))} mm "
+                          f"per side; turn on elephant foot compensation ({cite('fit.elephant_foot')})"))
+    info = {"recipe": r.name if r else None, "material": material, "calibrated": pr.calibrated,
+            "features": [vars(f) | {"size": f.size} for f in feats]}
+    return head, lines, info
+
+
+def cmd(args, job):
+    Out = _out()
+    items = list(getattr(args, "items", []) or [])
+    return cmd_check(items, job, Out)
+
+
+def _continue(job) -> str:
+    from .cli import DONE_NEXT, NEW_NEXT
+
+    if not job.exists():
+        return NEW_NEXT
+    st = job.status()
+    nxt = str(st.get("next") or "")
+    if not nxt or nxt.startswith("stone fit"):
+        return DONE_NEXT if st.get("passed") else ("stone build" if job.plan() else "stone recipes")
+    return nxt
+
+
+def cmd_check(items: list[str], job, Out):
+    out = Out(owns_next=False)
+    path = None
+    if items:
+        path = Path(items[0]).expanduser().resolve()
+        if not path.is_file():
+            out.fix(f"no file at {path}")
+            out.next = "stone fit <file.stl>"
+            return out
+    elif not job.exists() or part_file(job) is None:
+        out.fix("no built part yet; build first or name an STL file")
+        out.next = "stone build" if job.exists() and job.plan() else _continue(job)
+        return out
+    head, lines, info = report(job, path)
+    out.add(*head)
+    if not lines:
+        out.add("No round holes, pegs or fit settings found: nothing here has to fit another part.")
+    for i, ln in enumerate(lines[:12], 1):
+        out.add(f"{i} {ln.text}")
+    if len(lines) > 12:
+        out.add(f"({len(lines) - 12} more in fit.json)")
+    if job.exists() and path is None:
+        from .job import write_json
+
+        write_json(job.build_dir / "fit.json", {**info, "lines": [vars(x) for x in lines]})
+    fixes = {ln.param: ln.value for ln in lines if ln.param and ln.value is not None and ln.verdict in ("tight", "loose")}
+    out.result = f"fit: {sum(ln.verdict in ('tight', 'loose') for ln in lines)} to change"
+    if fixes and info["recipe"]:
+        out.next = f"stone set {info['recipe']} " + " ".join(f"{k}={v:g}" for k, v in fixes.items())
+        out.owns_next = True
+    elif path is not None:
+        out.next = "none, the fit report is done"
+    else:
+        out.next = _continue(job)
+        out.owns_next = str(job.status().get("next") or "").startswith("stone fit")
+    return out
 
