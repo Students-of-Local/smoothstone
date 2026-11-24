@@ -1055,3 +1055,16 @@ pieces (judge 7); the unit tests passed on both, and only the evals caught them.
 
 Open, from the judge: Milan's piers are shallow and its spires plain rods; the Taj lacks its guldastas; the Eiffel's second deck is nearly missing; St Paul's side
 walls are blank; St. Vitus's south tower is too slim. Physical prints untested. The held-out six stay sealed.
+
+## 2026-11-24 Milan's front piers
+
+Milan's six front piers are now square shafts as wide and as tall as the survey says, with a groove up the
+broad ones, string courses and gablets; the front spires step from a shaft to a needle. Course heights and the
+spire's step are estimated from a photograph, and the pack says so. The limit for a loose gable shaving grows
+with the print, a guard proven on a synthetic block only: Milan built at 290, 320, 350 and 400 mm without it.
+
+The judge did not move: l03, r8 and LFM3-1.7B (card S) got 7, 7, 7 at 1964db8, where 647c3df got 7, 7, 8. All
+three still fail the bar of 8. It says the piers barely project. They project the 1.8 m the map gives, 2.3 mm at
+this size, and its one front view draws the facade about 120 pixels wide with the light head on. Whether the
+views are too coarse is the next question, tested on older models first. Suite 1454 passed, 2 skipped; timing
+passes; the ratchet holds.

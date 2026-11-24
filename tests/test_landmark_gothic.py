@@ -52,17 +52,17 @@ def test_west_piers_take_their_surveyed_widths_and_follow_the_facade():
     block = m3.CrossSection([[(p * along + q * across).tolist() for p, q in
                               ((0, -43), (40, -43), (40, 43), (0, 43))]]).extrude(60)
     solid = _surveyed_west_facade(block, 86., 60., 0., 0., along, across, facts, [], [])
-    # 1.6 mm in front of the wall, above the jambs' feet, only the piers are cut.
+    # 1 mm in front of the wall, above the jambs' feet and behind the grooves, only the piers are cut.
     strip = m3.CrossSection([[(p * along + q * across).tolist() for p, q in
-                              ((-1.7, -50), (-1.6, -50), (-1.6, 50), (-1.7, 50))]])
+                              ((-1.1, -50), (-1., -50), (-1., 50), (-1.1, 50))]])
     runs = []
     for piece in (solid.slice(26.) ^ strip).decompose():
         ends = np.concatenate(piece.to_polygons()) @ across
-        runs.append((float(ends.mean()), float(np.ptp(ends))))
+        runs.append((float(ends.min() + ends.max()) / 2, float(np.ptp(ends))))
     middles, widths = zip(*sorted(runs))
     assert np.allclose(middles, [-38.7, -24.1, 24.1, 38.7], atol=.4)
     assert widths[0] > 1.8 * widths[1] and widths[3] > 1.8 * widths[2]
-    assert .80 * 8.6 < widths[0] < 8.7
+    assert widths[0] == pytest.approx(8.6, abs=.1)
 
 
 def test_west_piers_stand_on_the_bed_where_the_plinth_follows_the_plan():
@@ -81,7 +81,8 @@ def test_west_piers_stand_on_the_bed_where_the_plinth_follows_the_plan():
     assert np.isclose(-solid.bounding_box()[0], WEST_PIER_REACH, atol=.02)
 
 
-def test_a_shaving_left_by_the_gable_trim_is_dropped():
+@pytest.mark.parametrize("k", [1., 2.])
+def test_a_shaving_left_by_the_gable_trim_is_dropped(k):
     from smoothstone.landmark_style import _surveyed_west_facade
 
     facts = {"west_facade_profile": {"value": [[-.5, .5], [0, .9], [.5, .5]]},
@@ -89,14 +90,39 @@ def test_a_shaving_left_by_the_gable_trim_is_dropped():
     along, across = np.array([1., 0.]), np.array([0., 1.])
 
     def box(x0, y0, x1, y1, z0, z1):
-        return m3.CrossSection([[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]]).extrude(z1 - z0).translate([0, 0, z0])
+        return m3.CrossSection([[(k * x, k * y) for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]]).extrude(
+            k * (z1 - z0)).translate([0, 0, k * z0])
 
     block = box(0, -43, 40, 43, 0, 60) - box(-1, 10, 4, 14, 0, 52)
     notes = []
-    solid = _surveyed_west_facade(block, 86., 60., .2, 0., along, across, facts,
+    solid = _surveyed_west_facade(block, 86. * k, 60. * k, .2, 0., along, across, facts,
                                   [box(1, 11, 1.5, 13, 0, 62)], notes)
     assert sum(piece.volume() > 0 for piece in solid.decompose()) == 1
     assert any("shavings" in note for note in notes)
+
+
+def test_the_front_piers_stand_up_as_grooved_shafts_with_gablets():
+    from smoothstone.landmark_style import _surveyed_west_facade
+
+    facts = {"west_facade_profile": {"value": [[-.5, .5], [0, .9], [.5, .5]]},
+             "west_buttress_spires": {"value": [[-.45, .7], [-.28, .8], [.28, .8], [.45, .7]]},
+             "west_buttress_widths": {"value": [.10, .04, .04, .10]}, "west_pier_courses": {"value": [.3]},
+             "spire_plan": {}}
+    along, across = np.array([1., 0.]), np.array([0., 1.])
+    block = m3.CrossSection([[(0, -43), (40, -43), (40, 43), (0, 43)]]).extrude(60)
+    solid = _surveyed_west_facade(block, 86., 60., .2, 0., along, across, facts, [], [])
+
+    def ahead(z, depth, where):
+        strip = m3.CrossSection([[(-depth, where - 6), (-depth + .1, where - 6),
+                                  (-depth + .1, where + 6), (-depth, where + 6)]])
+        return (solid.slice(z) ^ strip).decompose()
+
+    for z in (15., 30.):
+        assert len(ahead(z, 1.9, -38.7)) == 2         # a broad pier is two shafts
+        assert len(ahead(z, 1.9, -24.08)) == 1        # a narrow one is not
+    assert ahead(2 + .3 * 60 + .5, 2.3, -38.7)        # the string course stands out
+    shoulder = 2 + 60 * float(np.interp(-.45, [-.5, 0], [.5, .9]))
+    assert ahead(shoulder + 1.5, 1.9, -38.7)          # the gablets rise over the wall
 
 
 def test_the_print_size_leaves_room_for_the_west_piers():

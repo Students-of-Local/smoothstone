@@ -281,6 +281,8 @@ def _reconcile_spire_plan(parts, refs: dict, facts: dict, notes: list[str]):
         record["spire_id"] = number
         record["placement_guessed"] = number in data["inferred"]
         record["roof_profile"] = [(0, 1), (.08, .97), (.27, .85), (.60, .62), (.84, .4), (1, 0)]
+        if surveyed is not None and "front_spire_profile" in facts:
+            record["roof_profile"] = facts["front_spire_profile"]["value"]
         out.append((record, disk))
         recorded += 1
     notes.append(f"Placed {recorded} counted spires ({len(matched)} aligned to OSM; "
