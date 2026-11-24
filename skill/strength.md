@@ -44,7 +44,8 @@ a thicker part or a lighter load would do. A thicker part is a recipe change: `s
 When the answer says "This holds only for a print with ...", tell the person those settings: the
 slicer does not know them. "not sure, ..." means the model cannot judge it yet: run NEXT.
 
-The numbers and every assumption are in build/strength.json.
+The numbers and every assumption are in build/strength.json. The "Picture:" file shows the part from above, the
+front and the right, red where it is nearest to breaking, the worst spot ringed. Look at it before you describe it.
 
 This is a model, not a break test: real prints vary with the printer, the temperature, and the
 moisture in the filament. A load held for weeks creeps, more so when warm.

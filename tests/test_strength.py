@@ -5,6 +5,7 @@ import shlex
 
 import numpy as np
 import trimesh
+from PIL import Image
 
 from smoothstone import strength
 from test_cli import stone
@@ -172,6 +173,8 @@ def test_stone_strength_reports_and_writes_its_files(jobenv, monkeypatch):
     d = json.loads((jobenv / "strength.json").read_text())
     assert d["safety_factor"] > 2 and d["inputs"]["material"] == "PLA" and d["advice"] and d["assumptions"]
     assert nxt == "none, the part holds"
+    img = np.asarray(Image.open(jobenv / "strength.png").convert("RGB"))
+    assert "strength.png" in text and (img == 0).all(-1).sum() > 100  # the ring
     text, code, nxt = stone("strength", str(jobenv / "bar.stl"), "load=400N", "at=right", "dir=down", "fixed=left")
     assert "fails" in text and (nxt.startswith("stone strength ") or nxt.startswith("ask the person: ")), text
     text, code, nxt = stone("strength", str(jobenv / "bar.stl"), "load=15N", "at=right", "dir=down", "fixed=left",
@@ -254,3 +257,15 @@ def test_a_slender_post_pushed_toward_its_hold_buckles():
     assert "buckles" in strength.verdict(st, res, case, p)[0]
     case.dir = (2, 1)  # pulled, not pushed
     assert strength.solve(post, case, p, 30_000)[1].buckle == np.inf
+
+
+def test_the_picture_reddens_and_rings_the_held_end(tmp_path):
+    from smoothstone.strengthview import picture
+
+    case = strength.parse(["load=80N", "at=right", "dir=down", "fixed=left", "infill=100"])[0]
+    st, res = strength.solve(beam(), case, strength.material("PLA"), 20_000)
+    picture(st, res, tmp_path / "s.png")
+    top = np.asarray(Image.open(tmp_path / "s.png").convert("RGB")).astype(int)[30:, :275]  # the view from above
+    red = np.argwhere((top[..., 0] == 255) & (top[..., 1] < 60) & (top[..., 2] < 60))
+    ring = np.argwhere((top < 10).all(-1))
+    assert len(red) > 50 and len(ring) > 100 and red[:, 1].max() < 140 and ring[:, 1].max() < 60, (len(red), len(ring))
