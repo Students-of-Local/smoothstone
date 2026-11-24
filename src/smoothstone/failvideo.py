@@ -495,8 +495,8 @@ def cmd(args, job, prof, out):
         out.fix("--fail draws one frame a layer; drop --mode")
         out.next = timelapse.again(args, **{"--mode": None})
         return out
-    if args.material and args.material.upper() not in failsim.MATERIALS:
-        out.fix(f"--material {args.material}: the model has {', '.join(failsim.MATERIALS)}")
+    if args.material and not failsim.named(args.material):
+        out.fix(f"--material {args.material}: the model has no numbers for it; it has {', '.join(failsim.MATERIALS)}")
         out.next = "ask the person: which of these is closest? Then: " + timelapse.again(args, **{"--material": "<" + "|".join(failsim.MATERIALS) + ">"})
         return out
     asked, without = args.supports, mode not in ("auto", "detach") and not args.gcode
@@ -512,11 +512,12 @@ def cmd(args, job, prof, out):
         without = asked == "on" or supports.analyze(supports.load(f), columns=True)["needed"]
     asked_for = refs.material_for(job.request()).material.upper() if job.exists() else ""
     said = (args.material or tp.material or asked_for).upper()
-    mat = next((k for k in (said, asked_for) if k in failsim.MATERIALS), "PLA")
-    note = ["material: PLA is assumed; say --material PETG or ABS" if not said else
-            f"material: the model has no {said}, so this is {mat}'s" if mat != said else
-            f"material: {mat}" + ("" if args.material or not tp.material else ", the G-code says")]
-    heat = tp.material == mat or mat == said and tp.material not in failsim.MATERIALS  # the file's is for this plastic
+    own, file = failsim.named(said), failsim.named(tp.material)
+    mat = own or failsim.named(asked_for) or "PLA"
+    note = [f"material: PLA is assumed; say --material {', '.join(failsim.MATERIALS[1:-1])} or {failsim.MATERIALS[-1]}" if not said else
+            f"material: the model has no numbers for {said}, so this is {mat}'s; it has {', '.join(failsim.MATERIALS)}" if not own else
+            f"material: {mat}" + ("" if mat == said else f", for {said}") + ("" if args.material or not tp.material else ", the G-code says")]
+    heat = file == mat or bool(own) and not file  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
     inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat)
     fails = failsim.predict(inp)

@@ -208,7 +208,9 @@ def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
     assert "Nothing here fails by bridge" in text and text.strip().endswith("NEXT: none, nothing to show"), text
     assert "Material: PLA is assumed" in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "wood"])
-    assert code == 1 and "--material wood: the model has PLA, PETG, ABS" in text, text
+    assert code == 1 and "--material wood: the model has no numbers for it; it has PLA, PETG, ABS" in text, text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "PLA Silk"])
+    assert "Material: PLA, for PLA SILK." in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "melt"])
     assert code == 1 and "FIX: --fail melt: one of auto" in text, text
     assert text.strip().splitlines()[-1] == f"NEXT: stone timelapse {stl} --fail auto", text
@@ -291,8 +293,8 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     tp.run[tp.layer < 3, 0] = np.nan
     assert failvideo.inputs(tp, "PLA").fan == 1  # the file says it from layer 4 on
     other = tmp_path / "other.gcode"
-    for said, more, line, own in (("PLA", (), "Material: PLA, the G-code says.", True), ("ASA", (), "no ASA, so this is PLA's", False),
-                                  ("ASA", ("--material", "ABS"), "Material: ABS.", True), ("PLA", ("--material", "ABS"), "Material: ABS.", False),
+    for said, more, line, own in (("PLA", (), "Material: PLA, the G-code says.", True), ("HIPS", (), "no numbers for HIPS, so this is PLA's", False),
+                                  ("HIPS", ("--material", "ABS"), "Material: ABS.", True), ("PLA", ("--material", "ABS"), "Material: ABS.", False),
                                   (None, (), "PLA is assumed", False)):  # another plastic's heat is not this one's
         other.write_text(gcode.read(file).replace("; filament_type = PLA", f"; filament_type = {said}" if said else ";"))
         text, code = cli.run(["timelapse", "--gcode", str(other), "--fail", "bridge", *more])
