@@ -2,6 +2,7 @@
 
 import json
 import math
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -398,26 +399,52 @@ def test_half_the_fan_is_half_the_wind():
 @pytest.mark.parametrize("mat", fs.MATERIALS)
 def test_every_plastic_is_a_melt_then_a_solid_the_model_can_run(mat):
     m = fs.material(mat)
-    t = np.linspace(m.tg + 20, m.nozzle, 60)
+    t = np.linspace(m.set + 20, m.nozzle, 60)
     for rate in (0, 100):
         eta = fs.viscosity(t, rate, mat)
         assert np.isfinite(eta).all() and (eta > 0).all() and (np.diff(eta) < 0).all()
-    assert m.tg < m.nozzle and 1000 < m.cp < 3000 and 0.1 < m.k < 0.3
+    assert m.tg <= m.set < m.nozzle and 1000 < m.cp < 3000 and 0.1 < m.k < 0.3
     assert len(m.stand_ins) == len(set(m.stand_ins)) and fs.note("mfi_rig") in m.stand_ins
     assert 0 < fs.cooling(mat)["soft_s"] < 5 and np.isfinite(fs.droop([1.0, 5.0], mat)).all() and 0 < fs.layer_stress(mat, 25) < 30
     assert 0 < fs.nozzle_hold(mat)["blob_mm3"] < 10 and 0 < fs.nozzle_drag(mat) < 1
-    got = _box((20, 20, 8), 0.5, material=mat)[0]
-    assert np.isfinite(got.numbers["margin"]) and got.numbers["margin"] > 0 and 0 < fs.bond_stress(mat) < 100
+    got = _box((20, 20, 8), 0.5, material=mat)[0].numbers
+    assert ("margin" in got) is (m.peel is not None)
+    if m.peel is not None:
+        assert np.isfinite(got["margin"]) and got["margin"] > 0 and 0 < fs.bond_stress(mat) < 100
 
 
 def test_what_a_plastic_borrows_is_the_one_it_is_like_and_its_own_is_its_own():
     asa, abs_, cf, pla = (fs.material(m) for m in ("ASA", "ABS", "PLA-CF", "PLA"))
     assert asa.peel == abs_.peel and cf.peel == pla.peel and (cf.cp, cf.k) == (pla.cp, pla.k)
-    assert asa.k == 0.1642 and asa.tg == 98 and cf.e == 3280.7
+    assert asa.k == 0.1642 and asa.tg == 98 and asa.set == asa.tg and cf.e == 3280.7
     assert fs.note("like") in asa.stand_ins and fs.note("abs.cross_wlf") in asa.stand_ins and fs.note("like") not in pla.stand_ins
     ratio = fs.viscosity(220, 0, "ASA") / fs.viscosity(220, 0, "ABS"), fs.viscosity(250, 0, "ASA") / fs.viscosity(250, 0, "ABS")
     assert ratio[0] == pytest.approx(ratio[1]) and ratio[0] > 2  # ABS's curve, at ASA's own thickness
     assert fs.tension(240, "ASA") == fs.tension(240, "ABS") and fs.wetting(240, "PLA-CF") == fs.wetting(240, "PLA")
+
+
+def test_nylon_and_tpu_set_where_they_turn_solid_not_at_the_glass_transition():
+    pa, tpu = fs.material("PA"), fs.material("TPU")
+    assert (pa.tg, pa.set, tpu.tg, tpu.set) == (66, 148, -25, 101.6)
+    glass = replace(pa, set=pa.tg)
+    assert fs.cooling(pa)["soft_s"] < 0.5 * fs.cooling(glass)["soft_s"]
+    for m, joules in (("PA", 72500), ("TPU", 144000)):
+        n = fs.material(m)
+        assert fs.viscosity(200, 0, m) / fs.viscosity(240, 0, m) == pytest.approx(math.exp(joules / 8.314 * (1 / 473.15 - 1 / 513.15)))
+        assert fs.viscosity(n.set - 1, 0, m) == math.inf > fs.viscosity(n.set, 0, m)
+    assert tpu.e * tpu.ratio(101.6) == pytest.approx(10 * 0.75 / (2 * math.sqrt(1 / math.pi)) / 1, rel=0.01)  # Vicat's 10 N on 1 mm2, 1 mm deep
+    t = (148 + pa.nozzle) / 2 + 273.15
+    assert pa.cp == pytest.approx((0.1526 * t + 223.95) / 113.16 * 1000)
+
+
+def test_a_plastic_nobody_has_peeled_gets_no_verdict_on_its_corners():
+    slab = trimesh.creation.box((150, 60, 10))
+    slab.apply_translation((100, 100, 5))
+    for m in ("PC", "PA", "TPU"):
+        assert fs.bond_stress(m) is None and fs.note("no_peel") in fs.material(m).stand_ins and fs.note("no_angle") in fs.material(m).stand_ins
+        got = fs.predict(fs.inputs_from_mesh(slab, cell=1.0, material=m, clean=0.05))
+        assert [f.kind for f in got] == ["none"] and got[0].numbers["edge_stress_mpa"] > 0 and "bond_mpa" not in got[0].numbers
+    assert fs.predict(fs.inputs_from_mesh(slab, cell=1.0, material="ABS", clean=0.05))[0].kind == "detach"
 
 
 @pytest.mark.parametrize("text, plastic", [
@@ -425,7 +452,7 @@ def test_what_a_plastic_borrows_is_the_one_it_is_like_and_its_own_is_its_own():
     ("ABS+", "ABS"), ("ASA", "ASA"), ("ASA+", "ASA"), ("PLA Silk Bronze", "PLA"), ("PLA Carbon Black", "PLA"),
     ("PLA-CF", "PLA-CF"), ("Carbon Fiber PLA", "PLA-CF"), ("PLA Carbonfiber", "PLA-CF"), ("PLA+CF", "PLA-CF"), ("PETG-CF10", "PETG-CF"), ("PETG-rCF08", "PETG-CF"),
     ("ASA-CF", None), ("PET", None), ("PLA/PHA", None), ("PC+ABS", None), ("Fiberglass PETG", None), ("PLA Bronzefill", None), ("Magnetic Iron PLA", None),
-    ("PC Blend", None), ("nylon", None), ("TPU 95A", None),
+    ("PC Blend", "PC"), ("nylon", "PA"), ("PA6", "PA"), ("PA 12", "PA"), ("CoPA", "PA"), ("TPU 95A", "TPU"), ("TPU95A", "TPU"),
     ("HIPS", None), ("PVA", None), ("PP", None), ("PA-CF", None), ("PET-CF", None), ("PC-ABS", None), ("ABS-GF", None), ("PLA-AERO", None),
     ("LW-PLA", None), ("wood", None), ("", None), (None, None)])
 def test_a_plastic_by_the_name_people_give_it(text, plastic):

@@ -227,8 +227,8 @@ def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
     assert "Material: PLA is assumed" in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "wood"])
     assert code == 1 and "--material wood: the model has no numbers for it; it has PLA, PETG, ABS" in text, text
-    text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "PLA Silk"])
-    assert "Material: PLA, for PLA SILK." in text, text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "nylon"])
+    assert "Material: PA, for NYLON." in text and "A corner lifting is not judged: edge pull" in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "melt"])
     assert code == 1 and "FIX: --fail melt: one of auto" in text, text
     assert text.strip().splitlines()[-1] == f"NEXT: stone timelapse {stl} --fail auto", text

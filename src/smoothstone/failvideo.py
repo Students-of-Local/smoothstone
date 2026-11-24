@@ -572,6 +572,8 @@ def numbers_line(f) -> str:
     n = f.numbers
     if "edge_stress_mpa" in n and "bond_mpa" in n:
         return f"edge pull {n['edge_stress_mpa']} MPa against a plate bond of {n['bond_mpa']} MPa (margin {n.get('margin')})"
+    if "edge_stress_mpa" in n:
+        return f"edge pull {n['edge_stress_mpa']} MPa; nobody has published how hard this plastic holds a plate"
     if "drive_nmm" in n:
         return f"nozzle drag {n['push_n']} N at {n['height_mm']} mm tips with {n['drive_nmm']} N mm against {n['adhesion_nmm']} N mm of hold"
     if "push_n" in n and "hold_n" in n:
@@ -640,6 +642,8 @@ def cmd(args, job, prof, out):
             n = fails[0].numbers if fails else {}
             if "margin" in n:
                 out.add(f"Plate bond margin {n['margin']} (above 1 holds).")
+            elif "edge_stress_mpa" in n:
+                out.add(f"A corner lifting is not judged: {numbers_line(fails[0])}.")
             out.result = "no failure predicted"
             out.next = nxt if nxt and nxt != "stone status" else "none, no failure predicted"
         else:
