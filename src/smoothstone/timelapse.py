@@ -263,10 +263,10 @@ def video(files: list[Path], mp4: Path, seconds: float | None) -> float:
     return len(files) / rate
 
 
-def sheet(files: list[Path], frs: list[dict], png: Path) -> None:
+def sheet(files: list[Path], frs: list[dict], png: Path, pick: list[int] | None = None) -> None:
     from PIL import Image, ImageDraw, ImageFont
 
-    pick = sorted(set(np.linspace(0, len(files) - 1, min(SHEET, len(files))).round().astype(int).tolist()))
+    pick = pick or sorted(set(np.linspace(0, len(files) - 1, min(SHEET, len(files))).round().astype(int).tolist()))
     ims = [Image.open(files[k]).convert("RGB") for k in pick]
     w, h = ims[0].size
     cols = 3
@@ -276,6 +276,8 @@ def sheet(files: list[Path], frs: list[dict], png: Path) -> None:
         d = ImageDraw.Draw(im)
         fr = frs[k]
         d.text((8, 6), f"layer {fr['layer'] + 1}  z {fr['z_mm']:.2f} mm  {clock(fr['t_s'])}", fill=(255, 220, 80), font=font)
+        if fr.get("note"):
+            d.text((8, 10 + font.size), fr["note"], fill=(255, 90, 70), font=font)
         out.paste(im, ((j % cols) * w, (j // cols) * h))
     out.save(png)
 
