@@ -103,16 +103,12 @@ def pieces(mk: np.ndarray, d: np.ndarray, inp: failsim.Inputs):
         elif ndimage.label(ring, eight)[1] >= 2 or whole[comp].all():
             yield comp, big, "bridge" if 2 * big > failsim.fact("max_bridge_length") else "fine"
         else:
-            tip, rule = -float(failsim.droop([big], inp.material, inp.layer, _width(inp), inp.fan, _air(inp))[0]), failsim.fact("droop_rule")
+            tip, rule = -float(failsim.droop([big], inp.material, inp.layer, _width(inp), inp.fan, inp.air)[0]), failsim.fact("droop_rule")
             yield comp, big, next((m for m in ("supports", "droop") if tip >= rule[m] * inp.layer), "fine")
 
 
 def _width(inp) -> float:
     return inp.width or failsim.fact("k2_widths")["outer_wall"]
-
-
-def _air(inp) -> float:
-    return failsim.material(inp.material).chamber if inp.enclosed else failsim.fact("room_air")
 
 
 def _first(inp: failsim.Inputs, mode: str):
@@ -146,7 +142,7 @@ def choose(fails: list, mode: str, inp: failsim.Inputs):
         i, piece, big = got
         span = 2 * big
         nums = ({"island": True} if math.isinf(big) else {"past_reach_mm": round(big - failsim.reach(lay), 2)}) if mode == "supports" else (
-            {"ledge_mm": round(big, 2), "droop_mm": round(-float(failsim.droop([big], inp.material, lay, _width(inp), inp.fan, _air(inp))[0]), 3)} if mode == "droop" else
+            {"ledge_mm": round(big, 2), "droop_mm": round(-float(failsim.droop([big], inp.material, lay, _width(inp), inp.fan, inp.air)[0]), 3)} if mode == "droop" else
             {"span_mm": round(span, 1), "sag_mm": round(-float(failsim.bridge_sag(span, [span / 2], lay)[0]), 3),
              "usable_mm": failsim.fact("max_bridge_length")})
         tax = failsim.TAXONOMY[mode]
@@ -278,7 +274,7 @@ class Story:
                 if kind != "fine":
                     dd = d[comp]
                     self.dz[comp] = (failsim.bridge_sag(2 * big, np.minimum(dd, big), inp.layer) if kind == "bridge" else
-                                     failsim.droop(dd, inp.material, inp.layer, _width(inp), inp.fan, _air(inp)))
+                                     failsim.droop(dd, inp.material, inp.layer, _width(inp), inp.fan, inp.air))
                     self.far[comp], self.droops[comp], self.since[comp] = np.minimum(dd, 100.0), kind == "droop", i
             solid = mk & ~falls  # what fell supports nothing above it
             self.since[falls] = -1
@@ -347,7 +343,7 @@ class Story:
             for k in np.unique(since[droops]):
                 if layer > k:
                     sel = droops & (since == k)
-                    q[sel, 2] += failsim.curl(dd[sel], self.inp.material, self.inp.layer, int(layer - k))
+                    q[sel, 2] += failsim.curl(dd[sel], self.inp.material, self.inp.layer, int(layer - k), self.inp.air)
             q[:, 2] = np.maximum(q[:, 2] - h / 2, h / 2)  # the middle of the line
             add(q[:-1], q[1:], w, h)
         if A:

@@ -10,8 +10,8 @@ materials.json once it is on main) and each with its assumptions named:
    layers above curl it up as they shrink.
 3. bridge_sag: a bridge strand hangs as a catenary; past the usable length it sags more than a layer.
 4. detachment and toppling: corner lift (the layers below Tg pull on the plate's free edge; their
-   temperatures come from steady conduction up the printed column) against the bond at the plate
-   temperature, nozzle drag against pull-off and shear strength, and the moment balance about the
+   temperatures come from steady conduction up the printed column) against the measured peel at the
+   plate's temperature, nozzle drag against pull-off and shear strength, and the moment balance about the
    footprint edge; then rigid_tip, rigid_slide and blob_volume for what follows.
 
 predict() runs the checks layer by layer in print order and returns the first failures. Every
@@ -65,6 +65,7 @@ class Material:
     cp: float  # J/(kg K)
     k: float  # W/(m K)
     peel: float  # N, 90 degree peel peak on glass
+    peel_bed: float  # C, the plate it was peeled from
     bed: float  # C, K2 profile
     chamber: float
     nozzle: float
@@ -108,15 +109,12 @@ def material(name: str = "PLA") -> Material:
     else:
         cp, k = fact("pla.cp"), fact(f"{m.lower()}.k")
         if m == "PETG":
-            stand += ["PETG uses PLA's specific heat (no sourced value for the melt)", note("petg.melt")]
+            stand += ["PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity", note("petg.melt")]
     if m == "ABS":
         stand.append(note("abs.cross_wlf"))
-    peel = {"PLA": fact("peel.pla"), "PETG": fact("peel.petg")}.get(m)
-    if peel is None:
-        peel = fact("peel.pla")
-        stand.append(f"{m} uses PLA's peel force on glass")
     return Material(m, p["density"]["value"], p["tg"]["value"], p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
-                    tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, peel, k2["bed"], k2["chamber"],
+                    tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k,
+                    fact(f"peel.{m.lower()}"), fact("peel_bed")[m], k2["bed"], k2["chamber"],
                     k2["nozzle"], tuple(stand), src)
 
 
@@ -257,21 +255,22 @@ def layer_stress(mat="PLA", t_part=None):
     return float(out) if np.ndim(out) == 0 else out
 
 
-def curl(dist_mm, mat="PLA", layer: float = 0.2, above: int = 1) -> np.ndarray:
+def curl(dist_mm, mat="PLA", layer: float = 0.2, above: int = 1, air_c: float | None = None) -> np.ndarray:
     """Upward displacement (mm) of each ledge vertex after `above` more layers shrink on top of it in
-    the chamber air. A layer of thickness t with misfit strain e on a stack s thick (same E) bends it by
+    the air (the chamber's unless air_c). A layer of thickness t with misfit strain e on a stack s thick (same E) bends it by
     6 e t s / (s + t)^3 (force and moment balance across the pair; 3e/4t for one layer on one)."""
     m = _mat(mat)
     x = np.clip(np.asarray(dist_mm, float) - reach(layer), 0.0, None)
-    e = layer_stress(m, m.chamber) / m.e
+    e = layer_stress(m, m.chamber if air_c is None else air_c) / m.e
     k = np.arange(1, max(0, above) + 1)
     kappa = float(np.sum(6 * e * k / ((k + 1) ** 3 * layer)))
     return kappa * x * x / 2
 
 
-def ledge(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, above: int = 1) -> np.ndarray:
+def ledge(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, above: int = 1,
+          air_c: float | None = None) -> np.ndarray:
     """Net dz per ledge vertex: droop when laid, then curl from the layers above."""
-    return droop(dist_mm, mat, layer, width, fan) + curl(dist_mm, mat, layer, above)
+    return droop(dist_mm, mat, layer, width, fan, air_c) + curl(dist_mm, mat, layer, above, air_c)
 
 
 # bridges
@@ -382,13 +381,14 @@ def drop_strand(path_xyz, speed_mm_s: float = 200.0, flow_mm3_s: float = 10.0, g
 
 def bond_stress(mat="PLA", clean: float = 1.0, bed: float | None = None) -> float:
     """MPa the plate's bond holds at the edge: the peel force as an edge stress, 2 P lambda / b
-    (Hetenyi, first layer as the foundation), capped at the plastic's own strength between layers
-    at the plate temperature (failsim.bond_hot), times the plate factor."""
+    (Hetenyi, first layer as the foundation), capped at the plastic's own strength between layers,
+    less by how much less this plate holds than the peel test's (failsim.bond_rule), times the plate factor."""
     m = _mat(mat)
     sp = fact("peel_specimen")
     lam = (3 / (sp["thickness"] * sp["thickness"] ** 3)) ** 0.25
-    hot = m.tensile_z * float(m.ratio(m.bed if bed is None else bed))
-    return min(2 * m.peel * lam / sp["width"], hot) * clean
+    past, hold = np.asarray(fact("hold_curve"), float).T
+    now, then = np.interp(np.array([m.bed if bed is None else bed, m.peel_bed]) - m.tg, past, hold)
+    return min(2 * m.peel * lam / sp["width"], m.tensile_z) * min(1.0, float(now / then)) * clean
 
 
 def printed_section(masks, cell: float, infill: float | None = None) -> dict:
@@ -555,6 +555,10 @@ class Inputs:
     drag: float | None = None  # N, a push to use instead of the nozzle's drag
     notes: list = field(default_factory=list)
 
+    @property
+    def air(self) -> float:  # C
+        return material(self.material).chamber if self.enclosed else fact("room_air")
+
 
 @dataclass
 class Failure:
@@ -595,7 +599,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     zs = np.asarray(inp.layer_z, float) if inp.layer_z is not None else (np.arange(len(inp.masks)) + 1) * lay
     ts = _times(inp, width, speed)
     bed = m.bed if inp.bed is None else inp.bed
-    air = m.chamber if inp.enclosed else fact("room_air")
+    air = inp.air
     where_air = f"{air:g} C chamber" if inp.enclosed else f"open printer, {air:g} C room air"
     base = [f"this is a model, not a recording; {m.name} on the K2 profile ({bed:g} C bed, {where_air})",
             *m.stand_ins, *inp.notes]
@@ -603,7 +607,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
         base.append(note("contamination"))
     if not inp.enclosed:
         base.append(note("room_air"))
-    warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), note("bond_hot"),
+    warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), note("bond_rule"),
             note("h_part") if inp.fan else note("h_still")]
 
     def xy(r, c):
@@ -673,7 +677,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
                     rule = fact("droop_rule")
                     nums = {"ledge_mm": round(big, 2), "reach_mm": round(reach(lay), 2), "droop_mm": round(tip, 3),
                             "soft_s": round(cooling(m, lay, width, inp.fan, air)["soft_s"], 2)}
-                    why = [note("droop_rule")] + ([note("fan_air_speed")] if inp.fan else [])
+                    why = [note("droop_rule"), note("fan_air_speed") if inp.fan else note("churchill_chu")]
                     if tip >= rule["supports"] * lay:
                         hit("supports", i, at, nums, why)
                     elif tip >= rule["droop"] * lay:

@@ -139,10 +139,11 @@ def test_hanging_strand_chain_matches_the_catenary_within_one_percent():
 
 def test_bond_and_warp_stress_match_the_hand_numbers():
     lam = (3 / (0.5 * 0.5 ** 3)) ** 0.25  # Hetenyi, a 0.5 mm strip on a 0.5 mm first layer
-    assert fs.bond_stress("PETG", bed=20) == pytest.approx(2 * 102 * lam / 25, rel=1e-9)  # 21.5 MPa, under 23
-    # 48.6 MPa from the peel, capped at PLA's Z strength at the 50 C plate: 31 x 0.73
-    assert fs.bond_stress("PLA") == pytest.approx(31 * 0.73, rel=1e-9)
-    assert fs.bond_stress("ABS") == pytest.approx(28 * 0.23, rel=1e-9)  # at 100 C ABS keeps 0.23
+    assert fs.bond_stress("PETG") == pytest.approx(2 * 102 * lam / 25, rel=1e-9)  # 21.5 MPa, under 23
+    assert fs.bond_stress("ABS") == pytest.approx(2 * 60 * lam / 25, rel=1e-9)  # 12.6 MPa
+    assert fs.bond_stress("PLA") == 31  # 48.6 MPa from the peel, capped at PLA's strength between layers
+    # PLA peeled at 50 C, 11 C under its Tg: 58.85 N on the hold curve; 80 C is 19 past it: 48.5 N
+    assert fs.bond_stress("PLA", bed=80) == pytest.approx(31 * 48.5 / 58.85, rel=1e-9)
     m = fs.material("PLA")
     ts = np.linspace(m.bed, m.tg, 4001)
     sig = m.cte * m.e * np.trapezoid(m.ratio(ts), ts)
@@ -218,11 +219,11 @@ def test_clean_plate_keeps_the_flat_plate_and_a_dirty_one_lets_go():
     dirty = fs.predict(fs.Inputs(plate, 0.5, clean=fs.fact("contamination")))
     first = dirty[0]
     assert (first.kind, first.layer, first.taxonomy) == ("detach", 0, "bed_adhesion")
-    # hand: one layer at T0 (just under the 50 C plate): sigma(T0) x sqrt(3 r_plate / r_T0) against 22.6 x 0.049
+    # hand: one layer at T0 (just under the 50 C plate): sigma(T0) x sqrt(3 r_plate / r_T0) against 31 x 0.049
     m, t0 = fs.material("PLA"), first.numbers["bottom_c"]
     hand = fs.layer_stress("PLA", t0) * math.sqrt(3 * m.ratio(50) / m.ratio(t0))
     assert first.numbers["edge_stress_mpa"] == pytest.approx(hand, abs=0.02)
-    assert first.numbers["bond_mpa"] == pytest.approx(31 * 0.73 * 0.049, abs=0.01)
+    assert first.numbers["bond_mpa"] == pytest.approx(31 * 0.049, abs=0.01)
 
 
 def test_abs_slab_on_an_open_printer_lifts_and_pla_does_not():
@@ -232,6 +233,21 @@ def test_abs_slab_on_an_open_printer_lifts_and_pla_does_not():
     assert abs_.layer < 50
     pla = _box((150, 150, 10), 0.5, enclosed=False)
     assert [f.kind for f in pla] == ["none"], pla[0].numbers
+
+
+@pytest.mark.parametrize("bed", [50, 55, 60, 65, 70])
+def test_pla_holds_on_the_beds_people_print_it_on_and_best_near_its_tg(bed):
+    n = _box((60, 60, 4), 0.5, bed=bed)[0]
+    assert n.kind == "none" and n.numbers["margin"] > 2  # 60 and 70 C let go when the cap fell with stiffness
+    assert fs.bond_stress("PLA", bed=60) >= fs.bond_stress("PLA", bed=bed) > fs.bond_stress("PLA", bed=90) > fs.bond_stress("PLA", bed=100)
+
+
+def test_an_open_printers_ledge_droops_and_curls_in_the_same_room_air():
+    inp = fs.Inputs([np.ones((2, 2), bool)], 0.5, material="ABS", enclosed=False)
+    assert inp.air == 25 and fs.Inputs([], 0.5, material="ABS").air == fs.material("ABS").chamber
+    d, room = [3.0], fs.curl([3.0], "ABS", above=5, air_c=25)
+    assert room[0] > fs.curl(d, "ABS", above=5)[0] > 0
+    assert fs.ledge(d, "ABS", above=5, air_c=25) == pytest.approx(fs.droop(d, "ABS", air_c=25) + room)
 
 
 def test_toppling_layer_of_a_block_matches_the_hand_moment_balance():
