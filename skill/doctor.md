@@ -20,7 +20,7 @@ Use this when someone says a print failed, shows a photo of a failed print, or a
    If you cannot see images, ask the person what the print looks like.
 3. Ask the one question in NEXT. Then: `stone doctor answer "<their answer>"`.
 4. When NEXT says `stone doctor try <cause>`, run it and tell the person the steps.
-5. If it worked: `stone doctor fixed "<what worked>"`. If not: the line "If it did not help" names the next try.
+5. If it worked: `stone doctor fixed "<what worked>"`. If not: the NEXT line names the next `stone doctor try`.
 
 Words for each failure: `stone doctor looks`.
 
@@ -59,7 +59,7 @@ $ stone doctor try plate_contaminated
 1. Wash the cold plate with warm water and plain dish soap (no lotion or oils), scrub, rinse, dry with a paper towel.
 2. Do not touch the print area afterward; hold the plate by its edges.
 3. Use the plate the slice expects and a thin glue stick layer if the maker suggests it for this filament.
-NEXT: ask the person: did that fix it? If it did: stone doctor fixed "<what worked>"
+NEXT: ask the person: did that fix it? If it did: stone doctor fixed "<what worked>"; if not: stone doctor try first_layer_too_high
 
 $ stone doctor fixed "washed the plate with dish soap and water"
 NEXT: none, the print problem is fixed
