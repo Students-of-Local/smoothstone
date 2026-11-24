@@ -1055,3 +1055,24 @@ pieces (judge 7); the unit tests passed on both, and only the evals caught them.
 
 Open, from the judge: Milan's piers are shallow and its spires plain rods; the Taj lacks its guldastas; the Eiffel's second deck is nearly missing; St Paul's side
 walls are blank; St. Vitus's south tower is too slim. Physical prints untested. The held-out six stay sealed.
+
+## 2026-11-24 The landmark judge sees the faces up close (gates written before any judging)
+
+views.png draws a facade about 120 pixels wide with the light head on. A 2 mm pier does not show there, and the
+judge kept calling Milan's front flat. The grader now also draws sides.png from the files that print: the four
+faces, 560 pixels each, turned 25 degrees and lit from one side. Same rubric, same bar of 8. Square-on panels
+were drawn first and dropped on sight: a pier's sides are edge on there.
+
+A better picture must not be an easier judge. Each median of three on saved builds; one miss rejects the change:
+
+| Saved build | Views before | Gate |
+| --- | --- | --- |
+| landmarks 1 Milan | 6 | below 8 |
+| Milan at 647c3df, tapered piers | 7 | below 8 |
+| landmarks 1 Notre-Dame | 7 | below 8 |
+| St. Vitus at 626a339, walls in 45 pieces | 7 | below 8 |
+| Cologne's build, asked as Milan | not asked | 5 or less |
+| Florence's build, asked as St Paul's | not asked | 5 or less |
+
+Reported, not gates: Milan at 1964db8 (three times) and the nine passing landmarks (once each). One that falls
+below 8 is a fault the old views hid, and is named as open.

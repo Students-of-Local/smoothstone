@@ -33,7 +33,7 @@ RUBRIC = """A tool prepared a printable model of a landmark for this request:
 
 Read the pictures with the Read tool:
   {reference}: a photo of {title}, the lead image of its English Wikipedia article.
-  {views}: the printable model from several sides, in plain clay with no color.
+  {views}: the printable model from several sides, in plain clay with no color.{sides}
 
 Is the model recognizably {title}? Compare what a model maker controls: the overall shape and
 proportions, the number and placement of towers, spires, domes or minarets, the roof line, and
@@ -169,8 +169,9 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
 
 
 def judge(job: Path, request: str, title: str | None = None, model: str = "opus", *,
-          reference_out: Path | None = None, minimum: int = PASS) -> dict:
-    """The blind landmark judge on build/views.png: {"score", "conflicts", "pass", "reference"}."""
+          reference_out: Path | None = None, minimum: int = PASS, sides: Path | None = None) -> dict:
+    """The blind landmark judge on build/views.png, and `sides` when given (landmarks_grade.side_views):
+    {"score", "conflicts", "pass", "reference"}."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_likeness as jl
 
@@ -191,18 +192,24 @@ def judge(job: Path, request: str, title: str | None = None, model: str = "opus"
         t = Path(tmp)
         (t / f"reference{ext}").write_bytes(data)
         shutil.copy(views, t / "views.png")
+        more = ""
+        if sides is not None:
+            shutil.copy(sides, t / "sides.png")
+            more = f"\n  {t / 'sides.png'}: the same model's four faces, larger, turned a little and lit from one side."
         reply = jl.claude(RUBRIC.format(request=request, title=ref["title"], reference=t / f"reference{ext}",
-                                        views=t / "views.png"), folder=t, model=model)
+                                        views=t / "views.png", sides=more), folder=t, model=model)
     res = jl.parse(reply)
     return {**res, "pass": res["score"] >= minimum, "reference": ref, "model": model, "request": request}
 
 
 def judged(rdir: Path, job: Path, spec: dict, g: dict, *, suite: str = "models",
-           save_reference: bool = False, minimum: int = PASS) -> dict:
-    """The grade with the judge's verdict, saved as landmark.json; a judge that cannot answer fails it."""
+           save_reference: bool = False, minimum: int = PASS, sides=None) -> dict:
+    """The grade with the judge's verdict, saved as landmark.json; a judge that cannot answer, or a
+    `sides` (called with no arguments, returns a picture) that cannot draw, fails it."""
     try:
         res = judge(job, spec["request"], spec["expect"][suite].get("wikipedia"),
-                    reference_out=rdir if save_reference else None, minimum=minimum)
+                    reference_out=rdir if save_reference else None, minimum=minimum,
+                    sides=sides() if sides else None)
     except Exception as e:  # never passed unjudged
         res = {"score": None, "pass": False, "conflicts": [], "error": f"{type(e).__name__}: {e}"}
     (rdir / "landmark.json").write_text(json.dumps(res, indent=1))
