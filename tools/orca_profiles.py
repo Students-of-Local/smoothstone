@@ -67,11 +67,11 @@ class Profiles:
 
     @staticmethod
     def _read(folder: Path) -> dict:
-        out = {}
-        for f in sorted(folder.rglob("*.json")):
+        """What OrcaSlicer loads: the files the vendor's index lists."""
+        out, index = {}, json.loads(folder.with_name(f"{folder.name}.json").read_text(encoding="utf-8"))
+        for f in (folder / x["sub_path"] for k in index if k.endswith("_list") for x in index[k]):
             d = json.loads(f.read_text(encoding="utf-8"))
-            if isinstance(d, dict) and d.get("name"):
-                out.setdefault((d.get("type"), d["name"]), {**d, "_file": f})
+            out[d.get("type"), d["name"]] = {**d, "_file": f}
         return out
 
     def names(self, kind: str, bundle: str) -> list[str]:
@@ -111,6 +111,8 @@ def filament(p: Profiles, machine: str, material: str) -> dict:
     mine = [d for n in p.names("filament", p.vendor) for d in [p.get("filament", n)] if d.get("instantiation") == "true"
             and num_type(d) == material and machine in d.get("compatible_printers", [])]
     plain = rf"(.* )?Generic {re.escape(material)}( @.*)?"
+    maker = (p.vendor, "Prusament") if p.vendor == "Prusa" else (p.vendor, "Bambu") if p.vendor == "BBL" else (p.vendor,)
+    mine = [d for d in mine if re.fullmatch(plain, d["name"]) or d["name"].startswith(maker)]
     mine.sort(key=lambda d: (not re.fullmatch(plain, d["name"]), len(d["compatible_printers"]), len(d["name"]), d["name"]))
     return mine[0] if mine else p.get("filament", f"Generic {material} @System", LIBRARY)
 
@@ -142,8 +144,8 @@ def build(checkout: Path) -> list[dict]:
         mc = p.get("machine", machine)
         pr = process(p, machine, mc)
         nozzle = prof["nozzle_mm"]
-        # a machine with one plate is sliced for the high temp plate, whatever the plate is
-        many = mc.get("support_multi_bed_types") == "1" and "textured" in prof["bed_surface"]["type"].lower()
+        # a machine with one plate is sliced for the high temp plate, whatever the plate is; a Bambu has them all
+        many = (vendor == "BBL" or mc.get("support_multi_bed_types") == "1") and "textured" in prof["bed_surface"]["type"].lower()
         line = num(pr.get("line_width"), nozzle) or None
         widths = {k: num(pr.get(v), nozzle) or line for k, v in WIDTHS.items()}
         accels = {k: num(pr.get(v), num(pr["default_acceleration"])) or num(pr["default_acceleration"]) for k, v in ACCELS.items()}
@@ -156,8 +158,9 @@ def build(checkout: Path) -> list[dict]:
         for m in MATERIALS:
             d = filament(p, machine, m)
             bed = many and num(d.get("textured_plate_temp")) or num(d.get("hot_plate_temp"))
-            value = {"nozzle": num(d["nozzle_temperature"]), "bed": bed, "chamber": num(d.get("chamber_temperature")) or None,
+            value = {"nozzle": num(d["nozzle_temperature"]), "bed": bed, "chamber": num(d.get("chamber_temperature", d.get("chamber_temperatures"))) or None,
                      "fan_min": num(d.get("fan_min_speed")), "fan_max": num(d.get("fan_max_speed")),
+                     "fan_long": None if num(d.get("reduce_fan_stop_start_freq")) or not num(d.get("fan_min_speed")) else 0,
                      "fan_min_layer_s": num(d.get("fan_cooling_layer_time")), "fan_max_layer_s": num(d.get("slow_down_layer_time")),
                      "max_flow": num(d.get("filament_max_volumetric_speed")),
                      "diameter": num(d.get("filament_diameter"))}
@@ -165,6 +168,7 @@ def build(checkout: Path) -> list[dict]:
             out.append(entry(f"{pid}.{m}", {k: v for k, v in value.items() if v is not None},
                              f"{m} on the {prof['name']}: C, the flow the hotend melts in mm3/s, filament mm, and the fan in %: at fan_min on "
                              "layers longer than fan_min_layer_s, at fan_max on ones shorter than fan_max_layer_s, in between between."
+                             + ("" if value["fan_long"] is None else " It stops the fan on the longer ones: fan_long.")
                              + ("" if own else " OrcaSlicer's profile for any printer: it has none for this one."),
                              f"\"name\": \"{d['name']}\"", p, d))
     return out
@@ -184,6 +188,8 @@ if __name__ == "__main__":
     head = subprocess.run(["git", "-C", str(a.checkout), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     if head != COMMIT:
         sys.exit(f"{a.checkout} is at {head or 'no commit'}, not {COMMIT}")
+    if subprocess.run(["git", "-C", str(a.checkout), "status", "--porcelain", "--", "resources/profiles"], capture_output=True, text=True).stdout:
+        sys.exit(f"{a.checkout} has edited profiles")
     got = text(build(a.checkout))
     if a.check:
         sys.exit(0 if OUT.read_text() == got else f"{OUT} is not what {a.checkout} says")

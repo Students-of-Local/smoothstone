@@ -43,13 +43,16 @@ def _settings() -> dict[str, dict]:
 
 def settings(p: dict, material: str) -> dict | None:
     """What this printer's slicer profile prints the plastic with (tools/orca_profiles.py), or None: nozzle, bed
-    and chamber in C, max_flow mm3/s, diameter mm, its profile and url, and the fan: fan_min % on layers longer than
-    fan_min_layer_s, fan_max on ones shorter than fan_max_layer_s. Heat the maker says the printer does not reach is
+    and chamber in C, max_flow mm3/s, diameter mm, its profile and url, and the fan in %: fan_long on layers longer than
+    fan_min_layer_s, fan_max on ones shorter than fan_max_layer_s, from fan_min up to it between. chamber is the air the
+    profile is written for: chamber_heated says whether the printer heats it or only its bed does. Heat the maker says the printer does not reach is
     cut to what it does, the chamber's to none on an open frame, and `cut` says so."""
     e = _settings().get(f"orca.{p['id']}.{material.upper()}")
     if not e:
         return None
     out = {**e["value"], "profile": e["cite"], "url": e["url"], "cut": []}
+    out.setdefault("fan_long", out["fan_min"])
+    out["chamber_heated"] = bool(out.get("chamber") and p.get("chamber_heater"))
     for k, top in (("nozzle", p.get("max_hotend_c")), ("bed", p.get("max_bed_c"))):
         if top and out.get(k, 0) > top:
             out["cut"].append(f"{e['cite']} wants the {k} at {out[k]:g} C; the {p['name']} reaches {top:g} C")

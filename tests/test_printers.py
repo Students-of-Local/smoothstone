@@ -266,14 +266,25 @@ def test_every_printer_has_its_slicer_settings_for_every_plastic(pid):
 def test_one_profile_says_one_thing_on_every_printer():
     said = {}
     for e in printers._settings().values():  # the bed may differ: it depends on the plate
-        said.setdefault(e["url"], set()).add(tuple(e["value"].get(k) for k in ("nozzle", "fan_min", "fan_max", "max_flow", "diameter")))
+        said.setdefault(e["url"], set()).add(json.dumps({k: v for k, v in e["value"].items() if k != "bed"}, sort_keys=True))
     assert len(said) > 50 and all(len(v) == 1 for v in said.values()), {k: v for k, v in said.items() if len(v) > 1}
 
 
 def test_no_printer_takes_another_brands_product_for_the_plain_plastic():
-    odd = [e["cite"] for k, e in printers._settings().items() if not k.endswith(".process")
-           and not e["cite"].startswith("OrcaSlicer Generic") and "Filament/" in e["source"]]
-    assert odd == [] and not any(re.search(r"addnorth|INSLOGIC|rABS|LCF", e["cite"]) for e in printers._settings().values())
+    for k, e in printers._settings().items():
+        name = e["cite"].removeprefix("OrcaSlicer ")
+        assert k.endswith(".process") or "Generic" in name or name.startswith(("Prusament", "Bambu", "Elegoo", "Qidi", "Creality")), (k, name)
+
+
+def test_the_plate_and_the_fan_are_the_ones_orca_uses():
+    """Bambu printers have every plate type (their textured plate's heat); a Prusa one. Fan off on long layers unless kept on."""
+    v = lambda k: printers._settings()[f"orca.{k}"]["value"]  # noqa: E731
+    assert v("bambu_x1c.PETG")["bed"] == 70 and v("prusa_mk4s.ASA")["bed"] == 110
+    assert v("bambu_h2d.ABS")["chamber"] == 60  # its profile's other spelling of it
+    k2, a1 = printers.get(OWNERS), printers.get("bambu_a1")
+    assert printers.settings(k2, "PA")["fan_long"] == 0 < printers.settings(k2, "PA")["fan_min"]
+    assert printers.settings(a1, "PLA")["fan_long"] == printers.settings(a1, "PLA")["fan_min"] > 0
+    assert printers.settings(printers.get("bambu_h2d"), "ABS")["chamber_heated"] and not printers.settings(k2, "ABS")["chamber_heated"]
 
 
 def test_a_process_is_the_callers_own_copy():
