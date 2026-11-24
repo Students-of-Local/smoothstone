@@ -1,0 +1,171 @@
+{
+ "about": "Slicer facts: the defaults OrcaSlicer ships, and its Creality K2 profile (Creality Print is an OrcaSlicer fork, Bambu Studio its parent). Numbers are read from the slicer's source and profile files; no slicer code is used. Where stone turns one into a rule of its own, the note says so.",
+ "entries": [
+  {
+   "id": "slicer.support_threshold_angle",
+   "topic": "supports",
+   "value": 30,
+   "unit": "deg",
+   "note": "Measured from the bed: a face sloping less than 30 deg from horizontal (more than 60 deg from vertical) gets support. The Creality K2 0.20mm Standard profile keeps 30. stone turns it into a reach per layer: layer height x tan(60 deg), 0.35 mm at 0.2 mm layers.",
+   "quote": "Support will be generated for overhangs whose slope angle is below the threshold. The smaller this value is, the steeper the overhang that can be printed without support.",
+   "source": "OrcaSlicer src/libslic3r/PrintConfig.cpp, support_threshold_angle (default 30)",
+   "cite": "OrcaSlicer support threshold angle",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/src/libslic3r/PrintConfig.cpp",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.max_bridge_length",
+   "topic": "supports",
+   "value": 10,
+   "unit": "mm",
+   "note": "A print profile setting, not a filament one: OrcaSlicer's K2 profiles use 10 mm for PLA and PETG alike. PETG bridges sag more than PLA in practice; stone keeps 10 mm for both and says so (assumption that the slicer's limit holds for PETG).",
+   "quote": "This is the maximum length of bridges that don't need support. Set it to 0 if you want all bridges to be supported, and set it to a very large value if you don't want any bridges to be supported.",
+   "source": "OrcaSlicer src/libslic3r/PrintConfig.cpp, max_bridge_length (default 10); resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json (10)",
+   "cite": "OrcaSlicer max bridge length",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/src/libslic3r/PrintConfig.cpp",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.support_spacing",
+   "topic": "supports",
+   "value": {
+    "line_width": 0.42,
+    "base_pattern_spacing": 2.5,
+    "top_z_distance": 0.2,
+    "object_xy_distance": 0.35
+   },
+   "unit": "mm",
+   "note": "Normal supports in the K2 0.20mm Standard profile: rectilinear lines 2.5 mm apart, 0.42 mm wide, so about 17% of the support's space is plastic.",
+   "quote": "This determines the spacing between support lines.",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, supports",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.k2_shells",
+   "topic": "toolpaths",
+   "value": {
+    "wall_loops": 2,
+    "bottom_shell_layers": 3,
+    "top_shell_layers": 5,
+    "sparse_infill_density": 15,
+    "sparse_infill_pattern": "grid",
+    "infill_direction": 45
+   },
+   "unit": "count",
+   "note": "Walls, solid layers and infill of the K2 0.20mm Standard profile. OrcaSlicer's own defaults are 2 walls, 3 bottom, 4 top and 20% infill; the K2 profile raises the top to 5 and lowers infill to 15%.",
+   "quote": "This is the number of solid layers of top shell, including the top surface layer.",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, shells",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.k2_widths",
+   "topic": "toolpaths",
+   "value": {
+    "outer_wall": 0.42,
+    "inner_wall": 0.45,
+    "sparse_infill": 0.45,
+    "solid_infill": 0.42,
+    "top_surface": 0.42,
+    "first_layer": 0.5,
+    "support": 0.42
+   },
+   "unit": "mm",
+   "note": "Line widths of the K2 0.20mm Standard profile, 0.4 mm nozzle.",
+   "quote": "\"outer_wall_line_width\": \"0.42\"",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, line widths",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.k2_speeds",
+   "topic": "toolpaths",
+   "value": {
+    "outer_wall": 200,
+    "inner_wall": 300,
+    "sparse_infill": 270,
+    "solid_infill": 250,
+    "top_surface": 200,
+    "support": 150,
+    "bridge": 25,
+    "first_layer": 60,
+    "first_layer_infill": 105,
+    "travel": 500
+   },
+   "unit": "mm/s",
+   "note": "Print speeds of the K2 0.20mm Standard profile. The fastest of them (inner wall, 300 mm/s) is the max speed OrcaSlicer's auto brim uses.",
+   "quote": "\"outer_wall_speed\": \"200\"",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, speeds",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.k2_accels",
+   "topic": "toolpaths",
+   "value": {
+    "default": 12000,
+    "outer_wall": 5000,
+    "inner_wall": 5000,
+    "top_surface": 5000,
+    "travel": 12000,
+    "first_layer": 2000,
+    "jerk_walls": 8,
+    "jerk_infill": 12
+   },
+   "unit": "mm/s2",
+   "note": "Accelerations of the K2 0.20mm Standard profile; the jerks (mm/s) become Klipper's square corner velocity in Klipper G-code.",
+   "quote": "\"default_acceleration\": \"12000\"",
+   "source": "OrcaSlicer resources/profiles/Creality/process/0.20mm Standard @Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 profile, accelerations",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/process/0.20mm%20Standard%20%40Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.k2_machine",
+   "topic": "printers",
+   "value": {
+    "bed_x": 260,
+    "bed_y": 260,
+    "height": 260,
+    "max_accel": 20000,
+    "max_speed_xy": 800
+   },
+   "unit": "mm",
+   "note": "Creality K2 printable area and machine limits (accelerations in mm/s2, speed in mm/s) in OrcaSlicer's machine profile.",
+   "quote": "\"printable_area\": [\"0x0\", \"260x0\", \"260x260\", \"0x260\"], \"printable_height\": \"260\"",
+   "source": "OrcaSlicer resources/profiles/Creality/machine/Creality K2 0.4 nozzle.json",
+   "cite": "OrcaSlicer K2 machine profile",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/resources/profiles/Creality/machine/Creality%20K2%200.4%20nozzle.json",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "slicer.auto_brim",
+   "topic": "tipping",
+   "value": "brim mm = adhesion x min(max(H/Ixx x Y, H/Iyy x X) x H / 1920 x max speed, 18); under 5 mm, no brim",
+   "unit": "formula",
+   "note": "OrcaSlicer's auto brim (from Bambu Studio) widens the brim for a part tall for its first layer: H the part's height, Ixx and Iyy the first layer's second moments of area about its centroid (mm4), X and Y its bounding box (mm), max speed the fastest print speed (mm/s). Adhesion is 1 for PLA, 2 for PETG, 0.5 for TPU. A brim under 5 mm is omitted. The heat term of the same formula (warping) is left out. stone calls a part tipping-prone when this term alone gives a brim Orca keeps (5 mm or more): the formula and the 5 mm are Orca's, reading it as tipping is stone's.",
+   "quote": "double height_to_area = std::max(height / Ixx * (bbox2.size()(1) * SCALING_FACTOR), height / Iyy * (bbox2.size()(0) * SCALING_FACTOR)) * height / 1920;",
+   "source": "OrcaSlicer src/libslic3r/Brim.cpp configBrimWidthByVolumeGroups; src/libslic3r/MaterialType.cpp adhesion coefficients",
+   "cite": "OrcaSlicer auto brim",
+   "url": "https://github.com/SoftFever/OrcaSlicer/blob/6b79a61ff323a03f67c5778a00019f6744986389/src/libslic3r/Brim.cpp",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "physics.support_polygon",
+   "topic": "tipping",
+   "value": "stable while the center of mass is over the support polygon",
+   "unit": "rule",
+   "note": "A part standing on the bed stays up on its own only while its center of mass, seen from above, is inside the convex hull of its first layer. stone checks it for the part as printed so far, at every layer.",
+   "quote": "its support polygon is a horizontal region over which the center of mass must lie to achieve static stability. For example, for an object resting on a horizontal surface (e.g. a table), the support polygon is the convex hull of its \"footprint\" on the table.",
+   "source": "Wikipedia, Support polygon",
+   "cite": "Support polygon (statics)",
+   "url": "https://en.wikipedia.org/wiki/Support_polygon",
+   "checked": "2026-11-24"
+  }
+ ]
+}

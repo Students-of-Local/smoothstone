@@ -119,14 +119,14 @@ def _open_ends(keys: np.ndarray) -> int:
     return int((k[0::2] != k[1::2]).sum())
 
 
-def _raster(seg: np.ndarray, x0: float, y0: float, w: int, h: int) -> np.ndarray:
-    """Fill a cross-section by the even-odd rule on a w by h grid of PIXEL squares."""
+def _raster(seg: np.ndarray, x0: float, y0: float, w: int, h: int, px: float = PIXEL) -> np.ndarray:
+    """Fill a cross-section by the even-odd rule on a w by h grid of px squares."""
     grid = np.zeros((h, w + 1), np.int8)  # counts wrap at 128, but only their parity matters
     if len(seg):
         a, b = seg[:, 0], seg[:, 1]
         lo, hi = np.minimum(a[:, 1], b[:, 1]), np.maximum(a[:, 1], b[:, 1])
-        r0 = np.ceil((lo - y0) / PIXEL - 0.5).astype(np.int64)
-        r1 = np.ceil((hi - y0) / PIXEL - 0.5).astype(np.int64)  # rows r0..r1-1 cross
+        r0 = np.ceil((lo - y0) / px - 0.5).astype(np.int64)
+        r1 = np.ceil((hi - y0) / px - 0.5).astype(np.int64)  # rows r0..r1-1 cross
         count = np.clip(r1 - r0, 0, None)
         keep = count > 0
         if keep.any():
@@ -134,10 +134,10 @@ def _raster(seg: np.ndarray, x0: float, y0: float, w: int, h: int) -> np.ndarray
             start = np.repeat(r0[keep], count[keep])
             offs = np.arange(len(idx)) - np.repeat(np.cumsum(count[keep]) - count[keep], count[keep])
             row = start + offs
-            yc = y0 + (row + 0.5) * PIXEL
+            yc = y0 + (row + 0.5) * px
             ax, ay, bx, by = a[idx, 0], a[idx, 1], b[idx, 0], b[idx, 1]
             x = ax + (yc - ay) / (by - ay) * (bx - ax)
-            col = np.clip(np.ceil((x - x0) / PIXEL - 0.5).astype(np.int64), 0, w)
+            col = np.clip(np.ceil((x - x0) / px - 0.5).astype(np.int64), 0, w)
             ok = (row >= 0) & (row < h)
             np.add.at(grid, (row[ok], col[ok]), 1)
     return (np.cumsum(grid, 1, dtype=np.int8)[:, :w] & 1).view(bool)
