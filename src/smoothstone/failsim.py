@@ -5,8 +5,9 @@ materials.json once it is on main) and each with its assumptions named:
 
 1. drop_strand: plastic laid onto nothing falls as a chain of short segments (position based
    dynamics: gravity, segment lengths, ground or printed-part contact, friction) and comes to rest.
-2. droop and curl: a bead past the reach hangs as a soft cantilever while it is above Tg (lumped
-   Newton cooling, melt viscosity, Trouton's 3 eta for E); the layers above curl it up as they shrink.
+2. droop and curl: a bead past the reach hangs as a soft cantilever while it is above Tg (cooled by
+   the fan or by rising air, and by radiation; its own melt viscosity, Trouton's 3 eta for E); the
+   layers above curl it up as they shrink.
 3. bridge_sag: a bridge strand hangs as a catenary; past the usable length it sags more than a layer.
 4. detachment and toppling: corner lift (the layers below Tg pull on the plate's free edge; their
    temperatures come from steady conduction up the printed column) against the bond at the plate
@@ -67,7 +68,7 @@ class Material:
     bed: float  # C, K2 profile
     chamber: float
     nozzle: float
-    stand_ins: tuple = ()  # data borrowed from PLA, said out loud
+    stand_ins: tuple = ()  # data borrowed from another plastic, said out loud
     source: str = ""
 
     def ratio(self, t) -> np.ndarray:
@@ -105,11 +106,11 @@ def material(name: str = "PLA") -> Material:
         cp = float(np.interp(ts, tab[:, 0], tab[:, 2]).mean())
         k = float(np.interp(np.linspace(fact("room_air"), p["tg"]["value"], 50), tab[:, 0], tab[:, 1]).mean())
     else:
-        cp, k = fact("pla.cp"), fact("pla.k")
-        if m != "PLA":
-            stand.append(f"{m} uses PLA's specific heat and thermal conductivity (no sourced values)")
-    if m != "PLA":
-        stand.append(f"{m} uses PLA's melt viscosity (Cross-WLF of PLA 3251D)")
+        cp, k = fact("pla.cp"), fact(f"{m.lower()}.k")
+        if m == "PETG":
+            stand += ["PETG uses PLA's specific heat (no sourced value for the melt)", note("petg.melt")]
+    if m == "ABS":
+        stand.append(note("abs.cross_wlf"))
     peel = {"PLA": fact("peel.pla"), "PETG": fact("peel.petg")}.get(m)
     if peel is None:
         peel = fact("peel.pla")
@@ -125,17 +126,56 @@ def _mat(m) -> Material:
 
 # melt, bead cooling, droop and curl
 
-def viscosity(t_c, rate=0.0) -> np.ndarray:
-    """Pa s of PLA melt at t_c (C) and shear rate (1/s): Cross-WLF, Pricci 2025 Table 2. Infinite at
-    and below the WLF pole (T* - A2, 48.4 C), where the fit stops meaning anything."""
-    p = fact("pla.cross_wlf")
+@lru_cache(maxsize=None)
+def _melt(name: str) -> dict:
+    if name != "PETG":
+        return fact(name.lower() + ".cross_wlf")
+    q, u = fact("petg.melt"), fact("wlf")  # one measured point, moved by the universal WLF constants
+    tg = material("PETG").tg
+    a1 = u["C1"] * math.log(10)
+    d1 = q["eta0_Pa_s"] * math.exp(a1 * (q["at_C"] - tg) / (u["C2_K"] + q["at_C"] - tg))
+    return {**fact("pla.cross_wlf"), "A1": a1, "A2_K": u["C2_K"], "D1_Pa_s": d1, "T_star_K": tg + 273.15}
+
+
+def viscosity(t_c, rate=0.0, mat="PLA") -> np.ndarray:
+    """Pa s of the melt at t_c (C) and shear rate (1/s): each plastic's own Cross-WLF. Infinite at and
+    below the WLF pole (T* - A2; 48.4 C for PLA), where the fit stops meaning anything."""
+    p = _melt(_mat(mat).name)
     dt = np.asarray(t_c, float) + 273.15 - p["T_star_K"]
     den = p["A2_K"] + dt
     with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
         eta0 = np.where(den > 0, p["D1_Pa_s"] * np.exp(-p["A1"] * dt / np.where(den > 0, den, 1.0)), np.inf)
         rate = np.asarray(rate, float)
         thin = np.where(rate > 0, (eta0 * rate / p["tau_star_Pa"]) ** (1.0 - p["n"]), 0.0)
-        return eta0 / (1.0 + thin)
+        return np.where(np.isinf(eta0), np.inf, eta0 / (1.0 + thin))
+
+
+# air
+
+def air(t_c) -> dict:
+    """Dry air at t_c (C), from Lienhard's Table A.6: rho kg/m3, nu m2/s, k W/(m K), Pr."""
+    tab = np.asarray(fact("air"), float)
+    return {key: np.interp(np.asarray(t_c, float) + 273.15, tab[:, 0], tab[:, j]) for j, key in enumerate(("rho", "nu", "k", "pr"), 1)}
+
+
+def nusselt(re, pr) -> np.ndarray:
+    """Forced flow across a cylinder, Re < 4000: Churchill-Bernstein, and Nakai-Okazaki at Re Pr <= 0.2 (Lienhard 7.66, 7.67)."""
+    re, pr = np.asarray(re, float), np.asarray(pr, float)
+    pe = np.maximum(re * pr, 1e-12)
+    cb = 0.3 + 0.62 * re ** 0.5 * pr ** (1 / 3) / (1 + (0.4 / pr) ** (2 / 3)) ** 0.25
+    return np.where(pe > 0.2, cb, 1 / (0.8237 - np.log(np.minimum(pe, 0.2) ** 0.5)))
+
+
+def h_strand(d_mm, t_c, air_c: float, wind=0.0) -> np.ndarray:
+    """W/(m2 K) off a strand d_mm thick at t_c in air at air_c: the larger of the wind's convection (m/s
+    across it) and its own rising air's (Churchill-Chu, Lienhard 8.28), plus radiation."""
+    d, t = np.asarray(d_mm, float) * 1e-3, np.asarray(t_c, float)
+    p = air((t + air_c) / 2)
+    ra = fact("gravity") * np.maximum(t - air_c, 0.0) / ((t + air_c) / 2 + 273.15) * d ** 3 * p["pr"] / p["nu"] ** 2
+    free = 0.36 + 0.518 * ra ** 0.25 / (1 + (0.559 / p["pr"]) ** (9 / 16)) ** (4 / 9)
+    nu = np.maximum(free, nusselt(np.asarray(wind, float) * d / p["nu"], p["pr"]))
+    a, b = t + 273.15, air_c + 273.15
+    return nu * p["k"] / d + fact("emissivity") * fact("stefan_boltzmann") * (a * a + b * b) * (a + b)
 
 
 def _bead(width: float, layer: float) -> tuple[float, float]:
@@ -143,28 +183,38 @@ def _bead(width: float, layer: float) -> tuple[float, float]:
     return (width - layer) * layer + math.pi * layer * layer / 4, 2 * (width - layer) + math.pi * layer
 
 
-def cooling(mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True) -> dict:
-    """Lumped Newton cooling of a bead: h, time constant tau, Biot number, seconds above Tg."""
-    m = _mat(mat)
+def _wind(fan: bool) -> float:
+    return fact("fan_air_speed") if fan else 0.0
+
+
+def _cool(m: Material, layer: float, width: float, fan: bool, n: int = 2001, air_c: float | None = None):
+    """(C from Tg to the nozzle, seconds the bead takes to cool by each degree there). air_c: default the chamber's."""
+    air_c = m.chamber if air_c is None else air_c
     a, per = _bead(width, layer)
-    d = 4 * a / per * 1e-3  # hydraulic diameter, m
-    if fan:
-        air = fact("air_400k")
-        re, pr = fact("fan_air_speed") * d / air["nu"], air["pr"]
-        nu = 0.3 + 0.62 * re ** 0.5 * pr ** (1 / 3) / (1 + (0.4 / pr) ** (2 / 3)) ** 0.25 * (1 + (re / 282000) ** 0.625) ** 0.8
-        h = nu * air["k"] / d
-    else:
-        h = fact("h_still")
-    tau = m.density * 1000 * m.cp * (a / per * 1e-3) / h
-    soft = tau * math.log((m.nozzle - m.chamber) / (m.tg - m.chamber)) if m.tg > m.chamber else math.inf
-    return {"h": h, "tau_s": tau, "biot": h * (a / per * 1e-3) / fact("pla.k"), "soft_s": soft}
+    ts = np.linspace(m.tg, m.nozzle, n)
+    h = h_strand(4 * a / per, ts, air_c, _wind(fan))
+    with np.errstate(divide="ignore"):
+        return ts, np.where(ts > air_c, m.density * 1000 * m.cp * (a / per * 1e-3) / (h * (ts - air_c)), math.inf)
 
 
-def _compliance(m: Material, layer: float, width: float, fan: bool) -> float:
+def cooling(mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, air_c: float | None = None) -> dict:
+    """Lumped cooling of a bead from the nozzle to Tg: the mean h (W/m2 K), time constant tau, Biot number and
+    seconds above Tg."""
+    m = _mat(mat)
+    air_c = m.chamber if air_c is None else air_c
+    a, per = _bead(width, layer)
+    ts, dt = _cool(m, layer, width, fan, air_c=air_c)
+    soft = float(np.sum((dt[1:] + dt[:-1]) * np.diff(ts)) / 2)
+    rho_cp = m.density * 1000 * m.cp * (a / per * 1e-3)
+    span = math.log((m.nozzle - air_c) / (m.tg - air_c)) if m.tg > air_c else math.inf
+    h = rho_cp * span / soft if math.isfinite(soft) else float(h_strand(4 * a / per, m.tg, air_c, _wind(fan)))
+    return {"h": h, "tau_s": rho_cp / h, "biot": h * (a / per * 1e-3) / m.k, "soft_s": soft}
+
+
+def _compliance(m: Material, layer: float, width: float, fan: bool, air_c: float | None = None) -> float:
     """The integral of dt / (3 eta) while the bead cools from the nozzle to Tg, in mm2/N."""
-    c = cooling(m, layer, width, fan)
-    ts = np.linspace(m.tg, m.nozzle, 4001)
-    f = c["tau_s"] / ((ts - m.chamber) * fact("trouton") * viscosity(ts))
+    ts, dt = _cool(m, layer, width, fan, 4001, air_c)
+    f = dt / (fact("trouton") * viscosity(ts, 0.0, m))
     return float(np.sum((f[1:] + f[:-1]) * np.diff(ts)) / 2) * 1e6  # 1/Pa -> mm2/N
 
 
@@ -173,7 +223,7 @@ def reach(layer: float = 0.2) -> float:
     return layer * math.tan(math.radians(90 - fact("support_threshold_angle")))
 
 
-def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True) -> np.ndarray:
+def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, air_c: float | None = None) -> np.ndarray:
     """Downward displacement (mm, negative) of each ledge vertex, by its distance past the edge of the
     layer below. The free length starts at the reach; the ledge sags as a cantilever under its own
     weight while soft: y = q x^2 (6L^2 - 4Lx + x^2) / (24 I) x integral dt / (3 eta), and no vertex
@@ -186,7 +236,7 @@ def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool
     a, _ = _bead(width, layer)
     q = m.density * 1e-6 * fact("gravity") * a  # N/mm
     i = width * layer ** 3 / 12  # mm4, the bead bends as a width x layer rectangle
-    dz = -q * x * x * (6 * big * big - 4 * big * x + x * x) / (24 * i) * _compliance(m, layer, width, fan)
+    dz = -q * x * x * (6 * big * big - 4 * big * x + x * x) / (24 * i) * _compliance(m, layer, width, fan, air_c)
     return np.maximum(dz, -x)  # past this it hangs straight down: a falling strand (model 1), not a ledge
 
 
@@ -427,7 +477,7 @@ def nozzle_drag(mat="PLA", speed_mm_s: float | None = None, layer: float = 0.2) 
     m = _mat(mat)
     v = fact("k2_speeds")["inner_wall"] if speed_mm_s is None else speed_mm_s
     rate = v / layer
-    tau = float(viscosity(m.nozzle, rate)) * rate * 1e-6  # MPa
+    tau = float(viscosity(m.nozzle, rate, m)) * rate * 1e-6  # MPa
     return tau * math.pi * (fact("nozzle_tip") / 2) ** 2
 
 
@@ -619,11 +669,11 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
                         hit("bridge", i, at, {"span_mm": round(span, 1), "sag_mm": round(sag, 2),
                                               "usable_mm": fact("max_bridge_length")}, [note("bridge_rule")])
                 else:
-                    tip = -float(droop([big], m, lay, width, inp.fan)[0])
+                    tip = -float(droop([big], m, lay, width, inp.fan, air)[0])
                     rule = fact("droop_rule")
                     nums = {"ledge_mm": round(big, 2), "reach_mm": round(reach(lay), 2), "droop_mm": round(tip, 3),
-                            "soft_s": round(cooling(m, lay, width, inp.fan)["soft_s"], 2)}
-                    why = [note("droop_rule"), note("fan_air_speed") if inp.fan else note("h_still")]
+                            "soft_s": round(cooling(m, lay, width, inp.fan, air)["soft_s"], 2)}
+                    why = [note("droop_rule")] + ([note("fan_air_speed")] if inp.fan else [])
                     if tip >= rule["supports"] * lay:
                         hit("supports", i, at, nums, why)
                     elif tip >= rule["droop"] * lay:
