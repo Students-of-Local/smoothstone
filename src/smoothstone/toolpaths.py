@@ -35,15 +35,15 @@ def spacing(width: float, height: float) -> float:
 
 def profile(prof: dict | None = None) -> dict:
     """Widths, speeds, accelerations and shells for generated toolpaths: OrcaSlicer's K2 profile. Given a
-    printer profile (its speeds), speeds scale down and accelerations are capped for a slower printer
-    (assumption: same proportions)."""
+    printer profile (its speeds), speeds, travel too, scale down and accelerations are capped for a slower
+    printer (assumption: same proportions)."""
     prof = prof or {}
     v = lambda k: refs.get(k)["value"]  # noqa: E731
     sp, ac = dict(v("slicer.k2_speeds")), dict(v("slicer.k2_accels"))
     typical = float((prof.get("speeds") or {}).get("typical_print_mm_s") or sp["inner_wall"])
     cap = float((prof.get("speeds") or {}).get("max_accel_mm_s2") or v("slicer.k2_machine")["max_accel"])
     f = min(1.0, typical / sp["inner_wall"])
-    speeds = {k: (x if k == "travel" else x * f) for k, x in sp.items()}
+    speeds = {k: x * f for k, x in sp.items()}
     accels = {k: min(x, cap) for k, x in ac.items() if not k.startswith("jerk")}
     accels.update({"sparse_infill": accels["default"], "solid_infill": accels["default"]})
     return {"widths": v("slicer.k2_widths"), "speeds": speeds, "accels": accels, "shells": v("slicer.k2_shells"),
@@ -118,28 +118,25 @@ def _paint(shape, polys, width_px: float) -> np.ndarray:
 
 def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, place=(0.0, 0.0)) -> gcode.Toolpath:
     """The part's toolpaths. prof: widths, speeds, accels (mm, mm/s, mm/s2 by feature), shells, jerk,
-    max_feed. sup: supports.analyze(..., columns=True) on the same mesh, for support lines. place:
-    mm added to x and y (the part's spot on the bed)."""
+    max_feed. sup: supports.analyze(..., columns=True) on the same mesh and layer height, for support lines.
+    place: mm added to x and y (the part's spot on the bed). Walls under two lines thick (about 0.8 mm, below
+    any stone recipe's) come out as short infill dashes or a doubled line, not a slicer's one thin line."""
     import cv2
     from scipy import ndimage
 
     if abs(mesh.bounds[0][2]) > 1e-9:
         mesh = mesh.copy()
         mesh.apply_translation((0.0, 0.0, -float(mesh.bounds[0][2])))
+    if sup and abs(sup["_grid"].layer - layer) > 1e-9:
+        raise ValueError(f"supports were found at {sup['_grid'].layer} mm layers, not {layer}")
     grid, it = supports.cut(mesh, layer, sup["_grid"].px if sup else None)
     px = grid.px
     W, S, A, sh = prof["widths"], prof["speeds"], prof["accels"], prof["shells"]
     dens = sh["sparse_infill_density"] / 100.0
     n_walls = max(1, int(sh.get("wall_loops", 2)))
     sp = prof["support"]
-    sup_fill = spacing(sp["line_width"], layer) / sp["base_pattern_spacing"]
     gap_layers = max(1, int(round(sp["top_z_distance"] / layer)))
-    support_at: dict[int, list] = {}
-    for root, i_top, r, c, base in (sup or {}).get("_columns", []):
-        for j in range(int(base.min()), i_top - gap_layers):  # i_top is the hanging layer; a gap of top_z_distance under it
-            sel = base <= j
-            if sel.any():
-                support_at.setdefault(j, []).append((r[sel], c[sel]))
+    columns = (sup or {}).get("_columns", [])
     F = gcode.FEATURES.index
     rows: list[tuple] = []
     vol = {"expected": [], "generated": []}
@@ -149,7 +146,7 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
     def xy(p):
         return ox + (p[..., 0] + 0.5) * px, oy + (p[..., 1] + 0.5) * px  # lines run through pixel centers
 
-    def path(pts, feat, width, speed, accel, z, i, closed=False):
+    def path(pts, feat, width, speed, accel, z, i):
         nonlocal pos
         x, y = xy(np.asarray(pts, float))
         if math.hypot(x[0] - pos[0], y[0] - pos[1]) > 1e-6:
@@ -166,11 +163,11 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
     src = iter(enumerate(it))
     loaded = -1
     for i in range(grid.n):
-        while loaded < min(grid.n - 1, i + sh["top_shell_layers"]):
+        while loaded < min(grid.n - 1, i + max(1, sh["top_shell_layers"])):
             k, m = next(src)
             masks[k] = m
             loaded = k
-        for k in [k for k in masks if k < i - sh["bottom_shell_layers"]]:
+        for k in [k for k in masks if k < i - max(1, sh["bottom_shell_layers"])]:
             del masks[k]
         M = masks[i]
         z = (i + 1) * layer
@@ -180,12 +177,16 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
             pos[2] = z
         made = 0.0
         sup_area = 0.0
-        if i in support_at:
+        wsup = W["first_layer"] if first else sp["line_width"]
+        sup_fill = spacing(wsup, layer) / sp["base_pattern_spacing"]
+        # i_top is the hanging layer; a gap of top_z_distance under it
+        under = [(r, c, base) for _, i_top, r, c, base in columns if base.min() <= i < i_top - gap_layers]
+        if under:
             sm = np.zeros(M.shape, bool)
-            for r, c in support_at[i]:
-                sm[r, c] = True
-            keep_off = max(1, int(round(sp["object_xy_distance"] / px)))
-            sm &= ~ndimage.binary_dilation(M, iterations=keep_off)
+            for r, c, base in under:
+                sm[r[base <= i], c[base <= i]] = True
+            if M.any():
+                sm &= cv2.distanceTransform((~M).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE) * px > sp["object_xy_distance"]
             sup_area = float(sm.sum()) * px * px
             lab, n_isl = ndimage.label(sm)
             for k in range(1, n_isl + 1):  # each support island's lines centered on it
@@ -194,9 +195,10 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
                 mid, half = (rows_k[0] + rows_k[-1]) / 2.0, (rows_k[-1] - rows_k[0] + 1) / 2.0
                 gap_px = sp["base_pattern_spacing"] / px
                 odd, even = 2 * math.floor(half / gap_px) + 1, 2 * math.floor(half / gap_px + 0.5)
-                shift = 0.0 if abs(odd - 2 * half / gap_px) <= abs(even - 2 * half / gap_px) else gap_px / 2
+                shift = 0.0 if even == 0 or abs(odd - 2 * half / gap_px) <= abs(even - 2 * half / gap_px) else gap_px / 2
                 for s in _scan(isl, 0.0, gap_px, (mid + shift) % gap_px):
-                    made += path(s, F("support"), sp["line_width"], S["support"], A["default"], z, i)
+                    made += path(s, F("support"), wsup, S["first_layer"] if first else S["support"],
+                                 A["first_layer"] if first else A["default"], z, i)
         if not M.any():
             vol["expected"].append(sup_fill * sup_area * layer)
             vol["generated"].append(made)
@@ -217,8 +219,8 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
                 walls.append((poly, w))
         core = dist >= (wo / 2 + so / 2 if n_walls == 1 else wo / 2 + (so + si) / 2 + (n_walls - 1.5) * si)
         covered = np.zeros(M.shape, bool)
-        for poly, w in walls:
-            covered |= _paint(M.shape, [poly], w / px)
+        for w in {w for _, w in walls}:
+            covered |= _paint(M.shape, [poly for poly, pw in walls if pw == w], w / px)
         gap = M & ~core & ~covered
         gap = ndimage.binary_opening(gap)  # a speck under a line's width is noise, not a gap
         below = [masks.get(i - k) for k in range(1, sh["bottom_shell_layers"] + 1)]
@@ -237,15 +239,17 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
             for s in _scan(region, deg, spacing(ws, layer) / px):
                 mid = np.rint(s.mean(0)).astype(int)[::-1]
                 if feat is None:
-                    up = above[0] is None or not above[0][tuple(np.clip(mid, 0, np.array(M.shape) - 1))]
-                    name = "top surface" if up else "bottom surface" if (first or below[0] is None or not below[0][tuple(np.clip(mid, 0, np.array(M.shape) - 1))]) else "solid infill"
+                    at = tuple(np.clip(mid, 0, np.array(M.shape) - 1))
+                    over, under_it = masks.get(i + 1), masks.get(i - 1)
+                    up = over is None or not over[at]
+                    name = "top surface" if up else "bottom surface" if under_it is None or not under_it[at] else "solid infill"
                 else:
                     name = feat
                 key = {"top surface": "top_surface", "bottom surface": "solid_infill"}.get(name, "solid_infill")
                 made += path(s, F(name), ws, S["first_layer_infill"] if first else S[key],
                              A["first_layer"] if first else A[key], z, i)
-        if sparse.any():
-            gap_px = 2 * spacing(wf, layer) / max(dens, 1e-3) / px  # a grid lays two directions, each at twice the spacing
+        if dens > 0 and sparse.any():
+            gap_px = 2 * spacing(wf, layer) / dens / px  # a grid lays two directions, each at twice the spacing
             for g in (45.0, 135.0):
                 for s in _scan(sparse, g, gap_px):
                     made += path(s, F("sparse infill"), wf, S["sparse_infill"], A["sparse_infill"], z, i)

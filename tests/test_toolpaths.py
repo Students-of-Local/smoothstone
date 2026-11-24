@@ -69,3 +69,47 @@ def test_generated_layers_take_orcas_time_for_the_same_plate():
         return float(dt[(tp.layer >= 0) & (tp.layer < 3)].sum())
 
     assert first3(ours) == pytest.approx(first3(orca), rel=0.10)
+
+    for feat, want in (("outer wall", 0.03), ("solid infill", 0.05)):  # the same lines, not offsetting errors
+        ours_mm, orca_mm = (_length(tp, feat) for tp in (ours, orca))
+        assert ours_mm == pytest.approx(orca_mm, rel=want), (feat, ours_mm, orca_mm)
+
+
+def _length(tp, feat):
+    sel = tp.extruding() & (tp.layer >= 0) & (tp.layer < 3) & (tp.feature == gcode.FEATURES.index(feat))
+    return float(np.linalg.norm(tp.p1[sel, :2] - tp.p0[sel, :2], axis=1).sum())
+
+
+def test_a_slower_printer_travels_slower_too():
+    fast, slow = toolpaths.profile(), toolpaths.profile({"speeds": {"typical_print_mm_s": 50, "max_accel_mm_s2": 500}})
+    f = 50 / fast["speeds"]["inner_wall"]
+    assert all(slow["speeds"][k] == pytest.approx(v * f) for k, v in fast["speeds"].items())
+    assert max(slow["accels"].values()) <= 500 and slow["scaled"]
+
+
+@pytest.mark.parametrize("along_x", [True, False])
+def test_a_narrow_ledge_gets_support_lines_either_way_round(along_x):
+    from smoothstone import supports
+
+    mesh = _union(_box((30, 10, 10), (0, 0, 0)), _box((30, 11.5, 3), (0, 0, 10)))  # 1.5 mm past the wall, 10 mm up
+    if not along_x:
+        mesh.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, (0, 0, 1)))
+    tp = toolpaths.generate(mesh, _k2(), 0.2, supports.analyze(mesh, columns=True))
+    sup = tp.feature == gcode.FEATURES.index("support")
+    assert sup.any()
+    assert np.allclose(tp.width[sup & (tp.layer == 0)], _k2()["widths"]["first_layer"])
+
+
+def test_supports_at_another_layer_height_are_refused():
+    from smoothstone import supports
+
+    mesh = _union(_box((10, 12, 10), (15, 0, 0)), _box((40, 12, 3), (0, 0, 10)))
+    with pytest.raises(ValueError, match="0.2 mm layers"):
+        toolpaths.generate(mesh, _k2(), 0.28, supports.analyze(mesh, columns=True))
+
+
+def test_a_hollow_open_top_box_prints():
+    prof = _k2()
+    prof["shells"] = {**prof["shells"], "sparse_infill_density": 0, "top_shell_layers": 0, "bottom_shell_layers": 0}
+    tp = toolpaths.generate(trimesh.creation.box((20, 20, 2)), prof, 0.2)
+    assert not (tp.feature == gcode.FEATURES.index("sparse infill")).any()
