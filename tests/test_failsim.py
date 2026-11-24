@@ -16,35 +16,6 @@ def _rect(shape, r0, r1, c0, c1):
     return m
 
 
-def _length(x):
-    return float(np.linalg.norm(np.diff(x, axis=0), axis=1).sum())
-
-
-# model 1: falling strands
-
-def test_dropped_strand_comes_to_rest_on_the_bed_and_keeps_its_length():
-    flow, speed = 10.0, 200.0
-    frames = fs.drop_strand(np.array([[0, 0, 10.0], [20, 0, 10.0]]), speed, flow, ground=0.0, steps=3000)
-    r = math.sqrt(flow / speed / math.pi)  # the strand's own radius: it lies on the bed, not in it
-    end = frames[-1]
-    assert len(frames) < 3000, "never came to rest"
-    assert len(end) == 41  # the whole 20 mm strand, 0.5 mm segments
-    assert np.allclose(end[:, 2], r, atol=0.01)
-    assert abs(_length(end) / 20.0 - 1) < 0.02
-
-
-def test_dropped_strand_piles_on_the_printed_part():
-    z = np.zeros((40, 60))
-    z[:, 25:] = 5.0  # a 5 mm block from x = 7.5 mm on
-    part = fs.Heightfield(z, 0.5, (-5.0, -10.0))
-    frames = fs.drop_strand(np.array([[0, 0, 12.0], [20, 0, 12.0]]), 200, 10, ground=part, steps=3000)
-    end, r = frames[-1], math.sqrt(10 / 200 / math.pi)
-    assert len(frames) < 3000
-    on = end[:, 0] > 8.0
-    assert on.sum() > 20 and np.allclose(end[on, 2], 5.0 + r, atol=0.05)
-    assert (end[:, 2] >= part(end[:, 0], end[:, 1]) + r - 1e-6).all()  # nothing inside the part
-
-
 # model 2: droop and curl
 
 def test_droop_is_zero_within_the_reach_and_grows_with_the_span():
@@ -148,21 +119,6 @@ def test_curl_lifts_the_ledge_by_the_bilayer_curvature():
 def test_bridge_sags_one_layer_at_the_usable_length():
     assert -fs.bridge_sag(10.0, [5.0], 0.2)[0] == pytest.approx(0.2, rel=1e-9)
     assert -fs.bridge_sag(20.0, [10.0], 0.2)[0] > 0.2
-
-
-def test_hanging_strand_chain_matches_the_catenary_within_one_percent():
-    span = 60.0
-    a, arc = fs.catenary_a(0.2), fs.bridge_length(span, 0.2)
-    closed = a * (math.cosh(span / (2 * a)) - 1)
-    dip = math.sqrt((arc / 2) ** 2 - (span / 2) ** 2)  # start as a V of the same length
-    path = np.array([[0, 0, 50.0], [span / 2, 0, 50.0 - dip], [span, 0, 50.0]])
-    frames = fs.drop_strand(path, speed_mm_s=1e9, flow_mm3_s=1.0, ground=-1000.0, steps=20000, dt=2e-4, iters=20,
-                            seg_mm=arc / 30 * (1 + 1e-9), pins=(0, -1), damping=0.02, rest_mm_s=0.05)
-    end = frames[-1]
-    assert len(frames) < 20000
-    sag = 50.0 - end[15, 2]
-    assert sag == pytest.approx(closed, rel=0.01)
-    assert sag == pytest.approx(-fs.bridge_sag(span, [span / 2], 0.2)[0], rel=0.01)
 
 
 # model 4: detachment and toppling
@@ -302,7 +258,6 @@ def test_rigid_tip_ends_on_its_side_and_slide_moves_the_distance():
     assert np.allclose(top[:3], [25.0, 0.0, 0.0], atol=1e-9)
     slide = fs.rigid_slide((0.0, 1.0), 12.0)
     assert np.allclose(slide[-1][:3, 3], [0, 12.0, 0])
-    assert fs.blob_volume(8.0, 10.0) == pytest.approx(0.5 * 80.0)
 
 
 def test_the_hotend_holds_what_surface_tension_carries():

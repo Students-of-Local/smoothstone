@@ -3,8 +3,7 @@
 Four models in plain numpy, each fed by sourced facts (recipes/lib/refs/failsim.json, and Track S's
 materials.json once it is on main) and each with its assumptions named:
 
-1. drop_strand: plastic laid onto nothing falls as a chain of short segments (position based
-   dynamics: gravity, segment lengths, ground or printed-part contact, friction) and comes to rest.
+1. plastic laid onto nothing falls as a strand: strand.py, on this module's facts and cooling.
 2. droop and curl: a bead past the reach hangs as a soft cantilever while it is above Tg (cooled by
    the fan or by rising air, and by radiation; its own melt viscosity, Trouton's 3 eta for E); the
    layers above curl it up as they shrink.
@@ -12,7 +11,7 @@ materials.json once it is on main) and each with its assumptions named:
 4. detachment and toppling: corner lift (the layers below Tg pull on the plate's free edge; their
    temperatures come from steady conduction up the printed column) against the measured peel at the
    plate's temperature, nozzle drag against pull-off and shear strength, and the moment balance about the
-   footprint edge; then rigid_tip, rigid_slide and blob_volume for what follows.
+   footprint edge; then rigid_tip and rigid_slide for what follows.
 
 predict() runs the checks layer by layer in print order and returns the first failures. Every
 answer is a model, not a recording.
@@ -338,91 +337,6 @@ def bridge_sag(span_mm: float, x_mm=None, layer: float = 0.2) -> np.ndarray:
     return a * (np.cosh((x - span_mm / 2) / a) - math.cosh(span_mm / (2 * a)))
 
 
-def bridge_length(span_mm: float, layer: float = 0.2) -> float:
-    """Arc length of the hanging bridge strand."""
-    a = catenary_a(layer)
-    return 2 * a * math.sinh(span_mm / (2 * a))
-
-
-# falling strands
-
-@dataclass
-class Heightfield:
-    """The top of what is printed so far: z (mm) on a grid of cell mm squares from origin (x, y)."""
-    z: np.ndarray
-    cell: float
-    origin: tuple = (0.0, 0.0)
-
-    def __call__(self, x, y) -> np.ndarray:
-        r = np.clip(((np.asarray(y) - self.origin[1]) / self.cell).astype(int), 0, self.z.shape[0] - 1)
-        c = np.clip(((np.asarray(x) - self.origin[0]) / self.cell).astype(int), 0, self.z.shape[1] - 1)
-        return self.z[r, c]
-
-    @classmethod
-    def from_masks(cls, masks, layer_z, cell: float, origin=(0.0, 0.0)) -> Heightfield:
-        z = np.zeros(np.shape(masks[0]))
-        for mk, top in zip(masks, layer_z):
-            z[mk] = top
-        return cls(z, cell, origin)
-
-
-def _resample(path: np.ndarray, seg: float) -> np.ndarray:
-    d = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))]
-    s = np.linspace(0, d[-1], max(2, int(math.ceil(d[-1] / seg)) + 1))
-    return np.stack([np.interp(s, d, path[:, k]) for k in range(3)], 1)
-
-
-def drop_strand(path_xyz, speed_mm_s: float = 200.0, flow_mm3_s: float = 10.0, ground=0.0, steps: int = 2000,
-                dt: float = 1 / 600, mu: float | None = None, seg_mm: float | None = 0.5, iters: int = 30,
-                pins=(), damping: float = 0.0, rest_mm_s: float = 1.0) -> list[np.ndarray]:
-    """Frames of a strand laid along path_xyz (mm) into air. Vertex i leaves the nozzle at s_i / speed
-    and is held on the path until then; the strand is flow / speed mm2 thick. ground is a z (mm), a
-    Heightfield or any f(x, y) -> z. pins: vertex indices held for good (a bridge's ends). seg_mm None
-    keeps path_xyz's own vertices. Each frame is the extruded part of the strand as an (n, 3) polyline; frames stop
-    once it is at rest."""
-    p = np.asarray(path_xyz, float)
-    p = p if seg_mm is None else _resample(p, seg_mm)
-    n = len(p)
-    rest = np.linalg.norm(np.diff(p, axis=0), axis=1)
-    out_t = np.r_[0.0, np.cumsum(rest)] / speed_mm_s
-    r = math.sqrt(flow_mm3_s / speed_mm_s / math.pi)
-    mu = fact("strand_friction") if mu is None else mu
-    gz = (lambda x, y: np.full(np.shape(x), float(ground))) if np.isscalar(ground) else ground
-    held = np.zeros(n, bool)
-    held[list(pins)] = True
-    x, v = p.copy(), np.zeros_like(p)
-    g = np.array([0.0, 0.0, -fact("gravity") * 1000])
-    frames = []
-    halves = (np.arange(0, n - 1, 2), np.arange(1, n - 1, 2))
-    for step in range(steps):
-        t = step * dt
-        w = ((out_t <= t) & ~held).astype(float)
-        xp = x + w[:, None] * (v * (1 - damping) * dt + g * dt * dt)
-        for _ in range(iters):
-            for i in halves:
-                d = xp[i + 1] - xp[i]
-                ln = np.linalg.norm(d, axis=1)
-                ws = w[i] + w[i + 1]
-                c = np.where((ws > 0) & (ln > 0), (ln - rest[i]) / np.where(ws > 0, ws, 1) / np.where(ln > 0, ln, 1), 0)
-                xp[i] += (w[i] * c)[:, None] * d
-                xp[i + 1] -= (w[i + 1] * c)[:, None] * d
-            floor = gz(xp[:, 0], xp[:, 1]) + r
-            wall = (w > 0) & (floor > x[:, 2] + 1e-6)  # the ground here is above where it was: it hit a side
-            xp[wall, :2] = x[wall, :2]
-            floor = gz(xp[:, 0], xp[:, 1]) + r
-            xp[:, 2] = np.where(w > 0, np.maximum(xp[:, 2], floor), xp[:, 2])
-        nv = (xp - x) / dt
-        touch = (w > 0) & (xp[:, 2] <= floor + 1e-9)
-        nv[touch, :2] *= 1 - mu  # friction on the tangential velocity (Mueller et al. 2007, sec. 3.5)
-        nv[touch, 2] = np.maximum(nv[touch, 2], 0)
-        x, v = xp, nv
-        m = int(np.searchsorted(out_t, t, side="right"))
-        frames.append(x[:max(m, 1)].copy())
-        if m >= n and float(np.abs(v[w > 0]).max(initial=0.0)) < rest_mm_s:
-            break
-    return frames
-
-
 # detachment and toppling
 
 def bond_stress(mat="PLA", clean: float = 1.0, bed: float | None = None) -> float:
@@ -547,12 +461,6 @@ def nozzle_hold(mat="PLA", nozzle_c: float | None = None, bore: float = 0.4) -> 
     wets = wetting(t, m) < 90
     newtons = math.pi * (fact("nozzle_tip") if wets else bore) * 1e-3 * tension(t, m)
     return {"hold_n": newtons, "wets": wets, "blob_mm3": newtons / (m.density * 1000 * fact("gravity")) * 1e9}
-
-
-def blob_volume(flow_mm3_s, t_s, stick: float | None = None) -> np.ndarray:
-    """mm3 stuck on the nozzle after t_s seconds of extruding into air (grows with flow)."""
-    s = fact("blob_stick") if stick is None else stick
-    return s * np.asarray(flow_mm3_s, float) * np.asarray(t_s, float)
 
 
 def _turn(axis_pt, u, ang) -> np.ndarray:
