@@ -366,6 +366,16 @@ def test_f4sol_status_after_an_unmatched_description_asks_for_one(work):
     assert stone("status")[2] == nxt and "None" not in nxt
 
 
+def test_f4_shared_outcome_has_no_paths_addresses_or_emails(work):
+    stone("doctor", "the print came off the bed")
+    stone("doctor", "fixed", "washed it after my kid smeared sunscreen at 12 Elm St, see /Users/me/notes.txt "
+                             "or mail me@example.com, call 555-123-4567")
+    line = (work / "stone-job" / "doctor" / "outcomes.jsonl").read_text()
+    for bad in ("12 Elm St", "/Users/me", "me@example.com", "555-123-4567"):
+        assert bad not in line, line
+    assert "sunscreen" in line
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)
