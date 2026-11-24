@@ -475,3 +475,8 @@ def test_r2_owner_flow_reads_the_wash_question_and_reaches_plate_contaminated(wo
     assert re.search(r"^Cause 1: .*\(plate_contaminated\)", text, re.M), text  # "I never wash it" no longer lowers it
     text, code, nxt = stone("doctor", "answer", "no, they were pressed flat")
     assert nxt == "stone doctor try plate_contaminated", nxt
+
+
+@pytest.mark.parametrize("text", ["yes and no", "yes, no", "no... well, yes"])
+def test_r2_yes_and_no_at_once_asks_again(text):
+    assert doctor.answer_key(text, ["yes", "no"]) is None
