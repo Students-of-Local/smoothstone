@@ -222,9 +222,9 @@ class Strand:
         r = dn / 2
         touch, floor = np.zeros(n, bool), None
         if self.ground is not None:
-            floor = np.asarray(self.ground(self.x[:, 0] * 1e3, self.x[:, 1] * 1e3), float) * 1e-3 + r
+            floor = self._top(self.x) + r
             touch = (self.x[:, 2] <= floor + 1e-6) & ~hold
-            to = np.minimum((floor - self.x[:, 2]) / dt, 0.5)  # down onto the ground, or up out of it
+            to = (floor - self.x[:, 2]) / dt  # down onto the ground, or up out of it
         v = self.v
         kb = _series(e_mod * soft) * math.pi * ((d[1:] + d[:-1]) / 2) ** 4 / 64 * (ln[1:] + ln[:-1]) / 2
         kb = np.stack([kb, kb, kb, kb / (1 + NU)], 1)  # G J = E I / (1 + nu)
@@ -275,15 +275,11 @@ class Strand:
         x = self.x + dt * v
         if check and far > TURN:
             return False
-        if floor is not None:  # what moved over higher ground this step stops at its side
-            go = x[:, :2] - self.x[:, :2]
-            via = np.linspace(0, 1, int(_norm(go).max() / r.min()) + 2)[1:, None, None] * go + self.x[:, :2]
-            path = np.asarray(self.ground(*via.reshape(-1, 2).T * 1e3), float).reshape(-1, n) * 1e-3 + r
-            f2 = path[-1]
-            wall = ~hold & ((path > self.x[:, 2] + r) & (path > floor + 1e-6)).any(0)
-            x[wall, :2] = self.x[wall, :2]
-            v[wall, :2] = 0
-            f2[wall] = floor[wall]
+        if floor is not None:
+            at, f2 = self._slide(self.x, x, r, floor)
+            stop = ~hold & (at != x).any(1)
+            x[stop], v[stop, :2] = at[stop], (at - self.x)[stop, :2] / dt
+            v[touch & (to > 0), 2] = 0.0  # pushed out of the ground, not thrown
             low = ~hold & (x[:, 2] < f2)
             x[low, 2] = f2[low]
         old_l, old_k, old_tn = ln, self._curve(tan, ln), tn
@@ -324,17 +320,52 @@ class Strand:
         self._grow()
         return True
 
+    def _top(self, p):
+        """m, the ground under p."""
+        return np.asarray(self.ground(*p[..., :2].reshape(-1, 2).T * 1e3), float).reshape(p.shape[:-1]) * 1e-3
+
+    def _slide(self, a, b, r, floor):
+        """Where nodes going from a to b get, and the ground there: ground higher than they are stops them at its side,
+        and they go on along it."""
+        for k in (slice(0, 3), 0, 1):
+            go = np.zeros_like(a)
+            go[:, k] = (b - a)[:, k]
+            s = np.linspace(0, 1, int(_norm(go[:, :2]).max() / r.min()) + 2)
+            via = a + s[:, None, None] * go
+            path = self._top(via) + r
+            clear = ~np.logical_or.accumulate((path > via[:, :, 2] + r) & (path > floor + 1e-6))
+            last = np.maximum(clear.sum(0) - 1, 0), np.arange(len(a))
+            a, floor = via[last], path[last]
+            if clear.all():
+                break
+            a[:, 2] = b[:, 2]
+        return a, floor
+
+    def _over(self, ln, f):
+        """Edges about to lie across ground higher than under their ends, and, in f, where to put a node on it."""
+        s = np.linspace(0, 1, 13)[1:-1, None]
+        top, ends = self._top(self.x[:-1] + s[:, :, None] * np.diff(self.x, axis=0)), self._top(self.x)
+        high, r = top.max(0), np.sqrt(self.vol / math.pi / ln)
+        mid = s[np.where(top == high, np.abs(s - 0.5), np.inf).argmin(0), 0]
+        z, vz = ((1 - mid) * q[:-1, 2] + mid * q[1:, 2] for q in (self.x, self.v))
+        over = (high > np.maximum(ends[:-1], ends[1:]) + r) & (z > high) & (z < high + 2 * r - DT * np.minimum(vz, 0))
+        over &= np.minimum(mid, 1 - mid) * ln > 1e-4
+        f[over] = mid[over]
+        return over
+
     def _grow(self):
-        """Cut an edge that has grown: the nozzle's by what came out, a drawn one by its length."""
+        """Cut an edge that has grown: the nozzle's by what came out, a drawn one by its length. And one over a wall."""
         ln = self.lengths()[1]
-        cut = ln > 1.5 * self.seg
-        cut[-1:] |= self.nozzle and (self.vol[-1] > 1.5 * self.area * self.seg)
+        cut, f = ln > 1.5 * self.seg, np.full(len(ln), 0.5)
+        if self.nozzle:
+            cut[-1] |= self.vol[-1] > 1.5 * self.area * self.seg
+            f[-1] = 2 / 3  # the edge at the nozzle stays the short one
+        if self.ground is not None:
+            cut |= self._over(ln, f)
         at = np.flatnonzero(cut)
         if not len(at):
             return
-        f = np.full(len(at), 0.5)
-        if self.nozzle and at[-1] == len(ln) - 1:
-            f[-1] = 2 / 3  # the edge at the nozzle stays the short one
+        f = f[at]
         i = at + 1
         for k in ("x", "v", "eb"):
             q = getattr(self, k)
@@ -347,3 +378,6 @@ class Strand:
         rest = self.vol[at] - first
         self.vol[at] = first
         self.vol = np.insert(self.vol, i, rest)
+        if self.ground is not None:  # the new node of an edge hung over a corner is not inside it
+            new = i + np.arange(len(i))
+            self.x[new, 2] = np.maximum(self.x[new, 2], self._top(self.x[new]) + np.sqrt(first / math.pi / ln[at] / f))

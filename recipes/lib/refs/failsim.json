@@ -621,7 +621,7 @@
    "cite": "assumption",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "Coulomb friction 0.5; it only changes how far a fallen strand slides, not whether it falls."
+   "assumption": "Coulomb friction 0.5 on the bed and on the part: how far a fallen strand slides, and what the nozzle drags or draws thin against."
   },
   {
    "id": "failsim.blob_stick",

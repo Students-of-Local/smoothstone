@@ -157,14 +157,45 @@ def test_it_welds_to_hot_enough_plastic_and_not_to_the_bed():
         assert off.points()[off.fixed, 2] == pytest.approx(step(off.points()[off.fixed, 0], 0) + 0.2, abs=0.05)
 
 
-@pytest.mark.parametrize("mm_s", (200, 2000))
-def test_a_wall_one_line_thick_stops_it(mm_s):
-    s = rod(10, ground=lambda x, y: np.where(np.abs(np.c_[x, y][:, 1] - 3) < 0.21, 5.0, 0.0), temp=25)
-    s.x[:, 2] = 0.3e-3
-    s.v[:, 1] = mm_s * 1e-3
+def fence(x, y):
+    """A wall one line thick and 5 mm high, along x at y = 3."""
+    return np.where(np.abs(np.c_[x, y][:, 1] - 3) < 0.21, 5.0, 0.0)
+
+
+@pytest.mark.parametrize("z,along,across,fall", [(0.3, 0, 0.2, 0), (0.3, 0, 2, 0), (0.3, 0.3, 0.2, 0), (5.2, 0, 0.3, 0.35)])
+def test_a_wall_one_line_thick_stops_it(z, along, across, fall):
+    s = rod(10, ground=fence, temp=25, mu=0.0)
+    s.x[:, 1:] = 2.4e-3, z * 1e-3
+    s.v[:] = along, across, -fall
     for _ in range(60):
         s.step()
-        assert s.points()[:, 1].max() < 2.8
+        assert s.points()[:, 1].max() < 2.8  # it stops at the wall's side, however fast, and does not hop it
+    assert s.points()[:, 1].max() > 2.5
+    assert s.points()[0, 0] == pytest.approx(along * 250, rel=0.1, abs=0.01)  # and slides along it
+
+
+@pytest.mark.parametrize("shift", (0.0, 0.3, 0.6, 0.9))
+def test_dropped_across_a_thin_wall_it_hangs_on_it(shift):
+    y = np.arange(-12, 18, 1.2) + shift
+    s = st.Strand(np.c_[0 * y, y, 0 * y + 12], 0.4, PLA, fan=False, ground=fence, temp=220)
+    for _ in range(120):
+        s.step()
+        p = s.points()
+        assert np.interp(3.0, p[:, 1], p[:, 2]) > 4.9
+    assert p[0, 2] < 0.3 and p[-1, 2] < 0.3 and s.vol.sum() == pytest.approx(math.pi / 4 * 0.4e-3 ** 2 * 28.8e-3)
+
+
+def test_cut_over_a_corner_the_new_node_lies_on_it():
+    top = lambda x, y: np.where(x >= 0, 5.0, 0.0)  # noqa: E731
+    s = st.Strand([[3.0, 0, 5.2], [1.6, 0, 5.2], [-0.4, 0, 3.9]], 0.4, PLA, fan=False, ground=top, temp=25)
+    s._grow()
+    new = s.points()[2]
+    assert len(s.x) == 4 and new[0] == pytest.approx(0.6) and new[2] >= 5.1
+    s = rod(10, ground=top, temp=25)
+    s.x[:, 2] = 4.9e-3  # and what is inside comes out, but is not thrown
+    for _ in range(20):
+        s.step()
+        assert s.points()[:, 2] == pytest.approx(5.2, abs=0.01)
 
 
 def test_halved_the_fan_stays_where_the_nozzle_is(monkeypatch):
