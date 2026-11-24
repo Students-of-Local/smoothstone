@@ -109,6 +109,8 @@ def material(name: str = "PLA") -> Material:
         cp, k = fact("pla.cp"), fact(f"{m.lower()}.k")
         if m == "PETG":
             stand += ["PETG uses PLA's specific heat (no sourced value for the melt)", note("petg.melt")]
+    if m == "ABS":
+        stand.append(note("abs.cross_wlf"))
     peel = {"PLA": fact("peel.pla"), "PETG": fact("peel.petg")}.get(m)
     if peel is None:
         peel = fact("peel.pla")
@@ -185,31 +187,33 @@ def _wind(fan: bool) -> float:
     return fact("fan_air_speed") if fan else 0.0
 
 
-def _cool(m: Material, layer: float, width: float, fan: bool, n: int = 2001):
-    """(C from Tg to the nozzle, seconds the bead takes to cool by each degree there)."""
+def _cool(m: Material, layer: float, width: float, fan: bool, n: int = 2001, air_c: float | None = None):
+    """(C from Tg to the nozzle, seconds the bead takes to cool by each degree there). air_c: default the chamber's."""
+    air_c = m.chamber if air_c is None else air_c
     a, per = _bead(width, layer)
     ts = np.linspace(m.tg, m.nozzle, n)
-    h = h_strand(4 * a / per, ts, m.chamber, _wind(fan))
+    h = h_strand(4 * a / per, ts, air_c, _wind(fan))
     with np.errstate(divide="ignore"):
-        return ts, np.where(ts > m.chamber, m.density * 1000 * m.cp * (a / per * 1e-3) / (h * (ts - m.chamber)), math.inf)
+        return ts, np.where(ts > air_c, m.density * 1000 * m.cp * (a / per * 1e-3) / (h * (ts - air_c)), math.inf)
 
 
-def cooling(mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True) -> dict:
+def cooling(mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, air_c: float | None = None) -> dict:
     """Lumped cooling of a bead from the nozzle to Tg: the mean h (W/m2 K), time constant tau, Biot number and
     seconds above Tg."""
     m = _mat(mat)
+    air_c = m.chamber if air_c is None else air_c
     a, per = _bead(width, layer)
-    ts, dt = _cool(m, layer, width, fan)
+    ts, dt = _cool(m, layer, width, fan, air_c=air_c)
     soft = float(np.sum((dt[1:] + dt[:-1]) * np.diff(ts)) / 2)
     rho_cp = m.density * 1000 * m.cp * (a / per * 1e-3)
-    span = math.log((m.nozzle - m.chamber) / (m.tg - m.chamber)) if m.tg > m.chamber else math.inf
-    h = rho_cp * span / soft if math.isfinite(soft) else float(h_strand(4 * a / per, m.tg, m.chamber, _wind(fan)))
+    span = math.log((m.nozzle - air_c) / (m.tg - air_c)) if m.tg > air_c else math.inf
+    h = rho_cp * span / soft if math.isfinite(soft) else float(h_strand(4 * a / per, m.tg, air_c, _wind(fan)))
     return {"h": h, "tau_s": rho_cp / h, "biot": h * (a / per * 1e-3) / m.k, "soft_s": soft}
 
 
-def _compliance(m: Material, layer: float, width: float, fan: bool) -> float:
+def _compliance(m: Material, layer: float, width: float, fan: bool, air_c: float | None = None) -> float:
     """The integral of dt / (3 eta) while the bead cools from the nozzle to Tg, in mm2/N."""
-    ts, dt = _cool(m, layer, width, fan, 4001)
+    ts, dt = _cool(m, layer, width, fan, 4001, air_c)
     f = dt / (fact("trouton") * viscosity(ts, 0.0, m))
     return float(np.sum((f[1:] + f[:-1]) * np.diff(ts)) / 2) * 1e6  # 1/Pa -> mm2/N
 
@@ -219,7 +223,7 @@ def reach(layer: float = 0.2) -> float:
     return layer * math.tan(math.radians(90 - fact("support_threshold_angle")))
 
 
-def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True) -> np.ndarray:
+def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, air_c: float | None = None) -> np.ndarray:
     """Downward displacement (mm, negative) of each ledge vertex, by its distance past the edge of the
     layer below. The free length starts at the reach; the ledge sags as a cantilever under its own
     weight while soft: y = q x^2 (6L^2 - 4Lx + x^2) / (24 I) x integral dt / (3 eta), and no vertex
@@ -232,7 +236,7 @@ def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool
     a, _ = _bead(width, layer)
     q = m.density * 1e-6 * fact("gravity") * a  # N/mm
     i = width * layer ** 3 / 12  # mm4, the bead bends as a width x layer rectangle
-    dz = -q * x * x * (6 * big * big - 4 * big * x + x * x) / (24 * i) * _compliance(m, layer, width, fan)
+    dz = -q * x * x * (6 * big * big - 4 * big * x + x * x) / (24 * i) * _compliance(m, layer, width, fan, air_c)
     return np.maximum(dz, -x)  # past this it hangs straight down: a falling strand (model 1), not a ledge
 
 
@@ -665,10 +669,10 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
                         hit("bridge", i, at, {"span_mm": round(span, 1), "sag_mm": round(sag, 2),
                                               "usable_mm": fact("max_bridge_length")}, [note("bridge_rule")])
                 else:
-                    tip = -float(droop([big], m, lay, width, inp.fan)[0])
+                    tip = -float(droop([big], m, lay, width, inp.fan, air)[0])
                     rule = fact("droop_rule")
                     nums = {"ledge_mm": round(big, 2), "reach_mm": round(reach(lay), 2), "droop_mm": round(tip, 3),
-                            "soft_s": round(cooling(m, lay, width, inp.fan)["soft_s"], 2)}
+                            "soft_s": round(cooling(m, lay, width, inp.fan, air)["soft_s"], 2)}
                     why = [note("droop_rule")] + ([note("fan_air_speed")] if inp.fan else [])
                     if tip >= rule["supports"] * lay:
                         hit("supports", i, at, nums, why)

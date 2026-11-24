@@ -301,3 +301,22 @@ def test_every_failsim_fact_has_a_source():
         assert e.get("assumption") or e.get("url") or e["cite"].startswith("stone"), e["id"]
         text = json.dumps(e, ensure_ascii=False)
         assert chr(0x2014) not in text and chr(0x2013) not in text, e["id"]  # no em or en dashes
+
+
+def test_an_open_printer_cools_a_bead_in_room_air():
+    warm, room = fs.cooling("ABS", fan=False), fs.cooling("ABS", fan=False, air_c=fs.fact("room_air"))
+    assert room["soft_s"] < warm["soft_s"]
+    a, b = np.zeros((60, 60), bool), np.zeros((60, 60), bool)
+    a[10:50, 10:40] = b[10:50, 10:56] = True  # 3.2 mm past the layer below
+    m = [a] * 5 + [b]
+    soft = [next(f for f in fs.predict(fs.Inputs(m, 0.2, material="ABS", fan=False, enclosed=e)) if "soft_s" in f.numbers).numbers for e in (True, False)]
+    assert soft[1]["soft_s"] == pytest.approx(round(room["soft_s"], 2)) and soft[1]["soft_s"] < soft[0]["soft_s"]
+
+
+def test_the_nozzle_drags_by_each_plastics_own_melt():
+    """300 mm/s over a 0.2 mm layer is 1500 1/s: ABS's Cross-WLF stress there on the 1 mm tip, by hand."""
+    eta0 = 2.54e12 * math.exp(-28.3 * (260 + 273.15 - 365) / (51.6 + 260 + 273.15 - 365))
+    tau = 1500 * eta0 / (1 + (eta0 * 1500 / 41070) ** (1 - 0.341))
+    drag = {m: fs.nozzle_drag(m, 300, 0.2) for m in fs.MATERIALS}
+    assert drag["ABS"] == pytest.approx(tau * math.pi * 0.5e-3 ** 2, rel=1e-3)
+    assert drag["PLA"] < drag["ABS"] < drag["PETG"] < 0.2

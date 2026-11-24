@@ -294,7 +294,8 @@
    "source": "Colon, Kazmer, Peterson, Seppala, Characterization of Die-Swell in Thermoplastic Material Extrusion, Additive Manufacturing 2023 (NIST), Table 1",
    "cite": "NIST 936451 Table 1",
    "url": "https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=936451",
-   "checked": "2026-11-24"
+   "checked": "2026-11-24",
+   "assumption": "ABS melts as a capillary rheometer measured it (Hatchbox black ABS); stretching tests on another ABS read 22 times stiffer at slow rates, which would sag less"
   },
   {
    "id": "failsim.petg.melt",
@@ -311,7 +312,7 @@
    "cite": "arXiv 2311.05158 Table 2",
    "url": "https://arxiv.org/abs/2311.05158",
    "checked": "2026-11-24",
-   "assumption": "PETG's viscosity is one measured point (600 Pa s at 240 C) moved to other temperatures by the universal WLF constants, thinning with speed as PLA does"
+   "assumption": "PETG's viscosity is one fit (600 Pa s at 240 C, the weighted mean of its 3 modes: the sum a slow sag feels is 600 to 1800, so it may sag less) moved to other temperatures by the universal WLF constants, thinning with speed as PLA does"
   },
   {
    "id": "failsim.wlf",
