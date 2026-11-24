@@ -285,11 +285,31 @@ def best_question(f: dict, post: dict[str, float], asked: list[str]) -> tuple[st
     return best if best and best[2] > 0.01 else None
 
 
+def described(said: str) -> list[str]:
+    """The failures the person's words actually describe (not differentials stone added to check)."""
+    return [f["id"] for f in catalog()["failures"] if word_score(said, f["words"], f.get("not_words", [])) > 0]
+
+
+def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
+    """SAFETY for the failures the person described. A thermal fault leads with its power-off lines, which
+    are never cut, and drops any step that heats the hotend while the fault stands."""
+    order = (["thermal_error"] if "thermal_error" in seen else []) + [f for f in seen if f != "thermal_error"]
+    out: list[str] = []
+    for fid in order:
+        for line in failure(fid).get("safety", []):
+            if "thermal_error" in seen and line.lower().startswith("heat "):
+                continue
+            if line not in out:
+                out.append(line)
+    keep = len(failure("thermal_error")["safety"]) if "thermal_error" in seen else 0
+    return out[:max(limit, keep)]
+
+
 def diagnose(said: str, printer: dict | None = None, material: str | None = None) -> dict:
     """The whole first pass, with no files: used by the command and by evals/doctor/run.py."""
     ctx = context(printer, material)
     ranked = rank_failures(said, ctx)
-    out = {"failures": ranked, "causes": {}, "question": None}
+    out = {"failures": ranked, "causes": {}, "question": None, "described": described(said)}
     if ranked:
         f = failure(ranked[0][0])
         out["causes"] = cause_priors(f, said, ctx)
@@ -468,10 +488,8 @@ def report(case: dict, p: dict | None) -> list[str]:
     for i, (cid, pr) in enumerate(causes, 1):
         lines.append(f"Cause {i}: {by_id[cid]['cause']} ({cid}) {pr:.0%}")
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
-    safety = []
-    for fid in ranked[:3]:
-        safety += [s for s in failure(fid).get("safety", []) if s not in safety]
-    lines += [f"SAFETY: {s}" for s in safety[:4]]
+    seen = [f for f in ranked[:3] if f in case.get("described", ranked[:1])]
+    lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
     for fid in ranked[:3]:
         ex = examples(fid, p["id"] if p else None)
         if ex:
@@ -570,7 +588,7 @@ def _new(args, job, said: str, out):
                         'nozzle, shifted layers)? Then: stone doctor "<their words>"')
         return out
     case.update(state="asking", failures=d["failures"][:5], failure=d["failures"][0][0], causes=d["causes"],
-                question=d["question"], asked=[], answers=[], tried=[])
+                question=d["question"], described=d["described"], asked=[], answers=[], tried=[])
     save_case(job, case)
     out.add(head, *report(case, p))
     if case["image"]:
@@ -618,7 +636,8 @@ def _try(job, case, f, p, cid, out):
     out.add(*[f"{i}. {step}" for i, step in enumerate(c["fix"], 1)])
     if c.get("plate") and p:
         out.add(f"On your {p['name']}: {printers.surface_line(p)}", printers.clean_line(p))
-    out.add(*[f"SAFETY: {s}" for s in f.get("safety", [])[:4]])
+    seen = case.get("described") or [f["id"]]
+    out.add(*[f"SAFETY: {s}" for s in safety_lines([f["id"]] + [x for x in seen if x == "thermal_error"])])
     out.add(f"Source: {source_text(c['source'])}")
     case["tried"] = [t for t in case.get("tried", []) if t != cid] + [cid]
     case["state"] = "try"
