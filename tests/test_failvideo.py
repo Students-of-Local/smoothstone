@@ -327,3 +327,34 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
     assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
+
+
+def test_strands_of_one_layer_lie_where_they_fell_while_the_next_one_comes(monkeypatch):
+    tp, inp, fail, _ = _story(_t())  # two arms, so more than one strand in the failing layer
+    st = failvideo.Story(tp, inp, fail, (255, 255, 255), (260, 260))
+    motion = st.run(fail.layer)
+    lie = [b for i, _, b, _ in st.links if i == fail.layer]
+    settled = lambda p: any(len(b) == len(p) - 1 and np.array_equal(p[1:], b) for b in lie)  # noqa: E731
+    assert len(lie) > 2 and all(settled(p) for pieces, _ in motion for p, _ in pieces[:-1])
+    assert all(settled(p) for p, _ in motion[-1][0])  # the last one comes to rest in the motion too
+    monkeypatch.setattr(failvideo, "SIM", 1e-6)  # nothing is followed: what has plastic under it is drawn as laid
+    st = failvideo.Story(tp, inp, fail, (255, 255, 255), (260, 260))
+    st.run(fail.layer)
+    on = np.asarray(inp.masks[fail.layer - 1], bool)
+    air = np.flatnonzero(st.flew)
+    flat = np.vstack([b[1] for b in st.bent if b[0] == fail.layer])
+    want = np.concatenate([st.line(j, 0.5)[on[st.px(st.line(j, 0.5))]] for j in air])
+    assert len(flat) > 20 and np.mean([np.abs(flat - p).sum(1).min() < 1e-9 for p in want]) > 0.8  # all but single points
+    assert not st.links and st.gone[air].all()
+
+
+def test_a_short_run_lays_its_plastic_and_the_plate_past_the_grid_is_bare():
+    tp, inp, _, _ = _story(_box((20, 20, 3), (0, 0, 0)))
+    st = failvideo.Story(tp, inp, failsim.Failure("supports", 5, 1.2, 1.0, "spaghetti", None, {}, []), (255, 255, 255), (260, 260))
+    run = st.runs(5, st.ext)[0][:1]
+    tp.t1[run] = tp.t0[run] + 0.002  # under one step
+    st.strand(5, run, np.ones(st.field.shape, bool), 60.0)
+    assert st.links and st.left == 0
+    st.field[:] = 0
+    st.pile(5, np.array([[-30.0, 0, 0.24], [-25.0, 0, 0.24]]), np.array([0.48]))
+    assert not st.field.any()

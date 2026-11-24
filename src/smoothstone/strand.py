@@ -87,7 +87,8 @@ def set_time(mat="PLA", d_mm: float | None = None, air_c: float | None = None, w
     return float(((q[1:] + q[:-1]) / 2 * np.diff(t)).sum())
 
 
-def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c: float | None = None, nozzle_c: float | None = None) -> dict:
+def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c: float | None = None, nozzle_c: float | None = None,
+            fan: float = 1.0) -> dict:
     """What decides where a strand goes: the hotend's hold on it, the air's, the plate's and its own heat."""
     m = failsim._mat(mat)
     d, air_c = exit_diameter(bore), m.chamber if air_c is None else air_c
@@ -97,7 +98,7 @@ def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c:
             "draw_mn": round(draw_force(m, flow_mm3_s, speed_mm_s, nozzle_c, bore=bore) * 1e3, 2), "plate_grip_mn_per_100mm": round(grip * 1e3, 2),
             "nozzle_hold_mn": round(hold["hold_n"] * 1e3, 3), "melt_wets_the_tip": hold["wets"], "blob_mm3": round(hold["blob_mm3"], 1),
             "fall_mm_s": round(fall_speed(m, d, air_c)), "set_s_still_air": round(set_time(m, d, air_c, 0, nozzle_c), 2),
-            "set_s_fan": round(set_time(m, d, air_c, failsim.fact("fan_air_speed"), nozzle_c), 2)}
+            "set_s_fan": round(set_time(m, d, air_c, fan * failsim.fact("fan_air_speed"), nozzle_c), 2)}
 
 
 def _norm(v):

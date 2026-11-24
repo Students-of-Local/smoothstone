@@ -34,6 +34,7 @@ LEAD = 30  # frames before the failure, evenly picked, so the failure is a good 
 MOTION = 8  # frames of the failure itself
 SIM = 60.0  # s of printing into air followed in all, shared by the layers; more is left out and said
 LIMIT = "s of printing into air is not drawn: the video follows"
+FALL = 480  # steps of strand.DT a dropped piece is followed, 2 s
 KEEP = 60.0  # mm of strand behind the nozzle that stays free to move
 WHAT = {"supports": "lines with nothing under them print into air and fall (spaghetti)",
         "droop": "a ledge past the reach droops while soft, then curls up",
@@ -202,14 +203,21 @@ class Story:
         took = np.maximum(tp.t1 - tp.t0, 1e-9)
         self.speed = np.linalg.norm((tp.p1 - tp.p0)[:, :3], axis=1) / took  # mm/s, the mean of each move
         self.flows = np.where(self.ext, tp.width * tp.height * self.speed, 0.0)  # mm3/s
-        mean = lambda q: float(np.average(q[self.ext], weights=took[self.ext])) if self.ext.any() else 0.0  # noqa: E731
-        self.flow, self.mean_speed = mean(self.flows), mean(self.speed)
+        self.flew = np.zeros(tp.n, bool)  # printed into air
+        self.told, self.cut = 0.0, 0  # s of it followed; pieces drawn before they lay still
+        self.mean = lambda q, of: float(np.average(q[of], weights=took[of])) if of.any() else 0.0
+        self.flow, self.mean_speed = self.mean(self.flows, self.ext), self.mean(self.speed, self.ext)
 
     def px(self, p):
         h, w = self.field.shape
         ox, oy = self.inp.origin
         return (np.clip(((p[:, 1] - oy) / self.cell).astype(int), 0, h - 1),
                 np.clip(((p[:, 0] - ox) / self.cell).astype(int), 0, w - 1))
+
+    def off(self, p):
+        """Past the grid's edge: bare plate."""
+        q = (p[:, :2] - self.inp.origin) / self.cell
+        return ((q < 0) | (q >= self.field.shape[::-1])).any(1)
 
     def line(self, j, step=1.0) -> np.ndarray:
         a, b = self.tp.p0[j, :3].copy(), self.tp.p1[j, :3]
@@ -240,14 +248,15 @@ class Story:
             p = a + (b - a) * np.linspace(0, 1, n)[:, None]
             k = int(round(w / 2 / self.cell))
             for off in np.ndindex(2 * k + 1, 2 * k + 1):
-                at = self.px(p + np.array([*((np.array(off) - k) * self.cell), 0.0]))
-                np.maximum.at(self.field, at, p[:, 2] + w / 2)
+                at = p + np.array([*((np.array(off) - k) * self.cell), 0.0])
+                at = at[~self.off(at)]
+                np.maximum.at(self.field, self.px(at), at[:, 2] + w / 2)
 
     def drop(self, i, s, pin=False):
         """What the nozzle let go, or pressed onto plastic, falls until it lies still; where it necks to a hair it breaks."""
         s.nozzle = False
         s.fixed[-1] |= pin
-        for k in range(120):
+        for k in range(FALL):
             if len(s.x) < 2:
                 return
             s.step()
@@ -256,6 +265,8 @@ class Story:
                 self.drop(i, piece)
             if not off and k > 10 and np.abs(s.v).max() < 0.005:
                 break
+        else:
+            self.cut += 1
         self.pile(i, s.points(), s.diameters())
 
     def strand(self, i, run, loose, secs, keep=False):
@@ -265,16 +276,18 @@ class Story:
         z, t0, t1 = float(self.inp.layer_z[i]), tp.t0[run], tp.t1[run]
         came = np.r_[0.0, np.cumsum(self.flows[run] * (t1 - t0))]  # mm3 out of the nozzle by each move's end
         first, snaps = len(self.links), []
-        low = np.minimum(self.field, z - d)  # what lies higher, the nozzle pushes down
-        ground = lambda x, y: low[self.px(np.c_[x, y])]  # noqa: E731
+        top = lambda: np.minimum(self.field, max(z - d, 0.0))  # noqa: E731  # what lies higher, the nozzle pushes down
+        low = top()
+        ground = lambda x, y: np.where(self.off(np.c_[x, y]), 0.0, low[self.px(np.c_[x, y])])  # noqa: E731
         plastic = lambda x, y: ground(x, y) > 0  # noqa: E731
         if self.rod is not None:
             self.rod.ground, self.rod.plastic = ground, plastic
-        n = int(min(t1[-1] - t0[0], secs) / dt)
+        took = float(t1[-1] - t0[0])
+        n = math.ceil(took / dt - 1e-9) if took <= secs else int(secs / dt)
         for q in range(n):
             t = t0[0] + (q + 1) * dt
             k = min(int(np.searchsorted(t1, t)), len(run) - 1)
-            head = tp.p0[run[k], :3] + float(np.clip((t - t0[k]) / max(t1[k] - t0[k], 1e-9), 0, 1)) * (tp.p1 - tp.p0)[run[k], :3]
+            head = tp.p0[run[k], :3] + float(np.clip((t - t0[k]) / max(t1[k] - t0[k], 1e-9), 0, 1)) * (tp.p1[run[k], :3] - tp.p0[run[k], :3])
             out = float(np.diff(np.interp([t - dt, t], np.r_[t0[0], t1], came))[0]) / dt
             at = self.px(head[None])
             solid = not loose[at][0]
@@ -288,20 +301,28 @@ class Story:
             s = self.rod
             s.flow = out * 1e-9
             s.step(dt, head)
-            if solid and len(s.x) > 2 and not loose[self.px(s.points()[-2:-1])][0]:  # printed on plastic as usual
+            if solid and out > 0 and len(s.x) > 2 and not loose[self.px(s.points()[-2:-1])][0]:  # printed on plastic as usual
                 s.fixed[-2], s.v[-2], s.x[-2, 2] = True, 0.0, (z - d / 2) * 1e-3
             if q % 40 == 0 and len(s.x) > 250:
                 self.pile(i, *s.lay(2 * KEEP), skip=3)
-                low[:] = np.minimum(self.field, z - d)
+                low[:] = top()
             for piece in s.snap():
                 self.drop(i, piece)
+                low[:] = top()
             if len(s.x) < 2:
                 self.rod = None
             if keep and q % max(1, n // 60) == 0:
                 got = [(np.vstack([a, b[-1:]]), w) for _, a, b, w in self.links[first:]]
                 snaps.append((got + ([(s.points(), s.diameters())] if self.rod else []), head))
-        self.left += max(0.0, float(t1[-1] - t0[0]) - n * dt - dt)
-        cut = t1[-1] - t0[0] > secs
+        self.left += max(0.0, took - n * dt)
+        cut = took > secs
+        for j in run[self.ext[run] & (t1 > t0[0] + n * dt)] if cut else ():  # not followed, but laid where there is plastic under it
+            p = self.line(j, 0.5)
+            on = ~loose[self.px(p)] & (tp.t0[j] + np.linspace(0, 1, len(p)) * (tp.t1[j] - tp.t0[j]) >= t0[0] + n * dt)
+            for part in np.split(np.arange(len(p)), np.flatnonzero(np.diff(on)) + 1):
+                if on[part[0]] and len(part) > 1:
+                    flat = np.zeros(len(part))
+                    self.bent.append((i, p[part], flat, flat, flat > 0, flat.astype(int) + i, float(tp.width[j]), float(tp.height[j])))
         if self.rod is not None:
             if self.kind != "detach" or cut:
                 s, self.rod = self.rod, None
@@ -335,12 +356,15 @@ class Story:
             self.notes.append(failsim.note("nozzle_tip"))
         layers = range(L + (self.kind == "detach"), last + 1)
         for i in layers:
-            secs = SIM / max(1, len(layers))
+            secs = (SIM - self.told) / (last + 1 - i)
             moves = np.flatnonzero(self.ext & (tp.layer == i))
             if self.kind == "detach":
                 self.gone[moves] = True
                 if len(moves):
-                    self.strand(i, np.flatnonzero(tp.layer == i), np.ones(self.field.shape, bool), secs)
+                    run = np.flatnonzero(tp.layer == i)
+                    self.strand(i, run, np.ones(self.field.shape, bool), secs)
+                    self.told += min(secs, float(tp.t1[run[-1]] - tp.t0[run[0]]))
+                    self.flew[moves] = True
                 self.blobs[i] = self.blob
                 continue
             mk = np.asarray(inp.masks[i], bool)
@@ -362,22 +386,28 @@ class Story:
             self.field[solid] = np.maximum(self.field[solid], inp.layer_z[i])
             loose = (d > self.rch) & ~held
             air = [j for j in moves if loose[self.px(self.line(j))].any()]
-            self.gone[air] = True
+            self.gone[air] = self.flew[air] = True
             over = np.zeros(tp.n, bool)
             over[air] = True
             for run in self.runs(i, over):
                 took = float(tp.t1[run[-1]] - tp.t0[run[0]])
+                before = [(np.vstack([a, b[-1:]]), w) for k, a, b, w in self.links if k == i]  # where the runs before lie
                 got = self.strand(i, run, loose, secs, keep=i == L)
-                secs = max(0.0, secs - took)
+                self.told, secs = self.told + min(secs, took), max(0.0, secs - took)
                 if i == L and self.kind == "supports":
-                    before = motion[-1][0] if motion else []
                     motion += [(before + pieces, head) for pieces, head in got]
+            if i == L and motion:  # and where they come to lie
+                motion.append(([(np.vstack([a, b[-1:]]), w) for k, a, b, w in self.links if k == i], motion[-1][1]))
             self.bend(i, np.setdiff1d(moves, air))
+        if self.flew.any():
+            self.flow, self.mean_speed = self.mean(self.flows, self.flew), self.mean(self.speed, self.flew)
+        if self.cut:
+            self.notes.append(f"{self.cut} pieces still moved {FALL * strand.DT:.0f} s after the nozzle let them go, and are drawn as they were then")
         if self.links:
             self.notes += [failsim.note(k) for k in ("die_swell", "strand_friction", "weld_rule", "fan_reach", "thread_limit")]
         if self.left > 0.5:
-            self.notes.append(f"{self.left:.0f} {LIMIT} {SIM:.0f} s of it, the start of each layer")
-        if self.bent:
+            self.notes.append(f"{self.left:.0f} {LIMIT} {self.told:.0f} s of it, the start of each layer")
+        if any((b[2] != 0).any() for b in self.bent):
             self.notes.append("assumption: layers above a sagged or drooped piece lie on it, bent the same way")
         return motion
 
@@ -646,7 +676,7 @@ def cmd(args, job, prof, out):
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
             "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
-            "predicted": [x.kind for x in fails], "strand": strand.numbers(inp.material, st.flow, st.mean_speed), "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
+            "predicted": [x.kind for x in fails], "strand": strand.numbers(inp.material, st.flow, st.mean_speed, air_c=inp.air, fan=float(inp.fan)), "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
             "pre_failure_frame": str(files[first - 1].relative_to(dest)) if first else None,
             "first_failure_frame": str(files[first].relative_to(dest)),
             "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"], "failing": k >= first,
@@ -659,8 +689,8 @@ def cmd(args, job, prof, out):
         out.add(f"Strand: {n['strand_mm']} mm thick, it leaves the nozzle at {n['payout_mm_s']} mm/s while the nozzle moves at {n['nozzle_mm_s']}. "
                 f"Pulling it that fast takes {n['draw_mn']} mN; 100 mm of it on the plate holds {n['plate_grip_mn_per_100mm']} mN, so "
                 f"the hotend {'drags it along' if n['draw_mn'] > n['plate_grip_mn_per_100mm'] else 'draws it thin'} until something holds it.")
-        out.add(f"Air and heat: it falls at {n['fall_mm_s'] / 1000:.1f} m/s at most, and sets in {n['set_s_still_air']} s ({n['set_s_fan']} s in the "
-                f"fan's air). The nozzle's tip carries {n['blob_mm3']} mm3.")
+        out.add(f"Air and heat: it falls at {n['fall_mm_s'] / 1000:.1f} m/s at most, and sets in {n['set_s_still_air']} s"
+                + (f" ({n['set_s_fan']} s in the fan's air)" if inp.fan else "") + f". The nozzle's tip carries {n['blob_mm3']} mm3.")
     for x in (x for x in st.notes if LIMIT in x):
         out.add(f"Limit: {x}.")
     out.add(f"Sheet: {png}")
