@@ -618,6 +618,7 @@ class Inputs:
     enclosed: bool = True  # False: an open printer, air at fact("room_air")
     infill: float | None = None  # %, default the K2 profile's sparse infill; 100 prints solid
     supports: bool = False
+    brim: np.ndarray | None = None  # what is printed round the first layer and holds it, as a mask
     speed: float | None = None  # mm/s, default the K2 profile's inner wall
     width: float | None = None  # mm, default the K2 profile's outer wall
     drag: float | None = None  # N, a push to use instead of the nozzle's drag
@@ -692,6 +693,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     fr, fc = np.nonzero(foot)
     px, py = inp.origin[0] + (fc + 0.5) * cell, inp.origin[1] + (fr + 0.5) * cell
     area = foot.sum() * cell * cell
+    grip = area + (0 if inp.brim is None else inp.brim.sum() * cell * cell)
     pull, shear = fact("adhesion.pulloff") * inp.clean, fact("adhesion.shear") * inp.clean
     lever = []  # per direction: the far edge, and the sum of each footprint mm2's distance to it
     narrow = math.inf  # the footprint's narrowest width: the layers within it of the plate load it
@@ -763,8 +765,8 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
                 "edge_zone_mpa": round(es["zone"], 2), "moment_nmm_per_mm": round(es["moment"], 2),
                 "bottom_c": round(float(temps[0]), 1), "top_c": round(float(temps[-1]), 1), "air_c": air,
                 "plate_factor": inp.clean}, [*warp, note("peel_specimen")], "bed_adhesion" if inp.clean < 1 else "warping")
-        elif push > shear * area:
-            hit("detach", i, None, {"push_n": round(push, 3), "hold_n": round(shear * area, 2)},
+        elif push > shear * grip:
+            hit("detach", i, None, {"push_n": round(push, 3), "hold_n": round(shear * grip, 2)},
                 [note("nozzle_tip")], "bed_adhesion")
         else:
             h = float(zs[i])

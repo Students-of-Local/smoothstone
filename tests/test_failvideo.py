@@ -380,3 +380,50 @@ def test_a_short_run_lays_its_plastic_and_the_plate_past_the_grid_is_bare():
 def test_the_fans_share_is_the_winds():
     still, half, full = (failvideo.strand.numbers("PLA", 10.0, 120.0, fan=f)["set_s_fan"] for f in (0.0, 0.4, 1.0))
     assert still > half > full and failvideo.strand.Strand([(0, 0, 0), (0, 0, 1)], 0.48, "PLA", fan=0.4).fan == pytest.approx(0.4 * failsim.fact("fan_air_speed"))
+
+
+def test_a_skirt_is_not_the_part_and_stays_when_it_goes():
+    tp = gcode.parse(Path(__file__).parent / "fixtures" / "gcode" / "prusa_screw.gcode.gz")
+    gcode.plan(tp)
+    skirt = failvideo.moves_of(tp, "skirt")
+    assert skirt.any()
+    inp = failvideo.inputs(tp, "PLA", enclosed=False)
+    r, c = np.nonzero(inp.masks[0])
+    wide = (c.max() - c.min() + 1) * inp.cell
+    assert 22 < wide < 26 and not inp.brim.any()  # the screw's head, 23.6 mm wide; the skirt round it is 31.4
+    assert not any("brim" in n for n in inp.notes)
+    fail, _ = failvideo.choose(failsim.predict(inp), "detach", inp)
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    assert not (st.ext & skirt).any() and st.ext.any()
+
+
+def test_a_brim_holds_against_sliding_and_goes_with_the_part():
+    tp = _toolpath(_box((20, 20, 2), (0, 0, 0)))
+    F = timelapse.gcode.FEATURES
+    bare = failvideo.inputs(tp, "PLA")
+    tp.feature[(tp.layer == 0) & (tp.feature == F.index("outer wall"))] = F.index("skirt")
+    inp = failvideo.inputs(tp, "PLA")
+    total = int(bare.masks[0].sum())
+    assert 0 < inp.brim.sum() and abs(int((inp.brim | inp.masks[0]).sum()) - total) < 0.05 * total
+    assert inp.masks[0].sum() < total and any("brim" in n for n in inp.notes)
+    hold = [failsim.predict(replace(i, drag=1e6, brim=b))[0].numbers["hold_n"] for i, b in ((inp, None), (inp, inp.brim))]
+    grown = inp.brim.sum() * inp.cell ** 2 * failsim.fact("adhesion.shear")
+    assert hold[1] - hold[0] == pytest.approx(grown, rel=1e-3)
+    fail, _ = failvideo.choose(failsim.predict(inp), "detach", inp)
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    assert (st.ext == (tp.extruding() & (tp.layer >= 0))).all()
+
+
+def test_strands_fall_on_the_part_where_it_slid_to():
+    tp, inp, fail, _ = _story(_box((20, 20, 2), (0, 0, 0)), "detach")
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    st.loose(30.0)
+    st.moved()
+    move = st.mats[-1][:2, 3]
+    r, c = np.nonzero(inp.masks[0])
+    mid = np.array([inp.origin[0] + (c.mean() + 0.5) * inp.cell, inp.origin[1] + (r.mean() + 0.5) * inp.cell])
+    top = float(inp.layer_z[st.L])
+    near = lambda at: st.field[st.px(np.c_[at + np.stack(np.meshgrid(*[np.linspace(-3, 3, 31)] * 2), -1).reshape(-1, 2), np.zeros(961)])]  # noqa: E731
+    assert np.linalg.norm(move) > 15
+    assert near(mid + move).max() == pytest.approx(top, abs=0.01)
+    assert near(mid).max() == 0  # it left that spot bare
