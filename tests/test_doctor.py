@@ -402,6 +402,18 @@ def test_r2_thermal_fault_leads_whatever_else_scores(work, said):
     assert not any(h in text.lower() for h in ("heat the hotend", "with the hotend hot", "heat up and push")), text
 
 
+def test_r2_thermal_fault_keeps_heating_steps_out_of_try(work):
+    stone("doctor", "Blocked nozzle. MINTEMP.")
+    text, code, nxt = stone("doctor", "try", "debris_or_burnt")
+    assert "Heat up and push" not in text, text
+    for cid in [c["id"] for c in doctor.failure("clog")["causes"]]:
+        assert "Heat up" not in stone("doctor", "try", cid)[0]
+
+
+def test_r2_a_denied_thermal_fault_does_not_lead():
+    assert doctor.diagnose("no thermal error on the screen, just strings everywhere")["failures"][0][0] == "stringing"
+
+
 def test_r2_two_photo_cases_in_one_second_keep_their_own_folders(work, monkeypatch):
     import datetime as real
 
@@ -431,12 +443,21 @@ def test_r2_a_case_keeps_the_printer_it_was_opened_with(work):
     assert json.loads((case_dir / "case.json").read_text())["printer"] == "bambu_a1"
 
 
+def test_r2_stone_printer_set_after_open_does_change_the_case(work):
+    stone("doctor", "--image", str(_photo(work / "a.jpg")), "--printer", "bambu_a1")
+    stone("printer", "set", "prusa_mk4s")  # the person set another printer on purpose
+    text, code, nxt = stone("doctor", "the part came off the bed")
+    assert text.splitlines()[0].endswith("Original Prusa MK4S"), text
+
+
 @pytest.mark.parametrize("text,want", [
     ("I never wash it", None),  # a negator says nothing about yes or no: ask again
+    ("didn't clean it in weeks", None),
     ("it never gets washed", None),
     ("no, I wash it before every print", "no"),
     ("nope", "no"),
     ("yes it has", "yes"),
+    ("it is not", None),
 ])
 def test_r2_a_bare_negator_is_not_a_no(text, want):
     assert doctor.answer_key(text, ["yes", "no"]) == want
@@ -501,3 +522,7 @@ def test_looks_names_what_the_words_do_not(work):
     assert code == 1 and "FIX: unknown --looks id: spagetti" in text and nxt == "stone doctor looks"
     text, code, nxt = stone("doctor", "looks")
     assert "--looks" in nxt and "toppled: " in text and "broken stub" in text
+
+@pytest.mark.parametrize("text", ["yes and no", "yes, no", "no... well, yes"])
+def test_r2_yes_and_no_at_once_asks_again(text):
+    assert doctor.answer_key(text, ["yes", "no"]) is None

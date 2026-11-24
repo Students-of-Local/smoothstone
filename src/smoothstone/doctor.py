@@ -372,6 +372,8 @@ def answer_key(text: str, keys: list[str]) -> str | None:
     if any(norm(w) in t for w in words.get("unknown", [])):
         return "unknown"
     toks = t.split()
+    if {"yes", "no"} <= set(keys) and set(toks) & LEAD["yes"] and set(toks) & LEAD["no"]:
+        return None  # "yes and no": ask again
     for k, lead in LEAD.items():
         if k in keys and toks and toks[0] in lead:
             return k
