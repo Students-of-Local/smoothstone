@@ -1637,6 +1637,13 @@ def cmd_refs(args, job: Job) -> Out:
     return out
 
 
+def cmd_fit(args, job: Job) -> Out:
+    """What each hole, peg and fit setting prints at on this printer, and what it fits (fit.py)."""
+    from . import fit
+
+    return fit.cmd(args, job)
+
+
 def cmd_video(args, job: Job) -> Out:
     """A vertical clip of a finished painted job for X, from the run log of the model that made it.
     The log defaults to log.json beside the job folder, where evals/run.py writes it."""
@@ -2587,6 +2594,9 @@ def make_parser() -> Parser:
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
     s.add_argument("items", nargs="*")
 
+    s = sub.add_parser("fit", parents=[common], help="printed size and fit of holes, pegs and clearances: stone fit")
+    s.add_argument("items", nargs="*")
+
     s = sub.add_parser("video", parents=[common], help="a vertical clip of a finished painted job for X")
     s.add_argument("log", nargs="?", help="the run log (default: log.json beside the job)")
     s.add_argument("--out", help="output folder (default: <job>/video)")
@@ -2631,6 +2641,7 @@ COMMANDS = {
     "colors": cmd_colors,
     "video": cmd_video,
     "printer": printers.cmd_printer,
+    "fit": cmd_fit,
 }
 
 
@@ -2648,7 +2659,7 @@ SYNONYMS = {"create": "new", "make": "new", "start": "new", "list": "recipes",
             "search": "recipes", "info": "show", "scale": "measure", "describe": "show", "finish": "done", "check_status": "status",
             "color": "colors", "colour": "colors", "colours": "colors", "paint": "colors",
             "references": "refs", "reference": "refs", "material": "refs", "materials": "refs",
-            "printers": "printer"}
+            "printers": "printer", "tolerance": "fit", "clearance": "fit"}
 NO_WORDS = ("status", "build", "done")
 
 
@@ -2685,7 +2696,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "usage", "error")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "fit", "usage", "error")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:

@@ -1,11 +1,12 @@
-"""stone fit's feature finder: round holes and pegs in a built mesh, with their exact facets."""
+"""stone fit: what each hole and peg prints at, and what it fits. Holes print small by their
+facets (an n-sided polygon inscribed in the circle) plus the printer's own error."""
 import os
 import subprocess
 
 import pytest
 
 from smoothstone import config, fit
-from test_cli import REPO
+from test_cli import REPO, stone
 
 
 def mesh_of(tmp_path, openscad, body: str):
@@ -64,4 +65,34 @@ def test_a_peg_is_a_peg_and_a_teardrop_is_a_hole(tmp_path, openscad):
     got = {(f.kind, f.shape, round(f.d, 2)) for f in fit.find_features(m)}
     assert ("peg", "round", 6.0) in got
     assert ("hole", "teardrop", 4.5) in got
+
+
+# an M3 hole drawn at 3.0 mm is tight; the fix is ISO 273 medium
+
+def test_an_m3_hole_at_3_mm_is_tight_and_the_fix_is_iso_medium():
+    pr = fit.printer()
+    row = fit.lib()["iso273.m3"]["value"]
+    assert row["medium"] == 3.4
+    ln = fit.screw_line("hole", 3.0, 96, pr, 0.0006, "M3", row, "hole_d")
+    assert ln.verdict == "tight"
+    assert ln.param == "hole_d"
+    assert fit.printed_hole(ln.value, 96, pr, 0.0006) == pytest.approx(3.4, abs=0.03)
+    assert "ISO 273 medium for M3: 3.4 mm" in ln.text
+
+
+def test_stone_fit_flags_an_m3_panel_hole_and_its_fix_fits(jobenv, openscad, monkeypatch):
+    monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
+    stone("new", "A 60 by 40 mm cover plate with two M3 screw holes")
+    stone("set", "panel", "hole_d=3.0", "cutouts=0")
+    _, code, _ = stone("build")
+    assert code == 0
+    text, code, nxt = stone("fit")
+    assert code == 0
+    assert "tight" in text and "ISO 273 medium for M3: 3.4 mm" in text, text
+    assert nxt == "stone set panel hole_d=3.6"
+    stone(*nxt.split()[1:])
+    stone("build")
+    text, _, nxt = stone("fit")
+    assert "hole_d=3.6" in text and "fits" in text and "tight" not in text, text
+    assert nxt.startswith("none, the part is ready"), nxt
 
