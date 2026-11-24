@@ -255,3 +255,11 @@ def test_gallery_examples(tmp_path, monkeypatch):
     assert [Path(p).name for p in ex] == ["b.jpg", "a.jpg"]
     monkeypatch.setattr(doctor, "LABELS", tmp_path / "missing.jsonl")
     assert doctor.examples("stringing", None) == []
+
+
+# review round 1 (PR #92)
+
+
+def test_gallery_from_the_repo_is_found():
+    ex = doctor.examples("spaghetti", None)
+    assert ex and all(Path(p).is_file() for p in ex)

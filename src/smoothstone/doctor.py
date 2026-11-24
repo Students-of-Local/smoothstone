@@ -18,13 +18,13 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from . import printers
+from . import config, printers
 from . import refs as reftool
 from .job import read_json, write_json
 
 FAIL_DIR = Path(__file__).resolve().parent / "failures"
 CATALOG = FAIL_DIR / "catalog.json"
-LABELS = FAIL_DIR / "gallery" / "labels.jsonl"
+LABELS = config.REPO_ROOT / "failures" / "gallery" / "labels.jsonl"  # the gallery, at the checkout root like recipes/
 SURE = 0.70  # the top cause past this: stop asking, try its fix
 MAX_PX = 1280
 NOT_SEEN = ("clog", "heat_creep", "feeder_grinding", "multi_material_feed", "thermal_error", "other")
@@ -283,7 +283,7 @@ def answer_key(text: str, keys: list[str]) -> str | None:
     return None
 
 
-# the gallery Track G writes (optional)
+# the gallery Track G writes (failures/gallery/labels.jsonl; its printer field is a name, not an id)
 
 
 def examples(fid: str, printer_id: str | None, n: int = 3) -> list[str]:
@@ -297,7 +297,9 @@ def examples(fid: str, printer_id: str | None, n: int = 3) -> list[str]:
             continue
         if r.get("failure") == fid and r.get("file"):
             rows.append(r)
-    rows.sort(key=lambda r: r.get("printer") != printer_id)
+    p = printers.get(printer_id) if printer_id else None
+    mine = {printer_id, p["name"] if p else None, printers.short_name(p) if p else None} - {None}
+    rows.sort(key=lambda r: r.get("printer") not in mine)
     return [str((LABELS.parent / r["file"]).resolve()) for r in rows[:n]]
 
 
