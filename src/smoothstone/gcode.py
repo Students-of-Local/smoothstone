@@ -326,8 +326,10 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
         elif cmd in HEAT and words.get("S", words.get("R", 0.0)) > 0:
             k, v, tool = HEAT[cmd], words.get("S", words.get("R")), words.get("T")
             if k == 2:
-                hot = {**hot, tool: v} if tool is not None else {}
-            if k != 2 or tool in (None, 0.0 if math.isnan(at[4]) else at[4]):  # an idle tool's heat is not the print's
+                now = 0.0 if math.isnan(at[4]) else at[4]
+                if tool is not None or hot:  # one nozzle for all tools never names one
+                    hot[now if tool is None else tool] = v
+            if k != 2 or tool in (None, now):  # an idle tool's heat is not the print's
                 at[k] = v
         elif re.fullmatch(r"T\d\d?", cmd):
             at[4] = float(cmd[1:])
@@ -366,8 +368,9 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     tp.infill = float(m.group(1)) if m else None
     m = re.search(r"^;\s*filament_type\s*=\s*(.+)", text, re.M)
     kinds = [k.strip(' "').upper() for k in re.split("[;,]", m.group(1))] if m else [""]
-    tools = tp.run[tp.part(), 4]  # the one that prints the part says which plastic it is
-    k = np.bincount(tools.astype(int)).argmax() if len(tools) and np.isfinite(tools).all() else len(kinds)
+    tools = tp.run[tp.part() & (tp.layer >= 0), 4]  # the one that prints the part says which plastic it is
+    tools = tools[np.isfinite(tools)].astype(int)
+    k = np.bincount(tools).argmax() if len(tools) else len(kinds)
     tp.material = kinds[0] if len(set(kinds)) == 1 else kinds[k] if k < len(kinds) else ""
     _fill_heights(tp)
     d = tp.p1 - tp.p0

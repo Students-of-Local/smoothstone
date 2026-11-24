@@ -227,7 +227,8 @@ def test_a_file_that_says_nothing_of_heat_is_not_given_any():
 
 def test_the_tool_that_prints_the_part_says_its_heat_and_plastic():
     line = "\nG1 X{} E{} F1200\n".format
-    text = "; filament_type = PLA;PETG\nM104 T0 S220\nM104 T1 S245\n;TYPE:Support\nT0" + line(1, 1) + ";TYPE:Inner wall\nT1" + line(9, 3)
+    text = ("; filament_type = PLA;PETG\nM104 T0 S220\nM104 T1 S245\n;TYPE:Custom\nM109 S222" + line(1, 1)  # a purge line
+            + ";LAYER_CHANGE\n;TYPE:Support\nT0" + line(2, 2) + ";TYPE:Inner wall\nT1" + line(9, 3))
     tp = gcode.parse(text + "M104 T0 S150" + line(20, 5))
-    assert tp.material == "PETG" and tp.run[:, 2].tolist() == [220, 245, 245]  # T0 waits at 150 C
+    assert tp.material == "PETG" and tp.run[:, 2].tolist() == [222, 222, 245, 245]  # T0 waits at 150 C
     assert gcode.parse(text.replace("T0\n", "\n").replace("T1\n", "\n")).material == ""  # no tool named: not known which

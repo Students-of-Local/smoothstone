@@ -290,11 +290,17 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     assert base[0].startswith("this is a model, not a recording; PLA (60 C bed, 200 C nozzle, open printer")
     tp.run[tp.layer < 3, 0] = np.nan
     assert failvideo.inputs(tp, "PLA").fan == 1  # the file says it from layer 4 on
-    asa = tmp_path / "asa.gcode"
-    asa.write_text(gcode.read(file).replace("; filament_type = PLA", "; filament_type = ASA"))
-    text, code = cli.run(["timelapse", "--gcode", str(asa), "--fail", "bridge"])  # PLA's numbers: not at ASA's heat
-    assert "no ASA, so this is PLA's" in text and "Not taken from the print file, so the K2 profile's: bed, nozzle" in text, text
+    other = tmp_path / "other.gcode"
+    for said, more, line, own in (("PLA", (), "Material: PLA, the G-code says.", True), ("ASA", (), "no ASA, so this is PLA's", False),
+                                  ("ASA", ("--material", "ABS"), "Material: ABS.", True), ("PLA", ("--material", "ABS"), "Material: ABS.", False),
+                                  (None, (), "PLA is assumed", False)):  # another plastic's heat is not this one's
+        other.write_text(gcode.read(file).replace("; filament_type = PLA", f"; filament_type = {said}" if said else ";"))
+        text, code = cli.run(["timelapse", "--gcode", str(other), "--fail", "bridge", *more])
+        assert line in text and ("bed 60 C" in text) is own and ("not the print's own: bed, nozzle" in text) is not own, text
+    tp.run[:, [0, 3]] = 0.4, 45
+    inp = failvideo.inputs(tp, "PLA")
+    assert (inp.fan, inp.air) == (0.4, 45) and failvideo.inputs(tp, "PLA", enclosed=False).air == failsim.fact("room_air")
     tp.run[:] = np.nan
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
-    assert "K2 profile's: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
+    assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]

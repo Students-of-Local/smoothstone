@@ -74,7 +74,7 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True) -> dict:  # h
         missing.append("chamber")
     notes = [f"this print's own settings: {', '.join(said)}"] if said else []
     if missing:
-        notes.append(f"{'not in the print file' if heat else 'not taken from the print file'}, so the K2 profile's: {', '.join(missing)}" + (" (fan full on)" if fan is None else ""))
+        notes.append(f"the K2 profile's, not the print's own: {', '.join(missing)}" + (" (fan full on)" if fan is None else ""))
     return {**got, "material": m, "fan": True if fan is None else fan, "notes": notes}
 
 
@@ -510,16 +510,15 @@ def cmd(args, job, prof, out):
         from . import supports
 
         without = asked == "on" or supports.analyze(supports.load(f), columns=True)["needed"]
-    own = tp.material if not args.material else ""
-    mat = (args.material or own or (refs.material_for(job.request()).material if job.exists() else "PLA")).upper()
-    note = [f"material: {mat}, the G-code says" if own else
-            f"material: {mat}" if args.material or job.exists() else "material: PLA is assumed; say --material PETG or ABS"]
-    known = mat in failsim.MATERIALS
-    if not known:
-        note = [f"material: the model has no {mat}, so this is PLA's"]
-        mat = "PLA"
+    asked_for = refs.material_for(job.request()).material.upper() if job.exists() else ""
+    said = (args.material or tp.material or asked_for).upper()
+    mat = next((k for k in (said, asked_for) if k in failsim.MATERIALS), "PLA")
+    note = ["material: PLA is assumed; say --material PETG or ABS" if not said else
+            f"material: the model has no {said}, so this is {mat}'s" if mat != said else
+            f"material: {mat}" + ("" if args.material or not tp.material else ", the G-code says")]
+    heat = tp.material == mat or mat == said and tp.material not in failsim.MATERIALS  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
-    inp = inputs(tp, mat, clean, prof.get("enclosed", True), known)
+    inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat)
     fails = failsim.predict(inp)
     fail, what_if = choose(fails, mode, inp)
     taken = without and asked != "off"
