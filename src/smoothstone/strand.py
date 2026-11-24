@@ -175,7 +175,7 @@ class Strand:
         self.fixed = np.zeros(n, bool)
         self.fixed[list(held)] = True
         self.nozzle, self.flow, self.area = nozzle, flow * 1e-9, math.pi / 4 * (exit_diameter(bore) * 1e-3) ** 2
-        self.fan, self.reach = (failsim.fact("fan_air_speed") if fan else 0.0), failsim.fact("fan_reach") * 1e-3
+        self.fan, self.reach = fan * failsim.fact("fan_air_speed"), failsim.fact("fan_reach") * 1e-3
         self.ground, self.plastic = ground, plastic
         self.mu = failsim.fact("strand_friction") if mu is None else mu
         self.seg = seg * 1e-3
