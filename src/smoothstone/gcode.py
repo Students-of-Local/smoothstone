@@ -2,7 +2,7 @@
 
 Reads what OrcaSlicer, PrusaSlicer, Bambu Studio, Creality Print and Cura write: G0/G1/G2/G3 (arcs
 cut into 1 mm chords, Klipper's default arc resolution), G90/G91, M82/M83, G92, G4, layer markers
-(;LAYER_CHANGE with ;Z:, ; CHANGE_LAYER with ; Z_HEIGHT:, Cura's ;LAYER:n, M73 L), feature comments
+(;LAYER_CHANGE with ;Z:, ; CHANGE_LAYER with ; Z_HEIGHT:, Cura's ;LAYER:n), feature comments
 (;TYPE:, Bambu's ; FEATURE:), line widths (;WIDTH: / ;HEIGHT:, ; LINE_WIDTH: / ; LAYER_HEIGHT:) and the motion limits (M201, M203, M204, M205, M566,
 SET_VELOCITY_LIMIT).
 
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import re
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,6 +27,7 @@ FEATURES = ("outer wall", "inner wall", "sparse infill", "solid infill", "top su
             "bridge", "support", "support interface", "skirt", "prime tower", "other")
 _FEATURE_WORDS = (  # first match wins, on the lower-cased ;TYPE: text
     ("support interface", "support interface"), ("support-interface", "support interface"),
+    ("support material interface", "support interface"),
     ("support", "support"), ("external perimeter", "outer wall"), ("outer wall", "outer wall"),
     ("wall-outer", "outer wall"), ("overhang", "outer wall"), ("perimeter", "inner wall"), ("wall", "inner wall"),
     ("top", "top surface"), ("bottom", "bottom surface"), ("bridge", "bridge"), ("solid", "solid infill"),
@@ -66,9 +68,9 @@ class Toolpath:
     height: np.ndarray  # mm, its layer height
     dwell: np.ndarray  # s of G4 before the move
     layer_z: list  # mm, each layer's height as the file names it
-    jerk: list  # x y z e mm/s
-    max_feed: list
-    max_accel: list
+    jerk: list | np.ndarray  # x y z e mm/s: one row for the whole print, or (n, 4) when the file changes them
+    max_feed: list | np.ndarray
+    max_accel: list | np.ndarray
     source: str = "gcode"
     slicer: str = ""
     estimate_s: float | None = None  # the slicer's own estimate from the file, s
@@ -138,6 +140,12 @@ def _arc(x0, y0, x1, y1, i, j, cw: bool, turns: int = 0):
     return pts
 
 
+def _comment_number(c: str) -> float | None:
+    """The number after a comment's colon; None when a person wrote words there."""
+    m = re.match(r"\s*([-+]?(?:\d+\.?\d*|\.\d+))\s*(?:mm)?\s*$", c.split(":", 1)[1])
+    return float(m.group(1)) if m else None
+
+
 def read(path) -> str:
     """A G-code file's text; .gz files are read through gzip."""
     path = Path(path)
@@ -151,7 +159,7 @@ def read(path) -> str:
 def parse(source, limits: Limits | None = None) -> Toolpath:
     """A G-code file (path or text) as a Toolpath, times not yet planned."""
     text = read(source) if isinstance(source, Path) or (isinstance(source, str) and "\n" not in source) else str(source)
-    lim = limits or Limits()
+    lim = deepcopy(limits) if limits else Limits()
     pos = [0.0, 0.0, 0.0, 0.0]
     absolute, e_abs = True, True
     scale = 1.0
@@ -159,10 +167,10 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     layer, feature, width, height = -1, FEATURES.index("other"), 0.0, 0.0
     layer_z: list[float] = []
     pending_z = False  # a layer began but its height is not known yet
-    last_z_comment = None
     dwell = 0.0
     fil_area = math.pi * (1.75 / 2) ** 2
     rows: list[tuple] = []
+    sets: list[tuple] = []  # each set of limits that was in force, in file order; a row names its set
     slicer = ""
     head = text[:4000]
     m = re.search(r"generated (?:by|with) ([^\n]+)", head, re.I) or re.search(r";\s*(Cura_SteamEngine [^\n]+)", head)
@@ -176,6 +184,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     # Cura marks layers with ;LAYER:n; others write ;LAYER_CHANGE, and a Klipper start script may add
     # ;LAYER:n beside it for the printer's display: count those only when nothing else marks layers
     cura_layers = not re.search(r"^;\s*(LAYER_CHANGE|CHANGE_LAYER)\s*$", text, re.M)
+    rrf = bool(re.search(r"^\s*M566\b|gcode_flavor\s*=\s*reprapfirmware", text, re.M))  # its M203 is mm/min too
     for key, k in (("x", 0), ("y", 1), ("z", 2), ("e", 3)):  # Orca and Creality write the machine limits in their config block
         mj = re.search(rf";\s*machine_max_jerk_{key}\s*=\s*([\d.]+)", text)
         if mj:
@@ -188,7 +197,10 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
         pending_z = z is None
 
     def move(target, f, cw=None, ij=None, turns=0):
-        nonlocal pos
+        nonlocal pos, dwell
+        now = (*lim.jerk, *lim.max_feed, *lim.max_accel)
+        if not sets or sets[-1] != now:
+            sets.append(now)
         e_move = target[3] - pos[3]
         accel = lim.print_accel if e_move > 0 else lim.travel_accel
         if abs(e_move) > 0 and all(abs(target[k] - pos[k]) < 1e-9 for k in range(3)):
@@ -202,12 +214,9 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
         for (x, y), s in zip(pts, share):
             done += s
             end = [x, y, start[2] + (target[2] - start[2]) * done, start[3] + e_move * done]
-            w = width
-            if e_move > 0 and not w:
-                ln = math.hypot(end[0] - pos[0], end[1] - pos[1])
-                w = (end[3] - pos[3]) * fil_area / max(ln * (height or 0.2), 1e-9) if ln > 0 else 0.0
-            rows.append((*pos, *end, f, accel, layer, feature, w if e_move > 0 else 0.0, height, dwell))
-            pos = end
+            rows.append((*pos, *end, f, accel, layer, feature, width if e_move > 0 else 0.0, height, dwell,
+                         len(sets) - 1))
+            pos, dwell = end, 0.0  # the wait comes before the first chord only
         pos = list(target)
 
     for raw in text.splitlines():
@@ -222,17 +231,18 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
             elif cura_layers and re.match(r"layer:-?\d+$", cl):
                 new_layer(None)
             elif cl.startswith("z:") or cl.startswith("z_height:"):
-                z = float(c.split(":", 1)[1])
-                last_z_comment = z
-                if layer >= 0 and pending_z:
+                z = _comment_number(c)
+                if z is not None and layer >= 0 and pending_z:
                     layer_z[layer] = z
                     pending_z = False
             elif cl.startswith(("type:", "feature:")):  # Bambu Studio: ; FEATURE: Outer wall
                 feature = feature_of(c.split(":", 1)[1])
             elif cl.startswith(("width:", "line_width:")):
-                width = float(c.split(":", 1)[1])
+                got = _comment_number(c)
+                width = width if got is None else got
             elif cl.startswith(("height:", "layer_height:")):
-                height = float(c.split(":", 1)[1])
+                got = _comment_number(c)
+                height = height if got is None else got
             continue
         code = line.split(";", 1)[0].strip()
         if not code:
@@ -240,6 +250,8 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
         up = code.upper()
         if up.startswith("SET_VELOCITY_LIMIT"):
             for k, v in re.findall(r"(\w+)=([\d.]+)", up):
+                if float(v) <= 0:
+                    continue
                 if k == "ACCEL":
                     lim.print_accel = lim.travel_accel = float(v)
                 elif k == "SQUARE_CORNER_VELOCITY":
@@ -250,7 +262,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
         words = {k.upper(): float(v) for k, v in _WORD.findall(code[1:] if up[0] in "GM" else code)}
         cmd = up.split()[0]
         if cmd in ("G0", "G1", "G2", "G3", "G00", "G01", "G02", "G03"):
-            if "F" in words:
+            if words.get("F", 0.0) > 0:
                 feed = words["F"] * scale / 60.0
             target = list(pos)
             for k, a in enumerate("XYZ"):
@@ -258,19 +270,17 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
                     target[k] = words[a] * scale + (pos[k] if not absolute else 0.0)
             if "E" in words:
                 target[3] = words["E"] * scale + (pos[3] if not (absolute and e_abs) else 0.0)
-            if pending_z and "Z" in words and layer >= 0 and last_z_comment is None:
-                pass
             if layer >= 0 and pending_z and target[3] > pos[3] and math.isnan(layer_z[layer]):
                 layer_z[layer] = target[2]  # Cura names no height: the first extrusion's z is the layer's
                 pending_z = False
-            if target == pos:
+            arc = cmd in ("G2", "G3", "G02", "G03") and ("I" in words or "J" in words)
+            if target == pos and not arc:
                 continue
-            if cmd in ("G2", "G3", "G02", "G03") and ("I" in words or "J" in words):
+            if arc:
                 move(target, feed, cw=cmd in ("G2", "G02"), ij=(words.get("I", 0.0) * scale, words.get("J", 0.0) * scale),
                      turns=int(words.get("P", 1)) - 1 if "P" in words else 0)
             else:
                 move(target, feed)
-            dwell = 0.0
         elif cmd == "G4":
             dwell += words.get("P", 0.0) / 1000.0 + words.get("S", 0.0)
         elif cmd == "G90":
@@ -290,24 +300,26 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
                 if a in words:
                     pos[k] = words[a] * scale
         elif cmd == "G28":
-            pos[:3] = [0.0, 0.0, 0.0]
+            named = [k for k, a in enumerate("XYZ") if a in up[3:]]
+            for k in named or (0, 1, 2):
+                pos[k] = 0.0
         elif cmd == "M204":
-            if "S" in words:
+            if words.get("S", 0.0) > 0:
                 lim.print_accel = lim.travel_accel = words["S"]
-            if "P" in words:
+            if words.get("P", 0.0) > 0:
                 lim.print_accel = words["P"]
-            if "T" in words:
+            if words.get("T", 0.0) > 0:
                 lim.travel_accel = words["T"]
-            if "R" in words:
+            if words.get("R", 0.0) > 0:
                 lim.retract_accel = words["R"]
         elif cmd == "M201":
             for k, a in enumerate("XYZE"):
-                if a in words:
+                if words.get(a, 0.0) > 0:
                     lim.max_accel[k] = words[a]
         elif cmd == "M203":
             for k, a in enumerate("XYZE"):
-                if a in words:
-                    lim.max_feed[k] = words[a]
+                if words.get(a, 0.0) > 0:
+                    lim.max_feed[k] = words[a] / (60.0 if rrf else 1.0)
         elif cmd == "M205":
             for k, a in enumerate("XYZE"):
                 if a in words:
@@ -316,23 +328,36 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
             for k, a in enumerate("XYZE"):
                 if a in words:
                     lim.jerk[k] = words[a] / 60.0
-        elif cmd == "M73" and "L" in words and not slicer.lower().startswith(("orca", "prusa", "creality")):
-            pass  # Bambu numbers layers with M73 L as well as ; CHANGE_LAYER; the comment is the one counted
-    a = np.array(rows, float).reshape(-1, 15)
+    a = np.array(rows, float).reshape(-1, 16)
+    held = np.array(sets, float).reshape(-1, 12)[a[:, 15].astype(int)]  # each move's own limits
     tp = Toolpath(a[:, 0:4], a[:, 4:8], a[:, 8], a[:, 9], a[:, 10].astype(int), a[:, 11].astype(int),
-                  a[:, 12], a[:, 13], a[:, 14], layer_z, list(lim.jerk), list(lim.max_feed), list(lim.max_accel), "gcode", slicer,
+                  a[:, 12], a[:, 13], a[:, 14], layer_z, held[:, 0:4], held[:, 4:8], held[:, 8:12], "gcode", slicer,
                   slicer_estimate(text), header_layers)
     _fill_heights(tp)
+    d = tp.p1 - tp.p0
+    ln = np.hypot(d[:, 0], d[:, 1])
+    miss = (tp.width <= 0) & tp.extruding()  # Cura names no width: the filament's volume over length and height
+    tp.width[miss] = d[miss, 3] * fil_area / (ln[miss] * np.where(tp.height[miss] > 0, tp.height[miss], 0.2))
     return tp
 
 
 def _fill_heights(tp: Toolpath) -> None:
-    """A layer the file gave no ;HEIGHT: for gets the step from the layer below."""
-    z = np.asarray(tp.layer_z, float)
-    step = np.diff(np.r_[0.0, z])
+    """A layer the file gave no ;HEIGHT: for gets the step from the layer below; one that starts lower is
+    the first layer of the next object, and one with no extrusion has no height."""
+    steps, prev = [], 0.0
+    for z in tp.layer_z:
+        if math.isnan(z):
+            steps.append(0.0)
+            continue
+        steps.append(max(z - prev, 0.05) if z > prev else z if z < prev else (steps[-1] if steps else 0.0))
+        prev = z
     miss = (tp.height <= 0) & (tp.layer >= 0)
     if miss.any():
-        tp.height[miss] = np.clip(step[tp.layer[miss]], 0.05, None)
+        tp.height[miss] = np.asarray(steps)[tp.layer[miss]]
+
+
+def _per_move(tp: Toolpath, limit) -> np.ndarray:
+    return np.broadcast_to(np.asarray(limit, float), (tp.n, 4))
 
 
 def _cruise(tp: Toolpath):
@@ -342,7 +367,7 @@ def _cruise(tp: Toolpath):
     length = np.where(xyz > 1e-9, xyz, np.abs(d[:, 3]))
     unit = d / np.maximum(length, 1e-12)[:, None]  # per mm of the move, each axis
     v = np.maximum(tp.feed, 1e-3)
-    mf = np.asarray(tp.max_feed, float)
+    mf = _per_move(tp, tp.max_feed)
     over = np.max(np.abs(unit) * v[:, None] / mf, axis=1)
     v = np.where(over > 1, v / over, v)
     return length, unit, v
@@ -354,16 +379,18 @@ def corner_speeds(tp: Toolpath):
     starts from."""
     _, unit, v = _cruise(tp)
     n = tp.n
-    jerk = np.asarray(tp.jerk, float)
+    jerk = _per_move(tp, tp.jerk)  # a corner goes by the limits of the move it enters
     axis_v = unit * v[:, None]  # mm/s along each axis at cruise
     # the speed a move may start or end at from rest, as PrusaSlicer's GCodeProcessor::process_G1
     # (the estimator the slicer's own time comes from): the smallest jerk of the axes that run over
     # theirs, not the product of their ratios
     safe = v.copy()
     for k in range(4):
-        safe = np.where(np.abs(axis_v[:, k]) > jerk[k], np.minimum(safe, jerk[k]), safe)
+        safe = np.where(np.abs(axis_v[:, k]) > jerk[:, k], np.minimum(safe, jerk[:, k]), safe)
     # corner speed between move i-1 and i, as GCodeProcessor::process_G1 (Marlin classic jerk): once an
     # axis has limited, the next axis's exit and entry speeds are scaled by the running factor first
+    # (one difference: the faster next move's entry speed is scaled to the corner too; unscaled, two of the
+    # three fixtures land further from their slicer's estimate)
     junction = safe.copy()
     vjs = safe.copy()
     if n > 1:
@@ -375,11 +402,13 @@ def corner_speeds(tp: Toolpath):
             ve, vn = pa[:, k] * factor, ca[:, k] * factor  # factor is 1 until an axis limits
             jump = np.where(ve > vn, np.where((vn > 0) | (ve < 0), ve - vn, np.maximum(ve, -vn)),
                             np.where((vn < 0) | (ve > 0), vn - ve, np.maximum(-ve, vn)))
-            factor = np.where(jump > jerk[k], factor * jerk[k] / np.maximum(jump, 1e-12), factor)
+            j = jerk[1:, k]
+            factor = np.where(jump > j, factor * j / np.maximum(jump, 1e-12), factor)
         vj = lim_v * factor
         vjs[1:] = vj
         both = (safe[:-1] > vj * 0.99) & (safe[1:] > vj * 0.99)
         junction[1:] = np.where(both, np.minimum(safe[1:], lim_v), vj)
+        junction[tp.dwell > 0] = 0.0  # the printer stops to wait
     return safe, vjs, junction
 
 
@@ -387,20 +416,19 @@ def plan(tp: Toolpath) -> Toolpath:
     """Fill t0 and t1 (s) for every move with the trapezoid and jerk model."""
     length, unit, v = _cruise(tp)
     acc = tp.accel.copy()
-    lim_acc = np.asarray(tp.max_accel, float)
+    lim_acc = _per_move(tp, tp.max_accel)
     acc = np.minimum(acc, np.min(np.where(np.abs(unit) > 1e-9, lim_acc / np.maximum(np.abs(unit), 1e-12), np.inf), axis=1))
-    safe, _, junction = corner_speeds(tp)
+    _, _, junction = corner_speeds(tp)
     entry = np.minimum(junction, v)
-    tp.t0, tp.t1 = _passes(entry, v, acc, length, safe, tp.dwell)
+    tp.t0, tp.t1 = _passes(entry, v, acc, length, tp.dwell)
     return tp
 
 
-def _passes(entry, v, acc, length, safe, dwell):
+def _passes(entry, v, acc, length, dwell):
     n = len(v)
     ent = entry.tolist()
     vl, al, ll = v.tolist(), acc.tolist(), length.tolist()
-    nxt = float(safe[-1]) if n else 0.0
-    nxt = min(nxt, 0.0)  # the print ends at rest
+    nxt = 0.0  # the print ends at rest
     for i in range(n - 1, -1, -1):  # every move can slow to the next one's entry
         ent[i] = min(ent[i], math.sqrt(nxt * nxt + 2 * al[i] * ll[i]))
         nxt = ent[i]

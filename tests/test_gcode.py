@@ -159,3 +159,44 @@ def test_straight_to_diagonal_corner_matches_prusaslicer():
     safe, vj, junction = gcode.corner_speeds(gcode.parse(JERK + "G1 X100 F6000\nG1 X200 Y100\n"))
     assert vj[1] == pytest.approx(8 * math.sqrt(2), abs=1e-6)
     assert junction[1] == pytest.approx(8 * math.sqrt(2), abs=1e-6)
+
+
+def test_limits_hold_from_where_the_file_sets_them():
+    """Review #94 r2 F1: a jerk, feed or accel limit the file changes later leaves the earlier moves alone."""
+    head = "M205 X8 Y8\nM203 X50\nM201 X500\nM204 S1000\nG90\nM83\n"
+    body = "G1 X100 F6000\nG1 Y100\n"
+    tp = gcode.parse(head + body + "M205 X20 Y20\nM203 X400\nM201 X9000\nG1 X0\nG1 Y0\n")
+    safe, vj, _ = gcode.corner_speeds(tp)
+    assert safe[:2] == pytest.approx([8, 8]) and safe[2:] == pytest.approx([20, 20])
+    assert vj[1] == pytest.approx(8) and vj[3] == pytest.approx(20)
+    first = gcode.plan(gcode.parse(head + body)).t1[0]
+    assert gcode.plan(tp).t1[0] == pytest.approx(first)  # X 50 mm/s and 500 mm/s2 until the file says otherwise
+
+
+def test_a_wait_before_an_arc_is_counted_once_and_stops_the_printer():
+    """Review #94 r2 F2: G4 S10 before a 16-chord arc was counted as 160 s. And a wait on a straight line
+    is a stop: 100 mm/s, 1000 mm/s2 from rest to rest, twice, with 1 s between."""
+    arc = "M204 S1000\nG90\nM83\nG1 X20 Y10 F6000\n{}G3 X20 Y20 I0 J5 E0.8\n"
+    wait, none = (gcode.load(arc.format(w)).total_s() for w in ("G4 S10\n", ""))
+    assert 10 < wait - none < 10.5
+    tp = gcode.load("M205 X0 Y0\nM204 S1000\nG90\nM83\nG1 X100 F6000\nG4 P1000\nG1 X200\n")
+    assert tp.total_s() == pytest.approx(1.1 + 1 + 1.1, abs=1e-6)
+
+
+@pytest.mark.parametrize("h", [0.1, 0.3])
+def test_a_cura_width_uses_the_layers_real_height(h):
+    """Review #94 r2 F3: a 0.4 mm line at height h over 10 mm is 4h mm3 of 1.75 mm filament."""
+    e = 10 * 0.4 * h / (math.pi * 0.875 ** 2)
+    tp = gcode.load(f";LAYER:0\nM83\nG0 F6000 X10 Y10 Z{h}\nG1 F1800 X20 Y10 E{e:.6f}\n;LAYER:1\nG0 Z{2 * h}\nG1 X10 E{e:.6f}\n")
+    ext = tp.extruding()
+    assert tp.height[ext] == pytest.approx([h, h]) and tp.width[ext] == pytest.approx([0.4, 0.4], rel=1e-4)
+
+
+def test_one_at_a_time_comments_in_words_and_zero_limits():
+    """Review #94 r2 F4, F5, F6, S2, S4."""
+    tp = gcode.load("; Z: lift nozzle\n;HEIGHT: see profile\nM204 S0\nM201 X0\nM203 X0\nM83\n;LAYER:0\nG1 X10 Z0.3 E1 F0\n"
+                    ";LAYER:1\nG1 X20 Z20 E1 F1200\n;LAYER:2\n;LAYER:3\nG1 X0 Z0.3\nG1 X10 E1\n")
+    assert np.isfinite(tp.height).all() and np.isfinite(tp.t1).all() and tp.total_s() < 10
+    assert tp.height[-1] == pytest.approx(0.3)
+    assert gcode.FEATURES[gcode.feature_of("Support material interface")] == "support interface"
+    assert gcode.parse("M566 X300\nM203 X12000\nG1 X1 F60\n").max_feed[0][0] == 200  # RepRapFirmware: mm/min
