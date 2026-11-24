@@ -580,6 +580,15 @@ def test_safety_lines_of_a_failure_described_below_the_top_three():
         assert want and not [w for w in want if w not in lines], (looks, lines)
 
 
+def test_image_vote_for_an_unseen_failure_never_leads():
+    """A photo cannot show a thermal fault, a clog or grinding: their votes count for nothing, so only the
+    words or --looks thermal_error (the safety override) make thermal_error Most likely."""
+    for fid in doctor.NOT_SEEN:
+        for said, looks in (("", []), ("the print failed", []), ("", ["stringing"])):
+            d = doctor.diagnose(said, None, None, looks, {fid: 1.0})
+            assert not d["failures"] or d["failures"][0][0] != fid, (fid, said, looks, d["failures"][:3])
+
+
 def test_looks_names_what_the_words_do_not(work):
     text, code, nxt = stone("doctor", "the print failed", "--looks", "stringing")
     assert text.splitlines()[0].endswith("seen: stringing")

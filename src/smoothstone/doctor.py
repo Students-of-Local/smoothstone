@@ -248,7 +248,8 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
     base = max(scores.values(), default=0.0) or 1.0
     for lr, fid in zip(LOOK_LR, looks):
         scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * lr
-    votes = {fid: v for fid, v in (knn or {}).items() if failure(fid)}
+    # a photo cannot show a thermal fault or a clog, so a vote for one counts for nothing
+    votes = {fid: v for fid, v in (knn or {}).items() if failure(fid) and fid not in NOT_SEEN}
     if votes:
         for fid in looks[len(LOOK_LR):]:  # a look past the LR list is described too, so a vote stays below it
             scores.setdefault(fid, LOOK_FLOOR * base)
