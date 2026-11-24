@@ -501,3 +501,7 @@ def test_looks_names_what_the_words_do_not(work):
     assert code == 1 and "FIX: unknown --looks id: spagetti" in text and nxt == "stone doctor looks"
     text, code, nxt = stone("doctor", "looks")
     assert "--looks" in nxt and "toppled: " in text and "broken stub" in text
+
+@pytest.mark.parametrize("text", ["yes and no", "yes, no", "no... well, yes"])
+def test_r2_yes_and_no_at_once_asks_again(text):
+    assert doctor.answer_key(text, ["yes", "no"]) is None
