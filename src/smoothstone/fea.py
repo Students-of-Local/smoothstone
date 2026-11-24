@@ -119,16 +119,29 @@ def voxelize(mesh, pitch: float) -> Grid:
     return Grid(solid, float(pitch), origin)
 
 
-def shell(grid: Grid, wall_mm: float, density: float, exponent: float = 2.0) -> tuple[np.ndarray, np.ndarray]:
-    """Per solid cell: the share of it inside the solid skin `wall_mm` deep, and its stiffness weight. The rest is
-    infill at `density` (0 to 1), as stiff as density ** exponent of solid (Gibson-Ashby; refs any.infill_exponent).
-    The skin is the same depth on every face, top and bottom included (assumption: slicers lay about as many
-    solid layers as wall lines)."""
+def shell(grid: Grid, wall_mm: float, density: float, exponent: float = 2.0, caps: tuple[float, float] | None = None,
+          build: int = 2) -> tuple[np.ndarray, np.ndarray]:
+    """Per solid cell: the share of it inside the solid skin, and its stiffness weight. The rest is infill at
+    `density` (0 to 1), as stiff as density ** exponent of solid (Gibson-Ashby; refs any.infill_exponent).
+    Walls are `wall_mm` deep within a layer. caps is the solid bottom and top in mm along the build axis, as a
+    slicer lays them whatever the wall count; None makes the skin wall_mm deep on every face."""
     from scipy.ndimage import distance_transform_edt
 
     h = grid.pitch
-    depth = distance_transform_edt(np.pad(grid.solid, 1), sampling=h)[1:-1, 1:-1, 1:-1][grid.solid]
+    far = [h] * 3
+    if caps:
+        far[build] = 1e6  # the nearest empty cell in the same layer
+    depth = distance_transform_edt(np.pad(grid.solid, 1), sampling=far)[1:-1, 1:-1, 1:-1]
     wall = np.clip((wall_mm - (depth - h)) / h, 0.0, 1.0)  # a cell spans depth - h to depth below the surface
+    if caps:
+        s = np.moveaxis(grid.solid, build, 0)
+        for mm, order in zip(caps, (1, -1)):  # from the bottom up, then from the top down
+            run, n = np.zeros(s.shape[1:]), s.shape[0]
+            for i in range(n)[::order]:
+                run = np.where(s[i], run + h, 0.0)
+                layer = np.moveaxis(wall, build, 0)[i]
+                np.maximum(layer, np.clip((mm - (run - h)) / h, 0.0, 1.0), out=layer)
+    wall = wall[grid.solid]
     return wall, wall + (1 - wall) * density ** exponent
 
 
@@ -239,6 +252,13 @@ class Model:
                 "assemble_s": round(t1 - t0, 2), "setup_s": round(t2 - t1, 2), "solve_s": round(t3 - t2, 2)}
         return u.reshape(nn, 3), info
 
+    def face_stress(self, u: np.ndarray) -> np.ndarray:
+        """Stress (ne, 6, 6) at the middle of each cell's six faces, as stress() is at its center: bending peaks
+        on the outside of a wall, half a cell past the center."""
+        pts = np.vstack([np.eye(3), -np.eye(3)])
+        cb = np.stack([self.c @ _bmatrix(*p, self.grid.pitch) for p in pts])  # 6 points x 6 x 24
+        return np.einsum("pij,ej->epi", cb, u[self.elem].reshape(len(self.elem), 24))
+
     def stress(self, u: np.ndarray) -> np.ndarray:
         """Stress (ne, 6) in solid printed plastic at each cell center, MPa: C times the cell's strain. A wall
         line carries this; infill carries weight times it, spread over the cell."""
@@ -248,5 +268,5 @@ class Model:
 
 
 def von_mises(s: np.ndarray) -> np.ndarray:
-    xx, yy, zz, yz, xz, xy = s.T
+    xx, yy, zz, yz, xz, xy = np.moveaxis(s, -1, 0)
     return np.sqrt(0.5 * ((xx - yy) ** 2 + (yy - zz) ** 2 + (zz - xx) ** 2) + 3 * (yz ** 2 + xz ** 2 + xy ** 2))
