@@ -409,6 +409,18 @@ def cmd(args, job, out):
             out.result = "nothing to show"
             out.next = "stone timelapse --fail detach" + (f" {args.file}" if args.file else "")
         return out
+    dom = failsim.note("contamination") if clean < 1 and fail.kind == "detach" else failsim.note(DOMINANT[fail.kind])
+    if what_if:
+        dom = fail.assumptions[-1]
+    out.add(f"{'What-if (you asked for it, the model does not predict it)' if what_if else 'Predicted'}: "
+            f"{fail.kind} at layer {(fail.layer or 0) + 1} (z {fail.z} mm, {timelapse.clock(fail.time or 0)} in): {WHAT[fail.kind]}.")
+    out.add(f"Why: {numbers_line(fail)}.")
+    out.add(f"Main assumption: {dom}")
+    no = timelapse.missing()
+    if no:
+        out.fix(f"no video: {no}")
+        out.next = "none, the prediction is above; the video needs that program"
+        return out
     cam = timelapse.camera(job, prof)
     dest = job.build_dir if job.exists() and not args.file and not args.gcode else f.parent
     dest.mkdir(parents=True, exist_ok=True)
@@ -427,9 +439,6 @@ def cmd(args, job, out):
     timelapse.sheet(files, frs, png, pick=pick)
     for x in (dest / "fail").glob("*.npz"):
         x.unlink()
-    dom = failsim.note("contamination") if clean < 1 and fail.kind == "detach" else failsim.note(DOMINANT[fail.kind])
-    if what_if:
-        dom = fail.assumptions[-1]
     data = {"model_not_recording": True, "mode": mode, "what_if": what_if, "kind": fail.kind, "taxonomy": fail.taxonomy,
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
@@ -440,10 +449,6 @@ def cmd(args, job, out):
             "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"], "failing": k >= first,
                         "frame": str(p.relative_to(dest))} for k, (fr, p) in enumerate(zip(frs, files))]}
     js.write_text(json.dumps(data, indent=1, default=float))
-    out.add(f"{'What-if (you asked for it, the model does not predict it)' if what_if else 'Predicted'}: "
-            f"{fail.kind} at layer {(fail.layer or 0) + 1} (z {fail.z} mm, {timelapse.clock(fail.time or 0)} in): {WHAT[fail.kind]}.")
-    out.add(f"Why: {numbers_line(fail)}.")
-    out.add(f"Main assumption: {dom}")
     out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s; frames from layer {(fail.layer or 0) + 1} on are the model)")
     out.add(f"Sheet: {png}")
     out.add(f"Data: {js} ({time.time() - t_start:.0f} s)")

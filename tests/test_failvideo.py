@@ -89,6 +89,14 @@ def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
     assert text.strip().splitlines()[-1].startswith("NEXT: ")
 
 
+def test_without_blender_the_prediction_still_comes_out(jobenv, tmp_path, monkeypatch):
+    monkeypatch.setattr(timelapse, "blender", lambda: None)
+    stl = tmp_path / "t.stl"
+    _t().export(stl)
+    text, code = cli.run(["timelapse", str(stl), "--fail", "--supports", "off"])
+    assert code == 1 and "Predicted: supports at layer 21" in text and "FIX: no video: Blender not found" in text, text
+
+
 @needs_blender
 def test_the_frame_before_the_failure_is_the_timelapse_frame(jobenv, tmp_path, monkeypatch):
     from PIL import Image
