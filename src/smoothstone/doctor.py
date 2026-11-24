@@ -256,12 +256,16 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
     votes = {fid: v for fid, v in (knn or {}).items() if failure(fid) and fid not in NOT_SEEN}
     named = set(scores)  # what the words or --looks described
     for fid, v in votes.items():
-        scores[fid] = max(scores.get(fid, 0.0), LOOK_FLOOR * base) * (1 + KNN_W * v)
+        scores[fid] = scores.get(fid, LOOK_FLOOR * base) * (1 + KNN_W * v)  # a guessed word stays a guess
     named |= set(looks) & set(scores)  # a look past the LR list is described too
     # the vote reorders what was described; nothing undescribed, voted or a differential of a boosted top,
     # passes the two likeliest of them
-    cap = sorted((scores[f] for f in named), reverse=True)[:KNN_HOLD][-1] * KNN_CAP if votes and named else math.inf
-    scores.update({f: min(s, cap) for f, s in scores.items() if f not in named})
+    cap = low = math.inf
+    if votes and named:
+        held = sorted((scores[f] for f in named), reverse=True)
+        cap, low = held[:KNN_HOLD][-1] * KNN_CAP, held[-1] * KNN_CAP  # one id may reach cap; the rest stay under all
+        first = max((f for f in scores if f not in named), key=scores.get, default=None)
+        scores.update({f: min(s, cap if f == first else low) for f, s in scores.items() if f not in named})
     if scores:
         top = max(scores, key=scores.get)
         # root first: when a cause of the top failure is another failure the person also described
@@ -273,7 +277,7 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
             root = max(roots, key=scores.get)
             scores[root], top = scores[top] * 1.05, root
         for i, d in enumerate(failure(top).get("differentials", [])):  # the catalog lists the likeliest first
-            scores.setdefault(d["id"], min(scores[top] * DIFF_SHARE * (1 - 0.1 * i), cap))
+            scores.setdefault(d["id"], min(scores[top] * DIFF_SHARE * (1 - 0.1 * i), low))
     total = sum(scores.values()) or 1.0
     ranked = sorted(((i, s / total) for i, s in scores.items()), key=lambda x: -x[1])
     if thermal_fault(said) or "thermal_error" in looks:  # a safety override, not a score: the fault comes first whatever else scores
@@ -657,7 +661,7 @@ def report(case: dict, p: dict | None) -> list[str]:
     # every described failure's SAFETY, likeliest first, even one ranked below the top 3
     seen = sorted(described_ids, key=lambda f: ranked.index(f) if f in ranked else len(ranked))
     if "thermal_error" in described_ids:  # power off comes before anything else stone says
-        lines += [f"SAFETY: {s}" for s in safety_lines(["thermal_error"] + seen)]
+        lines += [f"SAFETY: {s}" for s in safety_lines(["thermal_error"] + seen, limit=None)]
     tell = {d["id"]: d["tell_apart"] for d in top.get("differentials", [])}
     for fid in ranked[1:4]:
         lines.append(f"Also check: {fid}: {tell.get(fid) or failure(fid)['looks_like']['camera']}")
@@ -783,7 +787,7 @@ def _new(args, job, said: str, out):
     d = diagnose(said, p, material, looks, case.get("knn")) if said or looks else {"failures": []}
     head = (f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
             + (f", seen: {', '.join(looks)}" if looks else ""))
-    if not d["failures"]:
+    if not d.get("described"):  # nothing said or seen matches: the photo's own vote alone never diagnoses
         case.update(state="look", failure=None, failures=[], causes={}, question=None)
         save_case(job, case)
         out.add(head)

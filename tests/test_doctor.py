@@ -573,10 +573,13 @@ def test_image_vote_stays_below_the_described_on_every_recorded_reply():
 
 
 def test_safety_lines_of_a_failure_described_below_the_top_three():
-    for looks in (["stringing", "warping", "layer_shift", "blob_on_nozzle"], ["blob_on_nozzle", "clog"]):
+    for looks in (["stringing", "warping", "layer_shift", "blob_on_nozzle"], ["blob_on_nozzle", "clog"],
+                  ["thermal_error", "blob_on_nozzle"]):
         d = doctor.diagnose("", None, None, looks, {"stringing": 0.5})
         lines = doctor.report({"failures": d["failures"][:5], "causes": d["causes"], "described": d["described"]}, None)
         want = [f"SAFETY: {s}" for f in looks for s in doctor.failure(f).get("safety", [])]
+        if "thermal_error" in looks:  # nothing heats while a thermal fault stands
+            want = [w for w in want if not w.startswith("SAFETY: Heat the hotend")]
         assert want and not [w for w in want if w not in lines], (looks, lines)
 
 
@@ -619,6 +622,37 @@ def test_an_open_photo_case_run_again_prints_no_none(work, monkeypatch):
     assert doctor.IMAGE_MATCH_ON in text
     text, code, nxt = stone("doctor")
     assert "None" not in text and doctor.IMAGE_MATCH_ON not in text and "--looks" in nxt
+    text, code, nxt = stone("doctor", "it went wrong")  # words that match nothing: still look at the photo first
+    assert "Most likely" not in text and "Image match (" not in text and "--looks" in nxt
+    text, code, nxt = stone("doctor", "it went wrong", "--looks", "warping")
+    assert "Most likely: " in text and "(warping)" in text.splitlines()[1]
+    assert "Also check: spaghetti" in text and "Image match (nearest gallery photos): spaghetti 100%" in text
+
+
+def test_gallery_cache_order_and_skip(tmp_path, monkeypatch):
+    """photo_match without the model: neighbors in order, a skipped print left out, the second call from disk."""
+    import numpy as np
+    from smoothstone import photo_match as pm
+    vec = {"a-1.jpg": (1, 0), "a-2.jpg": (0.9, 0.1), "b.jpg": (0, 1), "q.jpg": (1, 0)}
+    (tmp_path / "labels.jsonl").write_text("".join(json.dumps({"file": f"warping/{n}", "failure": "warping"}) + "\n"
+                                                    for n in ("b.jpg", "a-1.jpg", "a-2.jpg")))
+    calls = []
+    def embed(paths):
+        calls.append(len(paths))
+        return np.array([vec[p.name] for p in paths], float)
+    monkeypatch.setattr(pm, "GALLERY", tmp_path)
+    monkeypatch.setattr(pm, "embed", embed)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    for _ in range(2):
+        assert [f for f, _, _ in pm.neighbors(tmp_path / "q.jpg")] == [f"warping/{n}" for n in ("a-1.jpg", "a-2.jpg", "b.jpg")]
+    assert calls == [3, 1, 1]  # the gallery embedded once, then read back
+    assert [f for f, _, _ in pm.neighbors(tmp_path / "q.jpg", skip={"warping/a-1.jpg"})] == ["warping/b.jpg"]
+
+
+def test_several_votes_take_one_line_from_the_described():
+    votes = {f: 0.14 for f in ("spaghetti", "under_extrusion", "z_seam", "first_layer", "bed_adhesion")}
+    d = doctor.diagnose("", None, None, ["stringing", "warping", "layer_shift"], votes)
+    assert [f for f, _ in d["failures"][:4]] == ["stringing", "warping", "spaghetti", "layer_shift"], d["failures"]
 
 
 def test_knn_votes_and_frames_of_one_print():
