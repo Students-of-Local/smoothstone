@@ -400,6 +400,7 @@ def _route(monkeypatch, request_):
     "Download an STL of the Taj Mahal",
     "Find the Eiffel Tower on Thingiverse",
     "Grab the Cologne Cathedral file from Printables",
+    "Find me a 3D printable model of the Eiffel Tower",
 ])
 def test_a_find_request_routes_to_stone_models(jobenv, monkeypatch, request_):
     cmd, text = _route(monkeypatch, request_)
@@ -684,3 +685,8 @@ def test_a_model_whose_solids_save_broken_says_so_and_offers_the_next(jobenv, mo
     text, code, nxt = stone("build")
     assert "solids only touch" in text and "part 1 save with broken edges" in text, text
     assert nxt == "stone models --take 2"
+
+
+def test_get_my_files_is_no_found_model_request():
+    from smoothstone import models as mdl
+    assert not mdl.asks_found_model("A tray to get my files sorted beside my Steam Deck")

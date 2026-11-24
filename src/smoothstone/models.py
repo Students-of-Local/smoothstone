@@ -826,7 +826,7 @@ BUILDING = re.compile(r"\b(?:cathedral|basilica|church|chapel|abbey|minster|duom
                       r"catedral|sagrada|mahal|notre)\b", re.I)
 # "find me a model of", "download a model", "an open model", "on Printables": the person wants a made model
 FILE_WORD = r"(?:models?|stls?|3mfs?|files?|meshe?s?)"
-FIND_MODEL = re.compile(r"\b(?:find|download|get|grab)(?:\s+me)?\s+(?:an?\s+|the\s+)?(?:\w+\s+)?" + FILE_WORD + r"\b|"
+FIND_MODEL = re.compile(r"\b(?:find|download|get|grab)(?:\s+me)?\s+(?:an?\s+|the\s+)?(?:(?!my\b|your\b|our\b|his\b|her\b|their\b)[\w-]+\s+){0,2}" + FILE_WORD + r"\b|"
                         r"\b(?:existing|open|someone['’]s)\s+" + FILE_WORD + r"\b|"
                         r"\b(?:on|from)\s+(?:printables|thingiverse|myminifactory|cults3?d?)\b", re.I)
 PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica",
