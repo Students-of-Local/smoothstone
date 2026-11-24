@@ -78,19 +78,17 @@ def test_a_long_bridge_sags_by_the_catenary():
 
 
 def test_what_holds_is_not_drawn_failing():
-    """A T whose stem has a 6 mm tunnel through it, its roof a short bridge in the layers where the arms fall."""
-    stem = _union(_box((6, 20, 4), (12, 0, 0)), _box((2, 20, 2), (12, 0, 4)), _box((2, 20, 2), (16 + 4, 0, 4)), _box((2, 20, 2), (16, 0, 4)))
-    part = _union(stem, _box((8, 20, 4), (12, 0, 0)), _box((10, 20, 1), (12, 0, 6)), _box((30, 4, 1), (0, 0, 6)))
+    """Two posts, a roof over the 8 mm between them, and the roof's arm 14 mm out over nothing, all in one layer."""
+    part = _union(_box((6, 20, 4), (0, 0, 0)), _box((6, 20, 4), (14, 0, 0)), _box((34, 20, 1), (0, 0, 4)))
     tp, inp, fail, _ = _story(part)
     st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))[4]
-    r, c = np.nonzero(np.asarray(inp.masks[0], bool))
-    x0, x1 = inp.origin[0] + c.min() * inp.cell, inp.origin[0] + (c.max() + 1) * inp.cell
-    y0, y1 = inp.origin[1] + r.min() * inp.cell, inp.origin[1] + (r.max() + 1) * inp.cell
-    roof = st.ext & (tp.layer == fail.layer) & (np.minimum(tp.p0[:, 0], tp.p1[:, 0]) > x0) & (np.maximum(tp.p0[:, 0], tp.p1[:, 0]) < x1)
-    roof &= np.minimum(tp.p0[:, 1], tp.p1[:, 1]) > y0 + 6
-    assert fail.kind == "supports" and roof.any() and not st.gone[roof].any() and st.gone.any()
-    tp, inp, fail, _ = _story(_arch(22.5), "bridge")  # and a bridge the rules let pass is nothing to show
-    assert failvideo._first(_story(_arch(8))[1], "bridge") is None
+    x0 = inp.origin[0] + np.nonzero(np.asarray(inp.masks[0], bool))[1].min() * inp.cell
+    x = np.c_[tp.p0[:, 0], tp.p1[:, 0]] - x0
+    here = st.ext & (tp.layer == fail.layer)
+    roof, arm = here & (x.max(1) < 19) & (x.max(1) > 8) & (x.min(1) < 13), here & (x.min(1) > 22)
+    assert fail.kind == "supports" and roof.any() and arm.any()
+    assert not st.gone[roof].any() and st.gone[arm].all()
+    assert failvideo._first(_story(_arch(8))[1], "bridge") is None  # and a bridge the rules let pass is nothing to show
 
 
 def test_a_strand_has_no_gaps_at_any_slope():
