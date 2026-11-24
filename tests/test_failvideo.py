@@ -344,8 +344,14 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     assert (inp.fan, inp.air) == (0.4, 45) and failvideo.inputs(tp, "PLA", enclosed=False).air == failsim.fact("room_air")
     tp.run[:] = np.nan
     inp = failvideo.inputs(tp, "PLA")
-    assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
-    assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
+    assert inp.bed is None and inp.fan == 1 and inp.material.nozzle == failsim.material("PLA").nozzle
+    assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan 100%)" in inp.notes[1]
+    mini = failvideo.inputs(tp, "ABS", enclosed=False, prof=printers.get("prusa_mini"))
+    assert (mini.material.bed, mini.material.nozzle, mini.air) == (100, 260, failsim.fact("room_air"))
+    assert "MINI+ profile's, not the print's own: bed, nozzle, fan (fan" in mini.notes[1] and "reaches 100 C" in mini.notes[2]
+    assert mini.process["shells"]["wall_loops"] == 3 and failsim.run(replace(mini, width=None, speed=None)) == (0.4, 50)
+    secs = float(np.median(np.diff(failvideo.layer_times(tp), prepend=0.0)))
+    assert mini.fan == printers.fan(printers.settings(printers.get("prusa_mini"), "ABS"), secs)
 
 
 def test_strands_of_one_layer_lie_where_they_fell_while_the_next_one_comes(monkeypatch):

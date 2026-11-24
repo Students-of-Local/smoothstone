@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from smoothstone import failsim as fs
+from smoothstone import failsim as fs, printers
 from smoothstone import strand as st
 
 
@@ -465,3 +465,22 @@ def test_a_plastic_nobody_has_peeled_gets_no_verdict_on_its_corners():
     ("LW-PLA", None), ("wood", None), ("", None), (None, None)])
 def test_a_plastic_by_the_name_people_give_it(text, plastic):
     assert fs.named(text) == plastic
+
+
+@pytest.mark.parametrize("pid", printers.load())
+@pytest.mark.parametrize("mat", fs.MATERIALS)
+def test_a_plastic_at_the_heat_its_printers_profile_says(mat, pid):
+    p = printers.get(pid)
+    m, s, k2 = fs.material(mat, pid), printers.settings(p, mat), fs.material(mat)
+    assert m.set < m.nozzle and replace(m, nozzle=k2.nozzle, bed=k2.bed, chamber=k2.chamber, cp=k2.cp, stand_ins=k2.stand_ins) == k2
+    if pid == "creality_k2":
+        assert m == k2
+    elif s:
+        assert (m.nozzle, m.bed) == (s["nozzle"], s["bed"]) and m.chamber == s.get("chamber", m.chamber)
+        assert (fs.note("k2_air") in m.stand_ins) is ("chamber" not in s and p["enclosed"])
+
+
+def test_a_printers_own_shells_weigh_its_layers():
+    masks = [_rect((44, 44), 2, 42, 2, 42)] * 20
+    three, two = (fs.printed_section(masks, 0.5, process=printers.process(printers.get(p)))["share"] for p in ("prusa_mini", "creality_k2"))
+    assert (three > two).any() and np.allclose(two, fs.printed_section(masks, 0.5)["share"])

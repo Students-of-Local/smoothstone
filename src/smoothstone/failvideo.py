@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import failsim, strand, timelapse
+from . import failsim, printers, strand, timelapse
 
 MODES = ("auto", "supports", "detach", "droop", "bridge")
 AFTER = 12  # layers drawn after the failure (assumption: enough to see it; the printer would go on)
@@ -56,15 +56,18 @@ def layer_times(tp) -> np.ndarray:
     return np.maximum.accumulate(out)
 
 
-def settings(tp, material: str, enclosed: bool, heat: bool = True) -> dict:  # heat False: the file's is for another plastic
-    """failsim.Inputs of what this print is run at: the median over its part's moves past the first layer."""
+def settings(tp, material: str, enclosed: bool, heat: bool = True, prof: dict | None = None) -> dict:  # heat False: the file's is for another plastic
+    """failsim.Inputs of what this print is run at: the median over its part's moves past the first layer, and where
+    that says nothing the printer's own slicer profile for this plastic, or the K2's."""
     F = timelapse.gcode.FEATURES
     on = tp.part() & (tp.layer > 0)
     run = np.full((4, 1), np.nan) if tp.run is None else np.where([True, heat, heat, heat], tp.run[on, :4], np.nan).T
     fan, bed, nozzle, chamber = (float(np.median(c[ok])) if (ok := np.isfinite(c)).any() else None for c in run)
     speed, width = (float(np.median(q[s])) if (s := on & (tp.feature == F.index(k))).any() else None
                     for q, k in ((tp.feed, "inner wall"), (tp.width, "outer wall")))
-    m = failsim.material(material)
+    prof = prof or printers.get("creality_k2")
+    slicer, process = printers.settings(prof, material), printers.process(prof)
+    m = failsim.material(material, prof["id"])
     unsaid = failsim.note("k2_air") if failsim.note("k2_air") in m.stand_ins else None  # its profile names no chamber
     if chamber and enclosed:
         m = replace(m, chamber=chamber, stand_ins=tuple(x for x in m.stand_ins if x != unsaid))
@@ -78,11 +81,16 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True) -> dict:  # h
     if enclosed and chamber is None and not unsaid:
         missing.append("chamber")
     notes = [f"this print's own settings: {', '.join(said)}"] if said else []
+    given = fan is not None
+    if not given:
+        fan = printers.fan(slicer, float(np.median(np.diff(layer_times(tp), prepend=0.0)))) if slicer else 1.0
     if missing:
-        notes.append(f"the K2 profile's, not the print's own: {', '.join(missing)}" + (" (fan full on)" if fan is None else ""))
+        notes.append(f"the {printers.short_name(prof) if slicer and process else 'K2'} profile's, not the print's own: {', '.join(missing)}" + ("" if given else f" (fan {100 * fan:.0f}%)"))
     if enclosed and chamber is None and unsaid:
         notes.append(unsaid)
-    return {**got, "material": m, "fan": True if fan is None else fan, "notes": notes}
+    if slicer and None in (bed, nozzle):
+        notes += slicer["cut"]
+    return {**got, "material": m, "fan": fan, "process": process, "notes": notes}
 
 
 def moves_of(tp, *features) -> np.ndarray:
@@ -90,7 +98,8 @@ def moves_of(tp, *features) -> np.ndarray:
     return tp.extruding() & (tp.layer >= 0) & np.isin(tp.feature, [F.index(k) for k in features])
 
 
-def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True, heat: bool = True) -> failsim.Inputs:
+def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True, heat: bool = True,
+           prof: dict | None = None) -> failsim.Inputs:
     """failsim's per-layer masks from the toolpath's extruding moves, the part's and its supports': a skirt and a prime
     tower are not its footprint or its weight. The gaps in sparse infill are filled: failsim's masks are outlines, and
     it counts the infill's density itself."""
@@ -104,7 +113,7 @@ def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True,
     masks = lambda of, z, **kw: failsim.inputs_from_segments(  # noqa: E731  # every move sizes the grid, some are drawn
         tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], np.where(of, tp.layer, -1)[ext], z, **kw)
     inp = masks(ext & ~skirt & ~moves_of(tp, "prime tower"), z, layer_t=layer_times(tp), layer=thick, clean=clean, supports=bool(sup.any()), enclosed=enclosed)
-    inp = replace(inp, **settings(tp, material, enclosed, heat))
+    inp = replace(inp, **settings(tp, material, enclosed, heat, prof))
     rim, foot = masks(skirt, z[:1]).masks[0], inp.masks[0]
     lab, _ = ndimage.label(ndimage.binary_dilation(rim | foot))  # a slicer leaves a hair between brim and part
     inp.brim = rim & np.isin(lab, np.setdiff1d(lab[foot], 0))
@@ -153,7 +162,7 @@ def pieces(mk: np.ndarray, d: np.ndarray, inp: failsim.Inputs):
 
 
 def _width(inp) -> float:
-    return inp.width or failsim.fact("k2_widths")["outer_wall"]
+    return failsim.run(inp)[0]
 
 
 def _below(inp: failsim.Inputs, i: int) -> np.ndarray:
@@ -688,7 +697,7 @@ def cmd(args, job, prof, out):
         note.append(failsim.note(f"{mat.lower()}.set"))
     heat = file == mat or bool(own) and not file  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
-    inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat)
+    inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat, prof)
     fails = failsim.predict(inp)
     fail, what_if = choose(fails, mode, inp)
     blind = inp.material.peel is None

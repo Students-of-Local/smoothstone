@@ -121,7 +121,8 @@ def _own(m: str, key: str):
 
 
 @lru_cache(maxsize=None)
-def material(name: str = "PLA") -> Material:
+def material(name: str = "PLA", printer: str = "creality_k2") -> Material:
+    """Its numbers, at the heat that printer's slicer profile runs it at."""
     m = name.upper()
     if m not in MATERIALS:
         raise ValueError(f"failsim models {', '.join(MATERIALS)}, not {name}")
@@ -130,7 +131,9 @@ def material(name: str = "PLA") -> Material:
     curve[:, 1] = np.minimum.accumulate(curve[:, 1])  # Track S's rule: no credit for a rise on heating
     base, tg = like(m), p["tg"]["value"]
     k2 = f"k2.{m.lower()}"
-    heat = fact(k2) if "failsim." + k2 in facts() else printers.settings(printers.get("creality_k2"), m)
+    ours = fact(k2) if "failsim." + k2 in facts() else {}
+    heat = ours if ours and printer == "creality_k2" else printers.settings(printers.get(printer), m) or ours
+    air = {"chamber": fact("k2_air"), **ours, **heat}["chamber"]
     solid, cp = _own(m, "set") or tg, fact("pla.cp")
     k = _own(m, "k")
     if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg
@@ -147,7 +150,7 @@ def material(name: str = "PLA") -> Material:
     k = k or p["k"]["value"]
     stand = [note("mfi_rig"), *([note("like")] if base != m else [])]
     stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith((f"failsim.{base.lower()}.", f"failsim.{m.lower()}."))]
-    if "chamber" not in heat:
+    if "chamber" not in heat and printers.get(printer).get("enclosed"):
         stand.append(note("k2_air"))
     if base == "PETG":
         stand.append("PETG uses PLA's specific heat (no sourced value for the melt)")
@@ -158,7 +161,7 @@ def material(name: str = "PLA") -> Material:
               if "assumption" in p[key]]
     return Material(m, p["density"]["value"], tg, p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
                     tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()) if base in fact("peel_bed") else None,
-                    fact("peel_bed").get(base), solid, heat["bed"], heat.get("chamber", fact("k2_air")), heat["nozzle"], tuple(dict.fromkeys(stand)), src)
+                    fact("peel_bed").get(base), solid, heat["bed"], air, heat["nozzle"], tuple(dict.fromkeys(stand)), src)
 
 
 def _mat(m) -> Material:
@@ -466,12 +469,12 @@ def bond_stress(mat="PLA", clean: float = 1.0, bed: float | None = None) -> floa
     return min(2 * m.peel * lam / sp["width"], m.tensile_z) * min(1.0, float(now / then)) * clean
 
 
-def printed_section(masks, cell: float, infill: float | None = None) -> dict:
-    """Per layer: area (mm2), perimeter (mm) and the share of it the K2 profile prints (walls and
-    top and bottom shells solid, sparse infill at its density; failsim.section_rule)."""
+def printed_section(masks, cell: float, infill: float | None = None, process: dict | None = None) -> dict:
+    """Per layer: area (mm2), perimeter (mm) and the share of it the slicer's process (the K2's unless given) prints
+    (walls and top and bottom shells solid, sparse infill at its density; failsim.section_rule)."""
     from scipy import ndimage
 
-    sh, wd = fact("k2_shells"), fact("k2_widths")
+    sh, wd = (process[k] if process else fact("k2_" + k) for k in ("shells", "widths"))
     fill = (sh["sparse_infill_density"] if infill is None else infill) / 100
     wall = wd["outer_wall"] + (sh["wall_loops"] - 1) * wd["inner_wall"]
     st = np.asarray(masks, bool)
@@ -645,11 +648,12 @@ class Inputs:
     clean: float = 1.0  # 1 a clean plate, fact("contamination") a dirty one
     fan: float = True  # its share of full speed
     enclosed: bool = True  # False: an open printer, air at fact("room_air")
-    infill: float | None = None  # %, default the K2 profile's sparse infill; 100 prints solid
+    infill: float | None = None  # %, default the process's sparse infill; 100 prints solid
     supports: bool = False
     brim: np.ndarray | None = None  # what is printed round the first layer and holds it, as a mask
-    speed: float | None = None  # mm/s, default the K2 profile's inner wall
-    width: float | None = None  # mm, default the K2 profile's outer wall
+    speed: float | None = None  # mm/s, default the process's inner wall
+    width: float | None = None  # mm, default the process's outer wall
+    process: dict | None = None  # the printer's (printers.process), default the K2 profile's
     drag: float | None = None  # N, a push to use instead of the nozzle's drag
     notes: list = field(default_factory=list)
 
@@ -676,6 +680,12 @@ class Failure:
 DIRS = [(math.cos(a), math.sin(a)) for a in np.radians(np.arange(0, 360, 45))]
 
 
+def run(inp: Inputs) -> tuple[float, float]:
+    """(mm, mm/s) its walls are printed at: the print's own, else the printer's process's, else the K2 profile's."""
+    got = inp.process or {"widths": fact("k2_widths"), "speeds": fact("k2_speeds")}
+    return inp.width or got["widths"]["outer_wall"], inp.speed or got["speeds"]["inner_wall"]
+
+
 def _times(inp: Inputs, width: float, speed: float) -> np.ndarray:
     if inp.layer_t is not None:
         return np.asarray(inp.layer_t, float)
@@ -692,8 +702,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     inp = job_or_inputs if isinstance(job_or_inputs, Inputs) else inputs_from_mesh(job_or_inputs, **kw)
     m = _mat(inp.material)
     cell, lay = inp.cell, inp.layer
-    width = inp.width or fact("k2_widths")["outer_wall"]
-    speed = inp.speed or fact("k2_speeds")["inner_wall"]
+    width, speed = run(inp)
     zs = np.asarray(inp.layer_z, float) if inp.layer_z is not None else (np.arange(len(inp.masks)) + 1) * lay
     ts = _times(inp, width, speed)
     bed = m.bed if inp.bed is None else inp.bed
@@ -734,7 +743,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
         narrow = min(narrow, edge - float(d.min()) + half)
     push = nozzle_drag(m, speed, lay) if inp.drag is None else inp.drag
     bond = bond_stress(m, inp.clean, bed)
-    sec = printed_section(inp.masks, cell, inp.infill)
+    sec = printed_section(inp.masks, cell, inp.infill, inp.process)
     worst = {"edge": -1.0}
     tipping = (math.inf, 0.0, 0.0)  # lowest hold / drive, and the two
     wpm = m.density * 1e-6 * fact("gravity")  # N per mm3

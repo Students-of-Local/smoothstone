@@ -947,7 +947,7 @@
    "cite": "OrcaSlicer K2 PLA profile",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "The slicer's profile names no chamber heat for this plastic: 35 C, the K2's PLA chamber, is used"
+   "assumption": "The slicer's profile names no chamber heat for this plastic: the K2's is used, 35 C where that names none either"
   },
   {
    "id": "failsim.k2.pla",
