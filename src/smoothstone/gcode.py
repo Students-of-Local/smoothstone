@@ -4,7 +4,8 @@ Reads what OrcaSlicer, PrusaSlicer, Bambu Studio, Creality Print and Cura write:
 cut into 1 mm chords, Klipper's default arc resolution), G90/G91, M82/M83, G92, G4, layer markers
 (;LAYER_CHANGE with ;Z:, ; CHANGE_LAYER with ; Z_HEIGHT:, Cura's ;LAYER:n), feature comments
 (;TYPE:, Bambu's ; FEATURE:), line widths (;WIDTH: / ;HEIGHT:, ; LINE_WIDTH: / ; LAYER_HEIGHT:) and the motion limits (M201, M203, M204, M205, M566,
-SET_VELOCITY_LIMIT).
+SET_VELOCITY_LIMIT), and what the print is run at: part fan (M106, M107), bed (M140, M190), nozzle (M104, M109) and
+chamber (M141, M191) or a start macro's BED_TEMP=, EXTRUDER_TEMP= and CHAMBER_TEMP=, infill density and filament type.
 
 Time: each move is a trapezoid (accelerate, cruise, decelerate) at the acceleration in force, and
 the speed at each corner is limited by the jerk the file sets, the planner Marlin uses and that
@@ -33,6 +34,8 @@ _FEATURE_WORDS = (  # first match wins, on the lower-cased ;TYPE: text
     ("top", "top surface"), ("bottom", "bottom surface"), ("bridge", "bridge"), ("solid", "solid infill"),
     ("skin", "solid infill"), ("gap", "solid infill"), ("infill", "sparse infill"), ("fill", "sparse infill"),
     ("skirt", "skirt"), ("brim", "skirt"), ("tower", "prime tower"))
+HEAT = {"M140": 1, "M190": 1, "M104": 2, "M109": 2, "M141": 3, "M191": 3}  # columns of Toolpath.run
+_MACRO = re.compile(r"\b(BED|EXTRUDER|HOTEND|NOZZLE|CHAMBER)(?:_TEMP)?\s*=\s*([\d.]+)")
 _WORD = re.compile(r"([A-Za-z])\s*([-+]?(?:\d+\.?\d*|\.\d+))")
 
 
@@ -77,6 +80,9 @@ class Toolpath:
     header_layers: int | None = None
     t0: np.ndarray | None = None  # s, filled by plan()
     t1: np.ndarray | None = None
+    run: np.ndarray | None = None  # (n, 5) part fan 0 to 1, bed, nozzle and chamber C, and tool in force; nan: not said
+    infill: float | None = None  # %
+    material: str = ""
 
     @property
     def n(self) -> int:
@@ -85,6 +91,10 @@ class Toolpath:
     def extruding(self) -> np.ndarray:
         d = self.p1 - self.p0
         return (d[:, 3] > 1e-9) & (np.hypot(d[:, 0], d[:, 1]) > 1e-6)
+
+    def part(self) -> np.ndarray:
+        not_it = [FEATURES.index(k) for k in ("skirt", "support", "support interface", "prime tower")]
+        return self.extruding() & ~np.isin(self.feature, not_it)
 
     def total_s(self) -> float:
         return float(self.t1[-1]) if self.t1 is not None and self.n else 0.0
@@ -171,6 +181,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     fil_area = math.pi * (1.75 / 2) ** 2
     rows: list[tuple] = []
     sets: list[tuple] = []  # each set of limits that was in force, in file order; a row names its set
+    at, hot = [math.nan] * 5, {}  # Toolpath.run's row; each tool's nozzle C
     slicer = ""
     head = text[:4000]
     m = re.search(r"generated (?:by|with) ([^\n]+)", head, re.I) or re.search(r";\s*(Cura_SteamEngine [^\n]+)", head)
@@ -198,7 +209,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
 
     def move(target, f, cw=None, ij=None, turns=0):
         nonlocal pos, dwell
-        now = (*lim.jerk, *lim.max_feed, *lim.max_accel)
+        now = (*lim.jerk, *lim.max_feed, *lim.max_accel, *at)
         if not sets or sets[-1] != now:
             sets.append(now)
         e_move = target[3] - pos[3]
@@ -261,6 +272,12 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
             continue
         words = {k.upper(): float(v) for k, v in _WORD.findall(code[1:] if up[0] in "GM" else code)}
         cmd = up.split()[0]
+        if cmd in ("START_PRINT", "PRINT_START"):
+            for k, v in _MACRO.findall(up):
+                k = {"BED": 1, "CHAMBER": 3}.get(k, 2)
+                if float(v) > (100 if k == 2 else 0):  # NOZZLE=0.4 and EXTRUDER=0 are no temperatures
+                    at[k] = float(v)
+            continue
         if cmd in ("G0", "G1", "G2", "G3", "G00", "G01", "G02", "G03"):
             if words.get("F", 0.0) > 0:
                 feed = words["F"] * scale / 60.0
@@ -303,6 +320,20 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
             named = [k for k, a in enumerate("XYZ") if a in up[3:]]
             for k in named or (0, 1, 2):
                 pos[k] = 0.0
+        elif cmd in ("M106", "M107") and not words.get("P"):  # P0 is the part fan, the others are the chamber's and aux
+            s = words.get("S", 255.0) if cmd == "M106" else 0.0
+            at[0] = min(1.0, s if rrf and s <= 1 else s / 255)
+        elif cmd in HEAT and words.get("S", words.get("R", 0.0)) > 0:
+            k, v, tool = HEAT[cmd], words.get("S", words.get("R")), words.get("T")
+            if k == 2:
+                now = 0.0 if math.isnan(at[4]) else at[4]
+                if tool is not None or hot:  # one nozzle for all tools never names one
+                    hot[now if tool is None else tool] = v
+            if k != 2 or tool in (None, now):  # an idle tool's heat is not the print's
+                at[k] = v
+        elif re.fullmatch(r"T\d\d?", cmd):
+            at[4] = float(cmd[1:])
+            at[2] = hot.get(at[4], at[2])
         elif cmd == "M204":
             if words.get("S", 0.0) > 0:
                 lim.print_accel = lim.travel_accel = words["S"]
@@ -329,10 +360,18 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
                 if a in words:
                     lim.jerk[k] = words[a] / 60.0
     a = np.array(rows, float).reshape(-1, 16)
-    held = np.array(sets, float).reshape(-1, 12)[a[:, 15].astype(int)]  # each move's own limits
+    held = np.array(sets, float).reshape(-1, 17)[a[:, 15].astype(int)]  # each move's own limits
     tp = Toolpath(a[:, 0:4], a[:, 4:8], a[:, 8], a[:, 9], a[:, 10].astype(int), a[:, 11].astype(int),
                   a[:, 12], a[:, 13], a[:, 14], layer_z, held[:, 0:4], held[:, 4:8], held[:, 8:12], "gcode", slicer,
-                  slicer_estimate(text), header_layers)
+                  slicer_estimate(text), header_layers, run=held[:, 12:])
+    m = re.search(r"^;\s*(?:sparse_infill_density|fill_density)\s*=\s*([\d.]+)", text, re.M)
+    tp.infill = float(m.group(1)) if m else None
+    m = re.search(r"^;\s*filament_type\s*=\s*(.+)", text, re.M)
+    kinds = [k.strip(' "').upper() for k in re.split("[;,]", m.group(1))] if m else [""]
+    tools = tp.run[tp.part() & (tp.layer >= 0), 4]  # the one that prints the part says which plastic it is
+    tools = tools[np.isfinite(tools)].astype(int)
+    k = np.bincount(tools).argmax() if len(tools) else len(kinds)
+    tp.material = kinds[0] if len(set(kinds)) == 1 else kinds[k] if k < len(kinds) else ""
     _fill_heights(tp)
     d = tp.p1 - tp.p0
     ln = np.hypot(d[:, 0], d[:, 1])

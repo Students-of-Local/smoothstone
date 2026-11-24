@@ -3,11 +3,12 @@ the video's frames up to it being the normal timelapse's."""
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from smoothstone import cli, failsim, failvideo, printers, timelapse, toolpaths
+from smoothstone import cli, failsim, failvideo, gcode, printers, timelapse, toolpaths
 
 from test_slicer import _box, _union
 from test_supports import _arch
@@ -276,3 +277,30 @@ def test_the_frame_before_the_failure_is_the_timelapse_frame(jobenv, tmp_path, m
     assert min(light) > 0.005 and light[-1] > 0.03  # the failure fills the close frames: no toolhead box hides it
     c = np.asarray(Image.open(d / data["first_failure_frame"]).convert("RGB"), float)
     assert np.abs(c - b).mean() > 0.5  # and the failure itself is not
+
+
+def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
+    tp = gcode.parse(file := Path(__file__).parent / "fixtures" / "gcode" / "prusa_screw.gcode.gz")
+    gcode.plan(tp)
+    inp = failvideo.inputs(tp, "PLA", enclosed=False)
+    assert (inp.bed, inp.material.nozzle, inp.infill, inp.fan) == (60, 200, 5, 1)
+    assert inp.speed and inp.width and "bed 60 C, nozzle 200 C" in inp.notes[0]
+    assert not any("chamber" in n for n in inp.notes)  # an open printer has none
+    base = failsim.predict(inp)[0].assumptions
+    assert base[0].startswith("this is a model, not a recording; PLA (60 C bed, 200 C nozzle, open printer")
+    tp.run[tp.layer < 3, 0] = np.nan
+    assert failvideo.inputs(tp, "PLA").fan == 1  # the file says it from layer 4 on
+    other = tmp_path / "other.gcode"
+    for said, more, line, own in (("PLA", (), "Material: PLA, the G-code says.", True), ("ASA", (), "no ASA, so this is PLA's", False),
+                                  ("ASA", ("--material", "ABS"), "Material: ABS.", True), ("PLA", ("--material", "ABS"), "Material: ABS.", False),
+                                  (None, (), "PLA is assumed", False)):  # another plastic's heat is not this one's
+        other.write_text(gcode.read(file).replace("; filament_type = PLA", f"; filament_type = {said}" if said else ";"))
+        text, code = cli.run(["timelapse", "--gcode", str(other), "--fail", "bridge", *more])
+        assert line in text and ("bed 60 C" in text) is own and ("not the print's own: bed, nozzle" in text) is not own, text
+    tp.run[:, [0, 3]] = 0.4, 45
+    inp = failvideo.inputs(tp, "PLA")
+    assert (inp.fan, inp.air) == (0.4, 45) and failvideo.inputs(tp, "PLA", enclosed=False).air == failsim.fact("room_air")
+    tp.run[:] = np.nan
+    inp = failvideo.inputs(tp, "PLA")
+    assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
+    assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
