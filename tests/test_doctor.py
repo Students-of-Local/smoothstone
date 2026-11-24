@@ -413,3 +413,23 @@ def test_r2_thermal_fault_keeps_heating_steps_out_of_try(work):
 
 def test_r2_a_denied_thermal_fault_does_not_lead():
     assert doctor.diagnose("no thermal error on the screen, just strings everywhere")["failures"][0][0] == "stringing"
+
+
+def test_r2_two_photo_cases_in_one_second_keep_their_own_folders(work, monkeypatch):
+    import datetime as real
+
+    class Frozen(real.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 24, 1, 2, 3)
+
+    monkeypatch.setattr(doctor, "_dt", type("dt", (), {"datetime": Frozen, "date": real.date}))
+    stone("doctor", "--image", str(_photo(work / "a.jpg")))
+    first = sorted((work / "stone-job" / "doctor").glob("2*"))
+    first_bytes = (first[0] / "photo.jpg").read_bytes()
+    Image.new("RGB", (900, 700), (10, 200, 10)).save(work / "b.jpg", "JPEG")
+    stone("doctor", "--image", str(work / "b.jpg"))
+    cases = sorted((work / "stone-job" / "doctor").glob("2*"))
+    assert len(cases) == 2, cases
+    assert (first[0] / "photo.jpg").read_bytes() == first_bytes  # the first photo was not overwritten
+    assert json.loads((first[0] / "case.json").read_text())["id"] == first[0].name
