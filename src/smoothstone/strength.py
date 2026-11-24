@@ -37,6 +37,7 @@ DIRS = {"down": (2, -1), "up": (2, 1), "left": (0, -1), "right": (0, 1), "front"
 RIGID = ("PLA", "PETG", "ABS", "ASA", "PC", "PA", "PLA-CF", "PETG-CF")
 ASSUMPTIONS = [
     "Linear elastic, small deflection: past about a tenth of the lever the numbers run high.",
+    "Buckling is Euler's column, held at one end, when the load pushes toward the hold; wrinkling of a thin skin is not checked.",
     f"Wall lines {LINE} mm wide; solid bottom and top layers are OrcaSlicer's K2 profile (refs slicer.k2_shells) at 0.2 mm, "
     "whatever the wall count.",
     "Infill is rho^2 as stiff and as strong as solid plastic (Gibson-Ashby, refs any.infill_exponent).",
@@ -89,6 +90,12 @@ class Case:
                         + [shlex.quote(f"{k}={v}") for k, v in w.items()])
 
 
+    def again(self, *ask: str) -> str:
+        """The command with these words left for whoever fills them in; every other word stays as typed."""
+        kept = replace(self, words={k: v for k, v in self.words.items() if k not in ask})
+        return " ".join([kept.command(), *(f"{k}=<{HELP[k]}>" for k in ask)])
+
+
 def _number(text: str) -> float:
     return float(re.fullmatch(r"\s*(-?\d+(?:\.\d+)?)\s*", text).group(1))
 
@@ -135,7 +142,7 @@ def parse(items: list[str]) -> tuple[Case, Path | None, list[str]]:
                     raise ValueError
             elif k == "infill":
                 case.infill = _number(v.rstrip("%"))
-                if not 0 <= case.infill <= 100:
+                if not 1 <= case.infill <= 100:
                     raise ValueError
             elif k == "walls":
                 case.walls = int(v)
@@ -155,7 +162,7 @@ def parse(items: list[str]) -> tuple[Case, Path | None, list[str]]:
             else:
                 bad.append(f"{k}: not a strength word (load at dir fixed material infill walls orient sag voxels)")
                 continue
-        except (ValueError, AttributeError, KeyError, TypeError):
+        except (ValueError, AttributeError, KeyError, TypeError, OverflowError):
             bad.append(f"{k}={v}: {HELP[k] if k in HELP else 'not understood'}")
             continue
         case.words[k] = v
@@ -166,7 +173,7 @@ def parse(items: list[str]) -> tuple[Case, Path | None, list[str]]:
 
 HELP = {"load": "a weight like 20N, 2kg, 500g or 5lb", "at": "tip, top, center, a face (bottom back front left right top) or x,y,z in mm",
         "dir": "down up left right front back, or an axis like -y", "fixed": "a face, holes, x,y,z, or a box x0,y0,z0,x1,y1,z1; join with +",
-        "material": "one of " + " ".join(reftool.STRENGTH), "infill": "a percent, 0 to 100", "walls": "a count, 1 to 20",
+        "material": "one of " + " ".join(reftool.STRENGTH), "infill": "a percent, 1 to 100", "walls": "a count, 1 to 20",
         "orient": "as-printed, or the part axis that points up on the bed: x, y or z", "sag": "a deflection limit in mm",
         "voxels": "a cell count, 5000 to 400000"}
 
@@ -186,6 +193,7 @@ class Setup:
     lever: float  # mm from the hold to the load
     held: str  # words for the hold
     problem: str = ""  # why there is nothing to solve
+    lost: bool = False  # some of the part is thinner than the cells, so the model does not have it
 
 
 def _surface(model: fea.Model) -> np.ndarray:
@@ -237,10 +245,12 @@ def _holes(model: fea.Model) -> tuple[np.ndarray, str]:
 
 
 def _near(model: fea.Model, point, radius: float) -> np.ndarray:
-    """Surface nodes within radius of the surface point nearest to `point`."""
+    """Surface nodes within radius of the surface point nearest to `point`; none when the part is not there."""
     surf = np.nonzero(_surface(model))[0]
     c = model.coords[surf]
     snap = c[np.argmin(np.linalg.norm(c - point, axis=1))]
+    if np.linalg.norm(snap - point) > radius:
+        return surf[:0]
     return surf[np.linalg.norm(c - snap, axis=1) <= radius]
 
 
@@ -313,6 +323,14 @@ def pitch_for(mesh, voxels: int) -> float:
     return side / max(1, round(side / pitch))
 
 
+def lost(mesh, grid: fea.Grid) -> bool:
+    """Whether some of the mesh sits over 2 cells from every solid cell: a thin tab or pin no cell center fell in."""
+    from scipy.spatial import cKDTree
+
+    d, _ = cKDTree(grid.centers()).query(np.vstack([mesh.vertices, mesh.triangles_center]))
+    return bool(d.max() > 2 * grid.pitch)
+
+
 def _grown(model: fea.Model, fixed: np.ndarray, point, radius: float, mm: float) -> tuple[fea.Grid, int]:
     """The part `mm` thicker near a point, and the cells of padding; nothing grows onto a held node."""
     from scipy import ndimage
@@ -343,6 +361,7 @@ def setup(mesh, case: Case, props: Props, voxels: int | None = None, grow: tuple
 
     wall, model = build(fea.voxelize(mesh, pitch_for(mesh, voxels or VOXELS)))
     grid = model.grid
+    gone = lost(mesh, grid)
     fixed, held, empty = held_nodes(model, case.fixed)
     spot = load_spot(model, case.at, fixed) if len(fixed) else model.coords[0]
     patch = _near(model, spot, max(PATCH, 2 * grid.pitch))
@@ -350,6 +369,8 @@ def setup(mesh, case: Case, props: Props, voxels: int | None = None, grow: tuple
     problem = ""
     if empty:
         problem = f"found nothing to hold at fixed={'+'.join(empty)}"
+    elif "," in case.at and (off := np.linalg.norm(spot - [float(s) for s in case.at.split(",")])) > max(PATCH, 2 * grid.pitch):
+        problem = f"at={case.at} is {off:.0f} mm off the part"
     elif not len(patch):
         problem = f"the load at {case.at} sits on the held place, so nothing bends; pick another at= or fixed="
     else:
@@ -370,7 +391,7 @@ def setup(mesh, case: Case, props: Props, voxels: int | None = None, grow: tuple
     if len(patch):
         force[patch, axis] = sign * case.load / len(patch)
     lever = float(np.min(np.linalg.norm(model.coords[fixed] - spot, axis=1))) if len(fixed) else 0.0
-    return Setup(grid, model, wall, fixed, patch, spot, force, lever, held, problem)
+    return Setup(grid, model, wall, fixed, patch, spot, force, lever, held, problem, gone)
 
 
 # solve and judge
@@ -379,7 +400,7 @@ def setup(mesh, case: Case, props: Props, voxels: int | None = None, grow: tuple
 @dataclass
 class Result:
     sf: float
-    mode: str  # "layers" (between layers), "along" (in the layer plane) or "sag"
+    mode: str  # "layers" (between layers), "along" (in the layer plane), "sag" or "buckle"
     worst: np.ndarray  # mm, the cell nearest to breaking
     deflection: float  # mm at the load, along the load
     deflection_max: float
@@ -388,6 +409,7 @@ class Result:
     stress: dict
     info: dict
     thin: bool = False  # the loaded spot is under 3 cells across, so its bending stress reads low
+    buckle: float = math.inf  # safety factor against buckling
 
 
 def shown(sf: float) -> float:
@@ -401,6 +423,35 @@ def thin_cells(grid: fea.Grid) -> np.ndarray:
 
     d = ndimage.distance_transform_edt(np.pad(grid.solid, 1))[1:-1, 1:-1, 1:-1]
     return (ndimage.maximum_filter(d, size=5) < 1.5)[grid.solid]
+
+
+def buckling(st: Setup, props: Props, case: Case) -> float:
+    """Safety factor against bowing out sideways, for a load that pushes toward its hold: a column held at one end
+    (Euler, with Timoshenko's stiffness average for a changing section), its slices bending about their weakest axis."""
+    from scipy import ndimage
+
+    axis, sign = case.dir
+    hold = st.model.coords[st.fixed, axis]
+    base, end = (hold.max(), st.spot[axis]) if sign < 0 else (st.spot[axis], hold.min())
+    if end - base < 2 * st.grid.pitch:
+        return math.inf  # the load does not push along the part toward the hold
+    full = np.zeros(st.grid.shape)
+    full[st.grid.solid] = st.model.weight
+    h, soft, total = st.grid.pitch, 0.0, 0.0
+    for i, w in enumerate(np.moveaxis(full, axis, 0)):
+        x = st.grid.origin[axis] + (i + 0.5) * h
+        if not base < x < end:
+            continue
+        lab, n = ndimage.label(w > 0)
+        inertia = 0.0  # the pieces of a slice share the load
+        for k in range(1, n + 1):
+            c, m = np.argwhere(lab == k) * h, w[lab == k]
+            c = c - np.average(c, axis=0, weights=m)
+            inertia += np.linalg.eigvalsh((c * m[:, None]).T @ c * h * h + np.eye(2) * m.sum() * h ** 4 / 12)[0]
+        t = math.cos(math.pi / 2 * abs(x - (base if sign < 0 else end)) / (end - base)) ** 2
+        soft, total = soft + t / max(inertia, 1e-12), total + t
+    e = props.e_z if axis == case.build else props.e_xy
+    return math.pi ** 2 * e * total / soft / (4 * (end - base) ** 2) / case.load if soft else math.inf
 
 
 def judge(st: Setup, props: Props, case: Case, u: np.ndarray, info: dict) -> Result:
@@ -424,14 +475,16 @@ def judge(st: Setup, props: Props, case: Case, u: np.ndarray, info: dict) -> Res
     limit = case.sag if case.sag else max(1.0, SAG * st.lever)
     i = int(np.argmax(ratio))
     checks = {"layers": r_layers[i] if away[i] else 0.0, "along": r_along[i] if away[i] else 0.0, "sag": abs(defl) / limit}
+    buckle = buckling(st, props, case)
+    checks["buckle"] = 1 / buckle
     mode = max(checks, key=checks.get)
     sf = 1 / max(checks[mode], 1e-12)
     vm_away = vm[away]
     stress = {"peak_mpa": round(float(vm_away.max()), 2), "p995_mpa": round(float(np.percentile(vm_away, 99.5)), 2),
               "smoothed_max_mpa": round(float(fea.smoothed(st.grid, vm)[away].max()), 2),
               "across_layers_mpa": round(float(across[away].max()), 2)}
-    thin = bool((thin_cells(st.grid) & (ratio >= 0.5 * ratio.max())).any())
-    return Result(sf, mode, st.grid.centers()[i], defl, float(np.linalg.norm(u, axis=1).max()), limit, ratio, stress, info, thin)
+    thin = st.lost or bool((thin_cells(st.grid) & (ratio >= 0.5 * ratio.max())).any())
+    return Result(sf, mode, st.grid.centers()[i], defl, float(np.linalg.norm(u, axis=1).max()), limit, ratio, stress, info, thin, buckle)
 
 
 def solve(mesh, case: Case, props: Props, voxels: int | None = None, grow=None) -> tuple[Setup, Result | None]:
@@ -455,8 +508,9 @@ def advise(mesh, case: Case, props: Props, st: Setup, res: Result) -> list[dict]
     for name in RIGID:
         if name != props.name:
             p = material(name)
+            e = min(p.e_xy / props.e_xy, p.e_z / props.e_z)
             out.append({"change": f"material={name}", "words": f"print it in {name}", "kind": "material",
-                        "sf": min(_strength_sf(res, p), res.limit / max(abs(res.deflection) * props.e_xy / p.e_xy, 1e-12))})
+                        "sf": min(_strength_sf(res, p), res.limit * e / max(abs(res.deflection), 1e-12), res.buckle * e)})
     out = sorted(out, key=lambda a: -a["sf"])[:1]
     coarse = min(COARSE, VOXELS)
     cst, base = solve(mesh, case, props, coarse)
@@ -502,9 +556,11 @@ def verdict(st: Setup, res: Result, case: Case, props: Props) -> list[str]:
     sf = shown(res.sf)
     word = "fine" if sf >= FINE else ("holds, with little margin" if sf >= 1 else "fails")
     if res.thin and sf >= 1:
-        word = "not sure, the loaded spot is under 3 cells thick in this model and may be weaker"
+        word = ("not sure, part of it is thinner than this model's cells" if st.lost else
+                "not sure, the loaded spot is under 3 cells thick in this model and may be weaker")
     how = {"layers": f"breaks between layers at {_where(st, res, case)}",
            "along": f"breaks along the layers at {_where(st, res, case)}",
+           "buckle": "bows out sideways and buckles under the push",
            "sag": f"bends too far: {abs(res.deflection):.1f} mm, limit {res.limit:.1f} mm"}[res.mode]
     s = res.stress
     return [f"Safety factor {sf:.1f}: {word} ({how})." if sf < FINE else f"Safety factor {sf:.1f}: {word} (weakest: {how}).",
@@ -520,28 +576,28 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     from .job import write_json
 
     case, file, bad = parse(items)
-    usage = "stone strength load=20N at=tip dir=down fixed=bottom"
     if bad:
         out.fix("; ".join(bad))
-        out.next = usage
+        out.next = case.again(*dict.fromkeys(k for k in (re.match(r"\w*", b)[0] for b in bad) if k in HELP))
         return
     f = file or job.build_dir / "part.stl"
     if not f.is_file():
         out.fix(f"no file at {f}" if file else "no built part yet; build first or name an STL file")
-        out.next = "stone build" if not file else usage
+        out.next = "stone build" if not file else f"ask the person: where is the STL? Then: {case.command()}"
         return
     own = job.exists() and f.resolve() == (job.build_dir / "part.stl").resolve()  # the job's part, not another file
     pick = reftool.strength_material(plan_material) if own else ""
     if own and plan_material and not pick and not case.material:
-        out.fix(f"no strength data for {plan_material}, the job's filament; name the nearest with material=")
-        out.next = case.command(material="PLA")
+        out.fix(f"no strength data for {plan_material}, the job's filament")
+        out.next = f"ask the person: which of these is closest to {plan_material}? Then: {case.again('material')}"
         return
+    usual = pick if own and plan_material else "PLA"
     case.material = case.material or pick or "PLA"
     props = material(case.material)
     mesh = trimesh.load(f, force="mesh")
     if not mesh.is_watertight or mesh.volume <= 0:
         out.fix(f"{f.name} is not a closed shape, so it has no inside to load; repair it first")
-        out.next = "stone build" if own else usage
+        out.next = "stone build" if own else f"ask the person for a closed STL. Then: {case.command()}"
         return
     st, res = solve(mesh, case, props, case.voxels)
     if res and res.thin and not case.voxels:
@@ -549,7 +605,7 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     if res is None:
         out.fix(st.problem)
         out.next = (f"ask the person: what holds the part still ({HELP['fixed']}), and where does the load go? "
-                    f"Then: {usage}")
+                    f"Then: {case.again('at', 'fixed')}")
         return
     advice = advise(mesh, case, props, st, res)
     bd = job.build_dir if own else f.parent
@@ -577,10 +633,10 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     if better:
         out.add("What helps most: " + "; ".join(f"{a['words']} ({shown(a['sf'])})" for a in better) + ".")
     changed = [w for w, on in ((f"{case.walls} walls", case.walls != Case.walls), (f"{case.infill:g}% infill", case.infill != Case.infill),
-                               (props.name, props.name != (pick or "PLA")),
+                               (props.name, props.name != usual),
                                (f"its {'xyz'[case.build]} axis up on the bed", case.build != 2)) if on]
     if changed:
-        out.add("This holds only for a print with " + ", ".join(changed) + "; tell the person.")
+        out.add(("This holds only" if res.sf >= 1 else "This answer is") + " for a print with " + ", ".join(changed) + "; tell the person.")
     i = res.info
     out.add(f"Model: {i['voxels']:,} voxels of {i['pitch_mm']} mm, solved in {i['seconds']:.0f} s; linear, untested by a real "
             "break; assumptions in strength.json.")

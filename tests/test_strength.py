@@ -160,7 +160,7 @@ def test_shown_rounds_down():
 
 
 def test_bad_numbers_say_so():
-    for word in ("fixed=a,b,c", "sag=-2", "sag=0", "orient=", "walls=21"):
+    for word in ("fixed=a,b,c", "sag=-2", "sag=0", "orient=", "walls=21", "infill=0", "voxels=1e400"):
         assert strength.parse(["load=5N", word])[2], word
 
 
@@ -182,7 +182,11 @@ def test_stone_strength_reports_and_writes_its_files(jobenv, monkeypatch):
     assert "bar.stl" in text and "Safety factor" in text, text
     assert "tell the person" in text and nxt.startswith("ask the person: it holds 15 N only printed with"), (text, nxt)
     text, code, nxt = stone("strength", "load=lots")
-    assert code == 1 and "FIX: " in text and nxt.startswith("stone strength load=")
+    assert code == 1 and "FIX: " in text and nxt.startswith("stone strength load=<")
+    text, code, nxt = stone("strength", "bar.stl", "load=20N", "at=nose", "dir=-y", "fixed=holes")
+    assert code == 1 and "bar.stl load=20N dir=-y fixed=holes at=<" in nxt, nxt  # only the bad word is asked again
+    text, code, nxt = stone("strength", "gone.stl", "load=3N", "at=right")
+    assert code == 1 and "no file" in text and nxt.startswith("ask the person: ") and "gone.stl load=3N at=right" in nxt, nxt
 
 
 def test_nothing_held_says_so(jobenv, monkeypatch):
@@ -190,8 +194,11 @@ def test_nothing_held_says_so(jobenv, monkeypatch):
     beam(jobenv / "bar.stl")
     text, code, nxt = stone("strength", str(jobenv / "bar.stl"), "load=10N", "at=right", "fixed=top")
     assert "Safety factor" in text, text
-    text, code, nxt = stone("strength", str(jobenv / "bar.stl"), "load=10N", "at=right", "fixed=1000,1000,1000,1001,1001,1001")
+    text, code, nxt = stone("strength", str(jobenv / "bar.stl"), "load=10N", "at=right", "fixed=1000,1000,1000,1001,1001,1001", "walls=4")
     assert code == 1 and "FIX: found nothing to hold" in text and nxt.startswith("ask the person: what holds"), text
+    assert "bar.stl load=10N walls=4 at=<" in nxt and "fixed=<" in nxt, nxt
+    text, code, nxt = stone("strength", str(jobenv / "bar.stl"), "load=10N", "at=100,5,200", "fixed=left")
+    assert code == 1 and "190 mm off the part" in text, text
 
 
 def test_an_open_mesh_is_refused(jobenv):
@@ -199,4 +206,51 @@ def test_an_open_mesh_is_refused(jobenv):
     m.update_faces(np.arange(len(m.faces)) > 0)
     m.export(jobenv / "open.stl")
     text, code, nxt = stone("strength", str(jobenv / "open.stl"), "load=10N")
-    assert code == 1 and "not a closed shape" in text, text
+    assert code == 1 and "not a closed shape" in text and "open.stl load=10N" in nxt, (text, nxt)
+
+
+def test_a_filament_with_no_data_is_asked_about_and_stays_named(jobenv, monkeypatch):
+    from smoothstone import cli
+
+    monkeypatch.setattr(strength, "VOXELS", 10_000)
+    job, words = cli.Job(jobenv / "stone-job"), ["load=5N", "at=right", "dir=down", "fixed=left"]
+    job.create("a bar")
+    job.build_dir.mkdir(parents=True, exist_ok=True)
+    beam(job.build_dir / "part.stl")
+    out = cli.Out()
+    strength.report(job, words, out, "PVB")
+    assert out.code == 1 and "PVB" in out.next and "material=<" in out.next and "load=5N" in out.next, out.next
+    out = cli.Out()
+    strength.report(job, [*words, "material=PLA"], out, "PVB")
+    assert "print with PLA; tell the person" in " ".join(out.lines), out.lines
+
+
+def test_a_thin_tab_the_cells_miss_is_never_called_fine():
+    block = trimesh.creation.box(extents=[100, 100, 50])
+    tab = trimesh.creation.box(extents=[20, 20, 1]).apply_translation([59.9, 0, 2.2])
+    case = strength.parse(["load=5N", "at=right", "dir=down", "fixed=left"])[0]
+    p = strength.material("PLA")
+    st, res = strength.solve(block.union(tab), case, p, 5_000)
+    assert st.lost and res.thin and "thinner than this model's cells" in strength.verdict(st, res, case, p)[0]
+    assert not strength.setup(block, case, p, 5_000).lost
+
+
+def test_a_whole_number_of_cells_stays_whole():
+    from smoothstone import fea
+
+    for side in (8.5, 10.0, 3.3):
+        grid = fea.voxelize(trimesh.creation.box(extents=[40, 40, side]), side / 7)
+        assert grid.solid.any((0, 1)).sum() == 7, side
+
+
+def test_a_slender_post_pushed_toward_its_hold_buckles():
+    """3 x 3 x 100 mm PLA post on the bed: pi^2 E I / (2L)^2 is under 2 N in any PLA, far under what crushes it."""
+    post = trimesh.creation.box(extents=[3, 3, 100]).apply_translation([0, 0, 50])
+    p = strength.material("PLA")
+    case = strength.parse(["load=20N", "at=top", "dir=down", "fixed=bottom", "infill=100"])[0]
+    st, res = strength.solve(post, case, p, 30_000)
+    euler = np.pi ** 2 * p.e_z * 3 ** 4 / 12 / (4 * 100 ** 2) / 20
+    assert res.mode == "buckle" and res.sf < 1 and abs(res.buckle / euler - 1) < 0.05, (res.mode, res.buckle, euler)
+    assert "buckles" in strength.verdict(st, res, case, p)[0]
+    case.dir = (2, 1)  # pulled, not pushed
+    assert strength.solve(post, case, p, 30_000)[1].buckle == np.inf

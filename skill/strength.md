@@ -34,6 +34,7 @@ bed), `sag=2` (the deflection limit in mm). The material starts as the job's own
   2 or more is fine. Under 2 is little margin. Under 1 it fails.
 - Breaks between layers: printed layers pull apart before the plastic does. Rotating the part
   so the load runs along the layers often fixes this.
+- Buckles: a thin post or plate pushed toward its hold bows out sideways before the plastic breaks.
 - Deflection: how far the loaded spot moves.
 - What helps most: single changes, best first, each with the safety factor it reaches.
 
@@ -41,8 +42,7 @@ The NEXT line re-runs the check with a print change that reaches 2, or asks the 
 a thicker part or a lighter load would do. A thicker part is a recipe change: `stone set`, then
 `stone build`, then `stone strength` again.
 When the answer says "This holds only for a print with ...", tell the person those settings: the
-slicer does not know them. "not sure, the loaded spot is under 3 cells thick" means the model cannot
-judge it yet: run NEXT.
+slicer does not know them. "not sure, ..." means the model cannot judge it yet: run NEXT.
 
 The numbers and every assumption are in build/strength.json.
 
