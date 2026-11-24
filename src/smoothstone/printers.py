@@ -9,6 +9,7 @@ resumes or cancels a print.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 import shutil
@@ -20,6 +21,7 @@ from pathlib import Path
 from . import config
 
 PRINTERS_DIR = Path(__file__).resolve().parent / "printers"
+SETTINGS = config.REPO_ROOT / "recipes" / "lib" / "refs" / "printer_settings.json"
 GANTREL = "gantrel-printer"
 GANTREL_INSTALL = "uv tool install git+https://github.com/baney75/Gantrel"
 
@@ -32,6 +34,38 @@ def load() -> dict[str, dict]:
         p = json.loads(f.read_text())
         out[p["id"]] = p
     return dict(sorted(out.items(), key=lambda kv: (kv[1]["maker"], kv[1]["name"])))
+
+
+@lru_cache(maxsize=1)
+def _settings() -> dict[str, dict]:
+    return {e["id"]: e for e in json.loads(SETTINGS.read_text())["entries"]}
+
+
+def settings(p: dict, material: str) -> dict | None:
+    """What this printer's slicer profile prints the plastic with (tools/orca_profiles.py), or None: nozzle, bed
+    and chamber in C, max_flow mm3/s, diameter mm, its profile and url, and the fan in %: fan_long on layers longer than
+    fan_min_layer_s, fan_max on ones shorter than fan_max_layer_s, from fan_min up to it between. chamber is the air the
+    profile is written for: chamber_heated says whether the printer heats it or only its bed does. Heat the maker says the printer does not reach is
+    cut to what it does, the chamber's to none on an open frame, and `cut` says so."""
+    e = _settings().get(f"orca.{p['id']}.{material.upper()}")
+    if not e:
+        return None
+    out = {**e["value"], "profile": e["cite"], "url": e["url"], "cut": []}
+    out.setdefault("fan_long", out["fan_min"])
+    out["chamber_heated"] = bool(out.get("chamber") and p.get("chamber_heater"))
+    for k, top in (("nozzle", p.get("max_hotend_c")), ("bed", p.get("max_bed_c"))):
+        if top and out.get(k, 0) > top:
+            out["cut"].append(f"{e['cite']} wants the {k} at {out[k]:g} C; the {p['name']} reaches {top:g} C")
+            out[k] = top
+    if out.get("chamber") and not p.get("enclosed"):
+        out["cut"].append(f"{e['cite']} wants {out.pop('chamber'):g} C air; the {p['name']} is an open frame")
+    return out
+
+
+def process(p: dict) -> dict | None:
+    """This printer's slicer process: layer (mm) and widths, speeds, accels, shells, retract_mm, nozzle_volume_mm3 (where Orca gives it)."""
+    e = _settings().get(f"orca.{p['id']}.process")
+    return {**copy.deepcopy(e["value"]), "profile": e["cite"], "url": e["url"]} if e else None
 
 
 def _key(text: str) -> str:
