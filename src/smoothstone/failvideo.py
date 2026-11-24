@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import failsim, printers, strand, timelapse
+from . import failsim, printers, strand, timelapse, toolpaths
 
 MODES = ("auto", "supports", "detach", "droop", "bridge")
 AFTER = 12  # layers drawn after the failure (assumption: enough to see it; the printer would go on)
@@ -114,6 +114,12 @@ def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True,
         tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], np.where(of, tp.layer, -1)[ext], z, **kw)
     inp = masks(ext & ~skirt & ~moves_of(tp, "prime tower"), z, layer_t=layer_times(tp), layer=thick, clean=clean, supports=bool(sup.any()), enclosed=enclosed)
     inp = replace(inp, **settings(tp, material, enclosed, heat, prof))
+    inp.material = failsim.leaving(inp)
+    part = ext & tp.part()
+    fed = (tp.p1 - tp.p0)[part, 3] * toolpaths.FIL_AREA / np.maximum(tp.t1 - tp.t0, 1e-9)[part]
+    if (most := float(np.percentile(fed, 95))) > 1.05 * inp.material.max_flow:
+        inp.notes.append(f"this print asks the hotend for {most:.1f} mm3/s; the printer's slicer profile lets it melt {inp.material.max_flow:g} "
+                         f"of {inp.material.name}, and lines that come out thin past that are not drawn")
     rim, foot = masks(skirt, z[:1]).masks[0], inp.masks[0]
     lab, _ = ndimage.label(ndimage.binary_dilation(rim | foot))  # a slicer leaves a hair between brim and part
     inp.brim = rim & np.isin(lab, np.setdiff1d(lab[foot], 0))

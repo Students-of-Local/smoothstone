@@ -134,3 +134,15 @@ def test_a_hollow_open_top_box_prints():
     prof["shells"] = {**prof["shells"], "sparse_infill_density": 0, "top_shell_layers": 0, "bottom_shell_layers": 0}
     tp = toolpaths.generate(trimesh.creation.box((20, 20, 2)), prof, 0.2)
     assert not (tp.feature == gcode.FEATURES.index("sparse infill")).any()
+
+
+def test_no_line_asks_for_more_than_the_hotend_melts():
+    k2 = toolpaths.profile(printers.get("creality_k2"), "TPU")
+    assert k2["max_flow"] == 2 and "no faster than 2 mm3/s of TPU" in k2["whose"]
+    box = trimesh.creation.box((20, 20, 2))
+    slow, fast = toolpaths.generate(box, k2, 0.2), toolpaths.generate(box, {**k2, "max_flow": None}, 0.2)
+    flow = lambda tp: tp.feed * toolpaths.spacing(tp.width, tp.height) * tp.height  # noqa: E731
+    on = slow.extruding()
+    assert flow(slow)[on].max() == pytest.approx(2) and flow(fast)[on].max() > 20
+    assert np.allclose(slow.p1, fast.p1)  # the same lines
+    assert slow.t1[-1] > 5 * fast.t1[-1]

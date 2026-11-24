@@ -322,7 +322,8 @@ def test_every_failsim_fact_has_a_source():
 
 
 def test_an_open_printer_cools_a_bead_in_room_air():
-    warm, room = fs.cooling("ABS", fan=False), fs.cooling("ABS", fan=False, air_c=fs.fact("room_air"))
+    out = fs.leaving(fs.Inputs([], 0.2, material="ABS"))
+    warm, room = fs.cooling(out, fan=False), fs.cooling(out, fan=False, air_c=fs.fact("room_air"))
     assert room["soft_s"] < warm["soft_s"]
     a, b = np.zeros((60, 60), bool), np.zeros((60, 60), bool)
     a[10:50, 10:40] = b[10:50, 10:56] = True  # 3.2 mm past the layer below
@@ -429,10 +430,11 @@ def test_a_plastic_by_the_name_people_give_it(text, plastic):
 def test_a_plastic_at_the_heat_its_printers_profile_says(mat, pid):
     p = printers.get(pid)
     m, s, k2 = fs.material(mat, pid), printers.settings(p, mat), fs.material(mat)
-    assert m.set < m.nozzle and replace(m, nozzle=k2.nozzle, bed=k2.bed, chamber=k2.chamber, cp=k2.cp, stand_ins=k2.stand_ins) == k2
+    assert m.set < m.nozzle and replace(m, nozzle=k2.nozzle, bed=k2.bed, chamber=k2.chamber, cp=k2.cp, stand_ins=k2.stand_ins, max_flow=k2.max_flow) == k2
     if pid == "creality_k2" and "failsim.k2." + mat.lower() in fs.facts():  # its longer source
         assert {"nozzle": m.nozzle, "bed": m.bed, "chamber": m.chamber} == fs.fact("k2." + mat.lower())
     else:
+        assert m.max_flow == s["max_flow"]
         assert (m.nozzle, m.bed, m.chamber) == (s["nozzle"], s["bed"], s.get("chamber", 35))  # not the K2's 60 C for ABS
         assert (fs.note("k2_air") in m.stand_ins) is ("chamber" not in s and p["enclosed"])
 
@@ -441,3 +443,31 @@ def test_a_printers_own_shells_weigh_its_layers():
     masks = [_rect((44, 44), 2, 42, 2, 42)] * 20
     three, two = (fs.printed_section(masks, 0.5, process=printers.process(printers.get(p)))["share"] for p in ("prusa_mini", "creality_k2"))
     assert (three > two).any() and np.allclose(two, fs.printed_section(masks, 0.5)["share"])
+
+
+@pytest.mark.parametrize("mat, set_c, flow, want", [("PLA", 210, 3, 186.2), ("PLA", 210, 13, 175.5), ("PLA", 185, 3, 164.0),
+                                                    ("PETG", 240, 3, 209.9), ("PETG", 240, 13, 192.8)])
+def test_the_melt_leaves_cooler_than_it_is_set(mat, set_c, flow, want):  # Badarinath & Prabhu's fits, by hand
+    m = replace(fs.material(mat), nozzle=set_c, max_flow=13)
+    assert fs.melt_c(m, flow) == pytest.approx(want, abs=0.1)
+
+
+@pytest.mark.parametrize("mat", fs.MATERIALS)
+def test_the_faster_it_flows_the_cooler_it_leaves(mat):
+    m = fs.material(mat)
+    got = [fs.melt_c(m, f * m.max_flow) for f in (0, 0.23, 0.6, 1, 3)]
+    assert m.nozzle > got[0] >= got[1] > got[2] > got[3] == got[4] > m.set  # past the rig's fastest: what that gave
+    small = replace(m, max_flow=m.max_flow / 2)  # half the hotend, the same flow
+    assert fs.melt_c(small, 0.4 * m.max_flow) < fs.melt_c(m, 0.4 * m.max_flow)
+
+
+def test_what_is_simulated_leaves_at_that_heat():
+    inp = fs.inputs_from_mesh(trimesh.creation.box((20, 20, 4)), material="PLA")
+    m = fs.leaving(inp)
+    width, speed = fs.run(inp)
+    assert width * speed * inp.layer == pytest.approx(m.max_flow)  # the K2's 300 mm/s walls are past what PLA melts at
+    assert m.out == fs.melt_c(m, m.max_flow) < m.nozzle
+    assert fs.run(replace(inp, speed=300))[1] == 300  # the print's own speed stands
+    assert fs.cooling(m)["soft_s"] < fs.cooling("PLA")["soft_s"]
+    assert st.Strand([(0, 0, 0), (0, 0, 1)], 0.48, m).hot == m.out
+    assert any("leaves the nozzle" in a for f in fs.predict(inp) for a in f.assumptions)

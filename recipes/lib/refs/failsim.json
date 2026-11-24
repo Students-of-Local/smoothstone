@@ -1894,6 +1894,24 @@
    "checked": "2026-11-24",
    "range": [0.02, 0.1],
    "assumption": "A thread thinner than 0.05 mm breaks; the hotend lets the strand go"
+  },
+  {
+   "id": "failsim.melt_exit",
+   "topic": "failsim",
+   "key": "melt_exit",
+   "value": {
+    "PLA": {"1": -5.98, "T": 0.9187, "Q": 2.361, "QQ": -0.06197, "TQ": -0.01159, "set_c": [185, 235]},
+    "PETG": {"1": 10.0, "T": 0.8414, "Q": -0.433, "QQ": -0.0801, "TQ": 0, "set_c": [215, 265]},
+    "flow": [3, 13]
+   },
+   "unit": "C, by set C and mm3/s",
+   "note": "How hot the plastic leaves the nozzle, by what the hotend is set to (T) and the flow (Q): infrared measurements on a stock hotend with a 0.6 mm brass nozzle, 3 mm3/s to 13, about the most it was rated for. PLA set to 210 C leaves at 186 C at 3 mm3/s and 175 C at 13. A hotend built to melt evenly lost 3 C at 225 C and 10 mm3/s (Colon, Kazmer, Peterson, Seppala, Rapid Prototyping Journal, Table 2, https://par.nsf.gov/servlets/purl/10552492). A printer's flow counts as its share of the most its slicer profile lets its hotend melt, out of the 13; slower than measured is the slowest measured. Heat outside the measured range keeps the same share of the way down to a 25 C room.",
+   "quote": "T_out PLA = -5.98 + 0.9187 x T_L + 2.361 x Q - 0.06197 x Q^2 - 0.01159 x T_L x Q; T_out PETG = 10.00 + 0.8414 x T_L - 0.433 x Q - 0.0801 x Q^2",
+   "source": "Badarinath, Prabhu, Real-Time Sensing of Output Polymer Flow Temperature and Volumetric Flowrate in Fused Filament Fabrication Process, Materials 2022, 15(2), 618, equations 1 and 2, table 1",
+   "cite": "Materials 2022 15:618 eq 1, 2",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8812280/",
+   "checked": "2026-11-24",
+   "assumption": "The melt leaves the nozzle as much cooler than it is set to as one stock hotend's did (24 to 34 C for PLA; a hotend built for it lost 3 C), the more the nearer the flow is to what the slicer's profile lets this hotend melt; plastics other than PLA as PETG did"
   }
  ]
 }

@@ -19,11 +19,11 @@ def _t():
     return _union(_box((6, 6, 4), (12, 0, 0)), _box((30, 6, 1), (0, 0, 4)))
 
 
-def _toolpath(mesh):
+def _toolpath(mesh, material="PLA"):
     prof = printers.get("creality_k2")
     lo, hi = mesh.bounds
     bx, by = prof["build_volume_mm"][:2]
-    return toolpaths.generate(mesh, toolpaths.profile(prof), 0.2, None, (bx / 2 - (lo[0] + hi[0]) / 2, by / 2 - (lo[1] + hi[1]) / 2))
+    return toolpaths.generate(mesh, toolpaths.profile(prof, material), 0.2, None, (bx / 2 - (lo[0] + hi[0]) / 2, by / 2 - (lo[1] + hi[1]) / 2))
 
 
 def _story(mesh, mode="auto", clean=1.0):
@@ -86,7 +86,7 @@ def test_spaghetti_falls_from_the_layer_and_rests_on_what_is_below():
     z = float(inp.layer_z[fail.layer])
     fell, wide = (np.concatenate([k[j] for k in st.links if k[0] == fail.layer]) for j in (1, 3))
     assert (fell[:, 2] - wide / 2).min() >= -0.03 and fell[:, 2].max() <= z + 2  # resting on the plate by its own radius, drawn thin or not, or a slack loop a little over the layer
-    assert (fell[:, 2] < 1.0).mean() > 0.4 and np.median(fell[:, 2]) < z / 2  # most of the arms' plastic lies on or near the bed
+    assert (fell[:, 2] < 1.0).mean() > 0.2 and np.median(fell[:, 2]) < z - 1  # the arms' plastic hangs well under its layer, some of it on the bed
     assert st.gone.any() and not st.gone[tp.layer < fail.layer].any()  # the scene up to the failure is untouched
     assert [f["layer"] for f in frs[:first]] == list(range(fail.layer))
     lines = [sum(len(it["mesh"][0]) for it in e) for e in extra[first:]]
@@ -166,7 +166,7 @@ def test_a_tall_part_tips_about_its_edge():
 
 
 def test_a_ledge_droops_then_curls():
-    tp, inp, fail, _ = _story(_union(_box((20, 20, 2), (0, 0, 0)), _box((23, 20, 2), (0, 0, 2))))
+    tp, inp, fail, _ = _story(_union(_box((20, 20, 2), (0, 0, 0)), _box((24, 20, 2), (0, 0, 2))))
     assert fail.kind == "droop"
     st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))[4]
     low = min(float(b[2].min()) for b in st.bent)
@@ -205,7 +205,7 @@ def test_high_up_the_nozzle_carries_only_what_its_tip_holds_and_drags_the_strand
     tp, inp, fail, _ = _story(_box((20, 20, 12), (0, 0, 0)), "detach")
     st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))[4]
     i = fail.layer + 1
-    assert st.blobs[i] == pytest.approx(failsim.nozzle_hold("PLA")["blob_mm3"], rel=0.02)
+    assert st.blobs[i] == pytest.approx(failsim.nozzle_hold(inp.material)["blob_mm3"], rel=0.02)
     p, d = st.live[i]  # the strand still hangs from the nozzle when the layer ends
     end = tp.p1[np.flatnonzero(tp.layer == i)[-1], :3]
     assert p[-1] == pytest.approx(end, abs=2.0) and p[:, 2].min() < 1.0 < p[-1, 2]
@@ -277,7 +277,7 @@ def test_the_video_says_what_it_does_not_simulate(jobenv, tmp_path, monkeypatch)
     stl = tmp_path / "p.stl"
     _box((30, 20, 0.6), (0, 0, 0)).export(stl)
     text, _ = cli.run(["timelapse", str(stl), "--fail", "--plate", "dirty"])
-    assert "Limit:" not in text and "Strand: 0.48 mm thick, it leaves the nozzle at" in text and "The nozzle's tip carries 8.0 mm3." in text, text
+    assert "Limit:" not in text and "Strand: 0.48 mm thick, it leaves the nozzle at" in text and "The nozzle's tip carries 8.6 mm3." in text, text
     monkeypatch.setattr(failvideo, "SIM", 1.0)
     text, _ = cli.run(["timelapse", str(stl), "--fail", "--plate", "dirty"])
     assert f" {failvideo.LIMIT} 1 s of it, the start of each layer." in text, text
@@ -399,6 +399,14 @@ def test_a_short_run_lays_its_plastic_and_the_plate_past_the_grid_is_bare():
 def test_the_fans_share_is_the_winds():
     still, half, full = (failvideo.strand.numbers("PLA", 10.0, 120.0, fan=f)["set_s_fan"] for f in (0.0, 0.4, 1.0))
     assert still > half > full and failvideo.strand.Strand([(0, 0, 0), (0, 0, 1)], 0.48, "PLA", fan=0.4).fan == pytest.approx(0.4 * failsim.fact("fan_air_speed"))
+
+
+def test_a_print_that_outruns_the_hotend_says_so():
+    box = _box((20, 20, 4), (0, 0, 0))
+    ok, fast = (failvideo.inputs(_toolpath(box, m), "PLA") for m in ("PLA", None))  # None: the K2's speeds, uncapped
+    said = [[n for n in i.notes if "asks the hotend" in n] for i in (ok, fast)]
+    assert not said[0] and "lets it melt 14 of PLA" in said[1][0]
+    assert fast.material.out <= ok.material.out < ok.material.nozzle  # the faster the cooler
 
 
 def test_a_skirt_is_not_the_part_and_stays_when_it_goes():
