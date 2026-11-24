@@ -1,0 +1,59 @@
+{
+ "id": "elegoo_centauri_carbon",
+ "name": "Elegoo Centauri Carbon",
+ "maker": "Elegoo",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  256.0,
+  256.0,
+  256.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": true,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 320,
+ "max_bed_c": 110,
+ "limits_source": "https://www.elegoo.com/pages/elegoo-centauri-carbon (320 C nozzle, 110 C bed)",
+ "bed_surface": {
+  "type": "dual-sided flexible plate",
+  "clean": "Scrub the PEI plate gently with dish soap on a soft sponge or cloth, rinse with clean water, let it dry completely (Elegoo's Centauri Carbon 2 guide).",
+  "source": "https://wiki.elegoo.com/en/centauri-carbon-2-combo/filament-blob-removal-and-prevention",
+  "clean_by": "maker (successor model's guide)",
+  "type_source": "https://www.elegoo.com/pages/elegoo-centauri-carbon"
+ },
+ "auto_level": "automatic bed leveling and Z offset",
+ "multi_material": "CANVAS (optional upgrade)",
+ "camera": {
+  "where": "camera inside the chamber (corner not stated)",
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": "16:9",
+  "ir_night": false,
+  "timelapse_mode": "fixed",
+  "source": "https://www.elegoo.com/pages/elegoo-centauri-carbon"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 20000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Elegoo/machine/ECC/Elegoo%20Centauri%20Carbon%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [
+  {
+   "failure": "blob_on_nozzle",
+   "note": "Elegoo: lost bed adhesion lets filament gather around the nozzle into a blob.",
+   "source": "https://wiki.elegoo.com/en/centauri-carbon-2-combo/filament-blob-removal-and-prevention"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "elegoo",
+  "gantrel_model": "elegoo-centauri-carbon"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Elegoo/machine/ECC/Elegoo%20Centauri%20Carbon%200.4%20nozzle.json (build volume)",
+  "https://www.elegoo.com/pages/elegoo-centauri-carbon",
+  "https://wiki.elegoo.com/en/canvas/printhead-anomaly-detected-error-after-installing-canvas"
+ ],
+ "checked": "2026-11-24"
+}

@@ -1,0 +1,53 @@
+{
+ "id": "creality_ender3_v3_se",
+ "name": "Creality Ender-3 V3 SE",
+ "maker": "Creality",
+ "firmware": "marlin",
+ "build_volume_mm": [
+  220.0,
+  220.0,
+  250.0
+ ],
+ "kinematics": "bedslinger",
+ "enclosed": false,
+ "chamber_heater": false,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 260,
+ "max_bed_c": 100,
+ "limits_source": "https://www.creality.com/support/creality-ender-3-v3-se (260 C nozzle, 100 C bed)",
+ "bed_surface": {
+  "type": "PC-coated spring steel plate (PEI is an optional upgrade)",
+  "clean": "Creality's Ender-3 V3 SE wiki gives no plate cleaning steps (checked 2026-11-24); its sibling's steps: Hand sweat is the first cause Creality lists: wash the plate with dish soap and water; wash built-up glue off with water; then a thin layer of the included glue stick.",
+  "source": "https://wiki.creality.com/en/k2-flagship-series/k2/first-layer-adhesion-compression",
+  "clean_by": "fallback",
+  "type_source": "https://store.creality.com/blogs/all/ender-3-v3-se-vs-ke"
+ },
+ "auto_level": "CR Touch probe for the mesh, strain sensor for the Z offset",
+ "multi_material": "none",
+ "camera": {
+  "where": null,
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": null,
+  "ir_night": false,
+  "timelapse_mode": "fixed"
+ },
+ "speeds": {
+  "typical_print_mm_s": null,
+  "max_accel_mm_s2": 2500,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20Ender-3%20V3%20SE%200.4%20nozzle.json (machine_max_acceleration_x)"
+ },
+ "quirks": [],
+ "connect": {
+  "gantrel_type": "serial",
+  "notes": "Marlin over USB; no network API"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20Ender-3%20V3%20SE%200.4%20nozzle.json (build volume)",
+  "https://www.creality.com/support/creality-ender-3-v3-se",
+  "https://www.creality.com/products/creality-ender-3-v3-se",
+  "https://github.com/CrealityOfficial/Ender-3V3-SE"
+ ],
+ "checked": "2026-11-24"
+}

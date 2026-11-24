@@ -1,0 +1,63 @@
+{
+ "id": "creality_k2_plus",
+ "name": "Creality K2 Plus",
+ "maker": "Creality",
+ "firmware": "klipper",
+ "build_volume_mm": [
+  350.0,
+  350.0,
+  350.0
+ ],
+ "kinematics": "corexy",
+ "enclosed": true,
+ "chamber_heater": true,
+ "nozzle_mm": 0.4,
+ "max_hotend_c": 350,
+ "max_bed_c": 120,
+ "limits_source": "https://www.creality.com/products/k2-series-3d-printer (compare table)",
+ "bed_surface": {
+  "type": "flexible PEI build plate",
+  "clean": "Keep the bed clean: clean it regularly with detergent or another degreaser, or spread the included glue stick evenly on it.",
+  "source": "https://wiki.creality.com/en/k2-flagship-series/k2-plus/hotend-clumping",
+  "clean_by": "maker",
+  "type_source": "https://www.creality.com/eu/resources/compare-k2-series"
+ },
+ "auto_level": "strain gauge leveling, anti-tilt automatic leveling",
+ "multi_material": "CFS (1 in the Combo, up to 4)",
+ "camera": {
+  "where": "dual AI cameras (Creality does not say where they mount)",
+  "pos_mm": null,
+  "look_at_mm": null,
+  "hfov_deg": null,
+  "aspect": "16:9",
+  "ir_night": false,
+  "timelapse_mode": "fixed",
+  "source": "https://www.creality.com/products/creality-k2-plus-cfs-combo"
+ },
+ "speeds": {
+  "typical_print_mm_s": 300,
+  "max_accel_mm_s2": 30000,
+  "source": "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20K2%20Plus%200.4%20nozzle.json (machine_max_acceleration_x); https://www.creality.com/products/k2-series-3d-printer (note 4: typical print speed)"
+ },
+ "quirks": [
+  {
+   "failure": "blob_on_nozzle",
+   "note": "Creality has a hotend clumping guide for the K2 Plus: heat above print temperature, remove, check the thermistor cable.",
+   "source": "https://wiki.creality.com/en/k2-flagship-series/k2-plus/hotend-clumping"
+  },
+  {
+   "failure": "multi_material_feed",
+   "note": "Creality documents the extruder pneumatic connector failing to hold the PTFE tube.",
+   "source": "https://wiki.creality.com/en/k2-flagship-series/k2-plus"
+  }
+ ],
+ "connect": {
+  "gantrel_type": "creality",
+  "gantrel_model": "creality-k2-plus"
+ },
+ "sources": [
+  "https://github.com/OrcaSlicer/OrcaSlicer/blob/a31c95e273d3423abf185a444d70beae4941c697/resources/profiles/Creality/machine/Creality%20K2%20Plus%200.4%20nozzle.json (build volume)",
+  "https://www.creality.com/products/k2-series-3d-printer"
+ ],
+ "checked": "2026-11-24"
+}
