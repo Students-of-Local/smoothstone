@@ -394,16 +394,29 @@ def target(b: tuple[float, float]) -> float:
     return round(round((b[0] + b[1]) / 2 / STEP) * STEP, 2)
 
 
-def iso273(d: float) -> tuple[str, dict] | None:
-    """The metric screw a hole of this modeled size is for: the largest whose shank fits it."""
-    rows = sorted(((k.split(".", 1)[1].upper(), e["value"]) for k, e in lib().items() if k.startswith("iso273.")),
-                  key=lambda kv: float(kv[0][1:]))
-    best = None
-    for size, v in rows:
-        nominal = float(size[1:])
-        if nominal <= d + 0.05 and d <= v["coarse"] + 0.5:
-            best = (size, v)
+def iso273(printed: float) -> tuple[str, dict] | None:
+    """The metric screw a hole that prints at this size is most likely for: the one whose ISO 273
+    fine to coarse range is nearest, within 0.5 mm. A guess only; a screw the recipe or the request
+    names, or the one recorded on the job's first stone fit, comes first (screw_for)."""
+    best, gap = None, 0.5 + 1e-9
+    for k, e in lib().items():
+        if k.startswith("iso273."):
+            v = e["value"]
+            g = max(v["fine"] - printed, printed - v["coarse"], 0.0)
+            if g < gap:
+                best, gap = (k.split(".", 1)[1].upper(), v), g
     return best
+
+
+def iso_row(size: str | None) -> dict | None:
+    return lib().get(f"iso273.{size.lower()}", {}).get("value") if size else None
+
+
+def request_screw(text: str) -> str | None:
+    """The one metric screw the request names ("two M2.5 screw holes"), when it names exactly one."""
+    sizes = {f"M{m}" for m in re.findall(r"\bM(\d+(?:\.\d)?)\b", text or "", re.I)}
+    sizes = {s for s in sizes if iso_row(s)}
+    return sizes.pop() if len(sizes) == 1 else None
 
 
 def screw_size(help_text: str) -> str | None:
@@ -481,8 +494,12 @@ def intended(p, summary: str = "") -> str:
     return "slide"
 
 
-def recipe_lines(r, params: dict, feats: list[Feature], pr: Printer, s: float, material: str | None) -> tuple[list[Line], set]:
-    """One line per fit setting, and the features those settings made (so they are not listed twice)."""
+def recipe_lines(r, params: dict, feats: list[Feature], pr: Printer, s: float, material: str | None,
+                 screw: str | None = None, known: dict | None = None) -> tuple[list[Line], set]:
+    """One line per fit setting, and the features those settings made (so they are not listed twice).
+    screw is the one the recipe or request names; known holds the screws guessed on an earlier run,
+    by setting, and gets this run's guesses: the guess must not follow the size stone's fix changes."""
+    known = {} if known is None else known
     out: list[Line] = []
     used: set[int] = set()
     n_default = int(params.get("quality") or 0)
@@ -530,15 +547,14 @@ def recipe_lines(r, params: dict, feats: list[Feature], pr: Printer, s: float, m
             else:
                 out.append(Line(text, vd))
             continue
-        named = screw_size(p.help)
-        row = None
-        if named:
-            row = lib().get(f"iso273.{named.lower()}", {}).get("value")
-            size = named
+        size = next((x for x in (screw_size(p.help), screw, known.get(p.name))
+                     if iso_row(x) and float(x[1:]) - 1 <= v <= iso_row(x)["coarse"] + 1.5), None)
+        row = iso_row(size)
         if row is None:
-            got = iso273(v)
+            got = iso273(printed_hole(v, n, pr, s))
             if got:
                 size, row = got
+                known[p.name] = size
         if row is None:
             out.append(Line(f"{what}: prints {num(printed_hole(v, n, pr, s))} mm"))
             continue
@@ -564,7 +580,7 @@ def feature_line(f: Feature, pr: Printer, s: float, material: str | None, screw:
             return screw_line(what, f.d, f.n, pr, s, got[0], got[1], None)
         p = printed_hole(f.d, f.n, pr, s)
         text = f"{what}: prints {num(p)} mm"
-        got = iso273(f.d)
+        got = iso273(p)
         if got:  # nothing says a screw goes here: what it would mean for one, with no change asked
             size, row = got
             v = "tight" if p < row["fine"] - 0.02 else ("loose" if p > row["coarse"] + 0.02 else "fits")
@@ -617,13 +633,18 @@ def report(job, path: Path | None = None) -> tuple[list[str], list[Line], dict]:
                 + (f"{num(s * 100)}% ({s_cite})" if s_cite else "by no sourced amount: 0 assumed"))
     lines: list[Line] = []
     used: set[int] = set()
-    screw = None
+    screw = request_screw(request)
     if r is not None:
-        rl, used = recipe_lines(r, params, feats, pr, s, material)
-        lines.extend(rl)
         for p in r.params:
-            if param_kind(p) == "screw" and isinstance(params.get(p.name), (int, float)):
+            if param_kind(p) == "screw" and isinstance(params.get(p.name), (int, float)) and params[p.name] > 0:
                 screw = f"M{params[p.name]:g}"
+        st = job.status() if job.exists() else {}
+        known = dict((st.get("fit_screws") or {}).get(r.name) or {})
+        before = dict(known)
+        rl, used = recipe_lines(r, params, feats, pr, s, material, screw, known)
+        lines.extend(rl)
+        if known != before and job.exists():
+            job.update(fit_screws={**(st.get("fit_screws") or {}), r.name: known})
     for i, f in enumerate(feats):
         if i not in used:
             lines.append(feature_line(f, pr, s, material, screw))

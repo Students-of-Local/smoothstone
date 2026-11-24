@@ -80,19 +80,55 @@ def test_an_m3_hole_at_3_mm_is_tight_and_the_fix_is_iso_medium():
     assert "ISO 273 medium for M3: 3.4 mm" in ln.text
 
 
-def test_stone_fit_flags_an_m3_panel_hole_and_its_fix_fits(jobenv, openscad, monkeypatch):
+@pytest.mark.parametrize("size", ["M2.5", "M3", "M4"])
+def test_following_stone_fit_next_ends_at_a_hole_that_fits_the_screw(jobenv, openscad, monkeypatch, size):
+    """A hole drawn at the screw's own size is tight; stone's fix fits, and the next run keeps the
+    same screw (it is not guessed again from the size the fix just changed)."""
     monkeypatch.setenv("STONE_RECIPES", str(REPO / "recipes"))
-    stone("new", "A 60 by 40 mm cover plate with two M3 screw holes")
-    stone("set", "panel", "hole_d=3.0", "cutouts=0")
+    medium = fit.lib()[f"iso273.{size.lower()}"]["value"]["medium"]
+    stone("new", f"A 60 by 40 mm cover plate with two {size} screw holes")
+    stone("set", "panel", f"hole_d={size[1:]}", "cutouts=0")
     _, code, _ = stone("build")
     assert code == 0
     text, code, nxt = stone("fit")
     assert code == 0
-    assert "tight" in text and "ISO 273 medium for M3: 3.4 mm" in text, text
-    assert nxt == "stone set panel hole_d=3.6"
+    assert "tight" in text and f"ISO 273 medium for {size}: {medium:g} mm" in text, text
+    assert nxt.startswith("stone set panel hole_d="), nxt
     stone(*nxt.split()[1:])
     stone("build")
     text, _, nxt = stone("fit")
-    assert "hole_d=3.6" in text and "fits" in text and "tight" not in text, text
+    assert f"{size} screw" in text and "fits" in text and "tight" not in text and "loose" not in text, text
     assert nxt.startswith("none, the part is ready"), nxt
+
+
+def _panel(**params):
+    from types import SimpleNamespace
+
+    from smoothstone import recipes as rc
+
+    r = rc.load("panel", REPO / "recipes")
+    full = {p.name: p.default for p in r.params} | params
+    return SimpleNamespace(name="panel", summary=r.summary, params=r.params), full
+
+
+def test_a_guessed_screw_is_kept_when_the_hole_changes():
+    pr, known = fit.printer(), {}
+    r, params = _panel(hole_d=3.6)
+    lines, _ = fit.recipe_lines(r, params, [], pr, 0, "PLA", None, known)
+    assert known == {"hole_d": "M3"} and lines[0].verdict == "fits"
+    r, params = _panel(hole_d=2.9)  # now nearest M2.5 by size, but the job's screw is M3
+    lines, _ = fit.recipe_lines(r, params, [], pr, 0, "PLA", None, known)
+    assert "M3 screw" in lines[0].text and lines[0].verdict == "tight" and lines[0].value == 3.6
+
+
+def test_the_recipes_screw_setting_judges_its_hole():
+    r, params = _panel(hole_d=3.4)
+    lines, _ = fit.recipe_lines(r, params, [], fit.printer(), 0, "PLA", "M4", {})
+    assert "M4 screw" in lines[0].text and lines[0].verdict == "tight", lines[0].text
+
+
+def test_a_named_screw_comes_from_the_request():
+    assert fit.request_screw("two M2.5 screw holes") == "M2.5"
+    assert fit.request_screw("an m3 hole and an M4 hole") is None
+    assert fit.request_screw("a 60 mm fan") is None
 
