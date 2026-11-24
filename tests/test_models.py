@@ -3,6 +3,7 @@ repair, scaling, bed split with pins and thin feature report on small meshes, an
 
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -211,7 +212,7 @@ def test_split_a_tower_taller_than_the_bed_into_pinned_parts():
     lost = 40 * 40 * 300 - sum(p.man.volume() for p in parts)
     hole = modelprint.PIN_HOLE ** 2 * modelprint.PIN_DEPTH
     assert lost == pytest.approx(2 * len(js[0].pins) * hole, rel=0.1)
-    pins = modelprint.to_trimesh(modelprint.pins_mesh([2 * modelprint.PIN_DEPTH - modelprint.PIN_SHORT] * len(js[0].pins)))
+    pins = modelprint.to_trimesh(modelprint.pins_mesh([2 * modelprint.PIN_DEPTH - modelprint.PIN_SHORT] * len(js[0].pins), (220, 220, 220)))
     assert pins.body_count == len(js[0].pins) and pins.is_watertight
 
 
@@ -245,18 +246,50 @@ def test_a_wide_base_is_cut_across_only_where_it_is_wider_than_the_bed():
 
 def test_lay_flat_keeps_a_flat_bottom_down():
     box = trimesh.creation.box((30, 20, 10))
-    flat, T, why = modelprint.lay_flat(box)
+    flat, T, why = modelprint.lay_flat(box, (220, 220, 220))
     assert why is None and np.allclose(T, np.eye(4)) and modelprint.flat_bottom(flat) == pytest.approx(600)
     spike = trimesh.creation.cone(5, 30)  # stands on its point when turned over
     spike.apply_transform(trimesh.transformations.rotation_matrix(np.pi, (1, 0, 0)))
-    flat, T, why = modelprint.lay_flat(spike)
+    flat, T, why = modelprint.lay_flat(spike, (220, 220, 220))
     assert why and modelprint.flat_bottom(flat) > 20
 
 
 def test_lay_flat_lays_a_part_on_its_largest_flat_face():
     slab = trimesh.creation.box((100, 5, 80))  # stands on a 500 mm2 edge; its side is 8000 mm2
-    flat, T, why = modelprint.lay_flat(slab)
+    flat, T, why = modelprint.lay_flat(slab, (220, 220, 220))
     assert why and "largest flat face" in why and modelprint.flat_bottom(flat) == pytest.approx(8000)
+
+
+def test_a_tall_box_on_a_non_cube_bed_splits_into_parts_that_fit(tmp_path):
+    """A 60 x 60 x 300 box on a 220 x 220 x 250 bed: a 249 mm band laid on its side would run past
+    the 220 mm x axis, so every part keeps an orientation that fits (review first-F1)."""
+    box = trimesh.creation.box((60, 60, 300))
+    root = tmp_path / "job"
+    (root / "model").mkdir(parents=True)
+    box.export(root / "model" / "model.stl")
+    (root / "model" / "model.json").write_text(json.dumps({"stl": str(root / "model" / "model.stl"),
+                                                           "name": "Box tower", "subject": "Box tower"}))
+    got = modelprint.make(root, "A 300 mm tall model of a tower for my 220 x 220 x 250 mm bed", (220, 220, 250))
+    parts = got["data"]["parts"]
+    assert len(parts) >= 2
+    room = np.array([220, 220, 250]) - modelprint.BED_ROOM
+    for rec in parts:
+        assert np.all(np.array(rec["size_mm"]) <= room + 1e-6), rec["size_mm"]
+        bed = [x for x in rec["checks"] if x["name"] == "bed"]
+        assert bed and bed[0]["ok"], bed
+
+
+def test_lay_flat_keeps_a_part_on_the_bed():
+    band = trimesh.creation.box((60, 60, 240))
+    flat, T, why = modelprint.lay_flat(band, (220, 220, 250))
+    assert np.all(flat.extents <= np.array([219, 219, 249]) + 1e-6), flat.extents
+
+
+def test_forty_pins_fit_a_220_bed():
+    lengths = [2 * modelprint.PIN_DEPTH - modelprint.PIN_SHORT] * 40
+    pins = modelprint.to_trimesh(modelprint.pins_mesh(lengths, (220, 220, 220)))
+    assert pins.body_count == 40 and pins.is_watertight
+    assert np.all(pins.extents[:2] <= 220 - modelprint.BED_ROOM), pins.extents
 
 
 # a found model's checks: thin walls measured, overhangs on supports
@@ -346,11 +379,46 @@ def test_names_landmark_leaves_ordinary_parts_alone():
     assert models.names_landmark("a wall hook for a 20 mm rail") is None
 
 
+@pytest.mark.parametrize("request_", ["A stand for my Kindle Paperwhite", "A case for my Flipper Zero"])
+def test_names_landmark_leaves_named_products_alone(request_):
+    """A capitalised product name is no landmark: it keeps the ask-the-person path (review first-F3)."""
+    assert models.names_landmark(request_) is None
+
+
+@pytest.mark.parametrize("request_,subject", [
+    ("A model of Cologne Cathedral", "Cologne Cathedral"),
+    ("print me the Eiffel Tower", "Eiffel Tower"),
+])
+def test_names_landmark_still_names_buildings(request_, subject):
+    assert models.names_landmark(request_) == subject
+
+
+def test_the_eval_landmarks_still_route():
+    for f in sorted((EVALS / "models").glob("m0*.json")):
+        req = json.loads(f.read_text())["request"]
+        assert models.names_landmark(req), req
+
+
+ODD = 'Tower of "$(touch pwned)" `x`'
+
+
+def test_models_route_quotes_the_subject_for_the_shell():
+    out = cli.models_route(cli.Out(), ODD)
+    assert shlex.split(out.next) == ["stone", "models", ODD], out.next
+
+
+def test_models_take_quotes_the_subject_for_the_shell(jobenv, monkeypatch):
+    stone("new", REQ)
+    monkeypatch.setattr(models, "names_landmark", lambda request: ODD)
+    text, code, nxt = stone("models", "--take", "1")
+    assert shlex.split(nxt) == ["stone", "models", ODD], nxt
+
+
 def test_a_landmark_request_routes_to_stone_models(jobenv, monkeypatch):
     monkeypatch.setenv("STONE_RECIPES", str(EVALS.parent / "recipes"))  # the real catalog: no recipe fits
     stone("new", "A model of Cologne Cathedral that fits my 220 mm bed")
     text, code, nxt = stone("recipes")
-    assert nxt == 'stone models "Cologne Cathedral"', text
+    assert nxt == "stone models 'Cologne Cathedral'", text
 
 
 def test_stone_models_lists_candidates_and_offers_the_first(jobenv, recorded):

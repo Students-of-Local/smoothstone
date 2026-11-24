@@ -522,16 +522,23 @@ def joint_line(j: Joint) -> str:
     return f"Parts {j.a} and {j.b} ({where}): {j.area:.0f} mm2 to glue, too small for a pin; line them up by eye."
 
 
-def pins_mesh(lengths: list[float]):
-    """Every printed pin, lying on a side, in a row: square pins with chamfered ends."""
+def pins_mesh(lengths: list[float], bed):
+    """Every printed pin, lying on a side, in rows along y that wrap to fit the bed minus BED_ROOM:
+    square pins with chamfered ends."""
     import manifold3d as m3
 
-    out = []
-    for i, L in enumerate(lengths):
-        core = m3.Manifold.cube([L - 2 * PIN_CHAMFER, PIN, PIN], True)
-        ends = m3.Manifold.cube([L, PIN - 2 * PIN_CHAMFER, PIN - 2 * PIN_CHAMFER], True)
-        pin = m3.Manifold.batch_hull([core, ends])
-        out.append(pin.translate([L / 2, PIN / 2 + i * (PIN + 4.0), PIN / 2]))
+    gap = 4.0
+    room_y = float(bed[1]) - BED_ROOM
+    per_row = max(1, int((room_y - PIN) // (PIN + gap)) + 1)
+    out, x = [], 0.0
+    for r in range(0, len(lengths), per_row):
+        row = lengths[r:r + per_row]
+        for i, L in enumerate(row):
+            core = m3.Manifold.cube([L - 2 * PIN_CHAMFER, PIN, PIN], True)
+            ends = m3.Manifold.cube([L, PIN - 2 * PIN_CHAMFER, PIN - 2 * PIN_CHAMFER], True)
+            pin = m3.Manifold.batch_hull([core, ends])
+            out.append(pin.translate([x + L / 2, PIN / 2 + i * (PIN + gap), PIN / 2]))
+        x += max(row) + gap
     return m3.Manifold.compose(out) if out else None
 
 
@@ -546,17 +553,22 @@ def flat_bottom(mesh) -> float:
     return float(mesh.area_faces[down].sum())
 
 
-def lay_flat(mesh) -> tuple[object, np.ndarray, str | None]:
+def lay_flat(mesh, bed) -> tuple[object, np.ndarray, str | None]:
     """Lay the part on its largest flat face (the model's own base or a cut face, most often): the
-    side of the six with the most area flat on the bed, keeping the model's up on a near tie."""
+    side of the six with the most area flat on the bed, keeping the model's up on a near tie. A side
+    is taken only when the part laid on it still fits the bed minus BED_ROOM: the split fits each part
+    the model's way up, and a tall band laid down can run past a short axis."""
     import trimesh
 
+    room = np.asarray(bed, float)[:3] - BED_ROOM
     best, bestT, best_a, why = mesh, np.eye(4), flat_bottom(mesh), None
     keep = best_a
     for d, name in (([1, 0, 0], "+x"), ([-1, 0, 0], "-x"), ([0, 1, 0], "+y"), ([0, -1, 0], "-y"), ([0, 0, 1], "+z")):
         T = trimesh.geometry.align_vectors(d, [0, 0, -1])
         m = mesh.copy()
         m.apply_transform(T)
+        if np.any(m.extents > room + 1e-6):
+            continue
         a = flat_bottom(m)
         if a > best_a and a > keep * 1.1:
             best, bestT, best_a, why = m, T, a, name
@@ -865,7 +877,7 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
     for p in parts:
         tm = to_trimesh(p.man)
         assembled.append(tm.copy())
-        flat, T, why = lay_flat(tm)
+        flat, T, why = lay_flat(tm, bed)
         f = root / (f"{name}.stl" if len(parts) == 1 else f"{name}_part{p.number}.stl")
         written, shift, broken = export(flat, f)
         M = np.eye(4)
@@ -885,7 +897,7 @@ def make(root: Path, request: str, bed_default, progress=None) -> dict:
     pins_file = None
     if pin_lengths:
         pins_file = root / f"{name}_pins.stl"
-        pm = to_trimesh(pins_mesh(pin_lengths))
+        pm = to_trimesh(pins_mesh(pin_lengths, bed))
         pm.export(str(pins_file))
     say(f"checking {len(files)} part{'s' if len(files) > 1 else ''}")
     jobs = [(str(f), bed, p.bodies) for f, p in zip(files, parts)] + ([(str(pins_file), bed, len(pin_lengths))] if pins_file else [])

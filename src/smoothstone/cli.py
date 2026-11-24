@@ -2175,7 +2175,7 @@ def models_route(out: Out, subject: str) -> Out:
     """No recipe makes a landmark: stone finds an open model of it made for printing instead."""
     out.add(f"No recipe makes {subject}: stone finds the best open model of it made for printing, "
             "credits it, and fits it to your printer.")
-    out.next = f'stone models "{subject}"'
+    out.next = f"stone models {shlex.quote(subject)}"
     out.owns_next = True
     out.stage = "no_recipe"
     out.result = f"no recipe: find a model of {subject}"
@@ -2262,7 +2262,7 @@ def _models_take(n: int, job: Job, out: Out) -> Out:
     found = read_json(mdl.found_file(job.root))
     if not found:
         out.fix("search first")
-        out.next = f'stone models "{mdl.names_landmark(job.request()) or "<landmark>"}"'
+        out.next = f"stone models {shlex.quote(mdl.names_landmark(job.request()) or '<landmark>')}"
         return out
     kept = found.get("kept") or []
     if not 1 <= n <= len(kept):

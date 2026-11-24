@@ -824,7 +824,6 @@ BUILDING = re.compile(r"\b(?:cathedral|basilica|church|chapel|abbey|minster|duom
                       r"pyramids?|monument|memorial|lighthouse|skyscraper|building|landmark|arch|gate|"
                       r"stadium|opera house|capitol|parliament|mausoleum|tomb|kremlin|cathedrale|kathedrale|"
                       r"catedral|sagrada|mahal|notre)\b", re.I)
-MODEL_WORDS = re.compile(r"\b(?:model|replica|miniature|landmark|scale model|diorama)\b", re.I)
 PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica"}
 
 
@@ -857,13 +856,13 @@ def subject_of(request: str) -> str | None:
 
 
 def names_landmark(request: str) -> str | None:
-    """The subject when a request plainly asks for a model of a named landmark (offline: words only)."""
+    """The subject when a request plainly asks for a model of a named landmark (offline: words only).
+    The subject must name a building or structure: a capitalised product ("a stand for my Kindle
+    Paperwhite") or the word "model" alone is no landmark, and keeps the ask-the-person path."""
     s = subject_of(request)
     if not s:
         return None
-    if BUILDING.search(s) or MODEL_WORDS.search(request) or s[:1].isupper():
-        return s
-    return None
+    return s if BUILDING.search(s) else None
 
 
 UNITS = {"mm": 1.0, "cm": 10.0, "in": 25.4, "inch": 25.4, "inches": 25.4, "\"": 25.4}
