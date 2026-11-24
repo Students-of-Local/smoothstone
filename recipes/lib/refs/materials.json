@@ -2579,6 +2579,21 @@
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
    "checked": "2026-11-24",
    "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "any.infill_exponent",
+   "topic": "materials",
+   "material": "ANY",
+   "key": "infill_exponent",
+   "value": 2,
+   "unit": "",
+   "note": "Infill at density rho is rho^2 as stiff and as strong as solid printed plastic: E* / Es = C1 (rho* / rhos)^n1 with C1 = 1, n1 = 2.",
+   "quote": "The exponent n 1 reflects the dominant deformation mechanism, distinguishing between architectures dominated by tension ( n 1 ≈ 1 ) and those dominated by bending ( n 1 ≈ 2 )",
+   "source": "From Structural Kinematics to Thermomechanical Degradation in Polymer and Hybrid Negative Thermal Expansion Metamaterials, Polymers 2026, 18, 1431, section 5.1, after Gibson and Ashby, Cellular Solids (Cambridge University Press, 1997, doi:10.1017/CBO9781139878326)",
+   "cite": "Polymers 2026 18:1431, Gibson-Ashby scaling",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13306733/",
+   "checked": "2026-11-24",
+   "assumption": "Grid, gyroid and cubic infill bend under most loads, so stone takes the bending exponent 2 and C1 = 1 for both stiffness and strength; the walls carry most of a bending load, so this matters little for thin parts."
   }
  ]
 }
