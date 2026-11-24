@@ -3769,5 +3769,15 @@
    "differentials": [],
    "safety": []
   }
+ ],
+ "needs_heat": [
+  "Heat the hotend to about 30 C above the print temperature (PLA: about 250 C) before you pull plastic off; work in heat-resistant gloves (Prusa, Bambu and Creality guides).",
+  "Clear a clog with the hotend hot and the printer still; keep fingers off the nozzle and heater block.",
+  "Heat up and push the filament by hand; do a cold pull.",
+  "Check the hotend (heatsink) fan spins whenever the hotend is hot.",
+  "Clean the hotend fan and check it spins when the hotend is hot.",
+  "Do a cold pull, or swap the nozzle (stone doctor \"nothing comes out\" covers it).",
+  "Clear the nozzle first (cold pull), then check the gear.",
+  "Run PID tuning for the bed and hotend; keep the printer out of drafts."
  ]
 }

@@ -201,6 +201,17 @@ DIFF_SHARE = 0.10  # assumption: a differential nobody described still deserves 
 ROOT_SHARE = 0.5  # assumption: a described root cause leads once it carries half the top failure's weight
 
 
+# what the screen says when the firmware stopped a heater; while one stands, nothing else gets heated
+THERMAL_FAULT = ["thermal runaway", "runaway", "thermal error", "heater error", "heater fault", "heating failed",
+                 "mintemp", "maxtemp", "min temp", "max temp", "thermistor error", "temperature error", "temp error",
+                 "sensor fault", "temperature deviation", "temp deviation", "won't heat", "wont heat"]
+HEAT_FIRST = "Skip every step that heats the printer until the thermal fault is found and fixed."
+
+
+def thermal_fault(said: str) -> bool:
+    return word_score(said, THERMAL_FAULT, guess=False) > 0
+
+
 def rank_failures(said: str, ctx: set[str]) -> list[tuple[str, float]]:
     """Failures by the words said; the top failure's differentials (the ones the catalog says to tell
     apart from it) follow at a small share, so "Also check" lists them even when nobody named them."""
@@ -221,7 +232,10 @@ def rank_failures(said: str, ctx: set[str]) -> list[tuple[str, float]]:
         for i, d in enumerate(failure(top).get("differentials", [])):  # the catalog lists the likeliest first
             scores.setdefault(d["id"], scores[top] * DIFF_SHARE * (1 - 0.1 * i))
     total = sum(scores.values()) or 1.0
-    return sorted(((i, s / total) for i, s in scores.items()), key=lambda x: -x[1])
+    ranked = sorted(((i, s / total) for i, s in scores.items()), key=lambda x: -x[1])
+    if thermal_fault(said):  # a safety override, not a score: the fault comes first whatever else scores
+        ranked = [("thermal_error", dict(ranked).get("thermal_error", 0.0))] + [r for r in ranked if r[0] != "thermal_error"]
+    return ranked
 
 
 def cause_priors(f: dict, said: str, ctx: set[str]) -> dict[str, float]:
@@ -287,22 +301,24 @@ def best_question(f: dict, post: dict[str, float], asked: list[str]) -> tuple[st
 
 def described(said: str) -> list[str]:
     """The failures the person's words actually describe (not differentials stone added to check)."""
-    return [f["id"] for f in catalog()["failures"] if word_score(said, f["words"], f.get("not_words", [])) > 0]
+    out = [f["id"] for f in catalog()["failures"] if word_score(said, f["words"], f.get("not_words", [])) > 0]
+    return (["thermal_error"] + [f for f in out if f != "thermal_error"]) if thermal_fault(said) else out
 
 
 def safety_lines(seen: list[str], limit: int = 4) -> list[str]:
     """SAFETY for the failures the person described. A thermal fault leads with its power-off lines, which
     are never cut, and drops any step that heats the hotend while the fault stands."""
-    order = (["thermal_error"] if "thermal_error" in seen else []) + [f for f in seen if f != "thermal_error"]
+    thermal = "thermal_error" in seen
+    order = (["thermal_error"] if thermal else []) + [f for f in seen if f != "thermal_error"]
     out: list[str] = []
     for fid in order:
         for line in failure(fid).get("safety", []):
-            if "thermal_error" in seen and line.lower().startswith("heat "):
-                continue
-            if line not in out:
+            if line not in out and not (thermal and line in catalog()["needs_heat"]):
                 out.append(line)
-    keep = len(failure("thermal_error")["safety"]) if "thermal_error" in seen else 0
-    return out[:max(limit, keep)]
+    if not thermal:
+        return out[:limit]
+    head = failure("thermal_error")["safety"] + [HEAT_FIRST]
+    return head + [ln for ln in out if ln not in head][:max(0, limit - len(head))]
 
 
 def diagnose(said: str, printer: dict | None = None, material: str | None = None) -> dict:
@@ -533,6 +549,10 @@ def report(case: dict, p: dict | None) -> list[str]:
     ranked = [fid for fid, _ in case["failures"]]
     top = failure(ranked[0])
     lines = [f"Most likely: {top['name']} ({top['id']})"]
+    described_ids = case.get("described", ranked[:1])
+    seen = [f for f in ranked[:3] if f in described_ids]
+    if "thermal_error" in described_ids:  # power off comes before anything else stone says
+        lines += [f"SAFETY: {s}" for s in safety_lines(["thermal_error"] + seen)]
     tell = {d["id"]: d["tell_apart"] for d in top.get("differentials", [])}
     for fid in ranked[1:4]:
         lines.append(f"Also check: {fid}: {tell.get(fid) or failure(fid)['looks_like']['camera']}")
@@ -541,8 +561,8 @@ def report(case: dict, p: dict | None) -> list[str]:
     for i, (cid, pr) in enumerate(causes, 1):
         lines.append(f"Cause {i}: {by_id[cid]['cause']} ({cid}) {pr:.0%}")
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
-    seen = [f for f in ranked[:3] if f in case.get("described", ranked[:1])]
-    lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
+    if "thermal_error" not in described_ids:
+        lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1])]
     for fid in ranked[:3]:
         ex = examples(fid, p["id"] if p else None)
         if ex:
@@ -691,12 +711,16 @@ def _try(job, case, f, p, cid, out):
         out.fix(f"no cause {cid} for {f['id']}; causes: " + " ".join(by_id))
         out.next = case_next(case)
         return out
+    seen = case.get("described") or [f["id"]]
+    steps = [s for s in c["fix"] if "thermal_error" not in seen or s not in catalog()["needs_heat"]]
     out.add(f"Fix for {c['cause']} ({cid}), cheapest and safest first:")
-    out.add(*[f"{i}. {step}" for i, step in enumerate(c["fix"], 1)])
+    if "thermal_error" in seen:
+        out.add(*[f"SAFETY: {s}" for s in safety_lines(["thermal_error", f["id"]])])
+    out.add(*[f"{i}. {step}" for i, step in enumerate(steps, 1)])
     if c.get("plate") and p:
         out.add(f"On your {p['name']}: {printers.surface_line(p)}", printers.clean_line(p))
-    seen = case.get("described") or [f["id"]]
-    out.add(*[f"SAFETY: {s}" for s in safety_lines([f["id"]] + [x for x in seen if x == "thermal_error"])])
+    if "thermal_error" not in seen:
+        out.add(*[f"SAFETY: {s}" for s in safety_lines([f["id"]])])
     out.add(f"Source: {source_text(c['source'])}")
     case["tried"] = [t for t in case.get("tried", []) if t != cid] + [cid]
     case["state"] = "try"
