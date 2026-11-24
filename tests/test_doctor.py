@@ -260,6 +260,30 @@ def test_gallery_examples(tmp_path, monkeypatch):
 # review round 1 (PR #92)
 
 
+@pytest.mark.parametrize("said", ["the top half shifted back 2 mm", "there is a 1 mm gap at the bottom",
+                                  "layer 2 moved over by a 1 mm step"])
+def test_f1_printer_names_match_whole_words_only(said):
+    assert doctor.find_printer(said) is None
+
+
+@pytest.mark.parametrize("said,want", [("my Creality K2 dropped the part", "creality_k2"),
+                                       ("on my k2 plus the part came off", "creality_k2_plus"),
+                                       ("ender 3 v3 se stringing", "creality_ender3_v3_se"),
+                                       ("X1C left a blob", "bambu_x1c"), ("my mk4s warps abs", "prusa_mk4s")])
+def test_f1_printer_names_still_found(said, want):
+    assert doctor.find_printer(said)["id"] == want
+
+
+def test_f1_configured_printer_wins_over_a_guess(work):
+    stone("printer", "set", "prusa_mk4s")
+    text, code, nxt = stone("doctor", "the top half shifted back 2 mm")
+    assert text.splitlines()[0].endswith("Original Prusa MK4S"), text
+    text, code, nxt = stone("doctor", "on my k2 the top half shifted back 2 mm")  # a bare 2-letter model: a guess
+    assert text.splitlines()[0].endswith("Original Prusa MK4S"), text
+    text, code, nxt = stone("doctor", "my Creality K2 Plus shifted layers")  # named clearly: that one
+    assert text.splitlines()[0].endswith("Creality K2 Plus"), text
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)

@@ -122,16 +122,45 @@ def word_score(said: str, words: list[str], not_words: list[str] = (), guess: bo
 # the printer and material
 
 
-def find_printer(said: str) -> dict | None:
-    """A printer named in the words: the longest model name that appears wins (K2 Plus before K2)."""
-    t = printers._key(said)
+ALIASES = {"voron_24": ["voron 2 4", "voron"]}
+
+
+def _spaced(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower().replace("-", " ")).split())
+
+
+def _forms(p: dict) -> list[str]:
+    """The ways a person names this printer, as whole words: "Creality K2 Plus", "k2 plus", "creality k2"...
+    A form without the maker needs a model token with a digit (k2, x1c, mk4s) or two words (core one), so
+    "mini" or "24" alone never names a printer."""
+    short = printers.short_name(p)
+    maker = p["maker"].split()[0]
+    out = {_spaced(p["name"]), _spaced(f"{maker} {short}")} | {_spaced(a) for a in ALIASES.get(p["id"], [])}
+    for f in {_spaced(short), _spaced(p["id"].split("_", 1)[1].replace("_", " ")), _spaced(short).replace(" ", "")}:
+        toks = f.split()
+        if any(re.search(r"[a-z]", t) and re.search(r"[0-9]", t) for t in toks) or \
+                (len(toks) >= 2 and toks[0].isalpha()):
+            out.add(f)
+    return [f for f in out if f]
+
+
+def printer_named(said: str) -> tuple[dict | None, bool]:
+    """The printer the words name on whole-word boundaries, longest name first, and whether the naming is
+    clear (the maker, or a model name of 4 or more letters and digits) rather than a 2 or 3 letter guess."""
+    t = f" {_spaced(said)} "
     best = None
     for p in printers.load().values():
-        for name in (p["name"], printers.short_name(p)):
-            k = printers._key(name)
-            if len(k) >= 2 and k in t and (best is None or len(k) > best[0]):
-                best = (len(k), p)
-    return best[1] if best else None
+        for form in _forms(p):
+            if f" {form} " in t and (best is None or len(form) > len(best[1])):
+                best = (p, form)
+    if best is None:
+        return None, False
+    p, form = best
+    return p, p["maker"].split()[0].lower() in form.split() or len(form.replace(" ", "")) >= 4
+
+
+def find_printer(said: str) -> dict | None:
+    return printer_named(said)[0]
 
 
 def find_material(said: str) -> str | None:
@@ -470,7 +499,10 @@ def _new(args, job, said: str, out):
         out.fix(f"no printer {args.printer}; ids: stone printer")
         out.next = "stone printer"
         return out
-    p = p or find_printer(said) or printers.current(job.root)
+    named, clear = printer_named(said)
+    # the printer asked for, then the one set with stone printer set, then a guess from the words; words
+    # that name a model clearly ("Creality K2 Plus", "mk4s") outrank the set one
+    p = p or (named if clear else None) or printers.current(job.root) or named
     material = (args.material or find_material(said) or "").upper() or None
     prior = open_case(job)
     reuse = prior if prior and prior.get("state") == "look" and not args.image and not args.camera else None
