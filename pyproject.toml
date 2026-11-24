@@ -18,7 +18,8 @@ dependencies = [
     "manifold3d>=3.0",
     "fast-simplification>=0.1",
     "opencv-python-headless>=4.10",
-    "pyamg>=5.4.1",
+    # pyamg ships wheels only for these; elsewhere fea.solve uses scipy's CG instead of building it from source
+    "pyamg>=5.4.1; (platform_machine == 'x86_64' or platform_machine == 'AMD64' or sys_platform == 'darwin') and python_version < '3.15'",
 ]
 
 [project.scripts]
@@ -40,4 +41,5 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # timing: a wall-clock budget; CI runs these alone, after the parallel run
-markers = ["timing: wall-clock budget, run without other workers"]
+markers = ["timing: wall-clock budget, run without other workers",
+           "network: reaches a live site; skipped unless STONE_NETWORK=1, so CI never runs it"]

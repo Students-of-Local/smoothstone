@@ -193,8 +193,13 @@ class Model:
         return k.tocsr()
 
     def solve(self, fixed: np.ndarray, force: np.ndarray, tol: float = 1e-8) -> tuple[np.ndarray, dict]:
-        """Displacements (nn, 3) for fixed node ids (all three directions held) and a force array (nn, 3) in N."""
-        import pyamg
+        """Displacements (nn, 3) for fixed node ids (all three directions held) and a force array (nn, 3) in N.
+        pyamg multigrid where it installs; plain Jacobi preconditioned CG from scipy where it has no wheel
+        (Linux on ARM, Windows on ARM, a new CPython): the same answer, slower on big parts."""
+        try:
+            import pyamg
+        except ImportError:
+            pyamg = None
 
         t0 = time.time()
         k = self.matrix()
@@ -212,10 +217,21 @@ class Model:
         rbm[0::3, 3], rbm[1::3, 3] = -x[:, 1], x[:, 0]
         rbm[1::3, 4], rbm[2::3, 4] = -x[:, 2], x[:, 1]
         rbm[0::3, 5], rbm[2::3, 5] = x[:, 2], -x[:, 0]
-        ml = pyamg.smoothed_aggregation_solver(kff, B=rbm[free], max_coarse=500)
-        t2 = time.time()
         res: list[float] = []
-        uf = ml.solve(f, tol=tol, accel="cg", maxiter=400, residuals=res)
+        if pyamg is not None:
+            ml = pyamg.smoothed_aggregation_solver(kff, B=rbm[free], max_coarse=500)
+            t2 = time.time()
+            uf = ml.solve(f, tol=tol, accel="cg", maxiter=400, residuals=res)
+        else:
+            from scipy.sparse.linalg import LinearOperator, cg
+
+            inv = 1.0 / kff.diagonal()
+            pre = LinearOperator(kff.shape, matvec=lambda r: inv * r)
+            fn = float(np.linalg.norm(f)) or 1.0
+            res.append(fn)
+            t2 = time.time()
+            uf, _ = cg(kff, f, rtol=tol, maxiter=20 * len(free), M=pre,
+                       callback=lambda xk: res.append(float(np.linalg.norm(f - kff @ xk))))
         t3 = time.time()
         u = np.zeros(3 * nn)
         u[free] = uf

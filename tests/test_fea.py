@@ -106,3 +106,13 @@ def test_about_200k_voxels_solve_inside_a_minute():
     assert 150_000 < g.solid.sum() < 300_000
     assert info["seconds"] < 60
     assert abs(tip / beam_theory() - 1) < 0.10
+
+
+def test_without_pyamg_scipy_cg_gives_the_same_tip(monkeypatch):
+    import sys
+
+    _, _, _, tip, info, _ = cantilever(2.0)
+    monkeypatch.setitem(sys.modules, "pyamg", None)  # as on a platform with no pyamg wheel
+    _, _, _, tip_cg, info_cg, _ = cantilever(2.0)
+    assert tip_cg == pytest.approx(tip, rel=1e-4)
+    assert info_cg["residual"] < 1e-6
