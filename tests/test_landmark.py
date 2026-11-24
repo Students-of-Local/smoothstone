@@ -91,8 +91,25 @@ def test_exact_landmark_outranks_a_nearby_structural_search_result(tmp_path, mon
             return {"search": [neighbour, requested]}
         return {"entities": {item["id"]: coordinates for item in (neighbour, requested)}}
 
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
     monkeypatch.setattr(landmark_refs, "_wiki", wiki)
     assert landmark_refs.resolve(requested["label"], tmp_path)["id"] == requested["id"]
+
+
+def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch):
+    place = {"id": "Q1", "label": "St Example's", "description": "district of a city"}
+    building = {"id": "Q2", "label": "St Example's Cathedral", "description": "cathedral in the city of Example"}
+    coordinates = {"claims": {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]}}
+
+    def wiki(params):
+        if params["action"] == "wbsearchentities":
+            return {"search": [place, building]}
+        return {"entities": {item["id"]: coordinates for item in (place, building)}}
+
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(landmark_refs, "_wiki", wiki)
+    assert landmark_refs.resolve(place["label"], tmp_path)["id"] == building["id"]
+    assert landmark_refs.resolve(building["label"], tmp_path / "again")["id"] == building["id"]
 
 
 def test_separate_bell_tower_requires_a_wikidata_component_link():
@@ -226,3 +243,20 @@ def test_an_unexpected_build_error_gives_fix_and_next(recorded, jobenv, monkeypa
     text, code = cli.run(["landmark", "Cologne Cathedral"])
     assert "FIX" in text and "ValueError" in text
     assert text.splitlines()[-1] == "NEXT: stone models 'Cologne Cathedral'"
+
+
+def test_supplied_facts_do_not_switch_off_the_inferred_massing(recorded, tmp_path, monkeypatch):
+    from smoothstone import landmark, landmark_massing
+
+    class Reached(Exception):
+        pass
+
+    def infer(*args):
+        raise Reached
+
+    recorded("Cologne Cathedral")
+    facts = {"expected_height_m": {"value": 157, "source": "https://example.com/survey"}}
+    monkeypatch.setattr(landmark_refs, "load_pack", lambda name, path=None, *, label=None: facts if path else {})
+    monkeypatch.setattr(landmark_massing, "infer_massing", infer)
+    with pytest.raises(Reached):
+        landmark.generate("Cologne Cathedral", tmp_path, (220, 220, 220), 200, "low", ref_pack="facts.json")

@@ -88,6 +88,10 @@ def _tapered(section, point, rise, ratio, z):
     return section.extrude(rise, scale_top=[ratio, ratio]).translate([*point, z])
 
 
+# How far the surveyed piers' feet stand in front of the mapped plan, in millimetres.
+WEST_PIER_REACH = 2.55
+
+
 def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, protected, notes):
     """Build the surveyed gable, portal bays and paired buttress spires."""
     import manifold3d as m3
@@ -159,7 +163,14 @@ def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, p
             outer = _section([_arch(w + 2.2, h + 1.65, pointed)]).translate([0, -.14])
             jamb = _place((outer - opening).extrude(1.45), across, -along, [*(xy - along * .78), z])
             additions.append(jamb)
-    return _union([man - _union(cuts), *additions])
+    solid = _union([man - _union(cuts), *additions])
+    # Piers and jambs stand in front of the mapped plan, and so in front of a plinth that follows it.
+    # Carry their footprint down to the bed.
+    reach = width + 2 * WEST_PIER_REACH
+    ahead = _section([[point + a * across - b * along for a, b in
+                       ((-reach, -.5), (-reach, reach), (reach, reach), (reach, -.5))]])
+    sill = z0 + .006 * height - .07
+    return _union([solid, *((solid.slice(z) ^ ahead).extrude(z) for z in (sill, z0 + .6))])
 
 
 def _west_facade(man, outline, facts, scale, notes, westward=None, *, records=(), sections=()):
@@ -292,23 +303,29 @@ def _iwans(man, cs, base, height, facts, notes):
     # meet. Across that join the portal still belongs to a single facade.
     for span, a, b, u, outward in _exposed(man, cs.simplify(.15), base + height * .48, min_span=.8)[:4]:
         mid = (a + b) / 2
-        width = span * facts["iwan_width_ratio"]["value"]
-        rise = height * facts["iwan_height_ratio"]["value"]
+        width = span * facts.get("iwan_width_ratio", {}).get("value", .30)
+        rise = height * facts.get("iwan_height_ratio", {}).get("value", .80)
         reach = width * .20
         frame = width * .062
-        if min(reach, width, frame) < .8 or rise < reach + .8:
-            notes.append("Omitted detail below the print floor: iwan moldings, openings and frames.")
+        if min(reach, width) < .8 or rise < reach + .8:
+            notes.append("Omitted detail below the print floor: iwan openings.")
             continue
         z = base + height * .035
         arch = _section([_arch(width, rise, True)])
         cuts.append(_masonry_cut(arch, mid, u, outward, z, reach))
         # The monument has a rectangular pishtaq around the curved arch,
         # and two smaller doorways on the back wall of the deep recess.
-        frame_out = m3.CrossSection.square([width + 4 * frame, rise + 2 * frame], True)
-        frame_in = m3.CrossSection.square([width + 2 * frame, rise], True)
-        mold = (frame_out - frame_in).translate([0, rise / 2])
-        additions.append(_place(mold.extrude(1.2), u, outward, [*(mid + outward * .8), z]))
+        if frame >= .8:
+            frame_out = m3.CrossSection.square([width + 4 * frame, rise + 2 * frame], True)
+            frame_in = m3.CrossSection.square([width + 2 * frame, rise], True)
+            mold = (frame_out - frame_in).translate([0, rise / 2])
+            additions.append(_place(mold.extrude(1.2), u, outward, [*(mid + outward * .8), z]))
+        else:
+            notes.append("Omitted detail below the print floor: iwan frames.")
         for shift, width_ratio, rise_ratio in ((.03, .43, .36), (.47, .31, .20)):
+            if min(width * width_ratio, reach * .32) < .8:
+                notes.append("Omitted detail below the print floor: iwan doorways.")
+                continue
             back = _section([_arch(width * width_ratio, rise * rise_ratio, True)])
             door = mid - outward * (reach - .06)
             cuts.append(_masonry_cut(back, door, u, outward, z + shift * rise, reach * .32))
@@ -317,11 +334,14 @@ def _iwans(man, cs, base, height, facts, notes):
         for side in (-1, 1):
             pos = mid + side * span * .31 * u
             niche_w, niche_h = span * .115, height * .31
+            if min(niche_w, reach * .45) < .8:
+                notes.append("Omitted detail below the print floor: iwan side niches.")
+                continue
             for fraction in (.035, .445):
                 niche = _section([_arch(niche_w, niche_h, True)])
                 cuts.append(_masonry_cut(niche, pos, u, outward, base + height * fraction, reach * .45))
     if cuts:
-        notes.append("Recessed the iwans, cut stacked doorways in their back walls and framed the flanking bays.")
+        notes.append("Recessed the iwans, with the doorways, frames and flanking niches this size can print.")
     return cuts, additions
 
 
@@ -510,10 +530,13 @@ def decorate(man, records, sections, scale, styles, facts=None, outline=None, *,
         top = 2 + rec["height"]["metres"] * scale
         eave = top - rec["roof_height"]["metres"] * scale
         wall_height = eave - lo
-        if rec.get("main_faces") and {"iwan_width_ratio", "iwan_height_ratio"} <= facts.keys():
+        # The generic windows below stand aside only for a part that got its own detail.
+        detailed = bool(rec.get("flying_buttress") or rec.get("platform_arcade") or rec.get("lantern_body"))
+        if rec.get("main_faces"):
             platform = next((2 + p["height"]["metres"] * scale for p in records if p.get("platform_arcade")),
                             lo + wall_height * .165)
             cuts, frames = _iwans(man, cs, platform, eave - platform, facts, notes)
+            detailed |= bool(cuts)
             cavities.extend(cuts)
             additions.extend(frames)
         if rec.get("platform_arcade"):
@@ -524,17 +547,18 @@ def decorate(man, records, sections, scale, styles, facts=None, outline=None, *,
             additions.extend(trim)
         if rec.get("feature") == "bell_tower" and "gothic" in keys:
             cuts, trim = _bell_tower_details(man, cs, lo, wall_height, notes)
+            detailed |= bool(cuts)
             cavities.extend(cuts)
             additions.extend(trim)
         if rec.get("feature") in {"aisle_walls", "crossing_lantern"} and "aisle_bay_m" in facts:
             cavities.extend(_aisle_and_lantern_windows(man, rec, cs, lo, eave, scale,
                                                         facts["aisle_bay_m"]["value"], notes))
+            detailed = True
         if rec.get("dome_drum_m"):
             drum = rec["dome_drum_m"] * scale
             for z in (eave - drum, eave - .45):
                 additions.append(cs.offset(.42).extrude(.78).translate([0, 0, z - .22]))
-        if (facade and wall_height > 9 and rec.get("feature") not in {"bell_tower", "aisle_walls", "crossing_lantern"} and
-                not (rec.get("main_faces") or rec.get("platform_arcade") or rec.get("lantern_body"))):
+        if facade and wall_height > 9 and not detailed:
             exposed = _exposed(man, cs, lo + wall_height * .5)
             for span, a, b, u, outward in exposed[:6]:
                 count = min(12, max(1, int(span / 9)))

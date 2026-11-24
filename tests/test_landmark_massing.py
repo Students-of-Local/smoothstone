@@ -45,3 +45,23 @@ def test_only_a_church_has_a_nave_to_join():
     assert landmark_massing._is_church({"tags": {"building": "cathedral"}}, {})
     assert landmark_massing._is_church({}, {"label": "Florence Cathedral"})
     assert not landmark_massing._is_church({"tags": {"building": "warehouse"}}, {"label": "Albert Dock"})
+
+
+def test_low_walls_fill_only_the_unmapped_plan():
+    """A chapel mapped at 10 m keeps its height beside an apse nobody mapped."""
+    def box(x0, y0, x1, y1):
+        return m3.CrossSection([[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]])
+
+    def part(identifier, top):
+        return {"id": identifier, "source": "s", "roof_shape": "flat", "spire": False, "tags": {},
+                "height": {"metres": top, "guessed": False}, "min_height": {"metres": 0.}, "roof_height": {"metres": 0.}}
+
+    outline = box(0, 0, 100, 40)
+    sections = [box(0, 0, 20, 40), box(20, 0, 80, 20), box(20, 20.02, 80, 40)]
+    records, plans, _, _ = landmark_massing.infer_massing(
+        [part(1, 60.), part(2, 45.), part(3, 10.)], sections, outline,
+        {"tags": {"height": "30"}, "source": "s"}, {}, {"mode": "max", "mm": 200.}, set())
+    (low, plan), = [(r, p) for r, p in zip(records, plans) if r["feature" if "feature" in r else "id"] == "lower_walls"]
+    assert low["height"]["metres"] == 30
+    assert plan.area() == pytest.approx(20 * 40, rel=.02)
+    assert (plan ^ sections[2]).area() < 3

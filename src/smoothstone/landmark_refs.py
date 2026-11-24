@@ -94,6 +94,7 @@ def resolve(name: str, job_root: Path) -> dict:
                           'props': 'labels|descriptions|claims|sitelinks', 'languages': 'en'}).get('entities', {})
         forbidden = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
         structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate)\b', re.I)
+        place = re.compile(r'\b(district|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|island|river|lake|street|square|station|school|company)\b', re.I)
         candidates = []
         for order, hit in enumerate(hits):
             entity = entities.get(hit['id'], {})
@@ -102,9 +103,9 @@ def resolve(name: str, job_root: Path) -> dict:
             description = hit.get('description', '')
             if forbidden.search(description):
                 continue
-            exact = any(' '.join(label.casefold().split()) == normalized for label in
+            exact = (structure.search(description) or not place.search(description)) and any(' '.join(label.casefold().split()) == normalized for label in
                         (hit.get('label', ''), hit.get('match', {}).get('text', '')))
-            candidates.append(((exact, bool(structure.search(description)), -order), hit, entity))
+            candidates.append(((bool(exact), bool(structure.search(description)), -order), hit, entity))
         if not candidates:
             raise LandmarkProblem(f'No building with coordinates found for {name}.')
         _, hit, entity = max(candidates, key=lambda x: x[0])

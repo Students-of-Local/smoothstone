@@ -170,8 +170,12 @@ def infer_massing(records, sections, outline, data, refs, target, styles):
         ground_spans = np.ptp(np.concatenate(ground.to_polygons()) @ frame.T, axis=0)
         if np.any(ground_spans < .97 * spans) or (outline - ground).area() > .12 * outline.area():
             source = data["source"]
-            parts.append((_new_part("outline-lower-walls", outline, 0, height, 0, "flat", source, "lower_walls"), outline))
-            notes.append("Kept the building outline's mapped low walls where the taller roof parts leave the plan incomplete.")
+            # Mapped ground parts keep their own heights. A gap too narrow to print is map noise, not wall.
+            grain = .3 / size
+            missing = (outline - ground).offset(-grain).offset(grain + .05) ^ outline
+            if not missing.is_empty():
+                parts.append((_new_part("outline-lower-walls", missing, 0, height, 0, "flat", source, "lower_walls"), missing))
+                notes.append("Kept the building outline's mapped low walls where the taller roof parts leave the plan incomplete.")
     updated, footprints = map(list, zip(*parts))
     return updated, footprints, westward, notes
 

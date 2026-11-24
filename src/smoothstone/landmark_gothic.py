@@ -16,6 +16,7 @@ def _centre(section: CrossSection) -> np.ndarray:
 
 
 def reconcile_gothic(parts, refs: dict, facts: dict, notes: list[str]):
+    from .landmark import _fact
     from .landmark_architecture import _measurement
 
     annex = facts.get("annex_roofs")
@@ -26,8 +27,8 @@ def reconcile_gothic(parts, refs: dict, facts: dict, notes: list[str]):
             if roof and roof["ridge_m"] > roof["eave_m"] > part["min_height"]["metres"]:
                 part["roof_shape"] = roof["shape"]
                 reason = "Estimated from the scaled section of the annex roof."
-                part["height"] = _measurement(roof["ridge_m"], annex["source"], reason)
-                part["roof_height"] = _measurement(roof["ridge_m"] - roof["eave_m"], annex["source"], reason)
+                part["height"] = _fact(roof["ridge_m"], annex["source"], True, reason)
+                part["roof_height"] = _fact(roof["ridge_m"] - roof["eave_m"], annex["source"], True, reason)
                 notes.append("Replaced an oversized flat annex with the pitched roof shown in the architectural section.")
     stages = facts.get("crossing_spire_stages")
     if stages:
@@ -149,7 +150,7 @@ def flying_buttress(section: CrossSection, part: dict, lo: float, eave: float,
 def _reconcile_spire_plan(parts, refs: dict, facts: dict, notes: list[str]):
     import manifold3d as m3
 
-    from .landmark import _frame, _section
+    from .landmark import _fact, _frame, _section
     from .landmark_architecture import _measurement, _new_part
 
     outline = _section(refs["outline"])
@@ -265,8 +266,8 @@ def _reconcile_spire_plan(parts, refs: dict, facts: dict, notes: list[str]):
         source = old["source"] if seen else plan["source"]
         record = _new_part(f"terrace-spire-{number}", disk, max(0, support), top,
                            top - spring, "pyramidal", source, "pinnacle")
-        record["height"] = _measurement(top, old["height"]["source"] if seen and top == height else rise["source"],
-                                        "Mapped peak or the typical rise above its source terrace.")
+        record["height"] = (_measurement(top, old["height"]["source"], "Mapped peak.") if seen and top == height else
+                            _fact(top, rise["source"], True, "Typical rise above its source terrace."))
         record["spire_id"] = number
         record["placement_guessed"] = number in data["inferred"]
         record["roof_profile"] = [(0, 1), (.08, .97), (.27, .85), (.60, .62), (.84, .4), (1, 0)]

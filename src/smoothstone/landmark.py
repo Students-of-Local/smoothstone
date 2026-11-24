@@ -363,7 +363,8 @@ def _target(size, bed):
     return t
 
 
-def _scale(sections, records, target):
+def _scale(sections, records, target, reach=0.):
+    """Millimetres per metre; `reach` is fixed-size detail standing past one end of the long axis."""
     import trimesh
     points = np.concatenate([np.concatenate(cs.to_polygons()) for cs in sections])
     _, ext = trimesh.bounds.oriented_bounds_2D(points)
@@ -373,13 +374,13 @@ def _scale(sections, records, target):
         # 0.98 matches the shared fitting allowance, including the plinth.
         bx, by = sorted(target["bed"][:2])
         ex, ey = sorted(ext)
-        return min((bx * .98 - .04) / ex, (by * .98 - .04) / ey, (target["bed"][2] * .98 - 2) / high)
+        return min((bx * .98 - .04) / ex, (by * .98 - .04 - reach) / ey, (target["bed"][2] * .98 - 2) / high)
     mm = float(target["mm"])
     if mode == "z":
         return (mm - 2) / high
     if mode == "long":
-        return (mm - .04) / max(ext)
-    return min((mm - .04) / max(ext), (mm - 2) / high)
+        return (mm - .04 - reach) / max(ext)
+    return min((mm - .04 - reach) / max(ext), (mm - 2) / high)
 
 
 def _anchor(man, notes):
@@ -527,7 +528,8 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     target = _target(size, bed)
     changes = []
     westward = None
-    if not pack and not outline.is_empty():
+    # A pack we ship covers the massing. Facts someone adds for another building do not switch it off.
+    if not landmark_refs.load_pack(name, label=refs.get("label")) and not outline.is_empty():
         from .landmark_massing import infer_massing
 
         records, sections, westward, changes = infer_massing(records, sections, outline, data, refs, target, keys)
@@ -548,7 +550,13 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                                      "reason": height.get("reason", "The sourced height describes the complete landmark.")}
     is_lattice = "steel" in keys and all(fact in pack for fact in (
         "deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m"))
-    scale = _scale([outline] if is_lattice and not outline.is_empty() else sections, records, target)
+    chosen = detail or ("high" if len(records) < 400 else "low")
+    if chosen not in ("low", "high"):
+        raise LandmarkProblem("detail must be low or high.")
+    reach = 0.
+    if chosen == "high" and "gothic" in keys and {"west_facade_profile", "west_buttress_spires"} <= pack.keys():
+        from .landmark_style import WEST_PIER_REACH as reach
+    scale = _scale([outline] if is_lattice and not outline.is_empty() else sections, records, target, reach)
     notes = ["Dimensions use local east/north metres, uniformly scaled to millimetres.",
              "Added a 2 mm convex footprint plinth to join detached ground parts.",
              "Mapped faces overlap by 0.01 metre at wall and roof joins; coordinates are otherwise unsnapped.",
@@ -620,9 +628,6 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         base = footprint.hull().offset(.02)
     solids.append(base.extrude(2.02))
     man = _union(solids)
-    chosen = detail or ("high" if len(records) < 400 else "low")
-    if chosen not in ("low", "high"):
-        raise LandmarkProblem("detail must be low or high.")
     man = _anchor(man, notes)
     if chosen == "high" and not is_lattice:
         from .landmark_style import decorate

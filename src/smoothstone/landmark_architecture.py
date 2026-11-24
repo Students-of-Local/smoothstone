@@ -41,7 +41,7 @@ def reconcile(records, sections, refs, facts, styles):
         for p, cs in parts:
             if p["spire"] and p.get("feature") is None and _dimensions(cs)[1] < 5:
                 p["feature"] = "pinnacle"
-                if rise and .27 * summit < p["height"]["metres"] < .73 * summit:
+                if rise and "spire_plan" not in facts and .27 * summit < p["height"]["metres"] < .73 * summit:
                     measured = p["roof_height"]["metres"]
                     if measured < rise["value"]:
                         delta = rise["value"] - measured
