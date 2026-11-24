@@ -31,10 +31,12 @@ LINK_ASK = ("ask the person: <read them the lines above and show them the photo>
             "above, attach the photo, read it there and submit the issue yourself; stone sends nothing. "
             "Did you submit it? (yes / no) yes: stone doctor share done. no: stone doctor share no")
 # a path from a filesystem root goes whole, spaces included, to the end of its last segment: a name with an
-# extension, or a closing quote, bracket, comma or semicolon, or the end of the line
-ROOTED = re.compile(r"(?:(?<![\w/~.])/(?i:Users|home|Volumes|mnt|media|private|tmp|var)[/\\]"
+# extension that no later "/name.ext" follows, or a closing quote, bracket, comma or semicolon, or the line's end
+ROOTED = re.compile(r"(?:(?<![\w/~.])/(?i:Users|home|Volumes|mnt|media|private|tmp|var|opt|run|srv|root|net|data)[/\\]"
+                    r"|(?<!\w)(?i:file):/{2,3}|(?<![\w\\])\\\\(?=\w)"
                     r"|(?<![\w/])~[/\\]|(?<![\w/\\])[A-Za-z]:[/\\])"
                     r"(?:[^\n\"'\[\](){}<>,;]*?\.(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{1,8}(?=$|[\s\"'\[\](){}<>,;:!?]|\.(?:\s|$))"
+                    r"(?![^\n\"'\[\](){}<>,;]*[/\\][^\n\"'\[\](){}<>,;]*?\.(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{1,8}(?!\w))"
                     r"|[^\n\"'\[\](){}<>,;]*)", re.M)
 
 # what never leaves the machine, in the order it is replaced (a link before the host inside it)
