@@ -1,0 +1,2550 @@
+{
+ "about": "Material properties for stone strength and stone heat, from maker sheets that test printed specimens in the layer plane (X-Y) and across layers (Z). Strength and stiffness: stone uses the one sheet with the lowest Z strength and takes X-Y and Z from it, so the pair comes from one test series; range and others hold the other makers. Heat deflection: the lowest maker value. A value with an assumption field is a modeling choice, not a measurement.",
+ "entries": [
+  {
+   "id": "pla.e_xy",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "e_xy",
+   "value": 2580,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 2580 ± 220 MPa",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2300,
+    3426.9
+   ],
+   "others": [
+    {
+     "value": 3426.9,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 3426.9 ± 64.8 MPa"
+    },
+    {
+     "value": 2300,
+     "cite": "Prusament PLA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/7ca620c4-prusament-pla-plablend.zip",
+     "quote": "Tensile Modulus [GPa] 2.3 ± 0.1 (Horizontal)"
+    }
+   ]
+  },
+  {
+   "id": "pla.e_z",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "e_z",
+   "value": 2060,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (Z) ISO 527, GB/T 1040 2060 ± 170 MPa",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2060,
+    3064.9
+   ],
+   "others": [
+    {
+     "value": 3064.9,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (Z) 3064.9 ± 83.4 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pla.tensile_xy",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "tensile_xy",
+   "value": 35,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 35 ± 4 MPa",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    35,
+    52.3
+   ],
+   "others": [
+    {
+     "value": 52.3,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (X-Y) 52.3 ± 0.3 MPa"
+    },
+    {
+     "value": 51,
+     "cite": "Prusament PLA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/7ca620c4-prusament-pla-plablend.zip",
+     "quote": "Tensile Yield Strength [MPa] 51 ± 3 (Horizontal)"
+    }
+   ]
+  },
+  {
+   "id": "pla.tensile_z",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "tensile_z",
+   "value": 31,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 31 ± 3 MPa",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    17,
+    40.5
+   ],
+   "others": [
+    {
+     "value": 40.5,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 40.5 ± 0.5 MPa"
+    },
+    {
+     "value": 17,
+     "cite": "Prusament PLA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/7ca620c4-prusament-pla-plablend.zip",
+     "quote": "Interlayer Adhesion [MPa] 17 ± 3 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ]
+  },
+  {
+   "id": "petg.e_xy",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "e_xy",
+   "value": 1810,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 1810 ± 190 MPa",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1500,
+    2116.8
+   ],
+   "others": [
+    {
+     "value": 2116.8,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 2116.8 ± 68.1 MPa"
+    },
+    {
+     "value": 1500,
+     "cite": "Prusament PETG datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf",
+     "quote": "Tensile Modulus [GPa] 1.5 ± 0.1 (Horizontal)"
+    }
+   ]
+  },
+  {
+   "id": "petg.e_z",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "e_z",
+   "value": 1540,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (Z) ISO 527, GB/T 1040 1540 ± 130 MPa",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1540,
+    1898.7
+   ],
+   "others": [
+    {
+     "value": 1898.7,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (Z) 1898.7 ± 98.5 MPa"
+    }
+   ]
+  },
+  {
+   "id": "petg.tensile_xy",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "tensile_xy",
+   "value": 34,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 34 ± 4 MPa",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    34,
+    50.8
+   ],
+   "others": [
+    {
+     "value": 50.8,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (X-Y) 50.8 ± 0.9 MPa"
+    },
+    {
+     "value": 47,
+     "cite": "Prusament PETG datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf",
+     "quote": "Tensile Yield Strength [MPa] 47 ± 2 (Horizontal)"
+    }
+   ]
+  },
+  {
+   "id": "petg.tensile_z",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "tensile_z",
+   "value": 23,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 23 ± 4 MPa",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    18,
+    42.8
+   ],
+   "others": [
+    {
+     "value": 42.8,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 42.8 ± 2.8 MPa"
+    },
+    {
+     "value": 18,
+     "cite": "Prusament PETG datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf",
+     "quote": "Interlayer Adhesion [MPa] 18 ± 4 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ]
+  },
+  {
+   "id": "abs.e_xy",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "e_xy",
+   "value": 2200,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 2200 ± 190 MPa",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2200,
+    2246.6
+   ],
+   "others": [
+    {
+     "value": 2246.6,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 2246.6 ± 58.2 MPa"
+    }
+   ]
+  },
+  {
+   "id": "abs.e_z",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "e_z",
+   "value": 1960,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (Z) ISO 527, GB/T 1040 1960 ± 110 MPA",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1960,
+    2080.9
+   ],
+   "others": [
+    {
+     "value": 2080.9,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (Z) 2080.9 ± 92.7 MPa"
+    }
+   ]
+  },
+  {
+   "id": "abs.tensile_xy",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "tensile_xy",
+   "value": 33,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 33 ± 3 MPa",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    33,
+    33.4
+   ],
+   "others": [
+    {
+     "value": 33.4,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (X-Y) 33.4 ± 0.6 MPa"
+    }
+   ]
+  },
+  {
+   "id": "abs.tensile_z",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "tensile_z",
+   "value": 28,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 28 ± 2 MPa",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    28,
+    29.7
+   ],
+   "others": [
+    {
+     "value": 29.7,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 29.7 ± 0.3 MPa"
+    }
+   ]
+  },
+  {
+   "id": "asa.e_xy",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "e_xy",
+   "value": 2450,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 2450 ± 270 MPa",
+   "source": "Bambu Lab ASA technical data sheet V3.0",
+   "cite": "Bambu ASA datasheet",
+   "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1600,
+    2450
+   ],
+   "others": [
+    {
+     "value": 2379,
+     "cite": "Polymaker PolyLite ASA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (X-Y) 2379"
+    },
+    {
+     "value": 1600,
+     "cite": "Prusament ASA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/bc8551ef-tds_prusament-asa_2024_en.pdf",
+     "quote": "Tensile Modulus [GPa] 1.6 ± 0.1 (Horizontal)"
+    }
+   ]
+  },
+  {
+   "id": "asa.e_z",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "e_z",
+   "value": 2120,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (Z) ISO 527, GB/T 1040 2120 ± 260 MPA",
+   "source": "Bambu Lab ASA technical data sheet V3.0",
+   "cite": "Bambu ASA datasheet",
+   "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1965,
+    2120
+   ],
+   "others": [
+    {
+     "value": 1965,
+     "cite": "Polymaker PolyLite ASA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+     "quote": "Young's modulus (Z) 1965"
+    }
+   ]
+  },
+  {
+   "id": "asa.tensile_xy",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "tensile_xy",
+   "value": 37,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 37 ± 3 MPa",
+   "source": "Bambu Lab ASA technical data sheet V3.0",
+   "cite": "Bambu ASA datasheet",
+   "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    37,
+    43.8
+   ],
+   "others": [
+    {
+     "value": 43.8,
+     "cite": "Polymaker PolyLite ASA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (X-Y) 43.8"
+    },
+    {
+     "value": 42,
+     "cite": "Prusament ASA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/bc8551ef-tds_prusament-asa_2024_en.pdf",
+     "quote": "Tensile Yield Strength [MPa] 42 ± 1 (Horizontal)"
+    }
+   ]
+  },
+  {
+   "id": "asa.tensile_z",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "tensile_z",
+   "value": 31,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 31 ± 4 MPa",
+   "source": "Bambu Lab ASA technical data sheet V3.0",
+   "cite": "Bambu ASA datasheet",
+   "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    11,
+    32
+   ],
+   "others": [
+    {
+     "value": 32,
+     "cite": "Polymaker PolyLite ASA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+     "quote": "Tensile strength (Z) 32"
+    },
+    {
+     "value": 11,
+     "cite": "Prusament ASA datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/bc8551ef-tds_prusament-asa_2024_en.pdf",
+     "quote": "Interlayer Adhesion [MPa] 11 ± 1 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ]
+  },
+  {
+   "id": "pc.e_xy",
+   "topic": "materials",
+   "material": "PC",
+   "key": "e_xy",
+   "value": 2497,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's modulus (X-Y) 2497 ± 154 MPa",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1900,
+    2497
+   ],
+   "others": [
+    {
+     "value": 2110,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Young's Modulus (X-Y) 2110 ± 40 MPa"
+    },
+    {
+     "value": 1900,
+     "cite": "Prusament PC Blend datasheet",
+     "url": "https://prusament.com/wp-content/uploads/2022/10/PCBlend_Prusament_TDS_2022_16_EN.pdf",
+     "quote": "Tensile Modulus [GPa] 1.9 ± 0.1 (Horizontal), PC Blend"
+    }
+   ]
+  },
+  {
+   "id": "pc.e_z",
+   "topic": "materials",
+   "material": "PC",
+   "key": "e_z",
+   "value": 2371,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's modulus (Z) 2371 ± 55 MPa",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1450,
+    2371
+   ],
+   "others": [
+    {
+     "value": 1450,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Young's Modulus (Z) 1450 ± 60 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pc.tensile_xy",
+   "topic": "materials",
+   "material": "PC",
+   "key": "tensile_xy",
+   "value": 69.1,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile strength (X-Y) 69.1 ± 3.0 MPa",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    62,
+    69.1
+   ],
+   "others": [
+    {
+     "value": 62,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Tensile Strength (X-Y) 62 ± 2 MPa"
+    },
+    {
+     "value": 63,
+     "cite": "Prusament PC Blend datasheet",
+     "url": "https://prusament.com/wp-content/uploads/2022/10/PCBlend_Prusament_TDS_2022_16_EN.pdf",
+     "quote": "Tensile Yield Strength [MPa] 63 ± 1 (Horizontal), PC Blend"
+    }
+   ]
+  },
+  {
+   "id": "pc.tensile_z",
+   "topic": "materials",
+   "material": "PC",
+   "key": "tensile_z",
+   "value": 52.8,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile strength (Z) 52.8 ± 1.7 MPa",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    21,
+    56
+   ],
+   "others": [
+    {
+     "value": 56,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Tensile Strength (Z) 56 ± 2 MPa"
+    },
+    {
+     "value": 21,
+     "cite": "Prusament PC Blend datasheet",
+     "url": "https://prusament.com/wp-content/uploads/2022/10/PCBlend_Prusament_TDS_2022_16_EN.pdf",
+     "quote": "Interlayer Adhesion [MPa] 21 ± 2 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ]
+  },
+  {
+   "id": "pla-cf.e_xy",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "e_xy",
+   "value": 3280.7,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's modulus (X-Y) 3280.7 ± 79.6 MPa",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2790,
+    3280.7
+   ],
+   "others": [
+    {
+     "value": 2790,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Young's Modulus (X-Y) 2790 ± 120 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pla-cf.e_z",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "e_z",
+   "value": 2213.1,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's modulus (Z) 2213.1 ± 42.9 MPa",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2160,
+    2213.1
+   ],
+   "others": [
+    {
+     "value": 2160,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Young's Modulus (Z) 2160 ± 90 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pla-cf.tensile_xy",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "tensile_xy",
+   "value": 31.2,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile strength (X-Y) 31.2 ± 0.7 MPa",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    31.2,
+    38
+   ],
+   "others": [
+    {
+     "value": 38,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Tensile Strength (X-Y) 38 ± 4 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pla-cf.tensile_z",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "tensile_z",
+   "value": 15.1,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile strength (Z) 15.1 ± 0.7 MPa",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    15.1,
+    26
+   ],
+   "others": [
+    {
+     "value": 26,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Tensile Strength (Z) 26 ± 2 MPa"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.e_xy",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "e_xy",
+   "value": 2460,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (X-Y) ISO 527, GB/T 1040 2460 ± 230 MPa",
+   "source": "Bambu Lab PETG-CF technical data sheet V3.0",
+   "cite": "Bambu PETG-CF datasheet",
+   "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    2460,
+    3710.1
+   ],
+   "others": [
+    {
+     "value": 3710.1,
+     "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+     "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+     "quote": "Young's modulus (X-Y) 3710.1 ± 151.1 MPa"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.e_z",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "e_z",
+   "value": 1340,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Young's Modulus (Z) ISO 527, GB/T 1040 1340 ± 150 MPa",
+   "source": "Bambu Lab PETG-CF technical data sheet V3.0",
+   "cite": "Bambu PETG-CF datasheet",
+   "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    1340,
+    2651.9
+   ],
+   "others": [
+    {
+     "value": 2651.9,
+     "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+     "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+     "quote": "Young's modulus (Z) 2651.9 ± 51.0 MPa"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.tensile_xy",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "tensile_xy",
+   "value": 35,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (X-Y) ISO 527, GB/T 1040 35 ± 5 MPa",
+   "source": "Bambu Lab PETG-CF technical data sheet V3.0",
+   "cite": "Bambu PETG-CF datasheet",
+   "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    35,
+    59.8
+   ],
+   "others": [
+    {
+     "value": 59.8,
+     "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+     "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+     "quote": "Tensile strength (X-Y) 59.8 ± 0.3 MPa"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.tensile_z",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "tensile_z",
+   "value": 29,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series.",
+   "quote": "Tensile Strength (Z) ISO 527, GB/T 1040 29 ± 4 MPa",
+   "source": "Bambu Lab PETG-CF technical data sheet V3.0",
+   "cite": "Bambu PETG-CF datasheet",
+   "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    29,
+    41.1
+   ],
+   "others": [
+    {
+     "value": 41.1,
+     "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+     "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+     "quote": "Tensile strength (Z) 41.1 ± 4.1 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pa.e_xy",
+   "topic": "materials",
+   "material": "PA",
+   "key": "e_xy",
+   "value": 724,
+   "unit": "MPa",
+   "note": "Young's modulus in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series. Nylon takes up water from the air and softens: the sheet's wet (conditioned) values are what a part in a room has after a while, so stone uses them; dry values are in others.",
+   "quote": "MECHANICAL PROPERTIES (Wet Status) Young's modulus (X-Y) 724 ± 61 MPa",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    724,
+    2703
+   ],
+   "others": [
+    {
+     "value": 2703,
+     "cite": "Polymaker PolyMide CoPA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+     "quote": "MECHANICAL PROPERTIES (Dry Status) Young's modulus (X-Y) 2703 ± 259 MPa"
+    },
+    {
+     "value": 1200,
+     "cite": "Prusament PA11 datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2026/08/2d2145fc-pa11_tds_eng.pdf",
+     "quote": "Tensile Modulus [GPa] 1.2 ± 0.0 (Horizontal xy)"
+    }
+   ]
+  },
+  {
+   "id": "pa.e_z",
+   "topic": "materials",
+   "material": "PA",
+   "key": "e_z",
+   "value": 660,
+   "unit": "MPa",
+   "note": "Young's modulus across layers (Z), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series. Nylon takes up water from the air and softens: the sheet's wet (conditioned) values are what a part in a room has after a while, so stone uses them; dry values are in others.",
+   "quote": "MECHANICAL PROPERTIES (Wet Status) Young's modulus (Z) 660 ± 29 MPa",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    660,
+    2209
+   ],
+   "others": [
+    {
+     "value": 2209,
+     "cite": "Polymaker PolyMide CoPA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+     "quote": "MECHANICAL PROPERTIES (Dry Status) Young's modulus (Z) 2209 ± 59 MPa"
+    }
+   ]
+  },
+  {
+   "id": "pa.tensile_xy",
+   "topic": "materials",
+   "material": "PA",
+   "key": "tensile_xy",
+   "value": 34.3,
+   "unit": "MPa",
+   "note": "tensile strength in the layer plane (X-Y), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series. Nylon takes up water from the air and softens: the sheet's wet (conditioned) values are what a part in a room has after a while, so stone uses them; dry values are in others.",
+   "quote": "MECHANICAL PROPERTIES (Wet Status) Tensile strength (X-Y) 34.3 ± 2.5 MPa",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    34.3,
+    78.0
+   ],
+   "others": [
+    {
+     "value": 78.0,
+     "cite": "Polymaker PolyMide CoPA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+     "quote": "MECHANICAL PROPERTIES (Dry Status) Tensile strength (X-Y) 78.0 ± 0.7 MPa"
+    },
+    {
+     "value": 38.3,
+     "cite": "Prusament PA11 datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2026/08/2d2145fc-pa11_tds_eng.pdf",
+     "quote": "Tensile Yield Strength [MPa] 38.3 ± 0.8 (Horizontal xy)"
+    }
+   ]
+  },
+  {
+   "id": "pa.tensile_z",
+   "topic": "materials",
+   "material": "PA",
+   "key": "tensile_z",
+   "value": 13.7,
+   "unit": "MPa",
+   "note": "tensile strength across layers (Z, between layers), printed specimen. Value used: the sheet with the lowest Z strength, so X-Y and Z come from one test series. Nylon takes up water from the air and softens: the sheet's wet (conditioned) values are what a part in a room has after a while, so stone uses them; dry values are in others.",
+   "quote": "MECHANICAL PROPERTIES (Wet Status) Tensile strength (Z) 13.7 ± 1.2 MPa",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    13.7,
+    45.8
+   ],
+   "others": [
+    {
+     "value": 45.8,
+     "cite": "Polymaker PolyMide CoPA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+     "quote": "MECHANICAL PROPERTIES (Dry Status) Tensile strength (Z) 45.8 ± 1.5 MPa"
+    },
+    {
+     "value": 32,
+     "cite": "Prusament PA11 datasheet",
+     "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2026/08/2d2145fc-pa11_tds_eng.pdf",
+     "quote": "Interlayer Adhesion [MPa] 32 ± 1 Prusa Polymers (in-house test, not ISO 527 Z)"
+    }
+   ]
+  },
+  {
+   "id": "tpu.e_xy",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "e_xy",
+   "value": 33.6,
+   "unit": "MPa",
+   "note": "Rubber-like: a linear model holds only for small strain, so deflections for TPU are rough.",
+   "quote": "Young's modulus (X-Y) ISO 37, GB/T 528 33.6 ± 0.9 MPa",
+   "source": "Polymaker PolyFlex TPU95 technical data sheet V5.4",
+   "cite": "Polymaker PolyFlex TPU95 datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyFlex_TPU95_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "tpu.e_z",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "e_z",
+   "value": 33.6,
+   "unit": "MPa",
+   "note": "No maker gives a Z modulus.",
+   "quote": "Young's modulus (X-Y) ISO 37, GB/T 528 33.6 ± 0.9 MPa",
+   "source": "Polymaker PolyFlex TPU95 technical data sheet V5.4",
+   "cite": "Polymaker PolyFlex TPU95 datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyFlex_TPU95_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "assumption": "Z modulus taken equal to X-Y: no maker sheet gives a Z value."
+  },
+  {
+   "id": "tpu.tensile_xy",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "tensile_xy",
+   "value": 41.4,
+   "unit": "MPa",
+   "note": "Printed horizontal specimen.",
+   "quote": "Tensile Strength [MPa] 41.4 ± 1.3 ISO 37 (Horizontal)",
+   "source": "Prusament TPU 95A technical datasheet",
+   "cite": "Prusament TPU 95A datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2025/05/80316f6d-tds-prusament_tpu_95a_en-1.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "tpu.tensile_z",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "tensile_z",
+   "value": 9.5,
+   "unit": "MPa",
+   "note": "Prusament's interlayer adhesion test, the only Z number a maker gives for TPU 95A.",
+   "quote": "Interlayer Adhesion [MPa] 9.5 ± 0.2 ISO 527",
+   "source": "Prusament TPU 95A technical datasheet",
+   "cite": "Prusament TPU 95A datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2025/05/80316f6d-tds-prusament_tpu_95a_en-1.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pla.density",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "density",
+   "value": 1.24,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.24 g/cm³",
+   "source": "Bambu Lab PLA Basic technical data sheet",
+   "cite": "Bambu PLA Basic datasheet",
+   "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.17,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.17 g/cm3 at 23°C"
+    }
+   ]
+  },
+  {
+   "id": "petg.density",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "density",
+   "value": 1.28,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.28 g/cm³",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.25,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.25 g/cm3 at 23°C"
+    }
+   ]
+  },
+  {
+   "id": "abs.density",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "density",
+   "value": 1.05,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.05 g/cm³",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.04,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.04 g/cm3 at 23 °C"
+    }
+   ]
+  },
+  {
+   "id": "asa.density",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "density",
+   "value": 1.05,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.05 g/cm³",
+   "source": "Bambu Lab ASA technical data sheet V3.0",
+   "cite": "Bambu ASA datasheet",
+   "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.13,
+     "cite": "Polymaker PolyLite ASA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+     "quote": "Density 1.13 g/cm3 at 23°C"
+    }
+   ]
+  },
+  {
+   "id": "pc.density",
+   "topic": "materials",
+   "material": "PC",
+   "key": "density",
+   "value": 1.19,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO1183, GB/T1033 1.19 g/cm3 at 23°C",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.2,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Density ISO 1183 1.20 g/cm³"
+    }
+   ]
+  },
+  {
+   "id": "tpu.density",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "density",
+   "value": 1.22,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers. Sheet gives 1.20 to 1.24; the middle is used.",
+   "quote": "Density ISO1183, GB/T1033 1.20-1.24 g/cm3 at 23 °C",
+   "source": "Polymaker PolyFlex TPU95 technical data sheet V5.4",
+   "cite": "Polymaker PolyFlex TPU95 datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyFlex_TPU95_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": []
+  },
+  {
+   "id": "pa.density",
+   "topic": "materials",
+   "material": "PA",
+   "key": "density",
+   "value": 1.12,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO1183, GB/T1033 1.12 g/cm3 at 23°C",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": []
+  },
+  {
+   "id": "pla-cf.density",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "density",
+   "value": 1.29,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO1183, GB/T1033 1.29 g/cm3 at 23°C",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.22,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Density ISO 1183 1.22 g/cm³"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.density",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "density",
+   "value": 1.25,
+   "unit": "g/cm3",
+   "note": "Same sheet as the strength numbers.",
+   "quote": "Density ISO 1183 1.25 g/cm³",
+   "source": "Bambu Lab PETG-CF technical data sheet V3.0",
+   "cite": "Bambu PETG-CF datasheet",
+   "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 1.3,
+     "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+     "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+     "quote": "Density 1.30 g/cm 3 at 23°C"
+    }
+   ]
+  },
+  {
+   "id": "pla.tg",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "tg",
+   "value": 61,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 61 °C",
+   "source": "Polymaker PolyLite PLA technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 60,
+     "cite": "Bambu PLA Basic datasheet",
+     "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+     "quote": "Glass Transition Temperature DSC, 10 °C/min 60 °C"
+    }
+   ]
+  },
+  {
+   "id": "petg.tg",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "tg",
+   "value": 66,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass Transition Temperature DSC, 10 °C/min 66 °C",
+   "source": "Bambu Lab PETG HF technical data sheet V1.0",
+   "cite": "Bambu PETG HF datasheet",
+   "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 81,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Glass transition temperature DSC, 10°C/min 81 °C"
+    }
+   ]
+  },
+  {
+   "id": "abs.tg",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "tg",
+   "value": 101,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 101 °C",
+   "source": "Polymaker PolyLite ABS technical data sheet V5.4",
+   "cite": "Polymaker PolyLite ABS datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": []
+  },
+  {
+   "id": "asa.tg",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "tg",
+   "value": 98,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temp. DSC, 10°C/min 98°C",
+   "source": "Polymaker PolyLite ASA technical data sheet V5.4",
+   "cite": "Polymaker PolyLite ASA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": []
+  },
+  {
+   "id": "pc.tg",
+   "topic": "materials",
+   "material": "PC",
+   "key": "tg",
+   "value": 113,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 113 °C",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 145,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Glass Transition Temperature DSC, 10 °C/min 145 °C"
+    }
+   ]
+  },
+  {
+   "id": "pa.tg",
+   "topic": "materials",
+   "material": "PA",
+   "key": "tg",
+   "value": 66,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 66 °C",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": []
+  },
+  {
+   "id": "pla-cf.tg",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "tg",
+   "value": 62,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temperature DSC, 10°C/min 62 °C",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 63,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Glass Transition Temperature DSC, 10 °C/min 63 °C"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.tg",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "tg",
+   "value": 69.7,
+   "unit": "C",
+   "note": "Glass transition by DSC. Value used: the lowest maker value.",
+   "quote": "Glass transition temp. DSC, 10°C/min 69.7 °C",
+   "source": "Polymaker Fiberon PETG-rCF08 technical data sheet V1.0",
+   "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+   "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+   "checked": "2026-11-24",
+   "others": [
+    {
+     "value": 68,
+     "cite": "Bambu PETG-CF datasheet",
+     "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+     "quote": "Glass Transition Temperature DSC, 10 °C/min 68 °C"
+    }
+   ]
+  },
+  {
+   "id": "pla.hdt_045",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "hdt_045",
+   "value": 55,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat Deflection Temperature (0.45 MPa) [°C] 55 ISO 75",
+   "source": "Prusament PLA technical datasheet v1.1 (1_PLA_Prusament_TDS_2022_EN.pdf inside the tech sheet zip linked from the Prusament PLA page)",
+   "cite": "Prusament PLA datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/7ca620c4-prusament-pla-plablend.zip",
+   "checked": "2026-11-24",
+   "range": [
+    55,
+    60
+   ],
+   "others": [
+    {
+     "value": 60,
+     "cite": "Polymaker PolyLite PLA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+     "quote": "Heat deflection temp. ISO 75 0.45MPa 60 °C"
+    },
+    {
+     "value": 57,
+     "cite": "Bambu PLA Basic datasheet",
+     "url": "https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf",
+     "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 57 °C"
+    }
+   ]
+  },
+  {
+   "id": "petg.hdt_045",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "hdt_045",
+   "value": 68,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat Deflection Temperature (0.45 MPa) [°C] 68 ISO 75",
+   "source": "Prusament PETG technical datasheet v1.1",
+   "cite": "Prusament PETG datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    68,
+    78
+   ],
+   "others": [
+    {
+     "value": 78,
+     "cite": "Polymaker PolyLite PETG datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+     "quote": "Heat deflection temperature ISO 75 0.45MPa 78 °C"
+    },
+    {
+     "value": 69,
+     "cite": "Bambu PETG HF datasheet",
+     "url": "https://store.bblcdn.com/3a230e260a3a47c2b0db0156e07eef91.pdf",
+     "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 69 °C"
+    }
+   ]
+  },
+  {
+   "id": "abs.hdt_045",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "hdt_045",
+   "value": 87,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 87 °C",
+   "source": "Bambu Lab ABS technical data sheet V3",
+   "cite": "Bambu ABS datasheet",
+   "url": "https://store.bblcdn.com/s7/default/23b4cf2b83d5470bb96d19970b5f3ae8/Bambu_ABS_Technical_Data_Sheet_V3.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    87,
+    100
+   ],
+   "others": [
+    {
+     "value": 100,
+     "cite": "Polymaker PolyLite ABS datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+     "quote": "Heat deflection temp. ISO 75 0.45MPa 100°C"
+    }
+   ]
+  },
+  {
+   "id": "asa.hdt_045",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "hdt_045",
+   "value": 93,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat Deflection Temperature (0.45 MPa) [°C] 93 ISO 75",
+   "source": "Prusament ASA technical datasheet v1.1",
+   "cite": "Prusament ASA datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/bc8551ef-tds_prusament-asa_2024_en.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    93,
+    103
+   ],
+   "others": [
+    {
+     "value": 103,
+     "cite": "Polymaker PolyLite ASA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+     "quote": "Heat deflection temp. ISO 75 0.45MPa 103°C"
+    },
+    {
+     "value": 100,
+     "cite": "Bambu ASA datasheet",
+     "url": "https://store.bblcdn.com/ad7b08230c164e72856cffbe06bb7dc9.pdf",
+     "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 100 °C"
+    }
+   ]
+  },
+  {
+   "id": "pc.hdt_045",
+   "topic": "materials",
+   "material": "PC",
+   "key": "hdt_045",
+   "value": 111,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat deflection temperature ISO 75 0.45MPa 111 °C",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    111,
+    113
+   ],
+   "others": [
+    {
+     "value": 112,
+     "cite": "Bambu PC datasheet",
+     "url": "https://store.bblcdn.com/a52afdccddfd448583d119587122c8c5.pdf",
+     "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 112 °C"
+    },
+    {
+     "value": 113,
+     "cite": "Prusament PC Blend datasheet",
+     "url": "https://prusament.com/wp-content/uploads/2022/10/PCBlend_Prusament_TDS_2022_16_EN.pdf",
+     "quote": "Heat Deflection Temperature (0.45 MPa) [°C] 113 ISO 75"
+    }
+   ]
+  },
+  {
+   "id": "pa.hdt_045",
+   "topic": "materials",
+   "material": "PA",
+   "key": "hdt_045",
+   "value": 58.7,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat Deflection Temperature (0.45 MPa) [°C] 58.7 ISO 75",
+   "source": "Prusament PA11 Carbon Fiber technical datasheet",
+   "cite": "Prusament PA11 datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2026/08/2d2145fc-pa11_tds_eng.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    58.7,
+    111
+   ],
+   "others": [
+    {
+     "value": 111,
+     "cite": "Polymaker PolyMide CoPA datasheet",
+     "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+     "quote": "Heat deflection temperature ISO 75 0.45MPa 111 °C"
+    }
+   ]
+  },
+  {
+   "id": "pla-cf.hdt_045",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "hdt_045",
+   "value": 54,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat deflection temperature ISO 75 0.45MPa 54 °C",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    54,
+    55
+   ],
+   "others": [
+    {
+     "value": 55,
+     "cite": "Bambu PLA-CF datasheet",
+     "url": "https://store.bblcdn.com/842f399d4e274507953a5231126ec8c1.pdf",
+     "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 55 °C"
+    }
+   ]
+  },
+  {
+   "id": "petg-cf.hdt_045",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "hdt_045",
+   "value": 68.6,
+   "unit": "C",
+   "note": "ISO 75 at 0.45 MPa. Value used: the lowest maker value, so a warning comes early.",
+   "quote": "Heat deflection temp. ISO 75 0.45MPa 68.6 °C",
+   "source": "Polymaker Fiberon PETG-rCF08 technical data sheet V1.0",
+   "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+   "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+   "checked": "2026-11-24",
+   "range": [
+    68.6,
+    74
+   ],
+   "others": [
+    {
+     "value": 74,
+     "cite": "Bambu PETG-CF datasheet",
+     "url": "https://store.bblcdn.com/626e4f424bf345ae965ad0ddfcaf2459.pdf",
+     "quote": "Heat Deflection Temperature ISO 75 0.45 MPa 74 °C"
+    }
+   ]
+  },
+  {
+   "id": "tpu.vicat",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "vicat",
+   "value": 101.6,
+   "unit": "C",
+   "note": "TPU 95A has no heat deflection temperature at 0.45 MPa on any sheet; Prusament gives 78.6 C at 1.80 MPa and Vicat A.",
+   "quote": "Vicat A [°C] 101.6 ISO 306",
+   "source": "Prusament TPU 95A technical datasheet",
+   "cite": "Prusament TPU 95A datasheet",
+   "url": "https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2025/05/80316f6d-tds-prusament_tpu_95a_en-1.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pla.mfi",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "mfi",
+   "value": [
+    7,
+    11
+   ],
+   "unit": "g/10min",
+   "note": "Melt flow index at 210 C, 2.16 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 210°C, 2.16kg 7-11 g/10min",
+   "source": "Polymaker PolyLite PLA technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "petg.mfi",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "mfi",
+   "value": 10.8,
+   "unit": "g/10min",
+   "note": "Melt flow index at 240 C, 2.16 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 240°C, 2.16kg 10.8 g/10min",
+   "source": "Polymaker PolyLite PETG technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PETG datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PETG_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "abs.mfi",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "mfi",
+   "value": [
+    9,
+    14
+   ],
+   "unit": "g/10min",
+   "note": "Melt flow index at 220 C, 2.16 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 220°C, 2.16kg 9-14 g/10min",
+   "source": "Polymaker PolyLite ABS technical data sheet V5.4",
+   "cite": "Polymaker PolyLite ABS datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ABS_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "asa.mfi",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "mfi",
+   "value": 25,
+   "unit": "g/10min",
+   "note": "Melt flow index at 220 C, 10 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 220°C, 10kg 25g /10min",
+   "source": "Polymaker PolyLite ASA technical data sheet V5.4",
+   "cite": "Polymaker PolyLite ASA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_ASA_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pc.mfi",
+   "topic": "materials",
+   "material": "PC",
+   "key": "mfi",
+   "value": [
+    8,
+    11
+   ],
+   "unit": "g/10min",
+   "note": "Melt flow index at 260 C, 2.16 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 260°C, 2.16kg 8-11 g/10min",
+   "source": "Polymaker PolyLite PC technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PC datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PC_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "tpu.mfi",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "mfi",
+   "value": [
+    3,
+    6
+   ],
+   "unit": "g/10min",
+   "note": "Melt flow index at 210 C, 1.2 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 210°C, 1.2 kg 3-6 g/10min",
+   "source": "Polymaker PolyFlex TPU95 technical data sheet V5.4",
+   "cite": "Polymaker PolyFlex TPU95 datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyFlex_TPU95_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pa.mfi",
+   "topic": "materials",
+   "material": "PA",
+   "key": "mfi",
+   "value": 12,
+   "unit": "g/10min",
+   "note": "Melt flow index at 260 C, 1.2 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 260°C, 1.2 kg 12 g/10min",
+   "source": "Polymaker PolyMide CoPA technical data sheet V5.4",
+   "cite": "Polymaker PolyMide CoPA datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pla-cf.mfi",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "mfi",
+   "value": 9.2,
+   "unit": "g/10min",
+   "note": "Melt flow index at 210 C, 2.16 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 210°C, 2.16 kg 9.2 g/10min",
+   "source": "Polymaker PolyLite PLA-CF technical data sheet V5.4",
+   "cite": "Polymaker PolyLite PLA-CF datasheet",
+   "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA-CF_TDS_EN_V5.4.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "petg-cf.mfi",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "mfi",
+   "value": 11.5,
+   "unit": "g/10min",
+   "note": "Melt flow index at 230 C, 2.16 kg; only comparable between rows with the same test load.",
+   "quote": "Melt index 230°C, 2.16 kg 11.5 g/10min",
+   "source": "Polymaker Fiberon PETG-rCF08 technical data sheet V1.0",
+   "cite": "Polymaker Fiberon PETG-rCF08 datasheet",
+   "url": "https://fiberon.polymaker.com/wp-content/uploads/TDS_FIBERON-PETG-rCF08_V1.0_EN.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pla.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     1.0
+    ],
+    [
+     40,
+     0.92
+    ],
+    [
+     45,
+     0.84
+    ],
+    [
+     50,
+     0.73
+    ],
+    [
+     55,
+     0.62
+    ],
+    [
+     60,
+     0.19
+    ],
+    [
+     65,
+     0.023
+    ],
+    [
+     70,
+     0.01
+    ],
+    [
+     80,
+     0.003
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (Prusament PLA (Prusa Research)), read from Figure 16 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 16. Storage and loss modulus of PLA-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "petg.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     0.96
+    ],
+    [
+     40,
+     0.79
+    ],
+    [
+     50,
+     0.64
+    ],
+    [
+     60,
+     0.5
+    ],
+    [
+     65,
+     0.47
+    ],
+    [
+     70,
+     0.53
+    ],
+    [
+     75,
+     0.54
+    ],
+    [
+     80,
+     0.28
+    ],
+    [
+     85,
+     0.05
+    ],
+    [
+     90,
+     0.016
+    ],
+    [
+     100,
+     0.005
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (PETG by Filament PM), read from Figure 17 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 17. Storage and loss modulus of PETG-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "abs.modulus_vs_temp",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     1.0
+    ],
+    [
+     40,
+     0.85
+    ],
+    [
+     50,
+     0.59
+    ],
+    [
+     60,
+     0.42
+    ],
+    [
+     70,
+     0.29
+    ],
+    [
+     80,
+     0.23
+    ],
+    [
+     90,
+     0.26
+    ],
+    [
+     100,
+     0.36
+    ],
+    [
+     110,
+     0.2
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (Prusament ABS (Prusa Research)), read from Figure 20 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 20. Storage and loss modulus of ABS-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "asa.modulus_vs_temp",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     0.97
+    ],
+    [
+     40,
+     0.81
+    ],
+    [
+     50,
+     0.63
+    ],
+    [
+     60,
+     0.47
+    ],
+    [
+     70,
+     0.29
+    ],
+    [
+     80,
+     0.14
+    ],
+    [
+     85,
+     0.1
+    ],
+    [
+     100,
+     0.14
+    ],
+    [
+     110,
+     0.032
+    ],
+    [
+     120,
+     0.002
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (Prusament ASA (Prusa Research)), read from Figure 21 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 21. Storage and loss modulus of ASA-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pa.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PA",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     1.0
+    ],
+    [
+     40,
+     0.81
+    ],
+    [
+     50,
+     0.43
+    ],
+    [
+     60,
+     0.22
+    ],
+    [
+     70,
+     0.11
+    ],
+    [
+     80,
+     0.049
+    ],
+    [
+     85,
+     0.023
+    ]
+   ],
+   "unit": "ratio",
+   "note": "Storage modulus E'(T) / E'(20 C) of a 100 % infill printed bar (PA by Filament PM), read from Figure 19 by tracing the curve against the log axis ticks; about +/- 5 %. Stone never credits a rise on heating (a curve bump): it keeps the lowest ratio reached so far.",
+   "quote": "Figure 19. Storage and loss modulus of PA-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pla-cf.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     1.0
+    ],
+    [
+     40,
+     0.92
+    ],
+    [
+     45,
+     0.84
+    ],
+    [
+     50,
+     0.73
+    ],
+    [
+     55,
+     0.62
+    ],
+    [
+     60,
+     0.19
+    ],
+    [
+     65,
+     0.023
+    ],
+    [
+     70,
+     0.01
+    ],
+    [
+     80,
+     0.003
+    ]
+   ],
+   "unit": "ratio",
+   "note": "No DMA of printed PLA-CF found; the PLA curve is used.",
+   "quote": "Figure 16. Storage and loss modulus of PLA-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24",
+   "assumption": "Chopped carbon fiber stiffens PLA but the glass transition of the PLA matrix sets where it softens (the PLA-CF sheets give Tg and HDT within a few C of PLA), so the PLA retention curve is used."
+  },
+  {
+   "id": "petg-cf.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "modulus_vs_temp",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     30,
+     0.96
+    ],
+    [
+     40,
+     0.79
+    ],
+    [
+     50,
+     0.64
+    ],
+    [
+     60,
+     0.5
+    ],
+    [
+     65,
+     0.47
+    ],
+    [
+     70,
+     0.53
+    ],
+    [
+     75,
+     0.54
+    ],
+    [
+     80,
+     0.28
+    ],
+    [
+     85,
+     0.05
+    ],
+    [
+     90,
+     0.016
+    ],
+    [
+     100,
+     0.005
+    ]
+   ],
+   "unit": "ratio",
+   "note": "No DMA of printed PETG-CF found; the PETG curve is used.",
+   "quote": "Figure 17. Storage and loss modulus of PETG-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
+   "checked": "2026-11-24",
+   "assumption": "Chopped carbon fiber stiffens PETG but the glass transition of the PETG matrix sets where it softens (the PETG-CF sheets give Tg and HDT within a few C of PETG), so the PETG retention curve is used."
+  },
+  {
+   "id": "any.hdt_modulus",
+   "topic": "materials",
+   "material": "ANY",
+   "key": "hdt_modulus",
+   "value": 198,
+   "unit": "MPa",
+   "note": "Modulus a part has at its HDT at 0.45 MPa: 800 MPa x 0.45 / 1.82.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "ISO 75 stops at a fixed deflection, so the modulus at HDT scales with the test stress; 0.45 / 1.82 of 800 MPa is 198 MPa. Stone uses it as the last point of a retention curve where no DMA curve is sourced."
+  },
+  {
+   "id": "pc.modulus_vs_temp",
+   "topic": "materials",
+   "material": "PC",
+   "key": "modulus_vs_temp",
+   "value": "from hdt",
+   "unit": "ratio",
+   "note": "No DMA of printed PC found. Stone builds the curve from two points: 1.0 at 23 C and any.hdt_modulus / e_xy at hdt_045.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Straight line in log(modulus) between 23 C and the HDT point; past the HDT stone gives no number and says the part softens."
+  },
+  {
+   "id": "pla.cte",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "cte",
+   "value": 96,
+   "unit": "1e-6/K",
+   "note": "Printed PLA, rasters along the bar (0 deg) and across (90 deg), 25 to 50 C.",
+   "quote": "PLA 0° 25-50 96 ± 5 (CTE, 10−6/°C); 90° 25-30 99 ± 5",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "range": [
+    96,
+    99
+   ]
+  },
+  {
+   "id": "abs.cte",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "cte",
+   "value": 86,
+   "unit": "1e-6/K",
+   "note": "Printed ABS, 25 to 50 C.",
+   "quote": "ABS 0° 25-50 86 ± 3 (CTE, 10−6/°C); 90° 25-50 89 ± 3",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "range": [
+    86,
+    89
+   ]
+  },
+  {
+   "id": "pa.cte",
+   "topic": "materials",
+   "material": "PA",
+   "key": "cte",
+   "value": 118,
+   "unit": "1e-6/K",
+   "note": "Printed nylon (Taulman Bridge), 25 to 50 C.",
+   "quote": "PA 0° 25-40 118 ± 5 (CTE, 10−6/°C); 90° 25-50 119 ± 5",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "range": [
+    118,
+    119
+   ]
+  },
+  {
+   "id": "pc.cte",
+   "topic": "materials",
+   "material": "PC",
+   "key": "cte",
+   "value": 70,
+   "unit": "1e-6/K",
+   "note": "Molded PC, not a printed bar. Value used: the top of the range.",
+   "quote": "Polycarbonate (PC) 65 - 70",
+   "source": "The Engineering ToolBox: Linear Thermal Expansion Coefficients of Materials",
+   "cite": "Engineering ToolBox thermal expansion table",
+   "url": "https://www.engineeringtoolbox.com/linear-expansion-coefficients-d_95.html",
+   "checked": "2026-11-24",
+   "range": [
+    65,
+    70
+   ]
+  },
+  {
+   "id": "petg.cte",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "cte",
+   "value": 59.4,
+   "unit": "1e-6/K",
+   "note": "No sourced CTE for PETG found.",
+   "quote": "Polyethylene terephthalate (PET) 59.4",
+   "source": "The Engineering ToolBox: Linear Thermal Expansion Coefficients of Materials",
+   "cite": "Engineering ToolBox thermal expansion table",
+   "url": "https://www.engineeringtoolbox.com/linear-expansion-coefficients-d_95.html",
+   "checked": "2026-11-24",
+   "assumption": "PETG is PET with glycol added; stone uses the PET value."
+  },
+  {
+   "id": "asa.cte",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "cte",
+   "value": 86,
+   "unit": "1e-6/K",
+   "note": "No sourced CTE for ASA found.",
+   "quote": "ABS 0° 25-50 86 ± 3 (CTE, 10−6/°C)",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "assumption": "ASA is a styrene acrylonitrile copolymer like ABS; stone uses the printed ABS value."
+  },
+  {
+   "id": "tpu.cte",
+   "topic": "materials",
+   "material": "TPU",
+   "key": "cte",
+   "value": 117,
+   "unit": "1e-6/K",
+   "note": "No sourced CTE for TPU found.",
+   "quote": "PEBA 0° 25-50 117 ± 5 (CTE, 10−6/°C)",
+   "source": "Characterization of Thermal Expansion Coefficient of 3D Printing Polymeric Materials Using Fiber Bragg Grating Sensors, Materials 2024, 17(18), 4668, Table 3",
+   "cite": "Materials 2024 17:4668 CTE of printed polymers",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11433601/",
+   "checked": "2026-11-24",
+   "assumption": "Stone uses the printed PEBA 90A value from the same study, the nearest printed elastomer."
+  },
+  {
+   "id": "pla-cf.cte",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "cte",
+   "value": 96,
+   "unit": "1e-6/K",
+   "note": "Fibers cut expansion along the printed lines only: printed Onyx (nylon with chopped carbon) measures 22 along the lines and 248 across layers, x 1e-6/K, against 175 for plain nylon.",
+   "quote": "Onyx 2.2 (0° Flow) 3.6 (45°/−45°) 9.5 (90° x-Flow) 24.8 (ZX), Nylon White 17.5 13.2 11.4 16.1 [10−5 1/°C]",
+   "source": "Faust et al., Effects of Coefficient of Thermal Expansion and Moisture Absorption on the Dimensional Accuracy of Carbon-Reinforced 3D Printed Parts, Polymers 2021, 13(21), 3637, Table 2",
+   "cite": "Polymers 2021 13:3637 CTE of carbon-reinforced prints",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8587952/",
+   "checked": "2026-11-24",
+   "assumption": "Stone uses the plain PLA value (96) in every direction: across the lines and between layers the fibers do not help."
+  },
+  {
+   "id": "petg-cf.cte",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "cte",
+   "value": 59.4,
+   "unit": "1e-6/K",
+   "note": "Fibers cut expansion along the printed lines only: printed Onyx (nylon with chopped carbon) measures 22 along the lines and 248 across layers, x 1e-6/K, against 175 for plain nylon.",
+   "quote": "Onyx 2.2 (0° Flow) 3.6 (45°/−45°) 9.5 (90° x-Flow) 24.8 (ZX), Nylon White 17.5 13.2 11.4 16.1 [10−5 1/°C]",
+   "source": "Faust et al., Effects of Coefficient of Thermal Expansion and Moisture Absorption on the Dimensional Accuracy of Carbon-Reinforced 3D Printed Parts, Polymers 2021, 13(21), 3637, Table 2",
+   "cite": "Polymers 2021 13:3637 CTE of carbon-reinforced prints",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8587952/",
+   "checked": "2026-11-24",
+   "assumption": "Stone uses the PETG value (59.4) in every direction: across the lines and between layers the fibers do not help."
+  },
+  {
+   "id": "pla.shrink",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "shrink",
+   "value": 0.35,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 96e-6 x (61 - 25) = 0.35 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "abs.shrink",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "shrink",
+   "value": 0.65,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 86e-6 x (101 - 25) = 0.65 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "pa.shrink",
+   "topic": "materials",
+   "material": "PA",
+   "key": "shrink",
+   "value": 0.48,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 118e-6 x (66 - 25) = 0.48 %. Nylon also shrinks as it crystallizes, so it warps more than this number says.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "pc.shrink",
+   "topic": "materials",
+   "material": "PC",
+   "key": "shrink",
+   "value": 0.62,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 70e-6 x (113 - 25) = 0.62 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "petg.shrink",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "shrink",
+   "value": 0.24,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 59.4e-6 x (66 - 25) = 0.24 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "asa.shrink",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "shrink",
+   "value": 0.63,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 86e-6 x (98 - 25) = 0.63 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "pla-cf.shrink",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "shrink",
+   "value": 0.36,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 96e-6 x (62 - 25) = 0.36 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "petg-cf.shrink",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "shrink",
+   "value": 0.27,
+   "unit": "%",
+   "note": "cte x (tg - 25 C) = 59.4e-6 x (69.7 - 25) = 0.27 %.",
+   "quote": "In neat amorphous polymers such as ABS, residual stress is governed primarily by constrained thermal contraction below the glass transition temperature",
+   "source": "Residual Stresses and Distortion in Material Extrusion Additive Manufacturing of Reinforced Thermoplastic Composites, Polymers 2026, 18(15), 1796",
+   "cite": "Polymers 2026 18:1796 residual stress review",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13468168/",
+   "checked": "2026-11-24",
+   "assumption": "Thermal contraction from the glass transition to room temperature, from this file's cte and tg. Not an injection mold shrinkage: it is the strain a printed layer locks in, which is what pulls corners up."
+  },
+  {
+   "id": "pc.k",
+   "topic": "materials",
+   "material": "PC",
+   "key": "k",
+   "value": 0.19,
+   "unit": "W/(m K)",
+   "note": "Molded PC.",
+   "quote": "Polycarbonate 0.19",
+   "source": "The Engineering ToolBox: Thermal Conductivity of Common Materials",
+   "cite": "Engineering ToolBox thermal conductivity table",
+   "url": "https://www.engineeringtoolbox.com/thermal-conductivity-d_429.html",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pc.cp",
+   "topic": "materials",
+   "material": "PC",
+   "key": "cp",
+   "value": 1.17,
+   "unit": "kJ/(kg K)",
+   "note": "Molded PC.",
+   "quote": "Polycarbonate 1.17",
+   "source": "The Engineering ToolBox: Solids, Specific Heats",
+   "cite": "Engineering ToolBox specific heat table",
+   "url": "https://www.engineeringtoolbox.com/specific-heat-solids-d_154.html",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pa.k",
+   "topic": "materials",
+   "material": "PA",
+   "key": "k",
+   "value": 0.25,
+   "unit": "W/(m K)",
+   "note": "Molded nylon 6 and 6/6.",
+   "quote": "Nylon 6, Nylon 6/6 0.25",
+   "source": "The Engineering ToolBox: Thermal Conductivity of Common Materials",
+   "cite": "Engineering ToolBox thermal conductivity table",
+   "url": "https://www.engineeringtoolbox.com/thermal-conductivity-d_429.html",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "pla.creep",
+   "topic": "materials",
+   "material": "PLA",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 55 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "petg.creep",
+   "topic": "materials",
+   "material": "PETG",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 68 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "abs.creep",
+   "topic": "materials",
+   "material": "ABS",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 87 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "asa.creep",
+   "topic": "materials",
+   "material": "ASA",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 93 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "pa.creep",
+   "topic": "materials",
+   "material": "PA",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 58.7 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "pla-cf.creep",
+   "topic": "materials",
+   "material": "PLA-CF",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 54 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  },
+  {
+   "id": "petg-cf.creep",
+   "topic": "materials",
+   "material": "PETG-CF",
+   "key": "creep",
+   "value": "creeps under a steady load as it nears 68.6 C (its HDT at 0.45 MPa)",
+   "unit": "",
+   "note": "HDT marks where the stiffness is nearly gone, so a part held under load deforms over time well before it.",
+   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
+   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
+   "cite": "Materials 2026 19:369, Takemori HDT rule",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "checked": "2026-11-24",
+   "assumption": "Stone warns of creep when the service temperature is within 20 C of the HDT under a lasting load; the 20 C margin is a rule of thumb, not a measured limit."
+  }
+ ]
+}
