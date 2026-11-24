@@ -1,6 +1,6 @@
 {
   "id": "m01_cologne",
-  "request": "A model of Cologne Cathedral that fits my 220 mm bed.",
+  "request": "Find me an open model of Cologne Cathedral that fits my 220 mm bed.",
   "input": "text",
   "expect": {
     "models": {

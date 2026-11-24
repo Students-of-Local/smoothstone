@@ -1,6 +1,6 @@
 {
   "id": "m02_notre_dame",
-  "request": "A 150 mm long model of Notre-Dame de Paris.",
+  "request": "Find me an open model of Notre-Dame de Paris, 150 mm long.",
   "input": "text",
   "expect": {
     "models": {

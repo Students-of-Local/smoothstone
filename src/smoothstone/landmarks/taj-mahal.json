@@ -1,0 +1,14 @@
+{
+  "styles": {"value": ["Mughal architecture", "Islamic architecture"], "source": "https://www.wikidata.org/wiki/Q9141#P149"},
+  "expected_height_m": {"value": 73, "source": "https://www.wikidata.org/wiki/Q9141#P2048"},
+  "dome_drum_m": {"value": 7, "source": "https://www.tajmahal.gov.in/the-taj-exteriors.aspx", "reason": "The exposed drum is roughly 23 feet tall."},
+  "dome_roof_m": {"value": 25, "source": "https://s3.amazonaws.com/media.archnet.org/system/publications/contents/8802/original/DTP101301.pdf#page=282", "reason": "Estimated marble rise from the drum to the lotus cap using the published section scale."},
+  "dome_profile": {"value": [[0, 0.929], [0.12, 0.98], [0.27, 1], [0.43, 0.934], [0.58, 0.768], [0.73, 0.444], [0.87, 0.182], [0.95, 0.096], [1, 0.02]], "source": "https://s3.amazonaws.com/media.archnet.org/system/publications/contents/8802/original/DTP101301.pdf#page=282", "reason": "Approximate normalized height and radius sampled from the published section to the top of the marble lotus crown."},
+  "iwan_width_ratio": {"value": 0.32, "source": "https://commons.wikimedia.org/wiki/File:Taj_Mahal_(Edited).jpeg", "reason": "Estimated clear pointed arch opening over the straight face width between the chamfers."},
+  "iwan_height_ratio": {"value": 0.88, "source": "https://commons.wikimedia.org/wiki/File:Taj_Mahal_(Edited).jpeg", "reason": "Estimated clear pointed arch opening rise over the flanking wall rise above the marble platform."},
+  "chhatri_column_m": {"value": 6.4, "source": "https://s3.amazonaws.com/media.archnet.org/system/publications/contents/8802/original/DTP101301.pdf#page=282", "reason": "Estimated clear pavilion column rise from the scaled section."},
+  "chhatri_canopy_m": {"value": 5.7, "source": "https://s3.amazonaws.com/media.archnet.org/system/publications/contents/8802/original/DTP101301.pdf#page=282", "reason": "Estimated roof-corner pavilion canopy rise from the eave to the lotus cap in the scaled section."},
+  "chhatri_finial_m": {"value": 2.7, "source": "https://s3.amazonaws.com/media.archnet.org/system/publications/contents/8802/original/DTP101301.pdf#page=282", "reason": "Estimated pavilion finial height from the scaled section."},
+  "chhatri_roof_count": {"value": 4, "source": "https://www.tajmahal.gov.in/the-taj-exteriors.aspx"},
+  "finial": {"value": true, "source": "https://www.tajmahal.gov.in/the-taj-exteriors.aspx"}
+}

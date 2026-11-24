@@ -1,0 +1,13 @@
+{
+  "id": "l06_eiffel",
+  "request": "Can you print the Eiffel Tower, around 20 cm tall?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Eiffel Tower",
+      "size": {"mode": "z", "mm": 200},
+      "bed": [220, 220, 220]
+    }
+  },
+  "why": "The tower's current height and surveyed footprint set its proportions at print scale."
+}

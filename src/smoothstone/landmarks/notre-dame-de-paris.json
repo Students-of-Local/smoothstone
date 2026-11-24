@@ -1,0 +1,15 @@
+{
+  "styles": {"value": ["French Gothic architecture"], "source": "https://www.wikidata.org/wiki/Q2981#P149"},
+  "expected_height_m": {"value": 96, "source": "https://rebatirnotredamedeparis.fr/en/news/the-spire-of-notre-dame-de-paris-is-reborn", "reason": "Height to the restored crossing spire. Wikidata Q2981 lists 69 m for the west towers and a 90 m spire claim that ended in 2019."},
+  "osm_way": {"value": 201611261, "source": "https://www.openstreetmap.org/way/201611261"},
+  "west_tower_m": {"value": 69, "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-western-facade/"},
+  "west_facade_height_m": {"value": 45, "source": "https://www.notredamedeparis.fr/en/understand/architecture/exterior-architecture/"},
+  "west_facade_width_m": {"value": 43.5, "source": "https://www.notredamedeparis.fr/en/understand/architecture/exterior-architecture/"},
+  "west_portals": {"value": 3, "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-western-facade/"},
+  "rose_width_ratio": {"value": 0.221, "source": "https://www.notredamedeparis.fr/en/understand/architecture/exterior-architecture/", "reason": "The 9.6 m west rose divided by the 43.5 m facade width."},
+  "nave_ridge_m": {"value": 43, "source": "https://www.notredamedeparis.fr/en/understand/architecture/plans/"},
+  "nave_roof_rise_m": {"value": 10, "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-roof-structure/"},
+  "nave_roof_width_m": {"value": 13, "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-roof-structure/"},
+  "spire_height_m": {"value": 96, "source": "https://rebatirnotredamedeparis.fr/en/news/the-spire-of-notre-dame-de-paris-is-reborn"},
+  "spire_base_span_m": {"value": [15, 13], "source": "https://rebatirnotredamedeparis.fr/en/news/launch-of-the-reconstruction-of-the-spire", "reason": "Internal timber base length and width at the crossing."}
+}

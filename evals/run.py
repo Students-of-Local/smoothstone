@@ -161,6 +161,7 @@ def main():
 
     spec_path = Path(a.spec).resolve()
     spec = json.loads(spec_path.read_text())
+    suite = spec_path.parent.name
     cond = drivers.cond_name(a.driver, a.card, a.compact_at, a.model)
     run_id = f"{spec['id']}__{cond}__s{a.seed}__{time.strftime('%Y%m%d-%H%M%S')}"
     rdir = Path(a.out) / run_id
@@ -190,7 +191,7 @@ def main():
         ("\nThe pictures are already in the job." if given > 1 else "") + "\nThe job is ready; use the stone tool."
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-    log = {"run_id": run_id, "spec": spec["id"], "suite": spec_path.parent.name, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
+    log = {"run_id": run_id, "spec": spec["id"], "suite": suite, "spec_sha256": sha(spec_path.read_bytes()), "condition": cond,
            "seed": a.seed, "figure_seed": a.seed, "driver": a.driver, "card": a.card, "card_sha256": card_sha, "compact_at": a.compact_at,
            "model": a.model_name if a.driver == "lfm3" else a.model, "sampling": SAMPLING if a.driver == "lfm3" else
            drivers.OPENAI_SAMPLING if a.driver == "openai" else None,
@@ -204,7 +205,8 @@ def main():
         log.update({"cli_timeout": a.cli_timeout, "cli": []})
     t0 = time.time()
     pending = ""
-    nxt = "stone status"
+    one_landmark = a.driver == "next" and suite == LANDMARKS
+    nxt = "stone landmark" if one_landmark else "stone status"
     print(f"{spec['id']}  {cond}  seed {a.seed}", flush=True)
 
     # a follow-up is the person asking for a change after the model stopped: the same chat goes on
@@ -304,12 +306,18 @@ def main():
                 messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": result})
                 print(f"{step:>2} {args.get('command', '?')[:70]}  ->  {(last_next(result) or result.splitlines()[-1] if result else '')[:60]}", flush=True)
             log["steps"].append(st)
+            if one_landmark:
+                break  # a found model offered on failure is outside this suite
             if not calls:
                 print(f"{step:>2} (stopped, no tool call)", flush=True)
                 break
 
     exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
-    if spec_path.parent.name in MODELS:
+    if suite == LANDMARKS:
+        import landmarks_grade
+
+        grade = landmarks_grade.run(rdir, job, spec)
+    elif suite in MODELS:
         grade = models_run(rdir, job, spec)
     else:
         grade = grade_job(job, {**spec, "expect": exp}, messages)
@@ -324,7 +332,11 @@ def main():
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
-    print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
+    if suite == LANDMARKS:
+        print(("PASS  " if grade["pass"] else "FAIL  ") + f"{spec['id']} " + landmarks_grade.summary(grade)
+              + ". " + "; ".join(grade["why"]), flush=True)
+    else:
+        print(("PASS  " if grade["pass"] else "FAIL  ") + "; ".join(grade["why"])[:160], flush=True)
 
 
 def cli_run(a, log: dict, messages: list, system: str, prompt: str, env: dict, job: Path, rdir: Path,
@@ -500,6 +512,7 @@ def engineering_grade():
 
 # found models (stone models): the suite and its held-out set, graded by evals/models_grade.py
 MODELS = ("models", "models_heldout")
+LANDMARKS = "landmarks"
 
 
 def models_run(rdir: Path, job: Path, spec: dict) -> dict:

@@ -291,3 +291,17 @@ of the size asked (`fit`: 97% of the bed or more in its tightest direction); `pa
 more; with `thin`, the thin features report is not empty. Then a blind Opus judge (the claude CLI)
 compares build/views.png with the lead photo of the `wikipedia` article and scores 1 to 10; under 6,
 or no answer, fails the run (landmark.json next to the run).
+
+## Built landmark specs
+
+`landmarks/` exercises `stone landmark` on six requests. With `--driver next`, the harness
+creates the job and runs `stone landmark` once, using the name and size in the request.
+`landmarks_grade.py` reads the build's print checks, checks the actual STL files for bed fit, and
+measures the assembled mesh. Its height above the plinth divided by the length and width
+of its footprint must be within 4% of the sourced reference ratios. The mesh height and
+tallest modeled part must also agree with a comparable Wikidata height within 4%.
+The grade checks any feature counts in the spec against `refs/landmark.json` and checks
+the credits for ODbL, OpenStreetMap contributors, and the Wikidata and Wikipedia sources.
+The same blind Opus judge used for found models needs a likeness of at least 6 out of 10.
+The run saves the reference photo next to `landmark.json` and the rendered views under
+`job/build/views.png`.

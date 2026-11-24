@@ -1,6 +1,6 @@
 {
   "id": "m06_st_basils",
-  "request": "A 150 mm tall model of St. Basil's Cathedral.",
+  "request": "Find me an open model of St. Basil's Cathedral, 150 mm tall.",
   "input": "text",
   "expect": {
     "models": {

@@ -824,6 +824,9 @@ BUILDING = re.compile(r"\b(?:cathedral|basilica|church|chapel|abbey|minster|duom
                       r"pyramids?|monument|memorial|lighthouse|skyscraper|building|landmark|arch|gate|"
                       r"stadium|opera house|capitol|parliament|mausoleum|tomb|kremlin|cathedrale|kathedrale|"
                       r"catedral|sagrada|mahal|notre)\b", re.I)
+# "find me a model of", "download a model", "an open model", "on Printables": the person wants a made model
+FIND_MODEL = re.compile(r"\b(?:find|download|get)(?:\s+me)?\s+(?:an?\s+|the\s+)?(?:\w+\s+)?models?\b|"
+                        r"\b(?:existing|open|someone['’]s)\s+models?\b|\bon\s+(?:printables|thingiverse)\b", re.I)
 PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica"}
 
 
@@ -838,6 +841,7 @@ def subject_of(request: str) -> str | None:
     from . import find
 
     req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("’", "'"))
+    req = re.sub(r"^\s*(?:can|could|would) you\s+(?:please\s+)?", "", req, flags=re.I)
     m = re.search(r"\b(?:model|replica|miniature|version|print)s?\s+of\s+(?:the\s+)?(.+)", req, re.I)
     if m:
         s = find._phrase(m.group(1))
@@ -863,6 +867,11 @@ def names_landmark(request: str) -> str | None:
     if not s:
         return None
     return s if BUILDING.search(s) else None
+
+
+def asks_found_model(request: str) -> bool:
+    """True when a request asks to find, download or get an existing or open model, not to build one."""
+    return bool(FIND_MODEL.search(request))
 
 
 UNITS = {"mm": 1.0, "cm": 10.0, "in": 25.4, "inch": 25.4, "inches": 25.4, "\"": 25.4}

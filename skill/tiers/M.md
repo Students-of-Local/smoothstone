@@ -29,7 +29,9 @@ recipe and the settings that make the part look its best, then let stone build a
 - Figures: style chibi (big head, the default), statue (natural proportions) or bust. Keep the
   name short, under about 10 letters, so it fits the plinth's front arc. 70 to 120 mm tall
   prints well. Use stone find for a public figure, stone image for the user's own photo.
-- Landmarks (a cathedral, a tower): no recipe makes them. stone models "<landmark>" lists the
+- For a landmark, run stone landmark "<name>" first. Follow its NEXT line.
+- To find or download a model, run stone models "<landmark>" instead.
+- stone models "<landmark>" lists the
   best open models made for printing with their licenses; pick by the list (a model made for
   FDM over one made for resin), stone models --take <n>, then stone build. Read the thin
   features lines: name them to the person. A license note (noncommercial, no derivatives) goes

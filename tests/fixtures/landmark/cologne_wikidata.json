@@ -1,0 +1,313 @@
+{
+  "entities": {
+    "Q4176": {
+      "id": "Q4176",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Cologne Cathedral"
+        }
+      },
+      "descriptions": {
+        "en": {
+          "language": "en",
+          "value": "Roman-Catholic cathedral in Cologne, Germany"
+        }
+      },
+      "claims": {
+        "P149": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P149",
+              "hash": "dd808475c396b3649c12f483b0851dd5686669e7",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 176483,
+                  "id": "Q176483"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "q4176$6EA968C3-4269-42E6-A9FC-7C90E4A0B43F",
+            "rank": "normal"
+          }
+        ],
+        "P625": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P625",
+              "hash": "455609a6517e43d747cabdb9873204fb6d18c4de",
+              "datavalue": {
+                "value": {
+                  "latitude": 50.94138888888889,
+                  "longitude": 6.958333333333333,
+                  "altitude": null,
+                  "precision": 0.0002777777777777778,
+                  "globe": "http://www.wikidata.org/entity/Q2"
+                },
+                "type": "globecoordinate"
+              },
+              "datatype": "globe-coordinate"
+            },
+            "type": "statement",
+            "id": "q4176$A6323F75-AD71-468A-845A-DFB18B2CC8DC",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "fa278ebfc458360e5aed63d5058cca83c46134f1",
+                "snaks": {
+                  "P143": [
+                    {
+                      "snaktype": "value",
+                      "property": "P143",
+                      "hash": "e4f6d9441d0600513c4533c672b5ab472dc73694",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 328,
+                          "id": "Q328"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P143"
+                ]
+              }
+            ]
+          }
+        ],
+        "P18": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P18",
+              "hash": "191ea0833e0efbfb5a8ad6a5aa3571aae8fe439d",
+              "datavalue": {
+                "value": "Kölner Dom von Osten.jpg",
+                "type": "string"
+              },
+              "datatype": "commonsMedia"
+            },
+            "type": "statement",
+            "id": "Q4176$9f2e9ddb-4c53-9440-cc98-806f05e7f221",
+            "rank": "normal"
+          }
+        ],
+        "P31": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P31",
+              "hash": "cc8183eaa33271d2d09f1f7fa30dd87e19f09c22",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 56242215,
+                  "id": "Q56242215"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "type": "statement",
+            "id": "q4176$73600021-A9D4-470D-A477-98A3EDB92AE2",
+            "rank": "normal"
+          }
+        ],
+        "P2043": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P2043",
+              "hash": "1929248ad89c1080d47aacff074fc3c57152044b",
+              "datavalue": {
+                "value": {
+                  "amount": "+144.5",
+                  "unit": "http://www.wikidata.org/entity/Q11573"
+                },
+                "type": "quantity"
+              },
+              "datatype": "quantity"
+            },
+            "type": "statement",
+            "id": "Q4176$7e07a3b1-41b7-3977-6727-22219ae6f6a8",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "fa278ebfc458360e5aed63d5058cca83c46134f1",
+                "snaks": {
+                  "P143": [
+                    {
+                      "snaktype": "value",
+                      "property": "P143",
+                      "hash": "e4f6d9441d0600513c4533c672b5ab472dc73694",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 328,
+                          "id": "Q328"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P143"
+                ]
+              }
+            ]
+          }
+        ],
+        "P2049": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P2049",
+              "hash": "9d622a155a2da0f9f84407692889a1fa1ff935cb",
+              "datavalue": {
+                "value": {
+                  "amount": "+86.25",
+                  "unit": "http://www.wikidata.org/entity/Q11573"
+                },
+                "type": "quantity"
+              },
+              "datatype": "quantity"
+            },
+            "type": "statement",
+            "id": "Q4176$7b2b29be-4525-b6a4-7c63-fb4213e7f9c3",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "fa278ebfc458360e5aed63d5058cca83c46134f1",
+                "snaks": {
+                  "P143": [
+                    {
+                      "snaktype": "value",
+                      "property": "P143",
+                      "hash": "e4f6d9441d0600513c4533c672b5ab472dc73694",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 328,
+                          "id": "Q328"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P143"
+                ]
+              }
+            ]
+          }
+        ],
+        "P2048": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P2048",
+              "hash": "da92220911583c8d48981ab6464f29d779d09893",
+              "datavalue": {
+                "value": {
+                  "amount": "+157",
+                  "unit": "http://www.wikidata.org/entity/Q11573"
+                },
+                "type": "quantity"
+              },
+              "datatype": "quantity"
+            },
+            "type": "statement",
+            "qualifiers": {
+              "P518": [
+                {
+                  "snaktype": "value",
+                  "property": "P518",
+                  "hash": "d92bb7c59c395c24c280c5ba267617396cc342ee",
+                  "datavalue": {
+                    "value": {
+                      "entity-type": "item",
+                      "numeric-id": 200334,
+                      "id": "Q200334"
+                    },
+                    "type": "wikibase-entityid"
+                  },
+                  "datatype": "wikibase-item"
+                }
+              ]
+            },
+            "qualifiers-order": [
+              "P518"
+            ],
+            "id": "Q4176$8bb8b458-482f-fbdc-d97d-329eead76a6c",
+            "rank": "normal",
+            "references": [
+              {
+                "hash": "fa278ebfc458360e5aed63d5058cca83c46134f1",
+                "snaks": {
+                  "P143": [
+                    {
+                      "snaktype": "value",
+                      "property": "P143",
+                      "hash": "e4f6d9441d0600513c4533c672b5ab472dc73694",
+                      "datavalue": {
+                        "value": {
+                          "entity-type": "item",
+                          "numeric-id": 328,
+                          "id": "Q328"
+                        },
+                        "type": "wikibase-entityid"
+                      },
+                      "datatype": "wikibase-item"
+                    }
+                  ]
+                },
+                "snaks-order": [
+                  "P143"
+                ]
+              }
+            ]
+          }
+        ],
+        "P10689": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P10689",
+              "hash": "248b380f0e854718c54b48972feb268a90edb9eb",
+              "datavalue": {
+                "value": "4532022",
+                "type": "string"
+              },
+              "datatype": "external-id"
+            },
+            "type": "statement",
+            "id": "Q4176$9CDAEC59-43B8-4675-B7AD-9B94CDC6B106",
+            "rank": "normal"
+          }
+        ]
+      },
+      "sitelinks": {
+        "enwiki": {
+          "site": "enwiki",
+          "title": "Cologne Cathedral",
+          "badges": [],
+          "url": "https://en.wikipedia.org/wiki/Cologne_Cathedral"
+        }
+      }
+    }
+  }
+}

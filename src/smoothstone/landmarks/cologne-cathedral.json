@@ -1,0 +1,9 @@
+{
+  "styles": {"value": ["High Gothic"], "source": "https://whc.unesco.org/en/list/292/"},
+  "expected_height_m": {"value": 157, "source": "https://www.wikidata.org/wiki/Q4176#P2048"},
+  "west_spire_heights_m": {"value": [157.18, 157.22], "source": "https://www.koelner-dom.de/erleben/der-dom-in-zahlen"},
+  "west_facade_width_m": {"value": 61.54, "source": "https://www.koelner-dom.de/erleben/der-dom-in-zahlen"},
+  "west_portals": {"value": 3, "source": "https://commons.wikimedia.org/wiki/File:K%C3%B6lner_Dom_-_Westfassade_2022_ohne_Ger%C3%BCst-0968_b.jpg"},
+  "rose_width_ratio": {"value": 0, "source": "https://www.koelner-dom.de/en/tour/cologne-cathedral-and-the-jews/the-west-portal-window", "reason": "The central window is pointed, with vertical tracery."},
+  "spire_tracery": {"value": true, "source": "https://commons.wikimedia.org/wiki/File:K%C3%B6lner_Dom_-_Westfassade_2022_ohne_Ger%C3%BCst-0968_b.jpg"}
+}

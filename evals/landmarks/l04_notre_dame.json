@@ -1,0 +1,25 @@
+{
+  "id": "l04_notre_dame",
+  "request": "Print me Notre-Dame de Paris, about 19 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Notre-Dame de Paris",
+      "size": {
+        "mode": "long",
+        "mm": 190
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 96,
+        "source": "https://rebatirnotredamedeparis.fr/en/news/the-spire-of-notre-dame-de-paris-is-reborn",
+        "why": "Wikidata's height (P2048) for Q2981 is the 69 m west towers; the tallest point is the restored 96 m spire"
+      }
+    }
+  },
+  "why": "Check the proportions and likeness of the restored cathedral with its central spire."
+}
