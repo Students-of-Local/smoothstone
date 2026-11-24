@@ -110,7 +110,7 @@ card: read it when the question comes up, run the command, tell the person what 
 
 - Does it need supports, and where? `stone supports` (supports.md)
 - Will it fit the screw, bearing, shaft or lid? `stone fit` (fit.md)
-- Will it hold the load? `stone strength load=20N at=tip dir=down fixed=bottom` with the person's own load,
+- Will it hold the load? `stone strength load=3kg at=tip dir=down fixed=bottom` with the person's own load and unit (20N, 3kg, 5lb),
   the spot it pushes on and what holds the part, `fixed=holes` for screws through its holes (strength.md)
 - Will it survive a car, the sun, a dishwasher, or warp on the bed? `stone heat where=car` (heat.md)
 - How long will it take, and what will it look like printing? `stone timelapse` (timelapse.md)

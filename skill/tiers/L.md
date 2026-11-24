@@ -19,7 +19,8 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   Its defaults and every example must build and pass too (the grader runs tools/sheet.py on it).
 - A refused command refuses only that command: stone commands still run, so go on and build with stone.
 - Open views.png and look at every panel before you stop; if a panel shows a fault, say what and where, and fix it.
-- Stop when the request's part is built with stone and the build says Part ready.
+- Stop when the request's part is built with stone, the build says Part ready, and the checks below that fit the part
+  (load, heat, fit, ledge) ran.
 - Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. Parts go by name: jacket=black rest=white. You may change the mapping after looking at regions.png, and check colors.png after it.
 
 ## Research
@@ -57,9 +58,11 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   which one the answer depends on. A thicker part is a recipe change: stone set, build, run the check again.
 - stone timelapse shows the print and its time; stone timelapse --fail shows the predicted failure, a model and not
   a recording.
-- A failed print: doctor.md. Give stone doctor the person's words (and what you see with --image and --looks), let it
+- A failed print: doctor.md. Name no cause before stone does: pass on their answer
+  (stone doctor answer "<their answer>") with no word on what it means. Give stone doctor the person's words (and what you see with --image and --looks), let it
   rank the causes for that printer, read every SAFETY line, and record what worked. Never start, pause or
   cancel a print.
+- When NEXT says ask the person, ask that question in its own words and stop: no command in the same turn.
 
 ## Recipe format
 - recipe.scad: one assignment per parameter at the top, with a comment that gives the unit, then

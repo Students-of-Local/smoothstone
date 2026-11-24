@@ -9,7 +9,8 @@ recipe and the settings that make the part look its best, then let stone build a
 - After a FIX line, change only the parameter it names, then build again.
 - Keep the part to one piece that sits flat, unless the recipe makes two on purpose.
 - Open views.png and look at every panel before you stop; if a panel shows a fault, say what and where, and fix it.
-- Stop when stone build says Part ready, unless you want to change the look and build again.
+- Stop when stone build says Part ready, unless you want to change the look and build again, or the part carries a load
+  or lives in heat: then run that check first (below).
 - Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. Parts go by name: jacket=black rest=white.
 
 ## Research
@@ -45,13 +46,14 @@ recipe and the settings that make the part look its best, then let stone build a
 - Phone cases: the phone_case recipe has Apple's numbers for the iPhone 17, 17 Pro, 17 Pro Max and Air; set phone to the exact model the request names, and ask if it names none.
 
 ## Before it prints, and when a print fails
-- Questions about a part: stone supports, stone fit, stone strength load=20N at=tip dir=down fixed=bottom (the
-  person's load, the spot it pushes on, what holds it: fixed=holes for screws through its holes), stone heat where=car, stone timelapse, and
+- Questions about a part: stone supports, stone fit, stone strength load=3kg at=tip dir=down fixed=bottom (the
+  person's load in their own unit (20N, 3kg, 5lb), the spot it pushes on, what holds it: fixed=holes for screws through its holes), stone heat where=car, stone timelapse, and
   stone timelapse --fail (a model, not a recording: say so). Add a file path for an STL stone did not build.
   Read the command's card (strength.md and so on) the first time, and pass on the limits it prints.
 - For a part that carries a load or lives in heat, run the check before you call it done, even if not asked.
+  If they gave no weight or place, ask for it.
 - A failed print: follow doctor.md, starting with stone doctor "<their words>" (--image for a photo). Don't name a
-  cause before stone does. Read every SAFETY line. Never start, pause or cancel a print: tell the person that they do that.
+  cause before stone does: pass on their answer (stone doctor answer "<their answer>") with no word on what it means. Read every SAFETY line. Never start, pause or cancel a print: tell the person that they do that.
 - When NEXT says ask the person, ask that question in its own words and stop: no command in the same turn.
 
 ## Steps

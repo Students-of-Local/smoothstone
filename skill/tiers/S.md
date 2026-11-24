@@ -31,7 +31,8 @@ Follow its NEXT line. Stop when stone says the parts are ready.
    not placed yet, find the parameter in the list whose meaning fits and add name=value.
 4. stone set <recipe> name=value name=value
 5. stone build. If the build prints FIX, run the NEXT line it gives, then stone build again.
-   When every check passes, the build says Part ready. Then stop.
+   When every check passes, the build says Part ready. If the part holds something up (a hook, shelf, bracket), it is
+   not done yet: ask how heavy the thing is and stop. Their answer goes to stone strength (below). Else stop.
 
 ## Figures
 For a figure, statue or bust of a person, pet or thing, the recipe is figure. Set height and
@@ -42,7 +43,7 @@ stone build. The build takes a few minutes.
 Run the line, tell the person what it says, then run NEXT. For a file of theirs, add its path.
 - Does it need supports? stone supports
 - Will it fit? stone fit
-- Will it hold a weight? stone strength load=20N at=tip dir=down fixed=bottom, with their weight, the spot it
+- Will it hold a weight? stone strength load=3kg at=tip dir=down fixed=bottom, with their number and unit (20N, 3kg, 5lb), the spot it
   pushes on (at=) and what holds the part: fixed=holes for screws through its holes. If they gave no weight, ask.
 - Will it take the heat, or warp? stone heat where=car (or sun, dishwasher, outdoor, 70C)
 - How long, or what will it look like? stone timelapse
@@ -50,6 +51,9 @@ Run the line, tell the person what it says, then run NEXT. For a file of theirs,
 
 ## A print failed
 Do not guess the cause. First run: stone doctor "<their words>" (with a photo: add --image <file>), then the NEXT line.
+Their answer to its question: stone doctor answer "<their answer>" (not stone note), and no word on what it means:
+doctor says the cause. They say it is fixed: stone doctor fixed "<what worked>". They say yes to sharing: stone doctor
+share. stone sends nothing; they submit it.
 Read every SAFETY line to the person. Never start, pause or cancel a print: they do that.
 
 ## Example
