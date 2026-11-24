@@ -1,0 +1,12 @@
+{
+ "id": "d18_seam_line",
+ "said": "there's an ugly vertical line/scar running up one side of my cylinder where every layer starts",
+ "printer": "prusa_core_one",
+ "material": "PLA",
+ "expect": {
+  "top": "z_seam",
+  "top3_includes": [
+   "surface_zits"
+  ]
+ }
+}

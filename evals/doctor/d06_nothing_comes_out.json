@@ -1,0 +1,13 @@
+{
+ "id": "d06_nothing_comes_out",
+ "said": "the printer goes through the motions but nothing comes out of the nozzle at all, extruder is clicking",
+ "printer": "creality_k1c",
+ "material": "PLA",
+ "expect": {
+  "top": "clog",
+  "top3_includes": [
+   "feeder_grinding",
+   "heat_creep"
+  ]
+ }
+}

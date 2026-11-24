@@ -1,0 +1,12 @@
+{
+ "id": "d26_ams_tangle",
+ "said": "AMS throws an error that filament is stuck, the spool was tangled and it can't pull it",
+ "printer": "bambu_p1s",
+ "material": "PETG",
+ "expect": {
+  "top": "multi_material_feed",
+  "top3_includes": [
+   "feeder_grinding"
+  ]
+ }
+}

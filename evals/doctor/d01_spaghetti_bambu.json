@@ -1,0 +1,12 @@
+{
+ "id": "d01_spaghetti_bambu",
+ "said": "woke up to a giant bird nest of spaghetti on my P1S, the print is just gone and there's a mess of filament everywhere",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "spaghetti",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

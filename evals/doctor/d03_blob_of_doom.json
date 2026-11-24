@@ -1,0 +1,12 @@
+{
+ "id": "d03_blob_of_doom",
+ "said": "got the blob of doom :( whole hotend is encased in a ball of plastic, the silicone sock is buried",
+ "printer": "bambu_a1",
+ "material": "PETG",
+ "expect": {
+  "top": "blob_on_nozzle",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

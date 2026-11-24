@@ -1,0 +1,12 @@
+{
+ "id": "d08_elephant_foot",
+ "said": "bottom few layers bulge out, the base is wider than the rest so my parts don't fit together, classic elephant foot I guess",
+ "printer": "prusa_mini",
+ "material": "PETG",
+ "expect": {
+  "top": "elephant_foot",
+  "top3_includes": [
+   "first_layer"
+  ]
+ }
+}

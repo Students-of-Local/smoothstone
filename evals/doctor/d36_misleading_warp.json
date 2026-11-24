@@ -1,0 +1,12 @@
+{
+ "id": "d36_misleading_warp",
+ "said": "bed adhesion must be bad again: corners of my long PETG part lift and curl up as it gets taller, the middle stays stuck",
+ "printer": "anycubic_kobra_3",
+ "material": "PETG",
+ "expect": {
+  "top": "warping",
+  "top3_includes": [
+   "bed_adhesion"
+  ]
+ }
+}

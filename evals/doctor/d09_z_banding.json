@@ -1,0 +1,10 @@
+{
+ "id": "d09_z_banding",
+ "said": "there are regular horizontal lines/bands all the way up the side of my vase, evenly spaced every few mm, looks like z wobble",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "z_wobble",
+  "top3_includes": []
+ }
+}

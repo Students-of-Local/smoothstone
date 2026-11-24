@@ -1,0 +1,10 @@
+{
+ "id": "d37_misleading_wet",
+ "said": "my extruder must be bad, prints come out with a rough fuzzy surface and I hear little pops and hissing from the nozzle, filament has been sitting out for months",
+ "printer": "prusa_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "wet_filament",
+  "top3_includes": []
+ }
+}

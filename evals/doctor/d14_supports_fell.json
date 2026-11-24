@@ -1,0 +1,12 @@
+{
+ "id": "d14_supports_fell",
+ "said": "the tree supports fell over partway through and the overhang printed onto nothing",
+ "printer": "bambu_x1c",
+ "material": "PLA",
+ "expect": {
+  "top": "support_failure",
+  "top3_includes": [
+   "spaghetti"
+  ]
+ }
+}

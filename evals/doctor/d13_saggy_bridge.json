@@ -1,0 +1,12 @@
+{
+ "id": "d13_saggy_bridge",
+ "said": "the bridge between the two pillars sags in the middle and the strands hang down loose",
+ "printer": "anycubic_kobra_3",
+ "material": "PLA",
+ "expect": {
+  "top": "poor_bridging",
+  "top3_includes": [
+   "overhang_droop"
+  ]
+ }
+}
