@@ -433,3 +433,19 @@ def test_r2_two_photo_cases_in_one_second_keep_their_own_folders(work, monkeypat
     assert len(cases) == 2, cases
     assert (first[0] / "photo.jpg").read_bytes() == first_bytes  # the first photo was not overwritten
     assert json.loads((first[0] / "case.json").read_text())["id"] == first[0].name
+
+
+def test_r2_a_case_keeps_the_printer_it_was_opened_with(work):
+    stone("doctor", "--image", str(_photo(work / "a.jpg")), "--printer", "bambu_a1")
+    said = "The part came off the bed. It looks like the failure I had on my Creality K2 Plus."
+    text, code, nxt = stone("doctor", said)
+    assert text.splitlines()[0].endswith("Bambu Lab A1"), text
+    case_dir = next((work / "stone-job" / "doctor").glob("2*"))
+    assert json.loads((case_dir / "case.json").read_text())["printer"] == "bambu_a1"
+
+
+def test_r2_stone_printer_set_after_open_does_change_the_case(work):
+    stone("doctor", "--image", str(_photo(work / "a.jpg")), "--printer", "bambu_a1")
+    stone("printer", "set", "prusa_mk4s")  # the person set another printer on purpose
+    text, code, nxt = stone("doctor", "the part came off the bed")
+    assert text.splitlines()[0].endswith("Original Prusa MK4S"), text

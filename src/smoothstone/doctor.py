@@ -630,10 +630,15 @@ def _new(args, job, said: str, out):
     prior = open_case(job)
     reuse = prior if prior and prior.get("state") == "look" and not args.image and not args.camera else None
     named, clear = printer_named(said)
-    # the printer asked for, then a model the words name clearly ("Creality K2 Plus", "mk4s"), then the one
-    # a photo's case was opened with, then the one set with stone printer set, then a guess
+    # the printer asked for, then the one the case was opened with (only stone printer set since then
+    # replaces it; a printer the words mention is not this one), then a model the words name clearly
+    # ("Creality K2 Plus", "mk4s"), then the one set with stone printer set, then a guess
+    cur = printers.current(job.root)
+    cur_id = cur["id"] if cur else None
     kept = printers.get((reuse or {}).get("printer"))
-    p = p or (named if clear else None) or kept or printers.current(job.root) or named
+    if reuse and cur and cur_id != reuse.get("printer_set"):
+        kept = cur
+    p = p or kept or (named if clear else None) or cur or named
     material = (args.material or find_material(said) or (reuse or {}).get("material") or "").upper() or None
     now = _dt.datetime.now()
     case = reuse or {"id": new_case_id(job, now), "created": now.isoformat(timespec="seconds"),
@@ -663,7 +668,7 @@ def _new(args, job, said: str, out):
         else:
             case["image"] = str(save_photo(frame, frame))
             case["camera"] = {"name": device["name"], "model": device.get("model")}
-    case.update(said=said, printer=p["id"] if p else None, material=material)
+    case.update(said=said, printer=p["id"] if p else None, printer_set=cur_id, material=material)
     d = diagnose(said, p, material) if said else {"failures": []}
     head = f"Case {case['id']}" + (f", {p['name']}" if p else "") + (f", {material}" if material else "")
     if not d["failures"]:
