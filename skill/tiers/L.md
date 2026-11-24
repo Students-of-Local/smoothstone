@@ -19,7 +19,9 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   Its defaults and every example must build and pass too (the grader runs tools/sheet.py on it).
 - A refused command refuses only that command: stone commands still run, so go on and build with stone.
 - Open views.png and look at every panel before you stop; if a panel shows a fault, say what and where, and fix it.
-- Stop when the request's part is built with stone and the build says Part ready.
+- Stop when the request's part is built with stone, the build says Part ready, and the checks below that fit the part
+  (load, heat, fit, ledge) ran, or the person can't give the number: ask once, then reply that the part is built and
+  that is not checked.
 - Colors: if the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. Parts go by name: jacket=black rest=white. You may change the mapping after looking at regions.png, and check colors.png after it.
 
 ## Research
@@ -48,6 +50,20 @@ You can drive stone like tier M, and you can also write new recipes when no reci
   and makes it the job's part; stone build scales, measures thin features, cuts it to the bed with
   pins and checks each part (src/smoothstone/modelprint.py). build/model/parts.json has every cut,
   pin and check. Never pass a found model off as stone's own: credits.txt goes with it.
+
+## Before it prints, and when a print fails
+- A part that carries a load, lives in heat, fits something or has a ledge: run stone strength, stone heat,
+  stone fit or stone supports before you call it done, with the person's own load and place. Ask for a number you
+  don't have. Read the command's card for what it models, and pass on the limits it prints.
+- A change that helps (walls, infill, orientation, material) is a slicer setting or the person's choice: tell them
+  which one the answer depends on. A thicker part is a recipe change: stone set, build, run the check again.
+- stone timelapse shows the print and its time; stone timelapse --fail shows the predicted failure, a model and not
+  a recording.
+- A failed print: doctor.md. Name no cause before stone does: when they answer its question, run
+  stone doctor answer "<their answer>" and say nothing about what it means, not even probably. Give stone doctor
+  the person's words (and what you see with --image and --looks), let it rank the causes for that printer, read every SAFETY line, and record what worked. Never start, pause or
+  cancel a print.
+- When NEXT says ask the person, ask that question in its own words and stop: no command in the same turn.
 
 ## Recipe format
 - recipe.scad: one assignment per parameter at the top, with a comment that gives the unit, then

@@ -2172,6 +2172,17 @@ def cmd_strength(args, job: Job) -> Out:
     return out
 
 
+def cmd_heat(args, job: Job) -> Out:
+    """Will it keep its shape where it lives, and will it warp on the bed."""
+    from . import heat
+
+    out = Out(owns_next=False)
+    plan = job.plan() if job.exists() else None
+    pick = reftool.material_for(job.request(), rc.load(plan["recipe"]), plan["params"]) if plan else None
+    heat.report(job, args.items, out, pick.info.name if pick else "")
+    return out
+
+
 def cmd_video(args, job: Job) -> Out:
     """A vertical clip of a finished painted job for X, from the run log of the model that made it.
     The log defaults to log.json beside the job folder, where evals/run.py writes it."""
@@ -3422,6 +3433,10 @@ def make_parser() -> Parser:
     s.add_argument("--bed-corners", help='the bed corners in that snapshot: "x1,y1 x2,y2 x3,y3 x4,y4"')
     s.add_argument("--snap-at", type=float, help="the printer's Z (or Y, on a bed-slinger) in mm when the snapshot was taken")
     s.add_argument("--save-camera", action="store_true", help="keep the fitted camera for every job")
+    s.add_argument("--fail", nargs="?", const="auto",
+                   help="the print failing as physics says (a model): auto, or a what-if: supports, detach, droop, bridge")
+    s.add_argument("--plate", choices=("clean", "dirty"), default="clean", help="for --fail: the plate's state")
+    s.add_argument("--material", help="for --fail: PLA, PETG or ABS; default: the job's material")
 
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
@@ -3453,6 +3468,9 @@ def make_parser() -> Parser:
     s.add_argument("topic", nargs="*")
 
     s = sub.add_parser("strength", parents=[common], help="will it hold: stone strength load=20N at=tip dir=down fixed=bottom")
+    s.add_argument("items", nargs="*")
+
+    s = sub.add_parser("heat", parents=[common], help="will it take the heat: stone heat where=car|sun|dishwasher|outdoor|70C")
     s.add_argument("items", nargs="*")
 
     sub.add_parser("done", parents=[common], help="finish the job")
@@ -3526,6 +3544,7 @@ COMMANDS = {
     "product": cmd_product,
     "refs": cmd_refs,
     "strength": cmd_strength,
+    "heat": cmd_heat,
     "done": cmd_done,
     "colors": cmd_colors,
     "video": cmd_video,
