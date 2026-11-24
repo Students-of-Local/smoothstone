@@ -23,6 +23,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import zlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -558,9 +559,42 @@ def turntable(npz: Path, out: Path, frames: int = TURN, log=None, size=None) -> 
 
 # ---- the timeline ----------------------------------------------------------------------------------
 
+class Reel:
+    """The clip's frames in order, each kept as zlib-packed RGB bytes (a 1080 x 1920 frame is 6.2 MB
+    raw, a series clip about 950 of them). A frame repeated by hold() shares one packed copy."""
+
+    def __init__(self):
+        self._packed: list[bytes] = []
+        self._im = None  # the image packed last, so a held frame is packed once
+
+    def append(self, im):
+        if im is not self._im or not self._packed:
+            self._packed.append(zlib.compress(im.tobytes(), 1))
+            self._im = im
+        else:
+            self._packed.append(self._packed[-1])
+
+    def __len__(self):
+        return len(self._packed)
+
+    def raw(self):
+        """Each frame's rgb24 bytes, unpacked one at a time."""
+        for b in self._packed:
+            yield zlib.decompress(b)
+
+    def __getitem__(self, i):
+        from PIL import Image
+
+        return Image.frombytes("RGB", (W, H), zlib.decompress(self._packed[i]))
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
+
 @dataclass
 class Shots:
-    frames: list = field(default_factory=list)  # PIL images, in order
+    frames: Reel = field(default_factory=Reel)  # in order, packed; len() counts them
     faults: list[str] = field(default_factory=list)
     taps: list[float] = field(default_factory=list)
     marks: dict = field(default_factory=dict)  # name -> first frame of a card
@@ -902,15 +936,15 @@ def ffprobe() -> str:
     return f
 
 
-def encode(frames: list, wav: Path, out: Path, total: float):
+def encode(frames, wav: Path, out: Path, total: float):
     """H.264 yuv420p at 30 fps with faststart, AAC 48 kHz at -16 LUFS (two-pass loudnorm)."""
     silent = out.with_suffix(".silent.mp4")
     p = subprocess.Popen([ffmpeg(), "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
                           "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "18",
                           "-preset", "slow", "-pix_fmt", "yuv420p", str(silent)], stdin=subprocess.PIPE)
     try:
-        for im in frames:
-            p.stdin.write(im.tobytes())
+        for raw in (frames.raw() if isinstance(frames, Reel) else (im.tobytes() for im in frames)):
+            p.stdin.write(raw)
         p.stdin.close()
     except OSError:  # the encoder died mid-write (a broken pipe)
         p.kill()
