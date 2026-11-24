@@ -30,6 +30,8 @@ def load() -> dict[str, dict]:
     out: dict[str, dict] = {}
     for f in FILES:
         for e in json.loads((refs_dir() / f"{f}.json").read_text())["entries"]:
+            if e["id"] in out:  # one id, one fact: a second would silently replace the first
+                raise ValueError(f"refs id {e['id']} is in both {out[e['id']]['file']}.json and {f}.json")
             out[e["id"]] = {**e, "file": f}
     return out
 
@@ -426,7 +428,7 @@ def strength_material(word: str) -> str | None:
     m = re.fullmatch(r"(pla|petg)-?(cf|carbon(-fiber)?)", w)
     if m:
         return m.group(1).upper() + "-CF"
-    named = named_material(w)
+    named = named_material(re.sub(r"[-_\s]+", " ", (word or "").strip().lower()))  # its patterns read spaces: pc blend, pa 11
     return {"PLA+": "PLA"}.get(named, named) if named else None
 
 

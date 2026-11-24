@@ -3,6 +3,7 @@
 import json
 import re
 
+import numpy as np
 import pytest
 
 from smoothstone import refs
@@ -38,7 +39,7 @@ def test_a_measured_number_is_in_its_quote():
     """A typo in the data (or a swapped column) shows: the value used and every other maker's value is in its quote."""
     checked = 0
     for e in DATA:
-        if e.get("assumption") or not isinstance(e["value"], (int, float)) or e["key"] in ("shrink", "hdt_modulus"):
+        if e.get("assumption") or not isinstance(e["value"], (int, float)) or e["key"] == "shrink":
             continue
         if e["id"] == "tpu.density":  # the sheet gives 1.20-1.24; the middle is used
             continue
@@ -72,8 +73,28 @@ def test_retention_curves_start_at_one_and_run_up_in_temperature():
     assert refs.get("pc.modulus_vs_temp")["assumption"]
 
 
+def _at(name: str, temp: float) -> float:
+    """Stiffness ratio at temp, linear between points, never rising (a DMA bump is not credited)."""
+    pts = refs.props(name)["modulus_vs_temp"]["value"]
+    return float(np.interp(temp, [t for t, _ in pts], np.minimum.accumulate([r for _, r in pts])))
+
+
+def test_derived_curves_keep_what_measured_curves_keep_at_hdt():
+    """A curve built by assumption (PC, the CF grades) keeps, at its own HDT, a share of stiffness inside the
+    range the measured DMA curves keep at theirs (0.10 ASA to 0.62 PLA), give or take 0.05."""
+    measured, derived = {}, {}
+    for name in NINE:
+        p = refs.props(name)
+        if "modulus_vs_temp" in p and "hdt_045" in p:
+            (derived if p["modulus_vs_temp"].get("assumption") else measured)[name] = _at(name, p["hdt_045"]["value"])
+    assert len(measured) >= 5 and set(derived) >= {"PC", "PLA-CF", "PETG-CF"}
+    lo, hi = min(measured.values()), max(measured.values())
+    for name, r in derived.items():
+        assert lo - 0.05 <= r <= hi + 0.05, (name, r, lo, hi)
+    assert _at("PC", 80) > 0.5  # glassy: most of its stiffness well below its HDT of 111 C
+
+
 def test_derived_numbers_follow_their_formula():
-    assert refs.get("any.hdt_modulus")["value"] == round(800 * 0.45 / 1.82)
     for name in NINE:
         p = refs.props(name)
         if "shrink" in p:
@@ -87,6 +108,24 @@ def test_material_words():
     assert refs.strength_material("nylon") == "PA"
     assert refs.strength_material("PLA+") == "PLA"
     assert refs.strength_material("wood") is None
+    assert refs.strength_material("PC Blend") == "PC"
+    assert refs.strength_material("PA 11") == "PA"
+    assert refs.strength_material("pa 12") == "PA"
+
+
+def test_an_id_in_two_files_is_an_error(tmp_path, monkeypatch):
+    for f in refs.FILES:
+        (tmp_path / f"{f}.json").write_text(json.dumps({"entries": []}))
+    one = {"id": "pla.tg", "value": 60}
+    (tmp_path / "filament.json").write_text(json.dumps({"entries": [one]}))
+    (tmp_path / "materials.json").write_text(json.dumps({"entries": [one]}))
+    monkeypatch.setattr(refs, "refs_dir", lambda: tmp_path)
+    refs.load.cache_clear()
+    try:
+        with pytest.raises(ValueError, match="pla.tg is in both filament.json and materials.json"):
+            refs.load()
+    finally:
+        refs.load.cache_clear()
 
 
 def test_stone_refs_shows_printed_strength(jobenv):

@@ -2103,34 +2103,68 @@
    "assumption": "Chopped carbon fiber stiffens PETG but the glass transition of the PETG matrix sets where it softens (the PETG-CF sheets give Tg and HDT within a few C of PETG), so the PETG retention curve is used."
   },
   {
-   "id": "any.hdt_modulus",
-   "topic": "materials",
-   "material": "ANY",
-   "key": "hdt_modulus",
-   "value": 198,
-   "unit": "MPa",
-   "note": "Modulus a part has at its HDT at 0.45 MPa: 800 MPa x 0.45 / 1.82.",
-   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
-   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
-   "cite": "Materials 2026 19:369, Takemori HDT rule",
-   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
-   "checked": "2026-11-24",
-   "assumption": "ISO 75 stops at a fixed deflection, so the modulus at HDT scales with the test stress; 0.45 / 1.82 of 800 MPa is 198 MPa. Stone uses it as the last point of a retention curve where no DMA curve is sourced."
-  },
-  {
    "id": "pc.modulus_vs_temp",
    "topic": "materials",
    "material": "PC",
    "key": "modulus_vs_temp",
-   "value": "from hdt",
+   "value": [
+    [
+     20,
+     1.0
+    ],
+    [
+     31,
+     1.0
+    ],
+    [
+     41,
+     0.997
+    ],
+    [
+     51,
+     0.974
+    ],
+    [
+     61,
+     0.884
+    ],
+    [
+     71,
+     0.739
+    ],
+    [
+     81,
+     0.57
+    ],
+    [
+     91,
+     0.415
+    ],
+    [
+     101,
+     0.297
+    ],
+    [
+     111,
+     0.267
+    ],
+    [
+     121,
+     0.222
+    ],
+    [
+     131,
+     0.087
+    ]
+   ],
    "unit": "ratio",
-   "note": "No DMA of printed PC found. Stone builds the curve from two points: 1.0 at 23 C and any.hdt_modulus / e_xy at hdt_045.",
-   "quote": "The heat distortion temperature (HDT) at 1.82 MPa (HDT-A) was determined as the temperature at which the storage modulus reached 800 MPa, in accordance with the Takemori assumption",
-   "source": "Validation of Filament Materials for Injection Moulding 3D-Printed Inserts Using Temperature and Cavity Pressure, Materials 2026, 19(2), 369, section 3.1, after Takemori, Polym Eng Sci 1979 19:1104",
-   "cite": "Materials 2026 19:369, Takemori HDT rule",
-   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12842723/",
+   "note": "No DMA of printed PC found. Stone gives PC the shape of the three printed amorphous curves in this file (PETG, ABS, ASA), each read at the same distance from its own HDT at 0.45 MPa and averaged, placed on PC's HDT (111 C). PC keeps 0.27 at its HDT; the measured curves keep 0.47, 0.23 and 0.10 at theirs (PLA 0.62).",
+   "quote": "Figure 17. Storage and loss modulus of PETG-100-030-DMA samples. Figure 20. Storage and loss modulus of ABS-100-030-DMA samples. Figure 21. Storage and loss modulus of ASA-100-030-DMA samples.",
+   "source": "Mikula et al., Wear and Dynamic Mechanical Analysis (DMA) of Samples Produced via Fused Deposition Modelling (FDM) 3D Printing Method, Polymers 2024, 16(21), 3018",
+   "cite": "Polymers 2024 16:3018 DMA of printed samples",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11548368/",
    "checked": "2026-11-24",
-   "assumption": "Straight line in log(modulus) between 23 C and the HDT point; past the HDT stone gives no number and says the part softens."
+   "assumption": "Printed amorphous plastics lose stiffness on the same path measured from their HDT, so PC follows the mean of the PETG, ABS and ASA retention curves shifted to its HDT (points every 10 C, HDT - 80 to HDT + 20)."
   },
   {
    "id": "pla.cte",
