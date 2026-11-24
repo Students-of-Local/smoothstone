@@ -574,6 +574,7 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     import trimesh
 
     from .job import write_json
+    from .strengthview import picture
 
     case, file, bad = parse(items)
     if bad:
@@ -622,6 +623,7 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
         "material": {"e_xy": props.e_xy, "e_z": props.e_z, "s_xy": props.s_xy, "s_z": props.s_z, "refs": props.ids},
         "advice": [{k: (round(v, 2) if k == "sf" else v) for k, v in a.items()} for a in advice],
         "model": res.info, "assumptions": ASSUMPTIONS})
+    picture(st, res, bd / "strength.png")
     size = mesh.bounds[1] - mesh.bounds[0]
     up = "as printed" if case.build == 2 else f"{'xyz'[case.build]} axis up on the bed"
     out.add(f"Part: {f.name}, {size[0]:.0f} x {size[1]:.0f} x {size[2]:.0f} mm, {props.name}, {case.walls} walls, "
@@ -639,7 +641,7 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
         out.add(("This holds only" if res.sf >= 1 else "This answer is") + " for a print with " + ", ".join(changed) + "; tell the person.")
     i = res.info
     out.add(f"Model: {i['voxels']:,} voxels of {i['pitch_mm']} mm, solved in {i['seconds']:.0f} s; linear, untested by a real "
-            "break; assumptions in strength.json.")
+            "break; assumptions in strength.json.", f"Picture: {bd / 'strength.png'}")
     sf = shown(res.sf)
     out.result = f"strength: safety factor {sf} at {case.load:.0f} N"
     nxt = (job.status().get("next") or "stone status") if own else "none, the part holds"
