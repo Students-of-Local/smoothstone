@@ -1,0 +1,16 @@
+{
+  "id": "r8_milan_pinnacles",
+  "request": "Print me Milan Cathedral, about 20 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Milan Cathedral",
+      "size": {"mode": "long", "mm": 200},
+      "bed": [220, 220, 220],
+      "features": {
+        "pinnacle": {"count": 135, "in_mesh": 134, "source": "https://www.duomomilano.it/en/art-and-culture/the-terraces/"}
+      }
+    }
+  },
+  "why": "The likeness judge marked the first model down: the real roof has 135 spires and ours had fewer, thicker ones (54 labels, 50 standing in the mesh)."
+}

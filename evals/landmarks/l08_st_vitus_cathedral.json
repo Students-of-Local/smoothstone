@@ -1,0 +1,27 @@
+{
+  "id": "l08_st_vitus_cathedral",
+  "request": "Can you make me a print of St. Vitus Cathedral in Prague, about 19 cm long?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "St. Vitus Cathedral",
+      "size": {"mode": "long", "mm": 190},
+      "bed": [220, 220, 220],
+      "features": {"west_spire": {"count": 2}, "main_tower": {"count": 1, "tallest": true}},
+      "tallest": {
+        "m": 96.5,
+        "source": "https://prague.eu/en/objevujte/prague-castle-cathedral-of-st-vitus-st-wenceslas-and-st-adalbert-katedrala-sv-vita-vaclava-a-vojtecha",
+        "why": "Prague City Tourism gives the main tower height as 96.5 m. Wikipedia gives 102.8 m and Wikidata has no height claim."
+      },
+      "references": {
+        "identity": "https://www.wikidata.org/wiki/Q5949",
+        "footprint": "https://www.openstreetmap.org/way/1568419039",
+        "architecture": "https://en.wikipedia.org/wiki/St._Vitus_Cathedral",
+        "length_m": {"value": 124, "source": "https://en.wikipedia.org/wiki/St._Vitus_Cathedral"},
+        "width_m": {"value": 60, "source": "https://en.wikipedia.org/wiki/St._Vitus_Cathedral"},
+        "west_spire_height_m": {"value": 82, "source": "https://en.wikipedia.org/wiki/St._Vitus_Cathedral"}
+      }
+    }
+  },
+  "why": "The two Gothic west spires frame the rose window. The taller, differently shaped south tower stands beside the crossing."
+}

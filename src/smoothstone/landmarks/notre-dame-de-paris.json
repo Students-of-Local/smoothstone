@@ -11,5 +11,13 @@
   "nave_roof_rise_m": {"value": 10, "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-roof-structure/"},
   "nave_roof_width_m": {"value": 13, "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-roof-structure/"},
   "spire_height_m": {"value": 96, "source": "https://rebatirnotredamedeparis.fr/en/news/the-spire-of-notre-dame-de-paris-is-reborn"},
-  "spire_base_span_m": {"value": [15, 13], "source": "https://rebatirnotredamedeparis.fr/en/news/launch-of-the-reconstruction-of-the-spire", "reason": "Internal timber base length and width at the crossing."}
+  "spire_base_span_m": {"value": [15, 13], "source": "https://rebatirnotredamedeparis.fr/en/news/launch-of-the-reconstruction-of-the-spire", "reason": "Internal timber base length and width at the crossing."},
+  "crossing_spire_stages": {"value": {"spring_m": 49, "profile": [[0, 1], [0.10, 0.92], [0.16, 1], [0.21, 0.69], [0.35, 0.66], [0.40, 0.78], [0.48, 0.52], [0.58, 0.47], [0.78, 0.29], [0.92, 0.15], [1, 0]]}, "source": "https://rebatirnotredamedeparis.fr/en/news/the-spire-of-notre-dame-de-paris-is-reborn", "reason": "The approximate visible profile follows the rebuilt spire's base, enclosed upper gallery and pointed termination. The top remains 96 m."},
+  "annex_roofs": {"value": [{"osm_id": 1340842277, "ridge_m": 19, "eave_m": 13.5, "shape": "gabled"}], "source": "https://www.e-rara.ch/zut/download/pdf/2631021", "reason": "Plate 78 by Lassus and Viollet-le-Duc shows pitched sacristy roof sections. Heights are estimated from the graphic scale."},
+  "plinth_follows_plan": {"value": true, "source": "https://www.openstreetmap.org/way/201611261", "reason": "Trace the mapped building and annex instead of filling the footprint's convex envelope."},
+  "flying_buttress_survey": {"value": {"aisle_eave_m": 18}, "source": "https://www.notredamedeparis.fr/en/understand/architecture/exterior-architecture/", "reason": "Single-flight supports spanning the side galleries. The aisle exterior ridge follows the 18 m spring of the mapped buttress roofs; interior aisle vaults are lower."},
+  "transept_span_m": {"value": 48, "source": "https://www.notredamedeparis.fr/comprendre/architecture/plans/"},
+  "transept_rose_m": {"value": 13.1, "source": "https://www.notredamedeparis.fr/comprendre/architecture/plans/"},
+  "west_gallery_bands": {"value": [[20, 3.5, 28, 0.90], [42, 4.3, 13, 0.92]], "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-western-facade/", "reason": "The 28 niches of the Gallery of Kings and upper arcade are represented at approximate levels from the surveyed west elevation. Lower niches merge by twos at desktop scale."},
+  "west_tower_windows": {"value": [[46.5, 17.5, 2, 0.30, 0.16]], "source": "https://www.notredamedeparis.fr/en/understand/architecture/the-western-facade/", "reason": "Two pointed belfry openings in each square west tower; elevation and width estimated from the facade survey."}
 }

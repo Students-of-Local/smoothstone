@@ -5,8 +5,10 @@
   "west_tower_m": {"value": 67, "source": "https://www.wikidata.org/wiki/Q173882#P2048"},
   "nave_ridge_m": {"value": 36, "source": "https://www.cityoflondon.gov.uk/assets/Services-Environment/planning-spd-protected-views-spd-2012.pdf"},
   "dome_peristyle_base_m": {"value": 42, "source": "https://www.cityoflondon.gov.uk/assets/Services-Environment/planning-spd-protected-views-spd-2012.pdf"},
+  "dome_peristyle": {"value": [42, 52, 32], "source": "https://www.stpauls.co.uk/wren-office-drawings", "reason": "The cathedral archive gives 32 columns. The base is 42 m in the City survey. The mapped column stage ends at 52 m."},
   "dome_base_m": {"value": 65.5, "source": "https://www.cityoflondon.gov.uk/assets/Services-Environment/planning-spd-protected-views-spd-2012.pdf"},
   "dome_crown_m": {"value": 84.8, "source": "https://www.cityoflondon.gov.uk/assets/Services-Environment/planning-spd-protected-views-spd-2012.pdf"},
   "dome_diameter_m": {"value": 34, "source": "https://www.wikidata.org/wiki/Q173882#P2386"},
+  "lantern_body": {"value": [86, 95, 0.24], "source": "https://www.cityoflondon.gov.uk/assets/Services-Environment/R0220-St-Pauls-Cathedral-Part5.pdf", "reason": "Square tempietto with four porticos. Stage heights follow OSM. Its width is approximated from the survey elevation relative to the lead dome."},
   "west_tower_count": {"value": 2, "source": "https://www.stpauls.co.uk/6-western-towers-c-1685-1710"}
 }

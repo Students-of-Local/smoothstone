@@ -6,5 +6,7 @@
   "deck_widths_m": {"value": [70.695, 37.63, 18.65], "source": "https://www.e-rara.ch/zut/download/pdf/2595721", "reason": "Widths in the period elevation, with the second width taken at the structural frame."},
   "foot_width_m": {"value": 25, "source": "https://www.toureiffel.paris/fr/le-monument/chiffres-cle"},
   "arch_height_m": {"value": 39.4, "source": "https://www.e-rara.ch/zut/download/pdf/2595721"},
+  "arch_band_ratio": {"value": 0.19, "source": "https://www.toureiffel.paris/en/the-monument/history", "reason": "Approximate thickness of the paired chords relative to the clear spring-to-crown rise from the operator's elevation and construction photographs."},
+  "summit_profile": {"value": [[289, 0.91], [302, 0.52], 0.28, 324], "source": "https://www.toureiffel.paris/en/news/history-and-culture/300-330-meters-story-towers-height", "reason": "Rounded roof levels and width fractions relative to the third deck, estimated from the operator's historical and modern summit photographs. The 324 m level precedes the latest antenna addition."},
   "historic_top_m": {"value": 312, "source": "https://www.toureiffel.paris/fr/le-monument/chiffres-cle"}
 }
