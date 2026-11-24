@@ -99,6 +99,29 @@ def test_shell_is_solid_skin_over_infill():
     assert abs(skin - (1 - (18 / 20) ** 3)) < 0.03, skin  # 1 mm skin of a 20 mm cube
 
 
+@pytest.mark.parametrize("build", [0, 1, 2])
+def test_caps_set_the_bottom_and_top_whatever_the_walls(build):
+    g = fea.voxelize(trimesh.creation.box(extents=[20, 20, 20]), 0.5)
+    full = np.zeros(g.shape)
+    full[g.solid] = fea.shell(g, 3.0, 0.15, caps=(0.5, 1.5), build=build)[0]
+    up = np.moveaxis(full, build, 0)
+    n = g.solid.shape[build]
+    core = up[:, up.shape[1] // 2, up.shape[2] // 2]
+    core = core[np.moveaxis(g.solid, build, 0)[:, up.shape[1] // 2, up.shape[2] // 2]]
+    assert np.allclose(core[[0, -1, -2, -3]], 1) and np.allclose(core[1:-3], 0), (n, core)
+    side = up[n // 2, :, up.shape[2] // 2]
+    assert np.isclose(side.sum(), 2 * 3.0 / 0.5)  # 3 mm of wall on each side of the layer
+
+
+def test_face_stress_reads_the_bending_peak_a_cell_center_misses():
+    """5 cells across the beam: a cell center sits at 4/5 of the outer fiber's stress, its face on the fiber."""
+    g, mdl, u, _, _, _ = cantilever(2.0)
+    mid = np.abs(g.centers()[:, 0] - 51) < 0.1
+    want = 6 * P * (100 - 51) / (10 * 10 ** 2)
+    center, face = mdl.stress(u)[mid, 0].max(), mdl.face_stress(u)[mid, :, 0].max()
+    assert center < 0.85 * want and abs(face / want - 1) < 0.05, (center, face, want)
+
+
 @pytest.mark.timing
 def test_about_200k_voxels_solve_inside_a_minute():
     g, _, _, tip, info, _ = cantilever(10 / 28)  # a whole number of cells across, so the beam keeps its size
