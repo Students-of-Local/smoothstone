@@ -7,12 +7,12 @@ softened stiffness and strength. Modeling choices are marked "assumption".
 
 from __future__ import annotations
 
-import math
 import re
 from pathlib import Path
 
 import numpy as np
 
+from . import printers
 from . import refs as reftool
 from . import strength
 
@@ -42,17 +42,15 @@ def service(word: str) -> tuple[float, str, str | None]:
     m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*c?", w)
     if not m:
         raise ValueError(word)
-    return float(m.group(1)), f"{float(m.group(1)):g} C", None
+    return float(m.group(1)), "the spot it lives in", None
 
 
 def curve(name: str) -> list[tuple[float, float]] | None:
-    """Stiffness ratio to room temperature against C, running minimum. PC: log-linear from 23 C to the HDT point."""
+    """Stiffness ratio to room temperature against C, running minimum (a rise in a DMA curve is not credited)."""
     p = reftool.props(name)
     e = p.get("modulus_vs_temp")
     if not e:
         return None
-    if e["value"] == "from hdt":
-        return [(ROOM, 1.0), (float(p["hdt_045"]["value"]), reftool.get("any.hdt_modulus")["value"] / p["e_xy"]["value"])]
     pts = sorted((float(t), float(r)) for t, r in e["value"])
     low = np.minimum.accumulate([r for _, r in pts])
     return [(t, float(r)) for (t, _), r in zip(pts, low)]
@@ -64,11 +62,6 @@ def retention(name: str, temp: float) -> float | None:
     if c is None:
         return None
     ts, rs = zip(*c)
-    if reftool.props(name)["modulus_vs_temp"]["value"] == "from hdt":  # straight in log(modulus)
-        if temp <= ts[0]:
-            return 1.0
-        f = min((temp - ts[0]) / (ts[1] - ts[0]), 1.0)
-        return math.exp(f * math.log(rs[1]))
     return float(np.interp(temp, ts, rs))
 
 
@@ -138,16 +131,11 @@ def _area(loops: list[np.ndarray], h: float = 0.2) -> float:
 
 
 def printer_enclosed(job) -> tuple[bool | None, str]:
-    """`enclosed` from the job's printer profile (src/smoothstone/printers), when that module exists."""
-    try:
-        from . import printers  # type: ignore[attr-defined]
-
-        p = printers.current(job.root)
-    except (ImportError, AttributeError, OSError, ValueError):
-        return None, ""
+    """`enclosed` from the printer profile stone.toml names (stone printer), for the job or the machine."""
+    p = printers.current(job.root if job.exists() else None)
     if not p or "enclosed" not in p:
         return None, ""
-    return bool(p["enclosed"]), p.get("name", "the printer profile")
+    return bool(p["enclosed"]), f"printer profile {p.get('name', p.get('id', ''))}"
 
 
 def report(job, items: list[str], out, plan_material: str = "") -> None:
@@ -207,11 +195,11 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
         flag = "too hot" if margin <= 0 else ("close" if margin < CREEP_BAND else "fine")
         why = (f"past the {hdt:g} C where {name} softens" if margin <= 0 else
                f"within {CREEP_BAND:g} C of the {hdt:g} C where {name} softens" if margin < CREEP_BAND else "")
-        lines.append(f"{words.capitalize()}: {temp:g} C. {name} softens at {hdt:g} C (HDT at 0.45 MPa), glass at {tg:g} C: "
+        lines.append(f"{words[0].upper() + words[1:]}: {temp:g} C. {name} softens at {hdt:g} C (HDT at 0.45 MPa), glass at {tg:g} C: "
                      + (f"{-margin:g} C past it, it will soften and bend." if margin <= 0 else f"{margin:g} C to spare."))
     else:
         v = p.get("vicat", {}).get("value")
-        lines.append(f"{words.capitalize()}: {temp:g} C. {name} has no HDT; it softens toward {v} C (Vicat).")
+        lines.append(f"{words[0].upper() + words[1:]}: {temp:g} C. {name} has no HDT; it softens toward {v} C (Vicat).")
     if r is not None:
         kept = f"{r:.0%}" if r >= 0.01 else "under 1%"
         lines.append(f"At {temp:g} C {name} keeps {'about ' if r >= 0.01 else ''}{kept} of its stiffness and strength.")
@@ -247,7 +235,7 @@ def report(job, items: list[str], out, plan_material: str = "") -> None:
     share = f", {clamp / hot_s:.0%} of its hot strength" if (r is None or r >= 0.1) else "; this soft it bends instead"
     lines.append(f"Expansion: it grows {grow:.2f} mm over its {longest:.0f} mm; held tight at both ends it pushes with "
                  f"{clamp:.1f} MPa{share}.")
-    found, src = printer_enclosed(job) if job.exists() else (None, "")
+    found, src = printer_enclosed(job)
     if enclosed is None:
         enclosed, src = (found, src) if found is not None else (False, "assumed open; say enclosed=yes")
     else:

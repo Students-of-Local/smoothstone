@@ -18,7 +18,7 @@ If `stone strength` ran first, its load is used again. To give one here, add the
 `load=20N at=tip dir=down fixed=bottom`.
 
 Optional: `material=ASA` (else the job's pick), `enclosed=yes` when the printer has a closed
-case (else stone uses the printer profile, or takes it as open), `bed=60` (bed temperature, C).
+case (else the printer `stone printer` set, or open), `bed=60` (bed temperature, C).
 
 ## 2. Read the answer
 

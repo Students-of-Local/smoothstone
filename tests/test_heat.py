@@ -25,10 +25,11 @@ def test_derating_hits_the_sourced_points(name):
     assert min(r0, r1) - 1e-9 <= mid <= max(r0, r1) + 1e-9
 
 
-def test_pc_runs_from_room_to_its_hdt_point():
+def test_pc_holds_its_glassy_stiffness_until_near_its_hdt():
     p = refs.props("PC")
     assert heat.retention("PC", 23) == 1.0
-    assert heat.retention("PC", p["hdt_045"]["value"]) == pytest.approx(198 / p["e_xy"]["value"])
+    assert heat.retention("PC", 80) > 0.5  # 111 C HDT: a car at 80 C leaves it most of its stiffness
+    assert 0.10 <= heat.retention("PC", p["hdt_045"]["value"]) <= 0.62  # what the measured curves keep at HDT
     assert heat.retention("TPU", 50) is None
 
 
@@ -92,3 +93,18 @@ def test_stone_heat_resolves_a_load(jobenv, monkeypatch):
     d = json.loads((jobenv / "heat.json").read_text())
     assert d["load"]["deflection_hot_mm"] == pytest.approx(d["load"]["deflection_room_mm"] / heat.retention("PETG", 50), rel=1e-2)
     assert not np.isnan(d["clamped_stress_mpa"])
+
+
+def test_enclosure_comes_from_the_printer_profile(jobenv, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(jobenv / "cfg"))
+    trimesh.creation.box(extents=[150, 20, 5]).export(jobenv / "bar.stl")
+    stone("heat", str(jobenv / "bar.stl"), "where=40C", "material=ABS")
+    open_ = json.loads((jobenv / "heat.json").read_text())["warp_risk"]
+    assert open_["enclosed"] is False and open_["enclosed_from"].startswith("assumed open")
+    (jobenv / "stone.toml").write_text('[printer]\nmodel = "bambu_x1c"\n')
+    stone("heat", str(jobenv / "bar.stl"), "where=40C", "material=ABS")
+    shut = json.loads((jobenv / "heat.json").read_text())["warp_risk"]
+    assert shut["enclosed"] is True and "X1" in shut["enclosed_from"], shut
+    assert shut["lift_mm"] < open_["lift_mm"]
+    stone("heat", str(jobenv / "bar.stl"), "where=40C", "material=ABS", "enclosed=no")
+    assert json.loads((jobenv / "heat.json").read_text())["warp_risk"]["enclosed"] is False
