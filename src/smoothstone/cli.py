@@ -2154,6 +2154,17 @@ def cmd_fit(args, job: Job) -> Out:
     return fit.cmd(args, job)
 
 
+def cmd_strength(args, job: Job) -> Out:
+    """Will the part hold: a voxel model of the print under the load, checked along and between layers."""
+    from . import strength
+
+    out = Out(owns_next=False)
+    plan = job.plan() if job.exists() else None
+    pick = reftool.material_for(job.request(), rc.load(plan["recipe"]), plan["params"]) if plan else None
+    strength.report(job, args.items, out, pick.info.name if pick else "")
+    return out
+
+
 def cmd_video(args, job: Job) -> Out:
     """A vertical clip of a finished painted job for X, from the run log of the model that made it.
     The log defaults to log.json beside the job folder, where evals/run.py writes it."""
@@ -3421,6 +3432,9 @@ def make_parser() -> Parser:
     s = sub.add_parser("refs", parents=[common], help="sourced facts: filaments, standards, design (stone refs PETG)")
     s.add_argument("topic", nargs="*")
 
+    s = sub.add_parser("strength", parents=[common], help="will it hold: stone strength load=20N at=tip dir=down fixed=bottom")
+    s.add_argument("items", nargs="*")
+
     sub.add_parser("done", parents=[common], help="finish the job")
 
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
@@ -3490,6 +3504,7 @@ COMMANDS = {
     "note": cmd_note,
     "product": cmd_product,
     "refs": cmd_refs,
+    "strength": cmd_strength,
     "done": cmd_done,
     "colors": cmd_colors,
     "video": cmd_video,
