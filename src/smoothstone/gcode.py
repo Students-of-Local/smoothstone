@@ -335,42 +335,61 @@ def _fill_heights(tp: Toolpath) -> None:
         tp.height[miss] = np.clip(step[tp.layer[miss]], 0.05, None)
 
 
-def plan(tp: Toolpath) -> Toolpath:
-    """Fill t0 and t1 (s) for every move with the trapezoid and jerk model."""
+def _cruise(tp: Toolpath):
+    """Each move's length (mm), its direction per mm on each axis, and the speed it cruises at (mm/s)."""
     d = tp.p1 - tp.p0
     xyz = np.linalg.norm(d[:, :3], axis=1)
     length = np.where(xyz > 1e-9, xyz, np.abs(d[:, 3]))
-    n = tp.n
     unit = d / np.maximum(length, 1e-12)[:, None]  # per mm of the move, each axis
     v = np.maximum(tp.feed, 1e-3)
     mf = np.asarray(tp.max_feed, float)
     over = np.max(np.abs(unit) * v[:, None] / mf, axis=1)
     v = np.where(over > 1, v / over, v)
-    acc = tp.accel.copy()
-    lim_acc = np.asarray(tp.max_accel, float)
-    acc = np.minimum(acc, np.min(np.where(np.abs(unit) > 1e-9, lim_acc / np.maximum(np.abs(unit), 1e-12), np.inf), axis=1))
+    return length, unit, v
+
+
+def corner_speeds(tp: Toolpath):
+    """Per move, mm/s: safe, the speed it may start or end at from rest; vj, the jerk-limited speed at
+    its corner with the move before (safe for the first move); junction, the corner speed the planner
+    starts from."""
+    _, unit, v = _cruise(tp)
+    n = tp.n
     jerk = np.asarray(tp.jerk, float)
     axis_v = unit * v[:, None]  # mm/s along each axis at cruise
-    # the speed a move may start or end at from rest: no axis jumps more than its jerk
+    # the speed a move may start or end at from rest, as PrusaSlicer's GCodeProcessor::process_G1
+    # (the estimator the slicer's own time comes from): the smallest jerk of the axes that run over
+    # theirs, not the product of their ratios
     safe = v.copy()
     for k in range(4):
-        j = np.abs(axis_v[:, k])
-        safe = np.where(j > jerk[k], safe * jerk[k] / np.maximum(j, 1e-12), safe)
-    # corner speed between move i-1 and i (Marlin classic jerk, as PrusaSlicer's estimator)
+        safe = np.where(np.abs(axis_v[:, k]) > jerk[k], np.minimum(safe, jerk[k]), safe)
+    # corner speed between move i-1 and i, as GCodeProcessor::process_G1 (Marlin classic jerk): once an
+    # axis has limited, the next axis's exit and entry speeds are scaled by the running factor first
     junction = safe.copy()
+    vjs = safe.copy()
     if n > 1:
         pv, cv = v[:-1], v[1:]
         lim_v = np.minimum(pv, cv)
         pa, ca = axis_v[:-1] * (lim_v / pv)[:, None], axis_v[1:] * (lim_v / cv)[:, None]
         factor = np.ones(n - 1)
         for k in range(4):
-            ve, vn = pa[:, k], ca[:, k]
+            ve, vn = pa[:, k] * factor, ca[:, k] * factor  # factor is 1 until an axis limits
             jump = np.where(ve > vn, np.where((vn > 0) | (ve < 0), ve - vn, np.maximum(ve, -vn)),
                             np.where((vn < 0) | (ve > 0), vn - ve, np.maximum(-ve, vn)))
             factor = np.where(jump > jerk[k], factor * jerk[k] / np.maximum(jump, 1e-12), factor)
         vj = lim_v * factor
+        vjs[1:] = vj
         both = (safe[:-1] > vj * 0.99) & (safe[1:] > vj * 0.99)
         junction[1:] = np.where(both, np.minimum(safe[1:], lim_v), vj)
+    return safe, vjs, junction
+
+
+def plan(tp: Toolpath) -> Toolpath:
+    """Fill t0 and t1 (s) for every move with the trapezoid and jerk model."""
+    length, unit, v = _cruise(tp)
+    acc = tp.accel.copy()
+    lim_acc = np.asarray(tp.max_accel, float)
+    acc = np.minimum(acc, np.min(np.where(np.abs(unit) > 1e-9, lim_acc / np.maximum(np.abs(unit), 1e-12), np.inf), axis=1))
+    safe, _, junction = corner_speeds(tp)
     entry = np.minimum(junction, v)
     tp.t0, tp.t1 = _passes(entry, v, acc, length, safe, tp.dwell)
     return tp
