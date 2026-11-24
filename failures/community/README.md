@@ -1,7 +1,10 @@
 # Shared print fixes
 
-Each folder here is one print problem a person fixed with `stone doctor` and chose to share with
-`stone doctor share --send`. stone doctor reads every `*/case.json` when it loads: on the same printer
+Each folder here is one print problem a person fixed with `stone doctor` and chose to share.
+`stone doctor share` never uploads anything: it scrubs the case, shows the person every word and the
+photo, and prints a prefilled link to a print-fix issue. The person attaches the photo and submits the
+issue on GitHub themselves. A maintainer reads the issue and adds the folder (`case.json` plus
+`photo.jpg`) here in a pull request. stone doctor reads every `*/case.json` when it loads: on the same printer
 model, the causes that fixed a failure rank higher next time (at most 3x, Laplace smoothed), and once
 two or more cases agree it prints "On <printer>, N of M shared <failure> cases were fixed by <cause>".
 Photos also show as examples of their failure.
@@ -19,13 +22,15 @@ Photos also show as examples of their failure.
 
 ## License
 
-The sender agrees, in the prompt stone shows before anything is sent, that the photo and text are
-shared under this repository's MIT license.
+The sender agrees, in the prompt stone shows and again in the issue form's checkbox, that the photo
+and text are shared under this repository's MIT license.
 
 ## How maintainers merge
 
-1. CI runs `tests/test_community.py` on the pull request: schema, ids, photo size, EXIF, private data.
-2. Look at the photo: it shows the failure, no faces, no screens with accounts, nothing private.
-3. Check the cause fits what was seen and what fixed it. If it does not, comment and close.
-4. Merge. An issue from the print-fix template (sent without gh) becomes a case the same way: a
-   maintainer saves the photo with no EXIF at most 1024 px, writes `case.json`, and opens the PR.
+1. Read the print-fix issue. Look at the photo: it shows the failure, no faces, no screens with
+   accounts, nothing private. Check the cause fits what was seen and what fixed it. If it does not,
+   comment and close.
+2. Add the folder in a pull request: save the photo as `photo.jpg` with no EXIF at most 1024 px,
+   write `case.json` from the issue's fields, and link the issue.
+3. CI runs `tests/test_community.py` on the pull request: schema, ids, photo size, EXIF, private data.
+4. Merge.

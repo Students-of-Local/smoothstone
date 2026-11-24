@@ -21,9 +21,11 @@ Use this when someone says a print failed, shows a photo of a failed print, or a
 3. Ask the one question in NEXT. Then: `stone doctor answer "<their answer>"`.
 4. When NEXT says `stone doctor try <cause>`, run it and tell the person the steps.
 5. If it worked: `stone doctor fixed "<what worked>"`. If not: the NEXT line names the next `stone doctor try`.
-6. Sharing is optional and asks twice: first whether to share, then, after `stone doctor share` shows the bundle,
-   whether to send exactly that (read the person every line and show them the photo first). Run what each answer
-   names. An issue link from `--send` goes to the person with the photo path.
+6. Sharing is optional, and stone sends nothing. First ask whether to share. On yes, `stone doctor share` prints
+   every line that would go public, the photo path and a prefilled GitHub issue link. Read the person every line,
+   show them the photo, and give them the link and the photo path. They open the link, attach the photo, read it
+   there and submit it themselves. Then ask whether they submitted it and run what the answer names:
+   `stone doctor share done` or `stone doctor share no`.
 
 Words for each failure: `stone doctor looks`.
 
@@ -68,13 +70,15 @@ $ stone doctor fixed "washed the plate with dish soap and water"
 NEXT: ask the person: Share this fix (photo, printer, material, what you saw and what fixed it) publicly on GitHub so other agents learn from it? The photo and words become public under smoothstone's MIT license. (yes / no) yes: stone doctor share. no: stone doctor share no
 
 $ stone doctor share
-Ready to share case 20261124-012644. Nothing is sent yet. This is all that goes public:
+Ready to share case 20261124-012644. stone sends nothing. This is all that would go public:
 Photo: stone-job/doctor/20261124-012644/share/photo.jpg (EXIF removed, at most 1024 px)
 ...
-NEXT: ask the person: <read them the lines above and show them the photo>; send exactly this? (yes / no) yes: stone doctor share --send. no: stone doctor share no
+Prefilled issue link:
+https://github.com/baney75/smoothstone/issues/new?template=print-fix.yml&title=Fixed%3A+bed_adhesion+on+creality_k2&...
+NEXT: ask the person: <read them the lines above and show them the photo>. To share it, open the link above, attach the photo, read it there and submit the issue yourself; stone sends nothing. Did you submit it? (yes / no) yes: stone doctor share done. no: stone doctor share no
 
-$ stone doctor share --send
-Sent: https://github.com/baney75/smoothstone/pull/<number>
+$ stone doctor share done
+Thanks. A maintainer reads the issue and adds the case; then stone doctor ranks this cause higher on this printer.
 NEXT: none, the print problem is fixed
 ```
 

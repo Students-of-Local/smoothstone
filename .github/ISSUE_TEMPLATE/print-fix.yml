@@ -6,8 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        `stone doctor share --send` fills this in when gh is not signed in. Attach the photo.jpg it names.
-        Everything here, the photo included, becomes public under smoothstone's MIT license.
+        `stone doctor share` fills this in; stone itself sends nothing. Attach the photo.jpg it names,
+        read every field, and submit it yourself. A maintainer reads it and adds the case to
+        failures/community in a pull request. Everything here, the photo included, becomes public under
+        smoothstone's MIT license.
   - type: input
     id: failure
     attributes:

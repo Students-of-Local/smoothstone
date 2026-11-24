@@ -1,43 +1,47 @@
 """stone doctor share: offer a fixed print problem to smoothstone so the next agent on that printer learns from it.
 
-Never forced and never silent: `stone doctor fixed` asks the person first, `stone doctor share` writes the
-bundle and prints exactly what would go public, and only `stone doctor share --send` lets anything leave the
-machine. With gh signed in it opens a pull request that adds failures/community/<folder>/ to the repo;
-without gh it prints a prefilled issue link and the photo to attach. Private details are scrubbed first.
+Never forced and never silent, and stone itself sends nothing: `stone doctor fixed` asks the person first,
+`stone doctor share` writes the scrubbed bundle, prints exactly what would go public and a prefilled print-fix
+issue link, and the person opens the link, attaches the photo and submits it on GitHub themselves. A maintainer
+reads the issue and adds failures/community/<folder>/ in a pull request. Private details are scrubbed first.
 """
 
 from __future__ import annotations
 
-import base64
 import getpass
 import hashlib
 import json
 import re
 import shutil
 import socket
-import subprocess
-import time
 import urllib.parse
 from pathlib import Path
 
 from . import config, doctor, printers
 
 REPO = "baney75/smoothstone"
-OWNER = REPO.split("/")[0]
 COMMUNITY_DIR = "failures/community"
 PX = 1024
 LICENSE_LINE = "The photo and the words become public on GitHub under smoothstone's MIT license."
 ASK = ("ask the person: Share this fix (photo, printer, material, what you saw and what fixed it) publicly on GitHub "
        "so other agents learn from it? The photo and words become public under smoothstone's MIT license. "
        "(yes / no) yes: stone doctor share. no: stone doctor share no")
-# the dry run ends in a question, so --send never runs before the person has seen the words and the photo
-SEND_ASK = ("ask the person: <read them the lines above and show them the photo>; send exactly this? (yes / no) "
-            "yes: stone doctor share --send. no: stone doctor share no")
+# stone never uploads: the person reads the words, sees the photo and submits the issue on GitHub themselves
+LINK_ASK = ("ask the person: <read them the lines above and show them the photo>. To share it, open the link "
+            "above, attach the photo, read it there and submit the issue yourself; stone sends nothing. "
+            "Did you submit it? (yes / no) yes: stone doctor share done. no: stone doctor share no")
+# a path from a filesystem root goes whole, spaces included, to the end of its last segment: a name with an
+# extension, or a closing quote, bracket, comma or semicolon, or the end of the line
+ROOTED = re.compile(r"(?:(?<![\w/~.])/(?i:Users|home|Volumes|mnt|media|private|tmp|var)[/\\]"
+                    r"|(?<![\w/])~[/\\]|(?<![\w/\\])[A-Za-z]:[/\\])"
+                    r"(?:[^\n\"'\[\](){}<>,;]*?\.(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{1,8}(?=$|[\s\"'\[\](){}<>,;:!?]|\.(?:\s|$))"
+                    r"|[^\n\"'\[\](){}<>,;]*)", re.M)
 
 # what never leaves the machine, in the order it is replaced (a link before the host inside it)
 PATTERNS = [
     ("link", re.compile(r"\b(?:https?|rtsp|webrtc|ws)://\S+", re.I)),
     ("email", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
+    ("path", ROOTED),
     ("path", re.compile(r"(?<![\w/~])(?:[A-Za-z]:)?(?:[/\\][\w.@-]+){2,}|(?<![\w/])~[/\\][\w.@/\\-]+")),
     ("address", re.compile(r"\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b", re.I)),
     # IPv6 with :: first (fd00::1234, ::1), so a full-form match never takes half of one; then IPv4, full IPv6
@@ -114,8 +118,8 @@ def last_fixed(job) -> dict | None:
 
 
 def build(job, case: dict) -> tuple[Path, dict, list[str]]:
-    """Write stone-job/doctor/<case>/share/ (case.json, photo.jpg, pr.md) and return it, the data and what
-    the scrub removed."""
+    """Write stone-job/doctor/<case>/share/ (case.json, photo.jpg) and return it, the data and what the scrub
+    removed."""
     o, names, gone = case["outcome"], private_names(), []
 
     def clean(text):  # every free-text field goes through the same scrub
@@ -142,23 +146,11 @@ def build(job, case: dict) -> tuple[Path, dict, list[str]]:
     data["id"] = f"{o['date']}-{o['printer']}-{o['failure']}-{h.hexdigest()[:7]}"
     out.mkdir(parents=True, exist_ok=True)
     (out / "case.json").write_text(json.dumps(data, indent=1) + "\n")
-    (out / "pr.md").write_text(pr_body(data))
     return out, data, gone
 
 
 def title(d: dict) -> str:
     return f"Fixed: {d['failure']} on {d['printer']}"
-
-
-def pr_body(d: dict) -> str:
-    return "\n".join([
-        f"A print problem a stone user fixed, shared with `stone doctor share`. Adds `{COMMUNITY_DIR}/{d['id']}/`.", "",
-        f"- Failure: `{d['failure']}`", f"- Cause that fixed it: `{d['cause']}`", f"- Printer: `{d['printer']}`",
-        f"- Material: {d['material'] or 'not given'}", f"- What they saw: \"{d['said']}\"",
-        f"- What fixed it: \"{d['fixed_by']}\"", f"- stone {d['stone_version']}, {d['date']}", "",
-        "The sender agreed to share the photo and text under the repo's MIT license.", "",
-        "Maintainers: check the photo shows the failure and nothing private, and that the cause fits; "
-        "tests/test_community.py checks the rest. Merging teaches stone doctor this printer's likeliest cause.", ""])
 
 
 def issue_url(d: dict) -> str:
@@ -168,98 +160,6 @@ def issue_url(d: dict) -> str:
     return f"https://github.com/{REPO}/issues/new?" + urllib.parse.urlencode(q)
 
 
-def _gh(args: list[str], timeout: float = 60) -> tuple[int, str]:
-    try:
-        r = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=timeout)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return 1, type(e).__name__
-    return r.returncode, (r.stdout or r.stderr).strip()
-
-
-def send_pr(bundle: Path, d: dict, st: dict, save) -> tuple[str | None, str]:
-    """Fork (unless this is the owner), branch, add the two files through the GitHub API (no clone) and open
-    the pull request. Returns (url, "") or (None, why). st is the case's share state: the branch and each file
-    that reached GitHub go in it (saved at once), so a retry resumes the branch and sends only what is missing."""
-    if shutil.which("gh") is None:
-        return None, "gh is not installed"
-    if _gh(["auth", "status"])[0] != 0:
-        return None, "gh is not signed in"
-    code, login = _gh(["api", "user", "-q", ".login"])
-    if code or not login:
-        return None, "gh could not read the account"
-    owner = OWNER if login.lower() == OWNER else login
-    if owner != OWNER:
-        if _gh(["repo", "fork", REPO, "--clone=false"])[0]:
-            return None, "gh could not fork the repo"
-        _gh(["api", "-X", "POST", f"repos/{owner}/smoothstone/merge-upstream", "-f", "branch=main"])
-    base, branch = f"repos/{owner}/smoothstone", f"fix/{d['id']}"
-    if (st.get("owner"), st.get("branch")) != (owner, branch):
-        sha = ""
-        for wait in (0, 2, 4, 8):  # a new fork takes a few seconds to appear
-            time.sleep(wait)
-            code, sha = _gh(["api", f"{base}/git/ref/heads/main", "-q", ".object.sha"])
-            if code == 0 and sha:
-                break
-        else:
-            return None, "the fork did not appear"
-        code, have = _gh(["api", f"{base}/git/ref/heads/{branch}", "-q", ".object.sha"])
-        if not (code == 0 and have):
-            if _gh(["api", "-X", "POST", f"{base}/git/refs", "-f", f"ref=refs/heads/{branch}", "-f", f"sha={sha}"])[0]:
-                return None, "gh could not make the branch"
-        st.update(owner=owner, branch=branch, public=[])
-        save()
-    public = st.setdefault("public", [])
-    put = bundle / ".put.json"
-    try:
-        for name in ["case.json"] + (["photo.jpg"] if d["photo"] else []):
-            if name in public:
-                continue
-            body = {"message": f"{title(d)}: {name}", "branch": branch,
-                    "content": base64.b64encode((bundle / name).read_bytes()).decode()}
-            put.write_text(json.dumps(body))
-            if _gh(["api", "-X", "PUT", f"{base}/contents/{COMMUNITY_DIR}/{d['id']}/{name}", "--input", str(put)])[0]:
-                return None, f"gh could not upload {name}"
-            public.append(name)
-            save()
-    finally:
-        put.unlink(missing_ok=True)
-    code, url = _gh(["pr", "list", "--repo", REPO, "--head", branch, "--state", "open", "--json", "url",
-                     "-q", ".[0].url"])
-    if code == 0 and url.strip():  # an earlier try opened it
-        return url.strip().splitlines()[-1], ""
-    code, url = _gh(["pr", "create", "--repo", REPO, "--head", f"{owner}:{branch}", "--base", "main",
-                     "--title", title(d), "--body-file", str(bundle / "pr.md")])
-    return (url.splitlines()[-1], "") if code == 0 else (None, "gh could not open the pull request")
-
-
-def tree_url(st: dict) -> str:
-    return f"https://github.com/{st['owner']}/smoothstone/tree/{st['branch']}/{COMMUNITY_DIR}/{st['folder']}"
-
-
-def bundle_hash(bundle: Path) -> str:
-    """One hash over every file that would go public: what the person saw at the preview."""
-    h = hashlib.sha256()
-    for name in ("case.json", "photo.jpg", "pr.md"):
-        f = bundle / name
-        data = f.read_bytes() if f.is_file() else b""
-        h.update(f"{name}:{f.is_file()}:{len(data)}:".encode() + data)
-    return h.hexdigest()
-
-
-def previewed(case: dict, bundle: Path) -> bool:
-    """True when the bundle on disk is the one the last preview showed, with no decline since."""
-    st = case.get("share") or {}
-    if st.get("state") not in ("ready", "link", "partial") or not st.get("hash"):
-        return False
-    if not (bundle / "case.json").is_file():
-        return False
-    try:
-        folder = json.loads((bundle / "case.json").read_text()).get("id")
-    except (OSError, ValueError, AttributeError):
-        return False
-    return folder == st.get("folder") and bundle_hash(bundle) == st["hash"]
-
-
 def cmd_share(args, job, rest: str, out):
     case = last_fixed(job)
     if case is None:
@@ -267,27 +167,29 @@ def cmd_share(args, job, rest: str, out):
         out.next = 'stone doctor "<what you see>"'
         return out
     bundle = doctor.doctor_dir(job) / case["id"] / "share"
-    if (case.get("share") or {}).get("state") == "sent":
-        out.add(f"Already shared: {case['share']['url']}")
+    st, word = case.get("share") or {}, rest.lower().split()[0] if rest.split() else ""
+    if st.get("state") == "linked":
+        out.add("Already shared: the person submitted it as a print-fix issue.")
         out.next = doctor.DONE
         return out
-    if rest.lower().startswith("no"):
-        shutil.rmtree(bundle, ignore_errors=True)  # a declined bundle can never be sent later
-        old = case.get("share") or {}
-        case["share"] = {"state": "declined"} | {k: old[k] for k in ("folder", "owner", "branch", "public") if k in old}
+    if word == "no":
+        shutil.rmtree(bundle, ignore_errors=True)
+        case["share"] = {"state": "declined"}
         doctor.save_case(job, case)
-        if old.get("public"):
-            out.add("Nothing more is sent. Still public on GitHub: " + ", ".join(old["public"]) + ", at",
-                    tree_url(old), f"Deleting the branch {old['branch']} on GitHub takes them down.")
-        else:
-            out.add("Not shared. The fix stays on this machine.")
+        out.add("Not shared. The fix stays on this machine.")
         out.next = doctor.DONE
         return out
-    if args.send:
-        if previewed(case, bundle):
-            return _send(job, case, bundle, out)
-        out.fix("Nothing was sent: the person has not seen this bundle since it last changed or was declined")
-        out.next = "stone doctor share"
+    if word == "done":
+        if st.get("state") != "ready":
+            out.fix("stone has not shown this case's words and link yet")
+            out.next = "stone doctor share"
+            return out
+        case["share"] = {"state": "linked", "folder": st["folder"]}
+        doctor.save_case(job, case)
+        out.add("Thanks. A maintainer reads the issue and adds the case; then stone doctor ranks this cause "
+                "higher on this printer.")
+        out.next = doctor.DONE
+        out.result = "doctor shared"
         return out
     if args.printer:
         p = printers.get(args.printer)
@@ -301,53 +203,24 @@ def cmd_share(args, job, rest: str, out):
         out.next = "ask the person: which printer was it? Then: stone doctor share --printer <id from stone printer>"
         return out
     bundle, d, gone = build(job, case)
-    old = case.get("share") or {}
-    case["share"] = {"state": "ready", "folder": d["id"], "hash": bundle_hash(bundle)}
-    if old.get("folder") == d["id"]:  # the same bundle went partly out before: resume that branch
-        case["share"] |= {k: old[k] for k in ("owner", "branch", "public") if k in old}
+    found = bundle_leaks(d, private_names())
+    if found:  # the last look before the person sees a link: a detail the scrub missed gives no link at all
+        case["share"] = {"state": "held"}
+        doctor.save_case(job, case)
+        out.fix(f"the bundle still holds {len(found)} private detail(s) the scrub should have removed, so there "
+                "is no link to share it. The case stays on this machine.")
+        out.next = doctor.DONE
+        return out
+    case["share"] = {"state": "ready", "folder": d["id"]}
     doctor.save_case(job, case)
-    out.add(f"Ready to share case {case['id']}. Nothing is sent yet. This is all that goes public:")
+    out.add(f"Ready to share case {case['id']}. stone sends nothing. This is all that would go public:")
     out.add(f"Photo: {bundle / 'photo.jpg'} (EXIF removed, at most {PX} px)" if d["photo"] else "Photo: none")
     out.add(f"Failure: {d['failure']}", f"Cause: {d['cause']}", f"Printer: {d['printer']}",
             f"Material: {d['material'] or 'not given'}", f"What you saw: \"{d['said']}\"",
             f"What fixed it: \"{d['fixed_by']}\"", f"stone {d['stone_version']}, {d['date']}")
     if gone:
         out.add("Removed first: " + ", ".join(f"{gone.count(k)} {k}" for k in dict.fromkeys(gone)))
-    out.add(LICENSE_LINE, f"Where: {COMMUNITY_DIR}/{d['id']}/ in a pull request to {REPO}")
-    out.next = SEND_ASK
-    return out
-
-
-def _send(job, case, bundle: Path, out):
-    d, st = json.loads((bundle / "case.json").read_text()), case["share"]
-    found = bundle_leaks(d, private_names())
-    if found:  # the last look before anything uploads: a detail the scrub missed stops the send
-        out.fix(f"Nothing was sent: the bundle still holds {len(found)} private detail(s) the scrub should have "
-                "removed. The case stays on this machine.")
-        out.next = doctor.DONE
-        return out
-    url, why = send_pr(bundle, d, st, lambda: doctor.save_case(job, case))
-    if url:
-        case["share"] = st | {"state": "sent", "url": url}
-        doctor.save_case(job, case)
-        out.add(f"Sent: {url}", f"Once a maintainer merges it, stone doctor ranks {d['cause']} higher for "
-                f"{d['failure']} on {d['printer']}.")
-        out.next = doctor.DONE
-        out.result = "doctor shared"
-        return out
-    if st.get("public"):  # some files reached GitHub: say exactly which, and resume rather than start over
-        st["state"] = "partial"
-        doctor.save_case(job, case)
-        out.add(f"Partly sent: {why}.",
-                f"Public on GitHub now: {', '.join(st['public'])}, on the branch {st['branch']}:", tree_url(st), "Nothing else went out. stone doctor share --send finishes it on the same branch.")
-        out.next = ("ask the person: the files named above are already public at that link; finish the pull "
-                    "request? (yes / no) yes: stone doctor share --send. no: stone doctor share no")
-        return out
-    link = issue_url(d)
-    (bundle / "issue_url.txt").write_text(link + "\n")
-    case["share"] = st | {"state": "link", "url": link}
-    doctor.save_case(job, case)
-    out.add(f"Nothing was sent: {why}. The bundle is in {bundle}.", "Share it as a GitHub issue instead:", link)
-    photo = f", attach {bundle / 'photo.jpg'}," if d["photo"] else ""
-    out.next = f"ask the person: open the link above{photo} and press Submit new issue (public, MIT license)"
+    out.add(LICENSE_LINE, f"Where: a print-fix issue on {REPO}; a maintainer reads it and adds the case.",
+            "Prefilled issue link:", issue_url(d))
+    out.next = LINK_ASK
     return out

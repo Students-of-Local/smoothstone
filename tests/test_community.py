@@ -1,11 +1,12 @@
 """stone doctor share and the shared cases: every case in failures/community validates, the scrub, the share
-flow against a fake gh (nothing reaches GitHub), and the prior shift the shared cases cause."""
+flow (stone prints a link and runs nothing), and the prior shift the shared cases cause."""
 
 import json
 import re
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -57,6 +58,28 @@ def test_scrub_removes_private_details():
     assert share.scrub(keep, ["Shopy"]) == (keep, [])
 
 
+SPACED = ("/Volumes/Shop Drive/Jane Doe/failed.stl", r"C:\Users\Jane Doe\Desktop\part.3mf",
+          "~/Shop Drive/Jane Doe/failed.stl", "/Users/Jane Doe/Shop Drive")
+
+
+@pytest.mark.parametrize("path", SPACED)
+def test_a_path_with_spaces_goes_whole(path):
+    for said in (f"the file {path} failed again", f"open \"{path}\" in the slicer", f"saved to {path}"):
+        text, gone = share.scrub(said, [])
+        for word in ("Jane", "Doe", "Shop", "Drive", "Users", "Desktop"):
+            assert word not in text, (word, text)
+        assert "[path]" in text and "path" in gone and share.leaks(text) == [], text
+        assert any(found.startswith(path) for found in share.leaks(said)), (path, share.leaks(said))
+    if "." in path:  # a last segment with an extension ends the path, so the words after it stay
+        assert share.scrub(f"the file {path} failed again", [])[0] == "the file [path] failed again"
+    assert share.scrub(f"open \"{path}\" in the slicer", [])[0] == "open \"[path]\" in the slicer"
+
+
+def test_slashes_in_prose_stay():
+    keep = "PLA/PETG plate, a 50/50 mix, and/or 0.2/0.4 mm at 1/2 speed"
+    assert share.scrub(keep, []) == (keep, []) and share.leaks(keep) == []
+
+
 def test_scrub_and_leaks_catch_every_ipv6_form():
     for addr in ("fd00::1234", "::1", "fe80::1", "2001:db8::8a2e:370:7334", "fd00::", "2001:db8:0:0:0:0:2:1", "10.0.0.2"):
         text, gone = share.scrub(f"the printer at {addr} dropped", [])
@@ -75,7 +98,6 @@ def work(tmp_path, monkeypatch):
     monkeypatch.setenv("STONE_JOB", str(w / "stone-job"))
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError(f"subprocess {a}")))
     monkeypatch.setattr(printers, "gantrel", lambda: None)
-    monkeypatch.setattr(share.time, "sleep", lambda s: None)
     return w
 
 
@@ -87,27 +109,6 @@ def stone(*argv):
     return text, code, lines[-1][len("NEXT: "):]
 
 
-class FakeGh:
-    """gh as the tests see it: every call is recorded, none reaches GitHub."""
-
-    def __init__(self, login="somefan", fail=(), open_pr=""):
-        self.calls, self.login, self.fail, self.open_pr = [], login, fail, open_pr
-
-    def __call__(self, args, timeout=60):
-        self.calls.append(args)
-        if any(f in " ".join(args) for f in self.fail):
-            return 1, "failed"
-        if args[:2] == ["api", "user"]:
-            return 0, self.login
-        if "git/ref/heads/main" in args[1]:
-            return 0, "abc123"
-        if args[:2] == ["pr", "create"]:
-            return 0, "https://github.com/baney75/smoothstone/pull/999"
-        if args[:2] == ["pr", "list"]:
-            return 0, self.open_pr
-        return 0, ""
-
-
 def _fixed_case(work):
     stone("doctor", "--image", str(PHOTO), "--printer", "creality_k2")
     stone("doctor", OWNER["said"], "--material", "PLA", "--printer", "creality_k2")
@@ -115,128 +116,65 @@ def _fixed_case(work):
     return stone("doctor", "fixed", "washed the plate with dish soap and water, ask jo@example.com")
 
 
-def test_fixed_ask_share_dry_then_send(work, monkeypatch):
-    gh = FakeGh()
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+def _bundle(work):
+    return next((work / "stone-job" / "doctor").glob("*/share"))
+
+
+def test_fixed_ask_share_link_then_done(work):
     text, code, nxt = _fixed_case(work)
     assert nxt == share.ASK and "MIT license" in nxt and "stone doctor share no" in nxt
 
-    text, code, nxt = stone("doctor", "share")
-    assert gh.calls == [] and nxt == share.SEND_ASK  # nothing leaves without --send
-    assert "Nothing is sent yet" in text and share.LICENSE_LINE in text and "Removed first: 1 email" in text
-    bundle = next((work / "stone-job" / "doctor").glob("*/share"))
+    text, code, nxt = stone("doctor", "share")  # the work fixture fails any subprocess: stone runs nothing
+    assert code == 0 and nxt == share.LINK_ASK and "stone sends nothing" in text
+    assert share.LICENSE_LINE in text and "Removed first: 1 email" in text
+    bundle = _bundle(work)
     d = json.loads((bundle / "case.json").read_text())
     assert (d["failure"], d["cause"], d["printer"], d["material"]) == ("bed_adhesion", "plate_contaminated", "creality_k2", "PLA")
     assert "[email]" in d["fixed_by"] and share.leaks(json.dumps(d)) == []
+    assert {f.name for f in bundle.iterdir()} == {"case.json", "photo.jpg"} and f"Photo: {bundle / 'photo.jpg'}" in text
     with Image.open(bundle / "photo.jpg") as im:
         assert max(im.size) == share.PX and not im.getexif()
+    url = next(ln for ln in text.splitlines() if ln.startswith("https://"))
+    q = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
+    assert url.startswith("https://github.com/baney75/smoothstone/issues/new?") and q["template"] == "print-fix.yml"
+    assert (q["failure"], q["cause"], q["printer"]) == ("bed_adhesion", "plate_contaminated", "creality_k2")
+    assert q["title"] == "Fixed: bed_adhesion on creality_k2" and q["fixed_by"] == d["fixed_by"]
+    fields = re.findall(r"^\s+id: (\w+)$", (REPO / ".github" / "ISSUE_TEMPLATE" / "print-fix.yml").read_text(), re.M)
+    assert set(q) - {"template", "title"} <= set(fields)
 
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert "Sent: https://github.com/baney75/smoothstone/pull/999" in text and nxt == doctor.DONE
-    puts = [c[3] for c in gh.calls if c[:3] == ["api", "-X", "PUT"]]
-    assert puts == [f"repos/somefan/smoothstone/contents/failures/community/{d['id']}/{n}" for n in ("case.json", "photo.jpg")]
-    assert ["repo", "fork", "baney75/smoothstone", "--clone=false"] in gh.calls
-    pr = next(c for c in gh.calls if c[:2] == ["pr", "create"])
-    assert pr[pr.index("--title") + 1] == "Fixed: bed_adhesion on creality_k2"
-    assert pr[pr.index("--head") + 1] == f"somefan:fix/{d['id']}" and not (bundle / ".put.json").exists()
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert "Already shared" in text and len([c for c in gh.calls if c[:2] == ["pr", "create"]]) == 1
-    text, code, nxt = stone("doctor", "share", "no")  # a decline after the send does not claim it stayed home
-    assert "Already shared" in text and "Not shared" not in text
-
-
-def test_dry_run_next_asks_the_person(work, monkeypatch):
-    gh = FakeGh()
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
-    _fixed_case(work)
+    text, code, nxt = stone("doctor", "share", "done")
+    assert code == 0 and nxt == doctor.DONE
+    assert share.last_fixed(SimpleNamespace(root=work / "stone-job"))["share"]["state"] == "linked"
     text, code, nxt = stone("doctor", "share")
-    assert nxt.startswith("ask the person:") and "show them the photo" in nxt and "send exactly this?" in nxt
-    assert nxt.endswith("yes: stone doctor share --send. no: stone doctor share no") and gh.calls == []
+    assert "Already shared" in text and "https://" not in text and nxt == doctor.DONE
+    text, code, nxt = stone("doctor", "share", "no")  # a decline after the person submitted it does not claim it stayed home
+    assert "Already shared" in text and "Not shared" not in text and _bundle(work).is_dir()
 
 
-def test_decline_after_preview_blocks_send(work, monkeypatch):
-    gh = FakeGh()
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+def test_dry_run_next_asks_the_person():
+    nxt = share.LINK_ASK
+    assert nxt.startswith("ask the person:") and "show them the photo" in nxt and "stone sends nothing" in nxt
+    assert nxt.endswith("yes: stone doctor share done. no: stone doctor share no")
+
+
+def test_decline_after_preview(work):
     _fixed_case(work)
     stone("doctor", "share")
     text, code, nxt = stone("doctor", "share", "no")
-    assert "Not shared" in text and not list((work / "stone-job" / "doctor").glob("*/share"))
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert not any(c[:3] == ["api", "-X", "PUT"] or c[:2] == ["pr", "create"] for c in gh.calls), gh.calls
-    assert code == 1 and "Nothing was sent" in text and nxt == "stone doctor share"
+    assert "Not shared" in text and nxt == doctor.DONE and not list((work / "stone-job" / "doctor").glob("*/share"))
+    assert share.last_fixed(SimpleNamespace(root=work / "stone-job"))["share"] == {"state": "declined"}
+    text, code, nxt = stone("doctor", "share", "done")  # done after a decline records nothing
+    assert code == 1 and nxt == "stone doctor share"
+    assert share.last_fixed(SimpleNamespace(root=work / "stone-job"))["share"] == {"state": "declined"}
 
 
-def test_send_refuses_a_bundle_changed_after_preview(work, monkeypatch):
-    gh = FakeGh()
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+def test_done_before_any_preview_records_nothing(work):
     _fixed_case(work)
-    stone("doctor", "share")
-    bundle = next((work / "stone-job" / "doctor").glob("*/share"))
-    d = json.loads((bundle / "case.json").read_text())
-    (bundle / "case.json").write_text(json.dumps(d | {"said": "not what the person saw"}))
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert gh.calls == [] and code == 1 and "Nothing was sent" in text and nxt == "stone doctor share"
-    stone("doctor", "share")
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert "Sent: " in text
+    text, code, nxt = stone("doctor", "share", "done")
+    assert code == 1 and nxt == "stone doctor share" and "share" not in share.last_fixed(SimpleNamespace(root=work / "stone-job"))
 
 
-def _kinds(gh, *kinds):
-    return [c for c in gh.calls if any(c[:len(k)] == k for k in kinds)]
-
-
-def test_partial_upload_says_what_is_public_and_resumes(work, monkeypatch):
-    gh = FakeGh(fail=("photo.jpg",))
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
-    _fixed_case(work)
-    stone("doctor", "share")
-    d = json.loads(next((work / "stone-job" / "doctor").glob("*/share/case.json")).read_text())
-    text, code, nxt = stone("doctor", "share", "--send")
-    tree = f"https://github.com/somefan/smoothstone/tree/fix/{d['id']}/failures/community/{d['id']}"
-    assert "Nothing was sent" not in text and "Public on GitHub now: case.json" in text and tree in text, text
-    assert "photo.jpg" not in text.split("Public on GitHub now:")[1].splitlines()[0]
-    assert nxt.startswith("ask the person:") and "stone doctor share --send" in nxt
-    gh.fail = ()
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert "Sent: https://github.com/baney75/smoothstone/pull/999" in text and nxt == doctor.DONE
-    assert len(_kinds(gh, ["api", "-X", "POST", "repos/somefan/smoothstone/git/refs"])) == 1  # the branch made once
-    puts = [c[3].rsplit("/", 1)[1] for c in _kinds(gh, ["api", "-X", "PUT"])]
-    assert puts == ["case.json", "photo.jpg", "photo.jpg"]  # case.json is not sent twice
-
-
-def test_retry_finds_the_open_pull_request(work, monkeypatch):
-    gh = FakeGh(fail=("pr create",))
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
-    _fixed_case(work)
-    stone("doctor", "share")
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert "Public on GitHub now: case.json, photo.jpg" in text and "gh could not open the pull request" in text
-    gh.fail, gh.open_pr = (), "https://github.com/baney75/smoothstone/pull/998"
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert "Sent: https://github.com/baney75/smoothstone/pull/998" in text
-    assert len(_kinds(gh, ["pr", "create"])) == 1 and len(_kinds(gh, ["api", "-X", "PUT"])) == 2
-
-
-def test_decline_after_a_partial_upload_names_what_stays_public(work, monkeypatch):
-    monkeypatch.setattr(share, "_gh", FakeGh(fail=("photo.jpg",)))
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
-    _fixed_case(work)
-    stone("doctor", "share")
-    stone("doctor", "share", "--send")
-    text, code, nxt = stone("doctor", "share", "no")
-    assert "stays on this machine" not in text and "Still public on GitHub: case.json" in text
-
-
-def test_every_typed_field_is_scrubbed(work, monkeypatch):
-    gh = FakeGh()
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+def test_every_typed_field_is_scrubbed(work):
     stone("doctor", "--image", str(PHOTO), "--printer", "creality_k2")
     stone("doctor", "the print came off the plate; camera at fd00::1234", "--material", "jo@example.com",
           "--printer", "creality_k2")
@@ -250,25 +188,37 @@ def test_every_typed_field_is_scrubbed(work, monkeypatch):
     assert share.leaks(raw.replace("[address]", "fd00::1234")) and share.leaks(raw.replace("[email]", "JO@EXAMPLE.COM"))
 
 
-def test_send_checks_the_bundle_once_more(work, monkeypatch):
-    gh = FakeGh()
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+def test_a_detail_the_scrub_missed_gives_no_link(work, monkeypatch):
     scrub = share.scrub
     stone("doctor", "--image", str(PHOTO), "--printer", "creality_k2")
     stone("doctor", "the print came off; camera at fd00::1234", "--material", "jo@example.com", "--printer", "creality_k2")
     stone("doctor", "try", "plate_contaminated")
     stone("doctor", "fixed", "washed the plate")
     monkeypatch.setattr(share, "scrub", lambda text, names=(): (text, []))  # a scrub that misses everything
-    stone("doctor", "share")
+    text, code, nxt = stone("doctor", "share")
+    assert code == 1 and "still holds" in text and "https://" not in text and nxt == doctor.DONE, text
+    assert "fd00" not in text and "jo@" not in text
     monkeypatch.setattr(share, "scrub", scrub)
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert code == 1 and "Nothing was sent" in text and gh.calls == [], (text, gh.calls)
+    text, code, nxt = stone("doctor", "share", "done")  # the held case cannot be marked shared
+    assert code == 1 and nxt == "stone doctor share"
 
 
-def test_dashes_in_the_words_pass_the_community_check(work, monkeypatch, tmp_path):
-    from types import SimpleNamespace
+def test_spaced_paths_in_the_words_and_material_never_reach_the_bundle(work):
+    stone("doctor", "--image", str(PHOTO), "--printer", "creality_k2")
+    stone("doctor", "the print from /Volumes/Shop Drive/Jane Doe/failed.stl came off the plate",
+          "--material", r"C:\Users\Jane Doe\Desktop\part.3mf", "--printer", "creality_k2")
+    stone("doctor", "try", "plate_contaminated")
+    stone("doctor", "fixed", "washed the plate, file in ~/Shop Drive/Jane Doe/failed.stl")
+    text, code, nxt = stone("doctor", "share")
+    d = json.loads(next((work / "stone-job" / "doctor").glob("*/share/case.json")).read_text())
+    raw = json.dumps(d)
+    for word in ("Jane", "Doe", "Shop", "Drive"):
+        assert word not in raw and word not in text, (word, raw)
+    assert d["material"] == "[path]" and "[path]" in d["said"] and "[path]" in d["fixed_by"], d
+    assert share.leaks(raw) == []
 
+
+def test_dashes_in_the_words_pass_the_community_check(work, tmp_path):
     _fixed_case(work)
     job = SimpleNamespace(root=work / "stone-job")
     case = share.last_fixed(job)
@@ -281,35 +231,6 @@ def test_dashes_in_the_words_pass_the_community_check(work, monkeypatch, tmp_pat
     for name in ("case.json", "photo.jpg"):
         shutil.copy(bundle / name, dest / name)
     validate(dest)
-
-
-def test_owner_skips_the_fork(work, monkeypatch):
-    gh = FakeGh(login="baney75")
-    monkeypatch.setattr(share, "_gh", gh)
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
-    _fixed_case(work)
-    stone("doctor", "share")
-    stone("doctor", "share", "--send")
-    assert not any(c[:2] == ["repo", "fork"] for c in gh.calls)
-    assert any(c[3].startswith("repos/baney75/smoothstone/contents/") for c in gh.calls if c[:3] == ["api", "-X", "PUT"])
-
-
-@pytest.mark.parametrize("which,fail,why", [(None, (), "gh is not installed"),
-                                            ("/fake/gh", ("auth",), "gh is not signed in"),
-                                            ("/fake/gh", ("contents",), "gh could not upload case.json")])
-def test_no_gh_gives_an_issue_link(work, monkeypatch, which, fail, why):
-    monkeypatch.setattr(share, "_gh", FakeGh(fail=fail))
-    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: which)
-    _fixed_case(work)
-    stone("doctor", "share")
-    text, code, nxt = stone("doctor", "share", "--send")
-    assert f"Nothing was sent: {why}" in text and nxt.startswith("ask the person: open the link above, attach ")
-    url = next(ln for ln in text.splitlines() if ln.startswith("https://"))
-    q = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
-    assert url.startswith("https://github.com/baney75/smoothstone/issues/new?") and q["template"] == "print-fix.yml"
-    assert (q["failure"], q["cause"], q["printer"]) == ("bed_adhesion", "plate_contaminated", "creality_k2")
-    fields = re.findall(r"^\s+id: (\w+)$", (REPO / ".github" / "ISSUE_TEMPLATE" / "print-fix.yml").read_text(), re.M)
-    assert set(q) - {"template", "title"} <= set(fields)
 
 
 def test_no_declines_and_nothing_to_share(work):
@@ -327,7 +248,7 @@ def test_a_case_without_a_printer_asks_for_one(work):
     text, code, nxt = stone("doctor", "share")
     assert code == 1 and "stone doctor share --printer" in nxt
     text, code, nxt = stone("doctor", "share", "--printer", "bambu_p1s")
-    assert "Printer: bambu_p1s" in text and nxt == share.SEND_ASK
+    assert "Printer: bambu_p1s" in text and "Photo: none" in text and nxt == share.LINK_ASK
 
 
 # learning from shared cases
