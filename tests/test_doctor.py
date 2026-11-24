@@ -354,6 +354,18 @@ def test_f3sol_camera_takes_the_matching_printer(work, monkeypatch):
     assert case["camera"] == {"name": "big", "model": "creality-k2"}
 
 
+def test_f3_status_after_try_repeats_the_did_it_work_ask(work):
+    stone("doctor", "the print came off the bed")
+    text, code, nxt = stone("doctor", "try", "plate_contaminated")
+    assert stone("status")[2] == nxt and nxt.startswith("ask the person: did that fix it?")
+    assert "stone doctor try " in nxt  # the next thing to try if it did not
+
+
+def test_f4sol_status_after_an_unmatched_description_asks_for_one(work):
+    text, code, nxt = stone("doctor", "it looks weird")
+    assert stone("status")[2] == nxt and "None" not in nxt
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)

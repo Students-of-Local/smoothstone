@@ -455,11 +455,22 @@ def _question_next(q: dict) -> str:
     return f'ask the person: {q["ask"]} ({answers}) Then: stone doctor answer "<their answer>"'
 
 
+DESCRIBE = ("ask the person: what does the print look like (came loose, strings, gaps, a blob on the nozzle, "
+            'shifted layers)? Then: stone doctor "<their words>"')
+
+
 def case_next(case: dict) -> str:
+    """The one NEXT for the case's state: what the command printed, and what stone status repeats."""
     if case.get("state") == "fixed":
         return DONE
     if case.get("state") == "look":
+        if not case.get("image"):
+            return DESCRIBE
         return f'stone doctor "<what you see in {case["image"]}: the part, the plate, the nozzle>"'
+    if case.get("state") == "try":
+        left = [k for k, _ in top_causes(case["causes"], 99) if k not in case.get("tried", [])]
+        return ('ask the person: did that fix it? If it did: stone doctor fixed "<what worked>"'
+                + (f"; if not: stone doctor try {left[0]}" if left else ""))
     top = top_causes(case["causes"], 1)
     if case.get("question") and top and top[0][1] < SURE:
         return _question_next(case["question"])
@@ -611,8 +622,7 @@ def _new(args, job, said: str, out):
             out.next = case_next(case)
         else:
             out.add("No failure matched those words. The words each failure goes by: stone doctor looks")
-            out.next = ("ask the person: what does the print look like (came loose, strings, gaps, a blob on the "
-                        'nozzle, shifted layers)? Then: stone doctor "<their words>"')
+            out.next = case_next(case)
         return out
     case.update(state="asking", failures=d["failures"][:5], failure=d["failures"][0][0], causes=d["causes"],
                 question=d["question"], described=d["described"], asked=[], answers=[], tried=[])
@@ -669,10 +679,7 @@ def _try(job, case, f, p, cid, out):
     case["tried"] = [t for t in case.get("tried", []) if t != cid] + [cid]
     case["state"] = "try"
     save_case(job, case)
-    left = [k for k, _ in top_causes(case["causes"], 9) if k not in case["tried"]]
-    if left:
-        out.add(f"If it did not help: stone doctor try {left[0]}")
-    out.next = 'ask the person: did that fix it? If it did: stone doctor fixed "<what worked>"'
+    out.next = case_next(case)
     return out
 
 
