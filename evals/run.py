@@ -205,7 +205,8 @@ def main():
         log.update({"cli_timeout": a.cli_timeout, "cli": []})
     t0 = time.time()
     pending = ""
-    landmark_eval = "landmarks" in spec["expect"]
+    exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
+    landmark_eval = "landmarks" in exp
     one_landmark = a.driver == "next" and landmark_eval
     nxt = "stone landmark" if one_landmark else "stone status"
     print(f"{spec['id']}  {cond}  seed {a.seed}", flush=True)
@@ -215,7 +216,7 @@ def main():
     first = None  # an "asks" spec with follow-ups: the first phase must end in a question, not a part
     session = None  # claude and codex: the CLI's session, resumed for a follow-up
     for phase, say in enumerate(says):
-        if phase == 1 and spec["expect"].get("asks"):
+        if phase == 1 and spec.get("expect", {}).get("asks"):
             first = grade_job(job, spec, messages)
         if say:
             messages.append({"role": "user", "content": say})
@@ -313,11 +314,10 @@ def main():
                 print(f"{step:>2} (stopped, no tool call)", flush=True)
                 break
 
-    exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
     if landmark_eval:
         import landmarks_grade
 
-        grade = landmarks_grade.run(rdir, job, spec, log["steps"])
+        grade = landmarks_grade.run(rdir, job, {**spec, "expect": exp}, log["steps"])
     elif suite in MODELS:
         grade = models_run(rdir, job, spec)
     else:

@@ -93,8 +93,9 @@ def resolve(name: str, job_root: Path) -> dict:
         entities = _wiki({'action': 'wbgetentities', 'ids': ids,
                           'props': 'labels|descriptions|claims|sitelinks', 'languages': 'en'}).get('entities', {})
         forbidden = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
-        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate)\b', re.I)
-        place = re.compile(r'\b(district|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|island|river|lake|street|square|station|school|company)\b', re.I)
+        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel)\b', re.I)
+        # The words before the first place say what the thing is: a "human settlement in Tower Hamlets" is no tower.
+        kind = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named)\b', re.I)
         candidates = []
         for order, hit in enumerate(hits):
             entity = entities.get(hit['id'], {})
@@ -103,9 +104,13 @@ def resolve(name: str, job_root: Path) -> dict:
             description = hit.get('description', '')
             if forbidden.search(description):
                 continue
-            exact = (structure.search(description) or not place.search(description)) and any(' '.join(label.casefold().split()) == normalized for label in
+            # An exact name counts first only with evidence that this is a building: its own kind says so,
+            # or it has an architectural style, an architect or a count of floors.
+            named = any(' '.join(label.casefold().split()) == normalized for label in
                         (hit.get('label', ''), hit.get('match', {}).get('text', '')))
-            candidates.append(((bool(exact), bool(structure.search(description)), -order), hit, entity))
+            building = bool(structure.search(kind.split(description, maxsplit=1)[0])
+                            or any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101')))
+            candidates.append(((named and building, building, bool(structure.search(description)), named, -order), hit, entity))
         if not candidates:
             raise LandmarkProblem(f'No building with coordinates found for {name}.')
         _, hit, entity = max(candidates, key=lambda x: x[0])

@@ -97,8 +97,11 @@ def test_exact_landmark_outranks_a_nearby_structural_search_result(tmp_path, mon
     assert landmark_refs.resolve(requested["label"], tmp_path)["id"] == requested["id"]
 
 
-def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch):
-    place = {"id": "Q1", "label": "St Example's", "description": "district of a city"}
+@pytest.mark.parametrize("description", [
+    "district of a city", "human settlement in Tower Hamlets, England", "locality in a state", "mountain in the Alps",
+    "unincorporated community near Church Hill", "railway stop", ""])
+def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch, description):
+    place = {"id": "Q1", "label": "St Example's", "description": description}
     building = {"id": "Q2", "label": "St Example's Cathedral", "description": "cathedral in the city of Example"}
     coordinates = {"claims": {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]}}
 
@@ -111,6 +114,22 @@ def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch
     monkeypatch.setattr(landmark_refs, "_wiki", wiki)
     assert landmark_refs.resolve(place["label"], tmp_path)["id"] == building["id"]
     assert landmark_refs.resolve(building["label"], tmp_path / "again")["id"] == building["id"]
+
+
+def test_an_exact_name_with_a_building_style_outranks_a_longer_name(tmp_path, monkeypatch):
+    ruin = {"id": "Q1", "label": "The Example", "description": "ancient Roman ruin in Example"}
+    church = {"id": "Q2", "label": "Church by The Example", "description": "church in Example"}
+    claims = {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]}
+    style = {"P149": [{"mainsnak": {"datavalue": {"value": {"id": "Q9"}}}}]}
+
+    def wiki(params):
+        if params["action"] == "wbsearchentities":
+            return {"search": [church, ruin]}
+        return {"entities": {"Q1": {"claims": {**claims, **style}}, "Q2": {"claims": claims}, "Q9": {}}}
+
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(landmark_refs, "_wiki", wiki)
+    assert landmark_refs.resolve(ruin["label"], tmp_path)["id"] == "Q1"
 
 
 def test_separate_bell_tower_requires_a_wikidata_component_link():

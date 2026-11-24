@@ -15,7 +15,8 @@
         "architecture": "https://en.wikipedia.org/wiki/Florence_Cathedral#Plan_and_structure",
         "height_m": {"value": 114.5, "source": "https://www.wikidata.org/wiki/Q191739#P2048"},
         "length_m": {"value": 153, "source": "https://www.wikidata.org/wiki/Q191739#P2043"},
-        "width_m": {"value": 90, "source": "https://www.wikidata.org/wiki/Q191739#P2049"}
+        "width_m": {"value": 90, "source": "https://www.wikidata.org/wiki/Q191739#P2049",
+                     "tolerance": 0.09, "why": "Wikidata does not say where the 90 m is taken. The mapped outline is 97 m across its tribunes."}
       }
     }
   },

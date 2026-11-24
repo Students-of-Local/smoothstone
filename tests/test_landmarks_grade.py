@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 import trimesh
 
@@ -73,6 +74,14 @@ def test_landmark_grade_uses_printed_geometry_and_sourced_parts(tmp_path):
     assert good["height_m"]["built"] == pytest.approx(50, abs=.0001)
     assert good["features"] == {"west_spire": 2}
 
+    cited = {"length_m": {"value": 102, "source": "survey"}, "width_m": {"value": 55, "source": "survey"}}
+    spec["expect"]["landmarks"]["references"] = cited
+    wrong = landmarks_grade.grade(job, spec)
+    assert wrong["why"] == ["built width is 50.0 m at scale, survey says 55 m (4% tolerance)"]
+    cited["width_m"]["tolerance"] = .1
+    assert landmarks_grade.grade(job, spec)["pass"]
+    del spec["expect"]["landmarks"]["references"]
+
     refs["parts"][2].pop("feature_of")
     refs["reference_dimensions_m"]["width"] = 55
     ref_path.write_text(json.dumps(refs))
@@ -101,3 +110,31 @@ def test_labelled_pinnacles_must_stand_in_the_printed_mesh():
     assert landmarks_grade.standing_in_mesh(mesh, labels, 1., 2.) == 2
     block = trimesh.creation.box((100, 20, 32), transform=trimesh.transformations.translation_matrix([0, 0, 16]))
     assert landmarks_grade.standing_in_mesh(block, labels, 1., 2.) == 0
+
+
+@pytest.mark.parametrize("turn", [0., .5, 1.4])
+def test_pinnacles_are_counted_in_the_file_that_prints(tmp_path, turn):
+    """The print step lost one of two posts. The generator's own mesh still has both."""
+    at = trimesh.transformations.translation_matrix
+    base = trimesh.creation.box((100, 40, 10), transform=at([0, 0, 5]))
+    posts = [trimesh.creation.box((2, 2, 32), transform=at([x, 5, 16])) for x in (-30, 10)]
+    frame = trimesh.transformations.rotation_matrix(turn, [0, 0, 1])
+    generated = trimesh.util.concatenate([base, *posts]).apply_transform(frame)
+    labels = []
+    for x in (-30, 10):
+        ring = np.array([[x - 1, 4, 0, 1], [x + 1, 4, 0, 1], [x + 1, 6, 0, 1], [x - 1, 6, 0, 1]]) @ frame.T
+        labels.append({"height": {"metres": 30.}, "footprint": [ring[:, :2].tolist()]})
+    whole = landmarks_grade.modelprint.footprint_turn(generated, [])
+    kept = landmarks_grade.trimesh.util.concatenate(
+        [piece for piece in whole.split(only_watertight=False) if piece.extents[2] < 20 or piece.centroid[0] < 50])
+    to_print = at([7, 8, 0])
+    counted = []
+    for name, mesh in (("whole", whole), ("kept", kept)):
+        path = tmp_path / f"{name}.stl"
+        mesh.copy().apply_transform(to_print).export(path)
+        printed = landmarks_grade.printed_mesh(generated, [{"file": str(path), "to_print": to_print.tolist()}])
+        counted.append(landmarks_grade.standing_in_mesh(printed, labels, 1., 2.))
+    assert counted == [2, 1]
+    half = tmp_path / "half.stl"
+    whole.copy().apply_scale(.5).export(half)
+    assert landmarks_grade.printed_mesh(generated, [{"file": str(half), "to_print": np.eye(4).tolist()}]) is None

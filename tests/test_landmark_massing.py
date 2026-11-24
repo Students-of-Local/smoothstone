@@ -65,3 +65,51 @@ def test_low_walls_fill_only_the_unmapped_plan():
     assert low["height"]["metres"] == 30
     assert (plan ^ sections[2]).area() < 8
     assert (box(80, 0, 100, 40) - plan).area() < 1
+
+
+def _box(x0, y0, x1, y1):
+    return m3.CrossSection([[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]])
+
+
+def _mapped(identifier, top, base=0.):
+    return {"id": identifier, "source": "s", "roof_shape": "flat", "spire": False, "tags": {},
+            "height": {"metres": top, "guessed": False}, "min_height": {"metres": base}, "roof_height": {"metres": 0.}}
+
+
+def test_a_low_part_mapped_off_the_ground_is_not_buried_in_the_walls():
+    """An apse mapped from 8 to 12 m keeps its 12 m roof, on wall only up to its own base."""
+    outline = _box(0, 0, 100, 40)
+    apse = _box(60, 5, 80, 35)
+    sections = [_box(0, 0, 60, 40), apse]
+    records, plans, _, _ = landmark_massing.infer_massing(
+        [_mapped(1, 60.), _mapped(2, 12., 8.)], sections, outline,
+        {"tags": {"height": "30"}, "source": "s"}, {}, {"mode": "max", "mm": 200.}, set())
+    walls = {r["height"]["metres"]: plan for r, plan in zip(records, plans) if r.get("feature") == "lower_walls"}
+    assert set(walls) == {8., 30.}
+    assert (walls[30.] ^ apse).area() < 8
+    assert (apse - walls[8.]).area() < 1
+
+
+def _tower_pair(x, top, first):
+    return [(_mapped(first + i, top), _box(x - 4, y - 4, x + 4, y + 4)) for i, y in enumerate((-12, 12))]
+
+
+def test_west_towers_are_at_the_west_end():
+    """A taller pair beside the choir is not the west front, whichever way the long axis points."""
+    spans, center = np.array([100., 40.]), np.zeros(2)
+    west, east = _tower_pair(-44, 70., 1), _tower_pair(44, 75., 3)
+    for frame in (np.eye(2), -np.eye(2)):
+        both = [*west, *east]
+        for part, _ in both:
+            part.pop("feature", None)
+        assert landmark_massing._west_towers(both, frame, center, spans, 75.) @ [1, 0] == pytest.approx(-1)
+        assert [part.get("feature") for part, _ in both] == ["west_tower"] * 2 + [None] * 2
+        assert landmark_massing._west_towers(east, frame, center, spans, 75.) is None
+
+
+def test_a_north_south_church_takes_its_tower_pair_at_either_end():
+    frame, spans = np.array([[0., 1.], [-1., 0.]]), np.array([100., 40.])
+    for end in (-44, 44):
+        pair = [(_mapped(i, 70.), _box(x - 4, end - 4, x + 4, end + 4)) for i, x in enumerate((-12, 12))]
+        facing = landmark_massing._west_towers(pair, frame, np.zeros(2), spans, 70.)
+        assert facing @ [0, np.sign(end)] == pytest.approx(1)

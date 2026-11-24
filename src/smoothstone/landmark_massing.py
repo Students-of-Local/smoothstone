@@ -14,12 +14,16 @@ def _center(section):
 
 
 def _west_towers(parts, frame, center, spans, peak):
-    """Find the high, symmetric pair at one end of a Gothic footprint."""
+    """Find the high, symmetric pair at the west end of a Gothic footprint. A plan whose long axis runs
+    nearer north and south has no west end, so there a pair at either end counts."""
+    east = frame[0][0]
     candidates = []
     for part, section in parts:
         h = part["height"]["metres"]
         width = math.sqrt(section.area()) / spans[1]
         position = (frame @ _center(section) - center) / spans
+        if abs(east) >= .5 and position[0] * east > 0:
+            continue
         if (not part["height"]["guessed"] and h >= peak * .77 and .04 <= width <= .26
                 and part["min_height"]["metres"] < h * .3 and abs(position[0]) > .28):
             candidates.append((part, position, width, h))
@@ -172,8 +176,13 @@ def infer_massing(records, sections, outline, data, refs, target, styles):
             source = data["source"]
             # A part mapped lower than these walls keeps its height. Taller parts simply stand in them.
             # A gap too narrow to print beside a low part is map noise, not wall.
-            low = m3.CrossSection.batch_boolean([cs for p, cs in parts if p["min_height"]["metres"] <= .1
-                                                 and p["height"]["metres"] < height], m3.OpType.Add)
+            low = m3.CrossSection.batch_boolean([cs for p, cs in parts if p["height"]["metres"] < height], m3.OpType.Add)
+            # A low part mapped off the ground with nothing under it stands on wall up to its own base.
+            for part, section in list(parts):
+                base = part["min_height"]["metres"]
+                bare = (section ^ outline) - ground
+                if .1 < base and part["height"]["metres"] < height and bare.area() * size ** 2 > .64:
+                    parts.append((_new_part(f"wall-below-{part['id']}", bare, 0, base, 0, "flat", source, "lower_walls"), bare))
             missing = outline - low
             if not low.is_empty():
                 grain = .3 / size
