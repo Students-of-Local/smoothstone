@@ -51,9 +51,12 @@ recipe and the settings that make the part look its best, then let stone build a
   stone timelapse --fail (a model, not a recording: say so). Add a file path for an STL stone did not build.
   Read the command's card (strength.md and so on) the first time, and pass on the limits it prints.
 - For a part that carries a load or lives in heat, run the check before you call it done, even if not asked.
-  If they gave no weight or place, ask for it.
+  If they gave no weight or place, ask for it once; if they can't say, reply that the part is built and that is not checked.
+  Never make up a number.
+  Add material=, walls= and infill= when they said them.
 - A failed print: follow doctor.md, starting with stone doctor "<their words>" (--image for a photo). Don't name a
-  cause before stone does: pass on their answer (stone doctor answer "<their answer>") with no word on what it means. Read every SAFETY line. Never start, pause or cancel a print: tell the person that they do that.
+  cause before stone does: when they answer its question, run stone doctor answer "<their answer>" and say nothing about what it
+  means. Read every SAFETY line. Never start, pause or cancel a print: tell the person that they do that.
 - When NEXT says ask the person, ask that question in its own words and stop: no command in the same turn.
 
 ## Steps

@@ -8,8 +8,9 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   "Not placed yet", add those sizes to the stone set line first.
 - Think in at most 3 short lines, then call the tool.
 - Use the sizes in the request. Leave every other setting at its default.
-- If NEXT says ask the person, write that question as your reply, with no tool call, and stop.
-  When the person answers, run: stone note "<their answer>", then run the NEXT line it prints.
+- If NEXT says ask the person, reply with any SAFETY line and what stone found, then that question, with no tool
+  call, and stop. When the person answers, run the command NEXT names for the answer (stone doctor answer for
+  doctor's question); if it names none, stone note "<their answer>". Then run the NEXT line it prints.
 - If you lost track or your memory was cleared, run: stone status
 - A part for a product stone does not know: NEXT asks for its size (a round one: diameter and
   height) and where the numbers come from. Ask exactly that; never guess a size. Never note the
@@ -17,7 +18,10 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
   convert or round a number), then run the stone product add line NEXT gives.
 - For a phone case use the phone_case recipe and set phone to the exact model named (iphone_17, iphone_17_pro, iphone_17_pro_max or iphone_air). If no model is named, ask.
 - If the build says NEXT: stone colors, run it, then run the NEXT line it prints; it already follows the colors in the request. A FIX from stone colors: run only the NEXT line it gives, never stone build.
-- Stop when stone says the part is ready.
+- Stop when stone says the part is ready. First, if it holds something up (a hook, shelf, mount), run stone strength;
+  if it lives in heat (a car, sun, a dishwasher), run stone heat where=<place>. If they did not say the weight, what
+  holds the part, or the place, ask that and stop. If they can't say, do not ask again: say the part is built
+  and that is not checked, and stop.
 
 ## Landmarks
 For a landmark, call stone landmark "<name>" first, with just its name.
@@ -31,8 +35,7 @@ Follow its NEXT line. Stop when stone says the parts are ready.
    not placed yet, find the parameter in the list whose meaning fits and add name=value.
 4. stone set <recipe> name=value name=value
 5. stone build. If the build prints FIX, run the NEXT line it gives, then stone build again.
-   When every check passes, the build says Part ready. If the part holds something up (a hook, shelf, bracket), it is
-   not done yet: ask how heavy the thing is and stop. Their answer goes to stone strength (below). Else stop.
+   When every check passes, the build says Part ready. Then follow the Stop rule above.
 
 ## Figures
 For a figure, statue or bust of a person, pet or thing, the recipe is figure. Set height and
@@ -45,13 +48,14 @@ Run the line, tell the person what it says, then run NEXT. For a file of theirs,
 - Will it fit? stone fit
 - Will it hold a weight? stone strength load=3kg at=tip dir=down fixed=bottom, with their number and unit (20N, 3kg, 5lb), the spot it
   pushes on (at=) and what holds the part: fixed=holes for screws through its holes. If they gave no weight, ask.
+  Add material=PETG walls=4 infill=30 with their own values if they said them (heat takes material= too).
 - Will it take the heat, or warp? stone heat where=car (or sun, dishwasher, outdoor, 70C)
 - How long, or what will it look like? stone timelapse
 - Show it failing: stone timelapse --fail. Say it is a model, not a recording.
 
 ## A print failed
 Do not guess the cause. First run: stone doctor "<their words>" (with a photo: add --image <file>), then the NEXT line.
-Their answer to its question: stone doctor answer "<their answer>" (not stone note), and no word on what it means:
+Their answer to its question: stone doctor answer "<their answer>", and no word on what it means:
 doctor says the cause. They say it is fixed: stone doctor fixed "<what worked>". They say yes to sharing: stone doctor
 share. stone sends nothing; they submit it.
 Read every SAFETY line to the person. Never start, pause or cancel a print: they do that.

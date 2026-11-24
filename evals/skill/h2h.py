@@ -2,7 +2,8 @@
 
   python evals/skill/h2h.py OUT OLD_SKILL_DIR NEW_SKILL_DIR S|M|L [repeats]
 
-Haiku gets SKILL.md and the tier card, no tools, one message from scenarios.json, and writes its next commands.
+Haiku gets SKILL.md and the tier card, no tools, one message from scenarios.json, and writes its next commands (Haiku for
+every tier: it stands in for the 3B and frontier readers, it does not measure them).
 Opus grades both replies against the rubric without knowing which card wrote which. Both run as `claude -p` on the
 person's sign-in (ANTHROPIC_API_KEY removed). Each case's replies and scores go to OUT; the table is printed."""
 

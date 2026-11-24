@@ -130,9 +130,9 @@ def tier_rules(t: str, limit: int = 12) -> list[str]:
             rules.append("- " + s[2:].strip())
         elif inside and s[:1].isdigit() and ". " in s[:4]:
             rules.append("- " + s.split(". ", 1)[1].strip())
-        if len(rules) >= limit:
-            break
-    return rules
+        elif inside and s and rules:  # a rule wrapped onto the next line
+            rules[-1] += " " + s
+    return rules[:limit]
 
 
 DEFAULT_FILAMENTS = ("white", "black")
