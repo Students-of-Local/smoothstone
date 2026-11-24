@@ -2,6 +2,7 @@
 the video's frames up to it being the normal timelapse's."""
 
 import json
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -43,6 +44,39 @@ def test_a_forced_mode_is_a_what_if_and_needs_its_feature():
     tp, inp, fail, what_if = _story(_box((20, 20, 20), (0, 0, 0)), "detach")
     assert fail.kind == "detach" and what_if and "what-if" in fail.assumptions[-1]
     assert failvideo.choose(failsim.predict(inp), "bridge", inp) == (None, True)  # a cube has no bridge to sag
+
+
+def test_infill_is_not_read_as_bare_faces():
+    """A big infilled plate on the toolpath and on its mesh: one prediction, the same margin. A bore stays a bore."""
+    import trimesh
+
+    box = _box((60, 60, 4), (0, 0, 0))
+    tp = _toolpath(box)
+    inp = failvideo.inputs(tp)
+    got, mesh = failsim.predict(inp)[0], failsim.predict(failsim.inputs_from_mesh(box))[0]
+    assert got.kind == mesh.kind
+    assert got.numbers["margin"] == pytest.approx(mesh.numbers["margin"], rel=0.1)
+    ring = trimesh.creation.annulus(4, 12, 4)
+    tp = _toolpath(ring)
+    inp = failvideo.inputs(tp)
+    mid = inp.masks[len(inp.masks) // 2]
+    bore = np.array([130.0, 130.0]) - inp.origin
+    assert not mid[int(bore[1] / inp.cell), int(bore[0] / inp.cell)]
+    assert mid.sum() * inp.cell ** 2 == pytest.approx(np.pi * (144 - 16), rel=0.05)  # the infill's gaps are part of it
+
+
+def test_the_layer_height_is_not_the_first_layers():
+    tp = _toolpath(_box((10, 10, 3), (0, 0, 0)))
+    z = np.r_[0.2, 0.2 + 0.12 * np.arange(1, len(tp.layer_z))]
+    assert failvideo.inputs(replace(tp, layer_z=z)).layer == pytest.approx(0.12)
+    assert failvideo.inputs(replace(tp, layer_z=z), enclosed=False).enclosed is False
+
+
+def test_the_nozzle_stays_at_the_layer_while_the_strand_falls():
+    tp, inp, fail, _ = _story(_t())
+    _, frs, _, first, _ = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))
+    heads = [f["head"][2] for f in frs[first:] if f["layer"] == fail.layer]
+    assert heads == pytest.approx([float(inp.layer_z[fail.layer])] * len(heads), abs=1e-6)
 
 
 def test_spaghetti_falls_from_the_layer_and_rests_on_what_is_below():
@@ -193,6 +227,25 @@ def test_without_blender_the_prediction_still_comes_out(jobenv, tmp_path, monkey
     text, code = cli.run(["timelapse", str(stl), "--fail", "supports"])  # this print has supports: not predicted
     assert "What-if (drawn without supports, which this print has): supports at layer 21" in text and "Predicted" not in text, text
     assert "the what-if is above" in text.strip().splitlines()[-1], text
+
+
+def test_the_video_says_what_it_does_not_simulate(jobenv, tmp_path, monkeypatch):
+    from PIL import Image
+
+    def render(scene, frs, prof, cam, d, *a, **k):
+        d.mkdir(parents=True)
+        files = [d / f"{i}.png" for i in range(len(frs))]
+        [Image.new("RGB", (64, 48)).save(f) for f in files]
+        return files
+
+    monkeypatch.setattr(timelapse, "missing", lambda: None)
+    monkeypatch.setattr(timelapse, "render", render)
+    monkeypatch.setattr(timelapse, "video", lambda *a: 1.0)
+    monkeypatch.setattr(failvideo, "AFTER", 1)
+    stl = tmp_path / "p.stl"
+    _box((30, 20, 0.6), (0, 0, 0)).export(stl)
+    text, _ = cli.run(["timelapse", str(stl), "--fail", "--plate", "dirty"])
+    assert f"Limit: {failvideo.LIMIT}." in text, text
 
 
 @needs_blender

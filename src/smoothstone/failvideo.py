@@ -32,7 +32,9 @@ AFTER = 12  # layers drawn after the failure (assumption: enough to see it; the 
 LEAD = 30  # frames before the failure, evenly picked, so the failure is a good part of the video
 MOTION = 8  # frames of the failure itself
 STEP = 1.0  # mm between strand vertices
-MAX_SIM = 600.0  # mm of each layer's strand simulated; the rest drops straight down (assumption: speed)
+MAX_SIM = 600.0  # mm of each layer's strand simulated; the rest is drawn dropped straight down
+LIMIT = (f"past the first {MAX_SIM:.0f} mm of each layer, the plastic is drawn dropped straight down, neater than the "
+         "loose strands it makes")
 WHAT = {"supports": "lines with nothing under them print into air and fall (spaghetti)",
         "droop": "a ledge past the reach droops while soft, then curls up",
         "bridge": "a bridge past the usable length sags",
@@ -52,13 +54,30 @@ def layer_times(tp) -> np.ndarray:
     return np.maximum.accumulate(out)
 
 
-def inputs(tp, material: str = "PLA", clean: float = 1.0) -> failsim.Inputs:
-    """failsim's per-layer masks from the toolpath's extruding moves; supports count when it prints them."""
+def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True) -> failsim.Inputs:
+    """failsim's per-layer masks from the toolpath's extruding moves; supports count when it prints them. The gaps
+    in sparse infill are filled: failsim's masks are outlines, and it counts the infill's density itself."""
+    from scipy import ndimage
+
     ext = tp.extruding() & (tp.layer >= 0)
     F = timelapse.gcode.FEATURES
     sup = bool((ext & np.isin(tp.feature, [F.index("support"), F.index("support interface")])).any())
-    return failsim.inputs_from_segments(tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], tp.layer[ext], tp.layer_z,
-                                        layer_times(tp), material=material, clean=clean, supports=sup)
+    z = np.asarray(tp.layer_z, float)
+    thick = float(np.median(np.diff(z))) if len(z) > 1 else float(z[0]) if len(z) else 0.2  # the first layer may differ
+    inp = failsim.inputs_from_segments(tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], tp.layer[ext], z, layer_times(tp),
+                                       layer=thick, material=material, clean=clean, supports=sup, enclosed=enclosed)
+    infill = ext & (tp.feature == F.index("sparse infill"))
+    for i in np.unique(tp.layer[infill]):
+        sel, mk = infill & (tp.layer == i), inp.masks[i]
+        a, d = tp.p0[sel, :2], tp.p1[sel, :2] - tp.p0[sel, :2]
+        n = int(np.ceil(np.linalg.norm(d, axis=1).max() / inp.cell)) + 1
+        at = ((a + d * np.linspace(0, 1, n + 1)[:, None, None]).reshape(-1, 2) - inp.origin) // inp.cell
+        near = np.zeros(mk.shape, bool)
+        near[at[:, 1].astype(int), at[:, 0].astype(int)] = True
+        near = ndimage.binary_dilation(near, iterations=int(np.ceil(np.median(tp.width[sel]) / 2 / inp.cell)))
+        lab, _ = ndimage.label(~mk)
+        mk |= np.isin(lab, np.setdiff1d(lab[near], [0, lab[0, 0]]))  # a gap that touches infill, never one walls close off
+    return inp
 
 
 def _dist(below: np.ndarray, cell: float) -> np.ndarray:
@@ -167,7 +186,8 @@ class Story:
         return a + (b - a) * np.linspace(0, 1, n + 1)[:, None]
 
     def strand(self, moves, loose, scale=1.0, keep=False):
-        """One layer's air moves as one strand, in print order, free where loose. Returns drop_strand's frames when keep."""
+        """One layer's air moves as one strand, in print order, free where loose. Returns drop_strand's frames and the
+        nozzle's place on the path in each, when keep."""
         parts, printed = [], []
         if not len(moves):
             return []
@@ -194,7 +214,8 @@ class Story:
         pins = np.flatnonzero(~loose[r, c])
         sel = self.ext[moves]
         speed = float(np.median(self.tp.feed[moves][sel])) if sel.any() else 200.0
-        flow = self.flow * scale
+        area = float(np.median((self.tp.width * self.tp.height)[moves][sel])) if sel.any() else self.flow / speed
+        flow = area * speed * scale  # the plastic these moves lay
         rad = math.sqrt(flow / speed / math.pi)
         hf = failsim.Heightfield(self.field.copy(), self.cell, self.inp.origin)
         m = int(np.searchsorted(s, MAX_SIM, "right"))
@@ -207,11 +228,11 @@ class Story:
         tail[free, 2] = hf(tail[free, 0], tail[free, 1]) + rad
         rest = np.vstack([rest, tail])
         if m < len(R):
-            self.notes.append(f"past the first {MAX_SIM:.0f} mm of a layer's strand, plastic drops straight down (no simulation)")
+            self.notes.append(LIMIT)
         laid = rest[np.r_[seg, False] | np.r_[False, seg]]  # a travel between two pieces lays nothing
         np.maximum.at(self.field, self.px(laid), laid[:, 2] + rad)
         self.links.append((self.layer_now, rest[:-1][seg], rest[1:][seg], 2 * rad))
-        return [(f, seg[:max(0, len(f) - 1)], 2 * rad) for f in frs] if keep else []
+        return [(f, seg[:max(0, len(f) - 1)], 2 * rad, R[len(f) - 1]) for f in frs] if keep else []
 
     def bend(self, i, moves):
         """The lines of layer i over a piece that bends, or over what bent below."""
@@ -312,7 +333,7 @@ class Story:
             if i <= layer and len(a) and not (falling and i == layer):  # this layer's strand is still on its way down
                 add(a, b, w, w)
         if falling:
-            f, seg, w = motion
+            f, seg, w, _ = motion
             add(f[:-1][seg], f[1:][seg], w, w)
         for i, p, dz, dd, droops, since, w, h in self.bent:
             if i > layer:
@@ -380,7 +401,7 @@ def plan(tp, inp, fail, rgb, bed):
         picks = list(np.linspace(0.25, 1.0, MOTION // 2))
     for k, mo in enumerate(picks):
         frac = (k + 1) / len(picks)
-        head = list(mo[0][-1]) if st.kind == "supports" else fl["head"]
+        head = list(mo[3]) if st.kind == "supports" else fl["head"]
         t = (float(fail.time or 0) + k / 30.0) if st.kind == "detach" else t0 + frac * (float(lt[L]) - t0)
         frs.append({"t_s": t, "layer": L, "z_mm": float(tp.layer_z[L]), "full": full(L), "part": None, "head": head, "note": tag})
         extra.append(st.items(L, t, head, motion=None if st.kind in ("droop", "bridge") else mo,
@@ -470,7 +491,7 @@ def cmd(args, job, prof, out):
         note = [f"material: the model has no {mat}, so this is PLA's"]
         mat = "PLA"
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
-    inp = inputs(tp, mat, clean)
+    inp = inputs(tp, mat, clean, prof.get("enclosed", True))
     fails = failsim.predict(inp)
     fail, what_if = choose(fails, mode, inp)
     taken = without and asked != "off"
@@ -543,6 +564,8 @@ def cmd(args, job, prof, out):
     js.write_text(json.dumps(data, indent=1, default=float))
     out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s; from layer {(fail.layer or 0) + 1} on: the model, closer in, "
             "only the nozzle drawn)")
+    if LIMIT in st.notes:
+        out.add(f"Limit: {LIMIT}.")
     out.add(f"Sheet: {png}")
     out.add(f"Data: {js} ({time.time() - t_start:.0f} s)")
     out.result = f"failure video made: {fail.kind}{' (what-if)' if what_if else ''}"

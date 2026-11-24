@@ -60,8 +60,11 @@ stone timelapse plate.stl --fail --plate dirty ->
   Why: edge pull 2.69 MPa against a plate bond of 1.11 MPa (margin 0.41).
   Main assumption: A contaminated plate keeps the same fraction of its hold as PP keeps of
   PLA's on a clean plate. (failsim.contamination)
+  Limit: past the first 600 mm of each layer, the plastic is drawn dropped straight down, neater
+  than the loose strands it makes.
   NEXT: ask the person: the model says this print fails (detach); print it with a clean plate and a
   brim?
 Reply: In the model, a dirty plate lets go after the first layer. The edges pull harder (2.7 MPa)
-than the plate holds (1.1 MPa). Then the plastic lands in loose strands and a blob grows on the
-nozzle. Shall we clean the plate with soap and water and add a brim? (I took it as PLA.)
+than the plate holds (1.1 MPa). Then later layers print into air and a blob grows on the nozzle.
+The model draws those layers neater than a real mess. Shall we clean the plate with soap and water
+and add a brim? (I took it as PLA.)
