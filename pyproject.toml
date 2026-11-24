@@ -18,6 +18,7 @@ dependencies = [
     "manifold3d>=3.0",
     "fast-simplification>=0.1",
     "opencv-python-headless>=4.10",
+    "pyamg>=5.4.1",
 ]
 
 [project.scripts]
