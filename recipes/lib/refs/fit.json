@@ -1,0 +1,332 @@
+{
+ "about": "Printed size and fit: how far FDM prints miss a modeled size, per material and per feature, and the clearance each kind of fit takes. Per side means half the diameter difference. Entries with an assumption key are stone's modeling choices, said in the output where they matter.",
+ "entries": [
+  {
+   "id": "fit.hole_error",
+   "topic": "fit",
+   "key": "hole_error",
+   "value": 0.2,
+   "unit": "mm",
+   "note": "Diameter a vertical hole prints small, with outer sizes true: a 45 mm hole printed 44.80 mm on a Creality Ender-3 Pro, PLA, 0.4 mm nozzle, 0.2 mm layers, after flow and steps calibration. stone uses 0.10 mm per side as the typical hole error on a printer it has not calibrated. One printer and one hole size: an assumption for other printers until a coupon is measured.",
+   "quote": "The test print showed inaccuracies in the internal dimensions of the object (44.80 mm), although the correct values were entered in the slicer software for the external dimensions, which were again printed accurately.",
+   "source": "Grgic, Karakasic, Glavas, Konjatic: Accuracy of FDM PLA Polymer 3D Printing Technology Based on Tolerance Fields. Processes 2023, 11, 2810 (CC BY 4.0)",
+   "cite": "Grgic et al. 2023, Processes",
+   "url": "https://doi.org/10.3390/pr11102810",
+   "assumption": "the same 0.10 mm per side for every hole size and printer until calibrated",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.hole_expansion",
+   "topic": "fit",
+   "key": "hole_expansion",
+   "value": 0.13,
+   "unit": "mm",
+   "note": "Per side offset the same study settled on to print holes to size (Cura Hole Horizontal Expansion); the top of the range stone gives for typical hole error.",
+   "quote": "It was found that the Horizontal Expansion parameter should be 0.0 mm and the Hole Horizontal Expansion parameter should be 0.13 mm.",
+   "source": "Grgic, Karakasic, Glavas, Konjatic: Accuracy of FDM PLA Polymer 3D Printing Technology Based on Tolerance Fields. Processes 2023, 11, 2810 (CC BY 4.0)",
+   "cite": "Grgic et al. 2023, Processes",
+   "url": "https://doi.org/10.3390/pr11102810",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.outer_error",
+   "topic": "fit",
+   "key": "outer_error",
+   "value": 0.0,
+   "unit": "mm",
+   "note": "Outer sizes print true on a calibrated printer in the same study; stone uses 0.0 mm per side as typical.",
+   "quote": "although the correct values were entered in the slicer software for the external dimensions, which were again printed accurately",
+   "source": "Grgic, Karakasic, Glavas, Konjatic: Accuracy of FDM PLA Polymer 3D Printing Technology Based on Tolerance Fields. Processes 2023, 11, 2810 (CC BY 4.0)",
+   "cite": "Grgic et al. 2023, Processes",
+   "url": "https://doi.org/10.3390/pr11102810",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.outer.pla_mk4",
+   "topic": "fit",
+   "key": "outer_pla",
+   "value": [
+    -0.092,
+    -0.017
+   ],
+   "unit": "mm",
+   "note": "Prusa MK4, 0.4 mm nozzle, 0.15 mm layers, CMM per ISO 10360-2, 480 parts. Width (25.1 mm) -0.062 to -0.017 mm, length (152.0 mm) -0.092 to -0.036 mm, height +0.013 to +0.032 mm.",
+   "quote": "For the PLA dataset (15-70%), the trend is unambiguous: W is smaller than the original in all cases (dWref = -0.0620 to -0.0170 mm), L is smaller than the original in all cases (dLref = -0.0920 to -0.0360 mm)",
+   "source": "Fales, Cernohlavek, Suszynski, Sterba, Balcar, Houska: 3D Printing, Dimensional Accuracy and Stability of PLA and PETG Prints Using the FDM Technology. Manufacturing Technology 2026, 26(2)",
+   "cite": "Fales et al. 2026, Manufacturing Technology",
+   "url": "https://doi.org/10.21062/mft.2026.020",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.outer.petg_mk4",
+   "topic": "fit",
+   "key": "outer_petg",
+   "value": [
+    -0.09,
+    -0.024
+   ],
+   "unit": "mm",
+   "note": "Same study, PETG: width -0.046 to -0.024 mm, length -0.090 to -0.076 mm.",
+   "quote": "For the PETG dataset (15-70%), the bias relative to the original is likewise consistent: W is smaller than the original in all cases (dWref = -0.024 to -0.046 mm), L is smaller than the original in all cases (dLref = -0.076 to -0.090 mm)",
+   "source": "Fales, Cernohlavek, Suszynski, Sterba, Balcar, Houska: 3D Printing, Dimensional Accuracy and Stability of PLA and PETG Prints Using the FDM Technology. Manufacturing Technology 2026, 26(2)",
+   "cite": "Fales et al. 2026, Manufacturing Technology",
+   "url": "https://doi.org/10.21062/mft.2026.020",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.accuracy",
+   "topic": "fit",
+   "key": "accuracy",
+   "value": 0.2,
+   "unit": "mm",
+   "note": "Maker's accuracy claim; stone prints sizes on a printer it has not calibrated as plus or minus this.",
+   "quote": "An Original Prusa will be accurate to at least 0.2 mm, but you also need to remember that different materials can warp or shrink during printing.",
+   "source": "Modeling with 3D printing in mind | Prusa Knowledge Base",
+   "cite": "Prusa Knowledge Base",
+   "url": "https://help.prusa3d.com/article/modeling-with-3d-printing-in-mind_164135",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.accuracy.desktop",
+   "topic": "fit",
+   "key": "accuracy_desktop",
+   "value": {
+    "percent": 0.5,
+    "lower_limit": 0.5
+   },
+   "unit": "mm",
+   "note": "Service bureau figure for desktop FDM: plus or minus 0.5 percent, at least plus or minus 0.5 mm. The loose bound.",
+   "quote": "Dimensional tolerance | prototyping (desktop): ± 0.5% (lower limit: ± 0.5 mm) industrial: ± 0.15% (lower limit: ± 0.2 mm)",
+   "source": "What is the dimensional accuracy of 3D printed parts? | Protolabs Network (Hubs)",
+   "cite": "Protolabs Network (Hubs)",
+   "url": "https://www.hubs.com/knowledge-base/dimensional-accuracy-3d-printed-parts/",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.elephant_foot",
+   "topic": "fit",
+   "key": "elephant_foot",
+   "value": 0.2,
+   "unit": "mm",
+   "note": "Per side the first layer squashes out with a 0.4 mm nozzle (PrusaSlicer's compensation value). stone recipes already inset the bed edge 0.4 mm (lib/stone.scad BED_CHAMFER), so a recipe hole that opens at the bed flares instead.",
+   "quote": "When printing the first layer is squished against the heated print bed and as a result, it's usually a bit wider than it should be. ... Values around 0.2 mm usually work well for the default 0.4 mm nozzle.",
+   "source": "Elephant foot compensation | Prusa Knowledge Base",
+   "cite": "Prusa Knowledge Base: elephant foot",
+   "url": "https://help.prusa3d.com/article/elephant-foot-compensation_114487",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.shrink.abs",
+   "topic": "fit",
+   "key": "shrink_abs",
+   "material": "ABS",
+   "value": 0.22,
+   "unit": "%",
+   "note": "XY shrinkage compensation Prusa ships for this material on the enclosed Core One (*C1_SH_ABS*). stone scales hole and outer sizes down by it. Track S's materials data may replace this.",
+   "quote": "[filament:*C1_SH_ABS*] filament_shrinkage_compensation_xy = 0.22%",
+   "source": "PrusaSlicer system profiles, PrusaResearch 2.5.16 bundle (Core One filament shrink sections)",
+   "cite": "PrusaSlicer Core One filament profiles",
+   "url": "https://github.com/prusa3d/PrusaSlicer-settings-prusa-fff/blob/main/PrusaResearch/2.5.16.ini",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.shrink.asa",
+   "topic": "fit",
+   "key": "shrink_asa",
+   "material": "ASA",
+   "value": 0.22,
+   "unit": "%",
+   "note": "XY shrinkage compensation Prusa ships for this material on the enclosed Core One (*C1_SH_ASA*). stone scales hole and outer sizes down by it. Track S's materials data may replace this.",
+   "quote": "[filament:*C1_SH_ASA*] filament_shrinkage_compensation_xy = 0.22%",
+   "source": "PrusaSlicer system profiles, PrusaResearch 2.5.16 bundle (Core One filament shrink sections)",
+   "cite": "PrusaSlicer Core One filament profiles",
+   "url": "https://github.com/prusa3d/PrusaSlicer-settings-prusa-fff/blob/main/PrusaResearch/2.5.16.ini",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.shrink.pc",
+   "topic": "fit",
+   "key": "shrink_pc",
+   "material": "PC",
+   "value": 0.18,
+   "unit": "%",
+   "note": "XY shrinkage compensation Prusa ships for this material on the enclosed Core One (*C1_SH_PC*). stone scales hole and outer sizes down by it. Track S's materials data may replace this.",
+   "quote": "[filament:*C1_SH_PC*] filament_shrinkage_compensation_xy = 0.18%",
+   "source": "PrusaSlicer system profiles, PrusaResearch 2.5.16 bundle (Core One filament shrink sections)",
+   "cite": "PrusaSlicer Core One filament profiles",
+   "url": "https://github.com/prusa3d/PrusaSlicer-settings-prusa-fff/blob/main/PrusaResearch/2.5.16.ini",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.shrink.pa",
+   "topic": "fit",
+   "key": "shrink_pa",
+   "material": "PA",
+   "value": 0.28,
+   "unit": "%",
+   "note": "XY shrinkage compensation Prusa ships for this material on the enclosed Core One (*C1_SH_PA11*). stone scales hole and outer sizes down by it. Track S's materials data may replace this.",
+   "quote": "[filament:*C1_SH_PA11*] filament_shrinkage_compensation_xy = 0.28%",
+   "source": "PrusaSlicer system profiles, PrusaResearch 2.5.16 bundle (Core One filament shrink sections)",
+   "cite": "PrusaSlicer Core One filament profiles",
+   "url": "https://github.com/prusa3d/PrusaSlicer-settings-prusa-fff/blob/main/PrusaResearch/2.5.16.ini",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.shrink.pla",
+   "topic": "fit",
+   "key": "shrink_pla",
+   "material": "PLA",
+   "value": 0.06,
+   "unit": "%",
+   "note": "Computed: the largest length shortfall, 0.092 mm on 152.01 mm, is 0.06 percent; Prusa ships no shrink compensation for PLA or PETG. stone uses 0.06 percent for PLA and PETG. Track S's materials data may replace this.",
+   "quote": "L is smaller than the original in all cases (dLref = -0.0920 to -0.0360 mm) ... the result for dimension L was L = 152.010 mm",
+   "source": "Fales, Cernohlavek, Suszynski, Sterba, Balcar, Houska: 3D Printing, Dimensional Accuracy and Stability of PLA and PETG Prints Using the FDM Technology. Manufacturing Technology 2026, 26(2)",
+   "cite": "Fales et al. 2026, Manufacturing Technology",
+   "url": "https://doi.org/10.21062/mft.2026.020",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.shrink.petg",
+   "topic": "fit",
+   "key": "shrink_petg",
+   "material": "PETG",
+   "value": 0.06,
+   "unit": "%",
+   "note": "Computed: 0.090 mm on 152.01 mm is 0.06 percent.",
+   "quote": "L is smaller than the original in all cases (dLref = -0.076 to -0.090 mm)",
+   "source": "Fales, Cernohlavek, Suszynski, Sterba, Balcar, Houska: 3D Printing, Dimensional Accuracy and Stability of PLA and PETG Prints Using the FDM Technology. Manufacturing Technology 2026, 26(2)",
+   "cite": "Fales et al. 2026, Manufacturing Technology",
+   "url": "https://doi.org/10.21062/mft.2026.020",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.class.press",
+   "topic": "fit",
+   "key": "press",
+   "value": [
+    -0.1,
+    0.05
+   ],
+   "unit": "mm",
+   "note": "Per side, modeled; negative is interference. The band stone's engineering grader uses for a rigid press fit.",
+   "quote": "Press in a rigid plastic: no published range found either; we take the narrow conservative band of 0.1 mm interference to 0.05 mm gap (a quarter of a 0.4 mm line or less).",
+   "source": "smoothstone evals/engineering_grade.py FIT table",
+   "cite": "smoothstone engineering grader",
+   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "assumption": "no published range; the grader's conservative band",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.class.snug",
+   "topic": "fit",
+   "key": "snug",
+   "value": [
+    0.05,
+    0.25
+   ],
+   "unit": "mm",
+   "note": "Per side, modeled. Holds by friction, comes apart by hand: a lid, a cap.",
+   "quote": "PLA and PETG slip 0.15 to 0.45 and snug 0.05 to 0.25, TPU 0.3 interference to 0.1 gap: the owner's ranges (smoothstone engineering program, 2026-11-22). No maker publishes a printed-fit table that covers these, so they stand as given.",
+   "source": "smoothstone evals/engineering_grade.py FIT table",
+   "cite": "smoothstone engineering grader",
+   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "assumption": "the owner's ranges; no maker table",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.class.slide",
+   "topic": "fit",
+   "key": "slide",
+   "value": [
+    0.15,
+    0.45
+   ],
+   "unit": "mm",
+   "note": "Per side, modeled. Slides in and out with no force: a product in a case, a peg in a hole. Prusa's starting point for movable parts, 0.3 mm, is inside it.",
+   "quote": "PLA and PETG slip 0.15 to 0.45 and snug 0.05 to 0.25, TPU 0.3 interference to 0.1 gap: the owner's ranges (smoothstone engineering program, 2026-11-22). No maker publishes a printed-fit table that covers these, so they stand as given.",
+   "source": "smoothstone evals/engineering_grade.py FIT table",
+   "cite": "smoothstone engineering grader",
+   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "assumption": "the owner's ranges; no maker table",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.class.loose",
+   "topic": "fit",
+   "key": "loose",
+   "value": [
+    0.45,
+    0.8
+   ],
+   "unit": "mm",
+   "note": "Per side, modeled. Free play: a snap-fit connector or a hinge pin. Starts where slide ends; Hubs gives 0.5 mm for FDM snap-fit connectors and the UZH guide 0.5 mm for moving parts. The 0.8 mm top is an assumption.",
+   "quote": "We recommend these nominal clearances: FDM (fused deposition modeling): 0.5mm",
+   "source": "How to design snap-fit joints for 3D printing | Protolabs Network (Hubs)",
+   "cite": "Protolabs Network (Hubs) snap-fit guide",
+   "url": "https://www.hubs.com/knowledge-base/how-design-snap-fit-joints-3d-printing/",
+   "assumption": "the 0.8 mm upper end",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.class.tpu",
+   "topic": "fit",
+   "key": "tpu",
+   "value": [
+    -0.3,
+    0.1
+   ],
+   "unit": "mm",
+   "note": "Per side, modeled, any fit in TPU: it stretches on.",
+   "quote": "PLA and PETG slip 0.15 to 0.45 and snug 0.05 to 0.25, TPU 0.3 interference to 0.1 gap: the owner's ranges (smoothstone engineering program, 2026-11-22). No maker publishes a printed-fit table that covers these, so they stand as given.",
+   "source": "smoothstone evals/engineering_grade.py FIT table",
+   "cite": "smoothstone engineering grader",
+   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "assumption": "the owner's ranges; no maker table",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.slide_ref",
+   "topic": "fit",
+   "key": "slide_ref",
+   "value": 0.2,
+   "unit": "mm",
+   "note": "Per side: the tightest coupon peg that slides on a typical printer. A printer whose tightest sliding peg is 0.1 mm looser than this shifts every class 0.1 mm looser. Also the skill's own peg-in-hole number.",
+   "quote": "A peg in a hole: 0.2 mm. A press fit: 0.05 to 0.1 mm.",
+   "source": "smoothstone skill/research.md, step 5",
+   "cite": "smoothstone research card",
+   "url": "https://github.com/baney75/smoothstone/blob/main/skill/research.md",
+   "assumption": "the reference a calibration is measured against",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "fit.fragments",
+   "topic": "fit",
+   "key": "fragments",
+   "value": "n = $fn if $fn > 0, else ceil(max(min(360 / $fa, r * 2 * PI / $fs), 5))",
+   "unit": "formula",
+   "note": "How many straight sides OpenSCAD gives a circle. Its corners sit on the radius, so a hole's flats sit at r cos(180/n degrees): a pin sees that smaller circle. Exact geometry, checked against OpenSCAD's own mesh in tests/test_fit.py.",
+   "quote": "echo(n=($fn>0?($fn>=3?$fn:3):ceil(max(min(360/$fa,r*2*PI/$fs),5))),a_based=floor(360/$fa),s_based=floor(r*2*PI/$fs));",
+   "source": "OpenSCAD User Manual: Other Language Features, Circle resolution",
+   "cite": "OpenSCAD manual",
+   "url": "https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Other_Language_Features",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "bearing.608",
+   "topic": "bearing",
+   "key": "608",
+   "value": {
+    "bore": 8,
+    "outside": 22,
+    "width": 7
+   },
+   "unit": "mm",
+   "note": "The ISO 15 series 60 size skateboards, spinners and printer idlers use.",
+   "quote": "the bearings are the industrial standard \"608\" size, with a bore of 8 or 10 mm (0.315 or 0.394 inches) depending on the axle, an outer diameter of 22 mm (0.866 inches), and a width of 7 mm (0.276 inches)",
+   "source": "Skateboard | Wikipedia",
+   "cite": "Wikipedia: Skateboard",
+   "url": "https://en.wikipedia.org/wiki/Skateboard",
+   "checked": "2026-11-24"
+  }
+ ]
+}

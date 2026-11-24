@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import config
 
-FILES = ("filament", "standards", "design")
+FILES = ("filament", "standards", "design", "fit")
 
 
 def refs_dir() -> Path:
@@ -418,6 +418,7 @@ TOPICS = {
     "gridfinity": "gridfinity.", "keystone": "keystone.", "ada": "ada.", "sign": "legibility.",
     "contrast": "wcag.", "wcag": "wcag.", "colors": "color.", "color": "color.", "harmony": "harmony.",
     "edges": "edge.", "edge": "edge.", "text": "text.", "legibility": "legibility.", "food": "any.food.",
+    "fit": "fit.", "tolerance": "fit.", "bearing": "bearing.", "bearings": "bearing.",
 }
 
 
