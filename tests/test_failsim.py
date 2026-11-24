@@ -100,14 +100,71 @@ def test_hanging_strand_chain_matches_the_catenary_within_one_percent():
 
 def test_bond_and_warp_stress_match_the_hand_numbers():
     lam = (3 / (0.5 * 0.5 ** 3)) ** 0.25  # Hetenyi, a 0.5 mm strip on a 0.5 mm first layer
-    assert fs.bond_stress("PETG") == pytest.approx(2 * 102 * lam / 25, rel=1e-9)  # 21.5 MPa, under PETG's 23
-    assert fs.bond_stress("PLA") == 31  # 48.6 MPa from the peel, capped at PLA's Z strength
+    assert fs.bond_stress("PETG", bed=20) == pytest.approx(2 * 102 * lam / 25, rel=1e-9)  # 21.5 MPa, under 23
+    # 48.6 MPa from the peel, capped at PLA's Z strength at the 50 C plate: 31 x 0.73
+    assert fs.bond_stress("PLA") == pytest.approx(31 * 0.73, rel=1e-9)
+    assert fs.bond_stress("ABS") == pytest.approx(28 * 0.23, rel=1e-9)  # at 100 C ABS keeps 0.23
     m = fs.material("PLA")
     ts = np.linspace(m.bed, m.tg, 4001)
     sig = m.cte * m.e * np.trapezoid(m.ratio(ts), ts)
     assert fs.layer_stress("PLA") == pytest.approx(sig, rel=1e-4)
-    assert fs.edge_stress("PLA", 12) == pytest.approx(6 * sig, rel=1e-4)
+    assert fs.layer_stress("PLA", 70) == 0.0  # above Tg: stress-free
     assert fs.layer_stress("PETG") == 0.0  # the K2's 70 C plate is above PETG's 66 C Tg
+    assert np.allclose(fs.layer_stress("PLA", np.array([50.0, 70.0])), [sig, 0.0])
+    # one stress through the stack: sigma x min(sqrt(3 n), 3), Hetenyi for thin stacks, the edge zone after
+    for n, k in ((1, math.sqrt(3)), (2, math.sqrt(6)), (12, 3.0)):
+        got = fs.edge_stress("PLA", [m.bed] * n)
+        assert got["edge"] == pytest.approx(k * fs.layer_stress("PLA"), rel=1e-9), n
+        assert got["moment"] == pytest.approx(fs.layer_stress("PLA") * (n * 0.2) ** 2 / 2, rel=1e-9)
+    # a 40 mm stack on a 10 mm wide footprint: only the 50 layers within 10 mm of the plate load it
+    tall = fs.edge_stress("PLA", [35.0] * 200, band=10.0)
+    assert tall["moment"] == pytest.approx(fs.layer_stress("PLA", 35) * 10 ** 2 / 2, rel=1e-9)
+    assert tall["edge"] == pytest.approx(3 * fs.layer_stress("PLA", 35), rel=1e-9)
+
+
+def test_column_temperatures_match_the_fin_formula():
+    # a 20 x 20 mm solid PLA column, 20 mm tall, fan on: a fin with a convective tip
+    n, a, p, k, h, tb, ta = 100, 400.0, 80.0, 0.13, 100.0, 50.0, 35.0
+    got = fs.column_temps("PLA", [a] * n, [p] * n, [1.0] * n, 0.2, tb, ta, True)
+    mm = math.sqrt(h * p * 1e-3 / (k * a * 1e-6))  # 1/m
+    big, x = n * 0.2e-3, (np.arange(n) + 0.5) * 0.2e-3
+    r = h / (mm * k)
+    fin = ta + (tb - ta) * (np.cosh(mm * (big - x)) + r * np.sinh(mm * (big - x))) / (np.cosh(mm * big) + r * np.sinh(mm * big))
+    assert np.abs(got - fin).max() < 0.02 * (tb - ta)
+    one = fs.column_temps("PLA", [a], [p], [1.0], 0.2, tb, ta, True)[0]
+    g, loss = k * a / 0.2 * 1e-3, h * (p * 0.2 + a) * 1e-6  # one layer: half a layer down to the plate
+    assert one == pytest.approx((2 * g * tb + loss * ta) / (2 * g + loss), rel=1e-12)
+    sec = fs.printed_section([_rect((44, 44), 2, 42, 2, 42)] * 20, 0.5)  # 20 x 20 mm, 4 mm tall
+    assert sec["area"][0] == pytest.approx(400) and sec["perimeter"][0] == pytest.approx(80)
+    assert sec["share"][0] == sec["share"][-1] == 1.0  # bottom and top shells
+    wall = 1 - (20 - 2 * 1.0) ** 2 / 400  # two loops, 0.87 mm, land on 2 cells of 0.5 mm
+    assert sec["share"][8] == pytest.approx(wall + 0.15 * (1 - wall), rel=1e-9)
+
+
+def _box(ext, cell, **kw):
+    b = trimesh.creation.box(extents=ext)
+    b.apply_translation([0, 0, ext[2] / 2])
+    return fs.predict(fs.inputs_from_mesh(b, cell=cell, **kw))
+
+
+# PLA on the K2 with a clean textured PEI plate at the profile's settings: these print fine in practice
+@pytest.mark.parametrize("ext, cell, kw", [
+    ((20, 20, 20), 0.25, {}),
+    ((20, 20, 40), 0.25, {"infill": 100}),
+    ((20, 20, 40), 0.25, {}),
+    ((100, 60, 2), 0.5, {}),
+    ((150, 20, 10), 0.5, {}),
+    ((10, 10, 60), 0.25, {}),
+], ids=["cube20", "block40_solid", "block40_15pct", "plate100x60x2", "bar150x20x10", "tower10x10x60"])
+def test_pla_parts_that_print_fine_predict_none(ext, cell, kw):
+    got = _box(ext, cell, **kw)
+    assert [f.kind for f in got] == ["none"], got[0].numbers
+    n = got[0].numbers
+    assert n["edge_stress_mpa"] < n["bond_mpa"] and n["margin"] > 1.5
+    assert n["tip_drive_nmm"] < n["tip_hold_nmm"]
+    if ext == (10, 10, 60):  # no brim: the moment balance says it stands, 4.8 N mm against 200 N mm
+        assert n["tip_drive_nmm"] == pytest.approx(n["push_n"] * 60, abs=0.01)
+        assert n["tip_hold_nmm"] == pytest.approx(0.40 * 10 * 10 ** 2 / 2, abs=0.5)
 
 
 def test_clean_plate_keeps_the_flat_plate_and_a_dirty_one_lets_go():
@@ -117,9 +174,20 @@ def test_clean_plate_keeps_the_flat_plate_and_a_dirty_one_lets_go():
     dirty = fs.predict(fs.Inputs(plate, 0.5, clean=fs.fact("contamination")))
     first = dirty[0]
     assert (first.kind, first.layer, first.taxonomy) == ("detach", 0, "bed_adhesion")
-    # hand: sqrt(3) x 1.38 MPa = 2.39 MPa at the edge against 31 MPa x 0.049 = 1.52 MPa
-    assert first.numbers["edge_stress_mpa"] == pytest.approx(math.sqrt(3) * fs.layer_stress("PLA"), abs=0.01)
-    assert first.numbers["bond_mpa"] == pytest.approx(31 * 0.049, abs=0.01)
+    # hand: one layer at T0 (just under the 50 C plate): sigma(T0) x sqrt(3 r_plate / r_T0) against 22.6 x 0.049
+    m, t0 = fs.material("PLA"), first.numbers["bottom_c"]
+    hand = fs.layer_stress("PLA", t0) * math.sqrt(3 * m.ratio(50) / m.ratio(t0))
+    assert first.numbers["edge_stress_mpa"] == pytest.approx(hand, abs=0.02)
+    assert first.numbers["bond_mpa"] == pytest.approx(31 * 0.73 * 0.049, abs=0.01)
+
+
+def test_abs_slab_on_an_open_printer_lifts_and_pla_does_not():
+    abs_ = _box((150, 150, 10), 0.5, material="ABS", enclosed=False)[0]
+    assert (abs_.kind, abs_.taxonomy) == ("detach", "warping")
+    assert abs_.numbers["air_c"] == 25 and abs_.numbers["edge_stress_mpa"] > abs_.numbers["bond_mpa"]
+    assert abs_.layer < 50
+    pla = _box((150, 150, 10), 0.5, enclosed=False)
+    assert [f.kind for f in pla] == ["none"], pla[0].numbers
 
 
 def test_toppling_layer_of_a_block_matches_the_hand_moment_balance():
