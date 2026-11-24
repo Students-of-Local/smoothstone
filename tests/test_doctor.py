@@ -547,7 +547,7 @@ def test_image_vote_never_outranks_the_two_likeliest_described():
         ranked = [f for f, _ in d["failures"]]
         assert ranked[0] == want and _held(d), ranked
     d = doctor.diagnose("", None, None, [], {"spaghetti": 0.6})
-    assert d["failures"][0][0] == "spaghetti"  # with nothing described, the vote alone still ranks
+    assert not d["failures"]  # with nothing described, the vote alone diagnoses nothing
 
 
 @pytest.mark.parametrize("votes", [{"bed_adhesion": 1.0}, {"bed_adhesion": 0.5, "spaghetti": 0.5}, {"spaghetti": 1.0}])

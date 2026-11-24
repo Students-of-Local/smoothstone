@@ -194,13 +194,13 @@ def score(split: str, skill: str | None = None) -> dict:
     near = neighbors()
     held = {r["file"] for r in _rows(SPLIT) if r["split"] == "heldout"}
     out = {}
-    for way in ("words", "looks", "looks_only", "knn", "knn_strict", "knn_only"):
+    for way in ("words", "looks", "looks_only", "knn", "knn_strict"):
         rows, strict = [], split == "dev" or way == "knn_strict"  # tuning on dev sees no held-out label
         for f, r in sorted(runs.items()):
-            said = "" if way in ("looks_only", "knn_only") else r["words"]
+            said = "" if way == "looks_only" else r["words"]
             nb = [n for n in near.get(f, []) if not strict or n[0] not in held]
             votes = photo_match.votes(nb, doctor.KNN_K) if way.startswith("knn") else {}
-            d = doctor.diagnose(said, None, None, [] if way in ("words", "knn_only") else r["looks"], votes)
+            d = doctor.diagnose(said, None, None, [] if way == "words" else r["looks"], votes)
             ranked = [fid for fid, _ in d["failures"]][:3]
             want = truth[f]["failure"]
             rows.append({"file": f, "want": want, "got": ranked, "top1": ranked[:1] == [want], "top3": want in ranked})

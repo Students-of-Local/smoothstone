@@ -255,6 +255,8 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
     # a photo cannot show a thermal fault or a clog, so a vote for one counts for nothing
     votes = {fid: v for fid, v in (knn or {}).items() if failure(fid) and fid not in NOT_SEEN}
     named = set(scores)  # what the words or --looks described
+    if not named and not looks:
+        votes = {}  # a photo nobody described is looked at first; the vote alone diagnoses nothing
     for fid, v in votes.items():
         scores[fid] = scores.get(fid, LOOK_FLOOR * base) * (1 + KNN_W * v)  # a guessed word stays a guess
     named |= set(looks) & set(scores)  # a look past the LR list is described too
@@ -271,7 +273,7 @@ def rank_failures(said: str, ctx: set[str], looks: list[str] = (), knn: dict[str
         # root first: when a cause of the top failure is another failure the person also described
         # (the blob formed because the part came loose), that failure is what to fix
         roots = [c["failure"] for c in failure(top)["causes"]
-                 if (c.get("failure") in named or not named)
+                 if c.get("failure") in named
                  and scores.get(c.get("failure"), 0) >= ROOT_SHARE * scores[top]]
         if roots:
             root = max(roots, key=scores.get)
@@ -676,9 +678,10 @@ def report(case: dict, p: dict | None) -> list[str]:
     lines += _printer_lines(p, ranked, [c for c, _ in causes])
     if "thermal_error" not in described_ids:
         lines += [f"SAFETY: {s}" for s in safety_lines(seen or ranked[:1], limit=None)]
-    if case.get("knn"):
+    if case.get("knn") is not None:
+        match = [(k, v) for k, v in case["knn"].items() if k not in NOT_SEEN][:3]
         lines.append("Image match (nearest gallery photos): "
-                     + ", ".join(f"{k} {v:.0%}" for k, v in list(case["knn"].items())[:3]))
+                     + (", ".join(f"{k} {v:.0%}" for k, v in match) or "no failure among them"))
     for fid in ranked[:3]:
         ex = examples(fid, p["id"] if p else None)
         if ex:
