@@ -1,0 +1,25 @@
+{
+  "id": "l07_westminster_abbey",
+  "request": "I'd like to print Westminster Abbey, about 20 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Westminster Abbey",
+      "size": {"mode": "long", "mm": 200},
+      "bed": [220, 220, 220],
+      "features": {"west_tower": {"count": 2}},
+      "tallest": {
+        "m": 68,
+        "source": "https://www.westminster-abbey.org/media/lnbl3alq/abbey-dimensions-for-web.pdf",
+        "why": "The Abbey gives the height to the west tower pinnacles. Wikidata has no overall height claim."
+      },
+      "references": {
+        "identity": "https://www.wikidata.org/wiki/Q5933",
+        "footprint": "https://www.openstreetmap.org/way/364313092",
+        "length_m": {"value": 161.5, "source": "https://www.westminster-abbey.org/media/lnbl3alq/abbey-dimensions-for-web.pdf"},
+        "architecture": "https://en.wikipedia.org/wiki/Westminster_Abbey#Architecture"
+      }
+    }
+  },
+  "why": "The matching square west towers with corner pinnacles and the narrower Lady Chapel at the east end make the abbey recognizable."
+}

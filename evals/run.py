@@ -205,7 +205,8 @@ def main():
         log.update({"cli_timeout": a.cli_timeout, "cli": []})
     t0 = time.time()
     pending = ""
-    one_landmark = a.driver == "next" and suite == LANDMARKS
+    landmark_eval = "landmarks" in spec["expect"]
+    one_landmark = a.driver == "next" and landmark_eval
     nxt = "stone landmark" if one_landmark else "stone status"
     print(f"{spec['id']}  {cond}  seed {a.seed}", flush=True)
 
@@ -313,10 +314,10 @@ def main():
                 break
 
     exp = spec["followups"][-1]["expect"] if spec.get("followups") else spec["expect"]
-    if suite == LANDMARKS:
+    if landmark_eval:
         import landmarks_grade
 
-        grade = landmarks_grade.run(rdir, job, spec)
+        grade = landmarks_grade.run(rdir, job, spec, log["steps"])
     elif suite in MODELS:
         grade = models_run(rdir, job, spec)
     else:
@@ -332,7 +333,7 @@ def main():
     log.update({"seconds": round(time.time() - t0, 1), **grade, "messages": messages})
     (rdir / "log.json").write_text(json.dumps(log, indent=1))
     append_score(log)
-    if suite == LANDMARKS:
+    if landmark_eval:
         print(("PASS  " if grade["pass"] else "FAIL  ") + f"{spec['id']} " + landmarks_grade.summary(grade)
               + ". " + "; ".join(grade["why"]), flush=True)
     else:
@@ -512,7 +513,6 @@ def engineering_grade():
 
 # found models (stone models): the suite and its held-out set, graded by evals/models_grade.py
 MODELS = ("models", "models_heldout")
-LANDMARKS = "landmarks"
 
 
 def models_run(rdir: Path, job: Path, spec: dict) -> dict:

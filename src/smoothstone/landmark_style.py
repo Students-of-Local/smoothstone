@@ -26,7 +26,7 @@ def _place(solid, u, outward, origin):
     return solid.transform(np.c_[A, origin].tolist())
 
 
-def _exposed(man, cs, z):
+def _exposed(man, cs, z, *, min_span=7):
     """Broad edges with air outside at a mid-wall slice, not internal part seams."""
     import manifold3d as m3
     scene = man.slice(z)
@@ -35,7 +35,7 @@ def _exposed(man, cs, z):
         p = np.asarray(ring)
         for a, b in zip(p, np.roll(p, -1, axis=0)):
             size = float(np.linalg.norm(b - a))
-            if size < 7:
+            if size < min_span:
                 continue
             u = (b - a) / size
             normal = np.array([u[1], -u[0]])
@@ -61,7 +61,7 @@ def _arch(width, height, pointed):
 def _relief_cut(profile, mid, u, outward, z, depth, *, chamfer=True):
     cut = profile.extrude(depth + .06)
     if chamfer:
-        cut = cut.transform([[1, 0, 0, 0], [0, 1, -.65, 0], [0, 0, 1, 0]])
+        cut = cut.transform([[1, 0, 0, 0], [0, 1, -1, 0], [0, 0, 1, 0]])
     return _place(cut, u, outward, [*(mid + outward * .03), z])
 
 
@@ -82,7 +82,7 @@ def chhatri(cs, eave, height):
     return pieces
 
 
-def _surveyed_west_facade(man, width, height, x, middle, along, across, facts):
+def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, protected, notes):
     """Build the surveyed gable, portal bays and paired buttress spires."""
     import manifold3d as m3
 
@@ -101,51 +101,70 @@ def _surveyed_west_facade(man, width, height, x, middle, along, across, facts):
     # shallow replacement remains embedded in the surveyed building volume.
     envelope = m3.CrossSection.square([width + .04, height], True).translate([0, height / 2])
     trim = _place((envelope - gable).extrude(depth * .72), across, -along, [*(point - along * .01), z0])
+    if protected:
+        trim = trim - _union(protected)
     man = (man - trim) + wall
 
     additions, cuts = [], []
     for where, peak in facts["west_buttress_spires"]["value"]:
         shoulder = float(np.interp(where, *np.asarray(silhouette).T)) * height
-        xy = point + where * width * across + along * .8
-        section = m3.CrossSection.square([3.4, 3.0], True).translate(xy.tolist())
+        xy = point + where * width * across - along * .55
+        section = m3.CrossSection.square([3.8, 3.4], True).translate(xy.tolist())
         foot = section.offset(.5).extrude(height * .09).translate([0., 0., z0 - .06])
         pier = section.extrude(shoulder + .1, scale_top=[.86, .86]).translate([0., 0., z0 - .04])
         additions.extend([foot, pier])
-        for shift in (-1.05, 1.05):
+        for shift in (() if "spire_plan" in facts else (-1.05, 1.05)):
             spot = xy + shift * across
             tip_height = peak * height - abs(shift) * .12
             spire_height = tip_height - shoulder + 1.6
             spire = m3.Manifold.cylinder(spire_height, 1.30, .83, 8)
             additions.append(spire.translate([*spot, z0 + shoulder - 1.5]))
 
+    for offset in np.arange(left + 2., right - 1.8, 2.45):
+        crest = float(np.interp(offset, *np.asarray(crown).T))
+        tip = _section([[(-.64, -.72), (.64, -.72), (.57, .26), (0, 1.74), (-.57, .26)]])
+        xy = point + offset * across
+        additions.append(_place(tip.extrude(1.25), across, -along, [*(xy - along * .65), z0 + crest]))
+
     for index, where in enumerate((-.36, -.21, 0, .21, .36)):
         central = index == 2
         inner = abs(where) < .3
         xy = point + where * width * across
-        series = [(width * (.106 if central else .066), height * (.178 if central else .126), .004, False),
-                  (width * (.085 if central else .056), height * .135, .28 if central else .175, False),
-                  (width * (.098 if central else .055), height * (.21 if central else .11),
+        series = [(width * (.142 if central else .082), height * (.22 if central else .137), .006, False),
+                  (width * (.105 if central else .071), height * .135, .28 if central else .175, False),
+                  (width * (.138 if central else .069), height * (.25 if central else .11),
                    .51 if central else .35 if inner else .32, True)]
-        for w, h, base, pointed in series:
+        for tier, (w, h, base, pointed) in enumerate(series):
+            if w < .8 or h < 1.6:
+                notes.append("Omitted detail below the print floor: surveyed facade portal or window.")
+                continue
             z = z0 + base * height
             opening = _section([_arch(w, h, pointed)])
-            cuts.append(_relief_cut(opening, xy, across, -along, z, 2.7))
-            outer = _section([_arch(w + 1.8, h + 1.3, pointed)]).translate([0, -.12])
-            jamb = _place((outer - opening).extrude(1.05), across, -along, [*(xy - along * .58), z])
+            recess = opening
+            if tier > 0 and w >= 3.2:
+                mullion = m3.CrossSection.square([.95, h * .88], True).translate([0, h * .41])
+                recess = opening - mullion
+            cut = _relief_cut(recess, xy, across, -along, z, 4.6 if central else 3.25)
+            cuts.append(cut.trim_by_plane((0, 0, 1), z0 + .04) if tier == 0 else cut)
+            outer = _section([_arch(w + 2.2, h + 1.65, pointed)]).translate([0, -.14])
+            jamb = _place((outer - opening).extrude(1.45), across, -along, [*(xy - along * .78), z])
             additions.append(jamb)
     return _union([man - _union(cuts), *additions])
 
 
-def _west_facade(man, outline, facts, scale):
+def _west_facade(man, outline, facts, scale, notes, westward=None, *, records=(), sections=()):
     """Locate the facade on the foot survey and cut the portal bays into its wall."""
     import manifold3d as m3
 
     from .landmark import _frame, _section
+    from .landmark_gothic import rose_profile, west_details
 
     if outline.is_empty():
         return man, [], []
     R, _, spans = _frame(outline, {})
     along = R[0] if R[0][0] >= 0 else -R[0]
+    if westward is not None:
+        along = -westward
     across = np.array([-along[1], along[0]])
     coords = np.concatenate(outline.to_polygons())
     x = coords @ along
@@ -159,7 +178,12 @@ def _west_facade(man, outline, facts, scale):
         return man, [], []
     facade_h = facts.get("west_facade_height_m", {}).get("value", 0) * scale or width * .67
     if "west_facade_profile" in facts and "west_buttress_spires" in facts:
-        man = _surveyed_west_facade(man, width, facade_h, float(x.min()) + .2, middle, along, across, facts)
+        plane = float(x.min())
+        front_depth = max(5., width * .095)
+        protected = [section.offset(.12).extrude(2 + facade_h)
+                     for record, section in zip(records, sections) if record.get("spire_id") is not None
+                     and (np.concatenate(section.to_polygons()) @ along).min() < plane + front_depth]
+        man = _surveyed_west_facade(man, width, facade_h, plane + .2, middle, along, across, facts, protected, notes)
         return man, [], []
     gaps = width * .58 / max(2, count - 1)
     cavities, additions = [], []
@@ -181,15 +205,18 @@ def _west_facade(man, outline, facts, scale):
         central = abs(offset) < .1
         h = facade_h * (.39 if central else .27)
         w = min(gaps * .7, width * (.18 if central else .115))
+        if w < .8:
+            notes.append("Omitted detail below the print floor: west facade portal.")
+            continue
         z = 2.35
         x0 = face(y, z + h * .35)
         if x0 is None:
             continue
         p = x0 * along + y * across
         profile = _section([_arch(w, h, True)])
-        relief = min(1.5, w * .20)
+        relief = max(.6, min(1.5, w * .20))
         cut = _relief_cut(profile, p, across, -along, z, relief)
-        rim = _section([_arch(w + 1.5, h + 1, True)]).translate([0, -.12]) - profile
+        rim = _section([_arch(w + 1.7, h + 1.2, True)]).translate([0, -.08]) - profile
         trim = _place(rim.extrude(.95), across, -along, [*(p - along * .48), z])
         cavities.append(cut)
         additions.append(trim)
@@ -198,12 +225,17 @@ def _west_facade(man, outline, facts, scale):
     radius = width * rose / 2
     z = 2 + facade_h * .64
     x0 = face(middle, z)
-    if x0 is not None and radius > 1.4:
+    if x0 is not None and radius >= .4:
         centre_xy = x0 * along + middle * across
         disk = m3.CrossSection.circle(radius, 32)
-        cavities.append(_relief_cut(disk, centre_xy, across, -along, z, .9))
-        ring = m3.CrossSection.circle(radius + .55, 32) - disk
+        profile, tracery = rose_profile(radius)
+        cavities.append(_relief_cut(profile, centre_xy, across, -along, z, .95))
+        if not tracery:
+            notes.append("Omitted detail below the print floor: west rose tracery.")
+        ring = m3.CrossSection.circle(radius + .85, 32) - disk
         additions.append(_place(ring.extrude(.9), across, -along, [*(centre_xy - along * .35), z]))
+    elif rose > 0 and x0 is not None:
+        notes.append("Omitted detail below the print floor: west rose window.")
     elif rose == 0 and x0 is not None:
         # Some surveys show a pointed west window in the position a rose occupies.
         w = width * .16
@@ -211,7 +243,7 @@ def _west_facade(man, outline, facts, scale):
         p = x0 * along + middle * across
         window = _section([_arch(w, h, True)])
         cavities.append(_relief_cut(window, p, across, -along, z - h * .45, 1.5))
-        jambs = _section([_arch(w + 1.4, h + 1, True)]).translate([0, -.12]) - window
+        jambs = _section([_arch(w + 1.7, h + 1.2, True)]).translate([0, -.08]) - window
         mullions = m3.CrossSection.square([.8, h * .68]).translate([-.4, -.1])
         trim = _place((jambs + mullions).extrude(.9), across, -along,
                       [*(p - along * .35), z - h * .45])
@@ -230,10 +262,216 @@ def _west_facade(man, outline, facts, scale):
             radius = max(.85, min(1.6, width * .021))
             peak = m3.Manifold.cylinder(max(3.1, width * .085), radius, .8, 8)
             additions.append(peak.translate([*p, z - 1.8]))
-    return man, cavities, additions
+    cuts, trim = west_details(man, face, middle, width, facade_h, along, across, scale, facts, notes)
+    return man, cavities + cuts, additions + trim
 
 
-def decorate(man, records, sections, scale, styles, facts=None, outline=None):
+def _masonry_cut(profile, mid, u, outward, z, depth):
+    cut = _place(profile.extrude(depth + .06).transform(
+        [[1, 0, 0, 0], [0, 1, -1, 0], [0, 0, 1, 0]]), u, outward, [*(mid + outward * .03), z])
+    return cut.trim_by_plane((0, 0, 1), z + profile.bounds()[1] - .04)
+
+
+def _iwans(man, cs, base, height, facts, notes):
+    import manifold3d as m3
+
+    from .landmark import _section
+
+    cuts, additions = [], []
+    # OSM sometimes inserts a nearly collinear vertex where adjoining surveys
+    # meet. Across that join the portal still belongs to a single facade.
+    for span, a, b, u, outward in _exposed(man, cs.simplify(.15), base + height * .48, min_span=.8)[:4]:
+        mid = (a + b) / 2
+        width = span * facts["iwan_width_ratio"]["value"]
+        rise = height * facts["iwan_height_ratio"]["value"]
+        reach = width * .20
+        frame = width * .062
+        if min(reach, width, frame) < .8 or rise < reach + .8:
+            notes.append("Omitted detail below the print floor: iwan moldings, openings and frames.")
+            continue
+        z = base + height * .035
+        arch = _section([_arch(width, rise, True)])
+        cuts.append(_masonry_cut(arch, mid, u, outward, z, reach))
+        # The monument has a rectangular pishtaq around the curved arch,
+        # and two smaller doorways on the back wall of the deep recess.
+        frame_out = m3.CrossSection.square([width + 4 * frame, rise + 2 * frame], True)
+        frame_in = m3.CrossSection.square([width + 2 * frame, rise], True)
+        mold = (frame_out - frame_in).translate([0, rise / 2])
+        additions.append(_place(mold.extrude(1.2), u, outward, [*(mid + outward * .8), z]))
+        for shift, width_ratio, rise_ratio in ((.03, .43, .36), (.47, .31, .20)):
+            back = _section([_arch(width * width_ratio, rise * rise_ratio, True)])
+            door = mid - outward * (reach - .06)
+            cuts.append(_masonry_cut(back, door, u, outward, z + shift * rise, reach * .32))
+        # The tall central bay is flanked by a pair of stacked blind niches
+        # on each side, with uninterrupted wall between the two storeys.
+        for side in (-1, 1):
+            pos = mid + side * span * .31 * u
+            niche_w, niche_h = span * .115, height * .31
+            for fraction in (.035, .445):
+                niche = _section([_arch(niche_w, niche_h, True)])
+                cuts.append(_masonry_cut(niche, pos, u, outward, base + height * fraction, reach * .45))
+    if cuts:
+        notes.append("Recessed the iwans, cut stacked doorways in their back walls and framed the flanking bays.")
+    return cuts, additions
+
+
+def _platform_arcade(man, cs, base, height, facts, notes):
+    import manifold3d as m3
+
+    from .landmark import _section
+
+    cuts = []
+    depth = min(1.6, height * .18)
+    if depth < .6 or height * .19 < .8:
+        notes.append("Omitted detail below the print floor: the platform arcading.")
+        return cuts
+    edges = _exposed(man, cs, base + height * .5)
+    if not edges:
+        return cuts
+    longest = edges[0][0]
+    for span, a, b, u, outward in edges:
+        # The terrace stairwell interrupts two lengths of the facade. Keep
+        # those panels on the same pitch without forcing them across the stair.
+        if span < longest * .24:
+            break
+        count = max(1, round(facts["platform_arcade"]["value"] * span / longest))
+        pitch = span / (count + 1)
+        width = pitch * .67
+        if min(width, pitch - width) < .8:
+            notes.append("Omitted detail below the print floor: the platform arcading.")
+            continue
+        arch = _section([_arch(width, height * .55, True)])
+        panel = m3.CrossSection.square([width, height * .19], True)
+        for i in range(1, count + 1):
+            mid = a + (b - a) * i / (count + 1)
+            cuts.extend([_masonry_cut(arch, mid, u, outward, base + height * .05, depth),
+                         _masonry_cut(panel, mid, u, outward, base + height * .75, .65)])
+    if cuts:
+        notes.append("Recessed the platform's blind arcades and rectangular upper panels.")
+    return cuts
+
+
+def _classical_details(man, rec, cs, lo, eave, scale, notes):
+    import manifold3d as m3
+
+    from .landmark import _section
+
+    additions, cuts = [], []
+    height = eave - lo
+    if rec.get("peristyle_column"):
+        span = min(np.ptp(np.asarray(cs.bounds()).reshape(2, 2), axis=0))
+        if span < 1.35:
+            notes.append("Omitted detail below the print floor: the colonnade bases and capitals.")
+        else:
+            for z in (lo, eave - 1.02):
+                additions.append(cs.offset(.32).extrude(1.05).translate([0, 0, z]))
+            notes.append("Shaped bases and capitals on the open lower drum colonnade.")
+    if rec.get("peristyle_core"):
+        # The mapped core runs up behind the freestanding columns and above
+        # their entablature. The attic's upper row reads as punched openings.
+        x, y, xx, yy = cs.bounds()
+        centre = np.array([(x + xx) / 2, (y + yy) / 2])
+        radius = min(xx - x, yy - y) / 2
+        count = rec["peristyle_core"]
+        pitch = 2 * math.pi * radius / count
+        if pitch * .45 < .8 or 1.1 * scale < .8:
+            notes.append("Omitted detail below the print floor: upper drum window bays.")
+        else:
+            for theta in np.linspace(0, 2 * math.pi, count, endpoint=False):
+                normal = np.array([math.cos(theta), math.sin(theta)])
+                u = np.array([-normal[1], normal[0]])
+                window = m3.CrossSection.square([pitch * .45, 2.3 * scale], True)
+                cuts.append(_masonry_cut(window, centre + normal * (radius + .12), u, normal,
+                                          eave - 3.15 * scale, .9))
+            notes.append("Recessed the upper drum's window bays above the stone gallery.")
+    if rec.get("lantern_body"):
+        if height < 2.8:
+            notes.append("Omitted detail below the print floor: the lantern windows.")
+            return cuts, additions
+        for span, a, b, u, outward in _exposed(man, cs, lo + height * .5, min_span=.8)[:4]:
+            width = span * .55
+            if width < .8:
+                notes.append("Omitted detail below the print floor: the lantern windows.")
+                continue
+            window = _section([_arch(width, height * .66, False)])
+            cuts.append(_masonry_cut(window, (a + b) / 2, u, outward, lo + height * .17, 1.0))
+        if cuts:
+            notes.append("Cut four shadowed openings in the square lantern.")
+    if rec.get("cupola_seat"):
+        cut_count = 0
+        for span, a, b, u, outward in _exposed(man, cs, eave - height * .085):
+            radius = min(span * .17, height * .054)
+            if radius < .8:
+                continue
+            oculus = m3.CrossSection.circle(radius, 24)
+            cuts.append(_relief_cut(oculus, (a + b) / 2, u, outward, eave - radius * 1.5, 1.05))
+            cut_count += 1
+        if cut_count:
+            notes.append(f"Recessed {cut_count} round windows in the exposed faces of the octagonal drum.")
+        else:
+            notes.append("Omitted detail below the print floor: the octagonal drum windows.")
+    return cuts, additions
+
+
+def _bell_tower_details(man, cs, lo, height, notes):
+    from .landmark import _section
+
+    cuts, additions = [], []
+    for span, a, b, u, outward in _exposed(man, cs.simplify(.12), lo + height * .74):
+        width = span * .20
+        if width < .8 or height * .09 < 1.6:
+            continue
+        for fraction, rise in ((.36, .09), (.54, .10), (.72, .16)):
+            recess = _section([_arch(width, height * rise, True)])
+            for bay in (.33, .67):
+                cuts.append(_relief_cut(recess, a + (b - a) * bay, u, outward,
+                                        lo + fraction * height, 1.25))
+    if cuts:
+        from .landmark import _loft
+
+        radius = max(np.ptp(np.asarray(cs.bounds()).reshape(2, 2), axis=0)) / 2
+        for fraction in (.34, .52, .70, .99):
+            additions.append(_loft(cs, lo + height * fraction - 1., 1., [(0, 1), (1, 1 + .8 / radius)], notes))
+        notes.append("Set back pointed belfry openings between the cornices of the mapped bell tower.")
+    else:
+        notes.append("Omitted detail below the print floor: belfry openings and cornices.")
+    return cuts, additions
+
+
+def _aisle_and_lantern_windows(man, rec, cs, lo, eave, scale, bay, notes):
+    import manifold3d as m3
+
+    from .landmark import _frame, _section
+
+    aisle = rec["feature"] == "aisle_walls"
+    height = eave - lo if aisle else rec["lantern_rise_m"] * scale
+    if height < 3.2:
+        notes.append("Omitted detail below the print floor: aisle or lantern windows.")
+        return []
+    frame, _, _ = _frame(cs, {})
+    cuts = []
+    contour = cs.simplify(.16 if aisle else .28)
+    for span, a, b, u, normal in _exposed(man, contour, eave - height * .36, min_span=2.8):
+        if aisle and abs(frame[0] @ u) < .92:
+            continue
+        count = max(1, round(span / (bay * scale))) if aisle else 1
+        pitch = span / count
+        width = pitch * (.67 if aisle else .61)
+        if width < 1.8:
+            continue
+        rise = height * (.62 if aisle else .68)
+        arch = _section([_arch(width, rise, True)])
+        if width >= 3.3:
+            arch = arch - m3.CrossSection.square([.9, rise]).translate([-.45, 0])
+        for index in range(count):
+            mid = a + (b - a) * ((index + .5) / count)
+            cuts.append(_relief_cut(arch, mid, u, normal, eave - .85 * height, 2.2 if aisle else 1.5))
+    if cuts:
+        notes.append(f"Cut {len(cuts)} pointed {'aisle' if aisle else 'crossing lantern'} window recesses from the surveyed plan.")
+    return cuts
+
+
+def decorate(man, records, sections, scale, styles, facts=None, outline=None, *, westward=None):
     import manifold3d as m3
     from .landmark import _loft, _section, _union
 
@@ -246,38 +484,47 @@ def decorate(man, records, sections, scale, styles, facts=None, outline=None):
     facade = keys & {"gothic", "romanesque", "mughal", "byzantine", "baroque"}
     # Work from the unadorned union so neighboring parts mask their shared walls.
     if "gothic" in keys and outline is not None:
-        man, front_cuts, front_trim = _west_facade(man, outline, facts, scale)
+        from .landmark_gothic import transept_details
+
+        man, front_cuts, front_trim = _west_facade(
+            man, outline, facts, scale, notes, westward, records=records, sections=sections)
         cavities.extend(front_cuts)
         additions.extend(front_trim)
+        cavities.extend(transept_details(man, records, sections, outline, scale, facts, notes))
         if front_cuts:
             notes.append("Recessed the west facade portals and any sourced rose window.")
         if "west_facade_profile" in facts:
-            notes.append("Rebuilt the west gable, its five portal bays and paired buttress spires from the facade survey.")
+            notes.append("Rebuilt the west gable, portal bays and buttress piers from the facade survey.")
     for rec, cs in zip(records, sections):
         lo = 2 + rec["min_height"]["metres"] * scale
         top = 2 + rec["height"]["metres"] * scale
         eave = top - rec["roof_height"]["metres"] * scale
         wall_height = eave - lo
-        if rec.get("main_faces"):
-            body_edges = _exposed(man, cs, lo + wall_height * .58)
-            for span, a, b, u, outward in body_edges[:4]:
-                mid = (a + b) / 2
-                width = span * facts.get("iwan_width_ratio", {}).get("value", .30)
-                base = wall_height * .165
-                height = (wall_height - base) * facts.get("iwan_height_ratio", {}).get("value", .80)
-                z = lo + base + .25
-                reach = min(3.2, width * .23)
-                profile = _section([_arch(width, height, True)])
-                cavities.append(_relief_cut(profile, mid, u, outward, z, reach))
-                frame = _section([_arch(width + 2, height + 1.35, True)]).translate([0, -.12]) - profile
-                additions.append(_place(frame.extrude(1.3), u, outward, [*(mid + outward * .62), z]))
-            if body_edges:
-                notes.append(f"Recessed {min(4, len(body_edges))} pointed iwans and framed their openings.")
+        if rec.get("main_faces") and {"iwan_width_ratio", "iwan_height_ratio"} <= facts.keys():
+            platform = next((2 + p["height"]["metres"] * scale for p in records if p.get("platform_arcade")),
+                            lo + wall_height * .165)
+            cuts, frames = _iwans(man, cs, platform, eave - platform, facts, notes)
+            cavities.extend(cuts)
+            additions.extend(frames)
+        if rec.get("platform_arcade"):
+            cavities.extend(_platform_arcade(man, cs, lo, wall_height, facts, notes))
+        if "baroque" in keys:
+            cuts, trim = _classical_details(man, rec, cs, lo, eave, scale, notes)
+            cavities.extend(cuts)
+            additions.extend(trim)
+        if rec.get("feature") == "bell_tower" and "gothic" in keys:
+            cuts, trim = _bell_tower_details(man, cs, lo, wall_height, notes)
+            cavities.extend(cuts)
+            additions.extend(trim)
+        if rec.get("feature") in {"aisle_walls", "crossing_lantern"} and "aisle_bay_m" in facts:
+            cavities.extend(_aisle_and_lantern_windows(man, rec, cs, lo, eave, scale,
+                                                        facts["aisle_bay_m"]["value"], notes))
         if rec.get("dome_drum_m"):
             drum = rec["dome_drum_m"] * scale
             for z in (eave - drum, eave - .45):
                 additions.append(cs.offset(.42).extrude(.78).translate([0, 0, z - .22]))
-        if facade and wall_height > 9:
+        if (facade and wall_height > 9 and rec.get("feature") not in {"bell_tower", "aisle_walls", "crossing_lantern"} and
+                not (rec.get("main_faces") or rec.get("platform_arcade") or rec.get("lantern_body"))):
             exposed = _exposed(man, cs, lo + wall_height * .5)
             for span, a, b, u, outward in exposed[:6]:
                 count = min(12, max(1, int(span / 9)))
@@ -292,7 +539,7 @@ def decorate(man, records, sections, scale, styles, facts=None, outline=None):
                     scene = man.slice(z + height * .5)
                     if (inside - scene).area() < .01 and width >= 1.4:
                         profile = _section([_arch(width, height, "gothic" in keys or "mughal" in keys)])
-                        depth = .5
+                        depth = .6
                         # Lower the complete cavity profile by its inward depth.
                         # This keeps every ceiling shoulder at least 45 degrees.
                         cut = profile.extrude(depth + .04).transform(
@@ -311,7 +558,8 @@ def decorate(man, records, sections, scale, styles, facts=None, outline=None):
                              [outward[1], 0, u[1], ribmid[1]], [0, 1, 0, 0]]
                         additions.append(rib.transform(A))
         title = " ".join(str(rec["tags"].get(k, "")) for k in ("building:part", "tower:type", "name"))
-        if "gothic" in keys and wall_height > 14 and top > maximum_top * .40:
+        if ("gothic" in keys and "spire_plan" not in facts and rec.get("feature") != "bell_tower"
+                and wall_height > 14 and top > maximum_top * .40):
             # Corners are inset into the shaft so each base has a full-width bond.
             # Limit the tops to the tallest measured part.
             x0, y0, x1, y1 = cs.bounds()

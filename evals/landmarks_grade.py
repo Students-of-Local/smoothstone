@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import json
 import math
+import shlex
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import numpy as np
+import trimesh
 
 import models_grade
 
 RATIO_TOL = 0.04
+MIN_LIKENESS = 8
 
 
 def _domain(url, domain: str) -> bool:
@@ -47,6 +50,38 @@ def credits_why(job: Path, refs: dict) -> list[str]:
     return why
 
 
+def standing_in_mesh(mesh: trimesh.Trimesh, parts: list[dict], scale: float, plinth: float) -> int:
+    """How many parts are slender points in the printed mesh itself: the surface reaches the part's
+    recorded top, and most of a ring just outside its footprint is at least 2 mm lower."""
+    centres, reach, tops = [], [], []
+    for part in parts:
+        ring = np.asarray(max(part["footprint"], key=len), dtype=float)[:, :2] * scale
+        centre = (ring.min(0) + ring.max(0)) / 2
+        centres.append(centre)
+        reach.append(np.linalg.norm(ring - centre, axis=1).max())
+        tops.append(part["height"]["metres"] * scale + plinth)
+    if not centres:
+        return 0
+    angles = np.linspace(0, 2 * math.pi, 12, endpoint=False)
+    unit = np.column_stack([np.cos(angles), np.sin(angles)])
+    near = np.vstack([[0, 0], .25 * unit])
+    rays = np.array([c + d for c, r in zip(centres, reach) for d in [*near, *(unit * (r + 1.0))]])
+    above = float(mesh.bounds[1, 2]) + 5
+    origins = np.column_stack([rays, np.full(len(rays), above)])
+    places, hit, _ = mesh.ray.intersects_location(
+        origins, np.tile([0., 0., -1.], (len(origins), 1)), multiple_hits=True)
+    level = np.full(len(origins), -np.inf)
+    np.maximum.at(level, hit, places[:, 2])
+    level = level.reshape(len(centres), len(near) + len(unit))
+    found: list[np.ndarray] = []
+    for centre, top, column in zip(centres, tops, level):
+        peak = column[:len(near)].max()
+        ringed = (column[len(near):] <= peak - 2).mean() >= .6
+        if abs(peak - top) <= 1.5 and ringed and all(np.linalg.norm(centre - c) > .8 for c in found):
+            found.append(centre)
+    return len(found)
+
+
 def feature_grade(parts: list[dict], want: dict) -> tuple[dict, list[str]]:
     counts = Counter(p["feature"] for p in parts if p.get("feature"))
     why = []
@@ -74,11 +109,13 @@ def _read(path: Path) -> dict:
 
 
 def grade(job: Path, spec: dict, checks: bool = True) -> dict:
-    import trimesh
-
     want = spec["expect"]["landmarks"]
     refs = _read(job / "refs" / "landmark.json")
     why = credits_why(job, refs)
+    references = want.get("references", {})
+    for fact, field in (("identity", "source"), ("footprint", "geometry_source")):
+        if references.get(fact) and refs.get(field) != references[fact]:
+            why.append(f"wrong landmark reference for {fact}")
     data = _read(job / "build" / "model" / "parts.json")
     parts = data.get("parts") or []
     if not parts or data.get("model", {}).get("source") != "landmark":
@@ -101,7 +138,8 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
     height = float(size[2]) - refs.get("plinth_height_mm", 2)
 
     dimensions = refs.get("reference_dimensions_m", {})
-    standard = refs.get("height")
+    named = want.get("tallest") or {}
+    standard = named.get("m") if named.get("source") else refs.get("height")
     if (_positive(standard) and _positive(dimensions.get("length")) and _positive(dimensions.get("width"))
             and _domain(dimensions.get("source"), "openstreetmap.org")):
         out["ratios"] = {}
@@ -126,7 +164,6 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
         out["height_m"] = {"built": height / scale, "tallest_part": tallest, "wikidata": wd}
     # Wikidata's height is not always the tallest point (Notre-Dame's is the 69 m towers, not the 96 m
     # spire); a spec may name the tallest point with its own source, and then that is the reference.
-    named = want.get("tallest") or {}
     label = "Wikidata"
     if _positive(named.get("m")) and named.get("source"):
         wd, label = float(named["m"]), named["source"]
@@ -142,16 +179,68 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
             why.append(f"tallest part is {tallest:.2f} m, {label} says {wd:g} m")
     out["features"], failures = feature_grade(refs.get("parts", []), want.get("features", {}))
     why.extend(failures)
+    for feature, rule in want.get("features", {}).items():
+        if "in_mesh" not in rule:
+            continue
+        stl = job / "model" / "generated.stl"
+        named_parts = [p for p in refs.get("parts", []) if p.get("feature") == feature]
+        stands = (standing_in_mesh(trimesh.load(stl), named_parts, scale, refs.get("plinth_height_mm", 2))
+                  if stl.is_file() and _positive(scale) else 0)
+        out.setdefault("in_mesh", {})[feature] = stands
+        if stands < rule["in_mesh"]:
+            why.append(f"{stands} {feature} stand in the printed mesh (want at least {rule['in_mesh']})")
     return {**out, "pass": not why, "why": why or ["all checks pass"]}
 
 
-def run(rdir: Path, job: Path, spec: dict) -> dict:
+def missing_parts_result(job: Path, spec: dict, steps: list[dict]) -> dict | None:
+    want = spec["expect"]["landmarks"]
+    if not want.get("allow_missing_parts") or (job / "model" / "generated.stl").exists():
+        return None
+    refs = _read(job / "refs" / "landmark.json")
+    sources = want.get("references", {})
+    if (not _domain(refs.get("geometry_source"), "openstreetmap.org")
+            or refs.get("geometry_source") != sources.get("footprint")
+            or refs.get("source") != sources.get("identity")
+            or not isinstance(refs.get("mapped_parts"), list)):
+        return None
+    known = refs.get("height_source_parts")
+    coverage = refs.get("height_source_coverage")
+    parts = refs.get("parts", [])
+    if type(known) is not int or known < 0 or not (isinstance(coverage, (int, float)) and 0 <= coverage < .45):
+        return None
+    if known and (not parts or known / len(parts) >= .35):
+        return None
+    for step in steps:
+        for call in step.get("tool_calls", []):
+            try:
+                command = shlex.split(call.get("args", {}).get("command", ""))
+                lines = call.get("result", "").splitlines()
+                next_command = shlex.split(lines[-1]) if lines else []
+            except (TypeError, ValueError):
+                continue
+            if command[:1] == ["stone"]:
+                command = command[1:]
+            if (command[:1] == ["landmark"] and
+                    any(line.startswith("FIX: insufficient mapped 3D parts") for line in lines) and
+                    next_command == ["NEXT:", "stone", "models", refs.get("requested_name")]):
+                return {"pass": True, "why": ["OSM lacks measured 3D parts. stone landmark gave FIX and NEXT stone models."],
+                        "fallback": "missing_mapped_parts", "parts": 0, "judge": None, "likeness": None}
+    return None
+
+
+def run(rdir: Path, job: Path, spec: dict, steps: list[dict] | None = None) -> dict:
+    fallback = missing_parts_result(job, spec, steps or [])
+    if fallback:
+        return fallback
     result = grade(job, spec)
-    result = models_grade.judged(rdir, job, spec, result, suite="landmarks", save_reference=True)
+    result = models_grade.judged(rdir, job, spec, result, suite="landmarks", save_reference=True,
+                                 minimum=MIN_LIKENESS)
     return {**result, "judge": result["likeness"]}
 
 
 def summary(result: dict) -> str:
+    if result.get("fallback"):
+        return "verified fallback"
     ratios = result.get("ratios", {})
     spans = ", ".join(f"H/{axis} {v['built']:.3f} (ref {v['reference']:.3f})" for axis, v in ratios.items())
     score = result.get("judge")

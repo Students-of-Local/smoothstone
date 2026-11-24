@@ -1,0 +1,23 @@
+{
+  "id": "l09_florence_cathedral",
+  "request": "Could you print Florence Cathedral for me, around 20 cm long?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Florence Cathedral",
+      "size": {"mode": "long", "mm": 200},
+      "bed": [220, 220, 220],
+      "features": {"main_dome": {"count": 1}},
+      "references": {
+        "identity": "https://www.wikidata.org/wiki/Q191739",
+        "footprint": "https://www.openstreetmap.org/way/43768260",
+        "dome_footprint": "https://www.openstreetmap.org/way/397848200",
+        "architecture": "https://en.wikipedia.org/wiki/Florence_Cathedral#Plan_and_structure",
+        "height_m": {"value": 114.5, "source": "https://www.wikidata.org/wiki/Q191739#P2048"},
+        "length_m": {"value": 153, "source": "https://www.wikidata.org/wiki/Q191739#P2043"},
+        "width_m": {"value": 90, "source": "https://www.wikidata.org/wiki/Q191739#P2049"}
+      }
+    }
+  },
+  "why": "The high ribbed octagonal dome and lantern rise above three radiating apses and the long nave. The request is for the cathedral building."
+}

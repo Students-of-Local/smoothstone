@@ -44,6 +44,13 @@ def _value(entity, prop):
     return None
 
 
+def _item_ids(entity, prop):
+    for claim in entity.get('claims', {}).get(prop, []):
+        val = claim.get('mainsnak', {}).get('datavalue', {}).get('value')
+        if claim.get('rank') != 'deprecated' and isinstance(val, dict) and val.get('id'):
+            yield val['id']
+
+
 # Wikidata unit items: metre, centimetre, millimetre, kilometre, foot, inch, yard.
 # A length in a unit not listed here is dropped rather than read as metres.
 METRES_PER_UNIT = {'Q11573': 1.0, 'Q174728': 0.01, 'Q174789': 0.001, 'Q828224': 1000.0,
@@ -68,7 +75,8 @@ def resolve(name: str, job_root: Path) -> dict:
     if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
         try:
             ref = json.loads(cache.read_text())
-            if ref.get('id') and ref.get('latitude') is not None and ref.get('longitude') is not None:
+            if (ref.get('id') and ref.get('latitude') is not None and ref.get('longitude') is not None
+                    and (ref.get('matched_name') == normalized or ref.get('label', '').casefold() == normalized)):
                 wikidata_height = _quantity(_value(ref.get('wikidata_raw', {}), 'P2048'))
                 if wikidata_height is not None:
                     ref['height'] = wikidata_height
@@ -85,7 +93,7 @@ def resolve(name: str, job_root: Path) -> dict:
         entities = _wiki({'action': 'wbgetentities', 'ids': ids,
                           'props': 'labels|descriptions|claims|sitelinks', 'languages': 'en'}).get('entities', {})
         forbidden = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
-        structure = re.compile(r'\b(cathedral|church|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate)\b', re.I)
+        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate)\b', re.I)
         candidates = []
         for order, hit in enumerate(hits):
             entity = entities.get(hit['id'], {})
@@ -94,15 +102,16 @@ def resolve(name: str, job_root: Path) -> dict:
             description = hit.get('description', '')
             if forbidden.search(description):
                 continue
-            exact = hit.get('label', '').casefold() == name.casefold()
-            candidates.append(((bool(structure.search(description)), exact, -order), hit, entity))
+            exact = any(' '.join(label.casefold().split()) == normalized for label in
+                        (hit.get('label', ''), hit.get('match', {}).get('text', '')))
+            candidates.append(((exact, bool(structure.search(description)), -order), hit, entity))
         if not candidates:
             raise LandmarkProblem(f'No building with coordinates found for {name}.')
         _, hit, entity = max(candidates, key=lambda x: x[0])
         entity_id = hit['id']
         source = f'https://www.wikidata.org/wiki/{entity_id}'
         coordinate = _value(entity, 'P625')
-        ref = {'id': entity_id, 'label': hit.get('label', name),
+        ref = {'id': entity_id, 'label': hit.get('label', name), 'matched_name': normalized,
                'latitude': coordinate['latitude'], 'longitude': coordinate['longitude'],
                'height': _quantity(_value(entity, 'P2048')),
                'length': _quantity(_value(entity, 'P2043')),
@@ -259,8 +268,13 @@ def parse_osm(data: dict, refs: dict) -> dict:
     boundary = selected['footprint']
     parts = [p for p in pieces if _inside(_centroid(p['footprint'][0]), boundary[0]) and
              not any(_inside(_centroid(p['footprint'][0]), h) for h in boundary[1:])]
+    components = set(_item_ids(refs.get('wikidata_raw', {}), 'P527'))
+    linked_towers = [c for c in candidates if c is not selected
+                     and c['tags'].get('wikidata') in components
+                     and (c['tags'].get('tower:type') == 'bell_tower' or c['tags'].get('building') == 'bell_tower')
+                     and not _inside(_centroid(c['footprint'][0]), boundary[0])]
     return {'outline': boundary, 'parts': parts, 'source': selected['source'], 'tags': selected['tags'],
-            'response_url': data.get('_smoothstone_response_url', OVERPASS)}
+            'linked_towers': linked_towers, 'response_url': data.get('_smoothstone_response_url', OVERPASS)}
 
 
 def load_pack(name, path=None, *, label=None):

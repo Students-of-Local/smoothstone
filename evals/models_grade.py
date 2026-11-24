@@ -169,7 +169,7 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
 
 
 def judge(job: Path, request: str, title: str | None = None, model: str = "opus", *,
-          reference_out: Path | None = None) -> dict:
+          reference_out: Path | None = None, minimum: int = PASS) -> dict:
     """The blind landmark judge on build/views.png: {"score", "conflicts", "pass", "reference"}."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import judge_likeness as jl
@@ -194,15 +194,15 @@ def judge(job: Path, request: str, title: str | None = None, model: str = "opus"
         reply = jl.claude(RUBRIC.format(request=request, title=ref["title"], reference=t / f"reference{ext}",
                                         views=t / "views.png"), folder=t, model=model)
     res = jl.parse(reply)
-    return {**res, "pass": res["score"] >= PASS, "reference": ref, "model": model, "request": request}
+    return {**res, "pass": res["score"] >= minimum, "reference": ref, "model": model, "request": request}
 
 
 def judged(rdir: Path, job: Path, spec: dict, g: dict, *, suite: str = "models",
-           save_reference: bool = False) -> dict:
+           save_reference: bool = False, minimum: int = PASS) -> dict:
     """The grade with the judge's verdict, saved as landmark.json; a judge that cannot answer fails it."""
     try:
         res = judge(job, spec["request"], spec["expect"][suite].get("wikipedia"),
-                    reference_out=rdir if save_reference else None)
+                    reference_out=rdir if save_reference else None, minimum=minimum)
     except Exception as e:  # never passed unjudged
         res = {"score": None, "pass": False, "conflicts": [], "error": f"{type(e).__name__}: {e}"}
     (rdir / "landmark.json").write_text(json.dumps(res, indent=1))

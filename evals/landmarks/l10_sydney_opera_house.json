@@ -1,0 +1,26 @@
+{
+  "id": "l10_sydney_opera_house",
+  "request": "I'd love a print of the Sydney Opera House, about 19 cm across at its longest point.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Sydney Opera House",
+      "size": {"mode": "long", "mm": 190},
+      "bed": [220, 220, 220],
+      "allow_missing_parts": true,
+      "references": {
+        "identity": "https://www.wikidata.org/wiki/Q45178",
+        "footprint": "https://www.openstreetmap.org/relation/9596872",
+        "architecture": "https://www.sydneyoperahouse.com/our-story/the-spherical-solution",
+        "height_m": {"value": 67, "source": "https://www.wikidata.org/wiki/Q45178#P2048"},
+        "length_m": {"value": 183, "source": "https://en.wikipedia.org/wiki/Sydney_Opera_House#Design"},
+        "width_m": {"value": 120, "source": "https://en.wikipedia.org/wiki/Sydney_Opera_House#Design"}
+      },
+      "fallback": {
+        "reason": "Mapped roof fragments lack heights and lower elevations to reconstruct the sail shells.",
+        "source": "https://www.openstreetmap.org/relation/9596872"
+      }
+    }
+  },
+  "why": "The two main groups of ascending spherical sail shells, the smaller restaurant shells, and the broad stepped podium set the silhouette."
+}

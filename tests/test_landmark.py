@@ -79,6 +79,38 @@ def test_tower_outline_with_negative_building_part_tag_is_a_reference():
     assert [p["id"] for p in parsed["parts"]] == [2]
 
 
+def test_exact_landmark_outranks_a_nearby_structural_search_result(tmp_path, monkeypatch):
+    requested = {"id": "Q1", "label": "Example Opera House", "description": "performing arts venue"}
+    neighbour = {"id": "Q2", "label": "Example Car Park", "description": "building next to the opera house"}
+    coordinates = {"claims": {"P625": [{"mainsnak": {"datavalue": {
+        "value": {"latitude": 1., "longitude": 2.},
+    }}}]}}
+
+    def wiki(params):
+        if params["action"] == "wbsearchentities":
+            return {"search": [neighbour, requested]}
+        return {"entities": {item["id"]: coordinates for item in (neighbour, requested)}}
+
+    monkeypatch.setattr(landmark_refs, "_wiki", wiki)
+    assert landmark_refs.resolve(requested["label"], tmp_path)["id"] == requested["id"]
+
+
+def test_separate_bell_tower_requires_a_wikidata_component_link():
+    def building(identifier, x, tags):
+        points = [(x-1, -1), (x+1, -1), (x+1, 1), (x-1, 1), (x-1, -1)]
+        return {"type": "way", "id": identifier, "tags": {"building": "yes", **tags},
+                "geometry": [{"lat": y, "lon": x} for x, y in points]}
+
+    body = building(1, 0, {"wikidata": "Q1"})
+    bell = building(2, 3, {"wikidata": "Q2", "tower:type": "bell_tower", "height": "80"})
+    nearby = building(3, -3, {"wikidata": "Q3", "tower:type": "bell_tower", "height": "70"})
+    components = [{"mainsnak": {"datavalue": {"value": {"id": "Q2"}}}}]
+    refs = {"latitude": 0, "longitude": 0, "id": "Q1", "wikidata_raw": {"claims": {"P527": components}}}
+    data = landmark_refs.parse_osm({"elements": [body, bell, nearby]}, refs)
+    assert [part["id"] for part in data["linked_towers"]] == [2]
+    assert data["parts"] == []
+
+
 @pytest.mark.parametrize("shape", ["flat", "gabled", "pyramidal", "skillion", "hipped", "dome",
                                   "onion", "half-hipped", "round", "gambrel", "mansard"])
 def test_roof_shapes_form_closed_solids_at_the_given_height(shape):
