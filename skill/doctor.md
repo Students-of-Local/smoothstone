@@ -21,6 +21,7 @@ Use this when someone says a print failed, shows a photo of a failed print, or a
    Pick the ids that match the photo, likeliest first, at most 3. Add them with `--looks`:
    `stone doctor "<what you see>" --looks bed_adhesion,blob_on_nozzle`.
    Write the words too. stone weighs both.
+   With a photo, stone also compares it to its labeled failure photos, if the vision extra is installed.
    If you cannot see images, ask the person what the print looks like. Then leave out `--looks`.
 3. Ask the one question in NEXT. Then: `stone doctor answer "<their answer>"`.
 4. When NEXT says `stone doctor try <cause>`, run it and tell the person the steps.
@@ -43,6 +44,7 @@ giving differentials also helps".
 $ stone doctor --image k2.jpg
 Case 20261124-012644, Creality K2
 Photo saved (EXIF removed, at most 1280 px): stone-job/doctor/20261124-012644/photo.jpg
+Image match on: the nearest labeled gallery photos count once you describe this one.
 Look at it: describe what you see, and pass the ids that match it with --looks (each id and its look: stone doctor looks). ...
 NEXT: stone doctor "<what you see in stone-job/doctor/20261124-012644/photo.jpg: the part, the plate, the nozzle>" --looks <ids from stone doctor looks that match, likeliest first>
 
@@ -50,8 +52,8 @@ $ stone doctor "flat plate print came loose and lies tilted on the bed with loos
 Case 20261124-012644, Creality K2, PLA, seen: bed_adhesion, blob_on_nozzle
 Most likely: Part came loose from the plate (bed_adhesion)
 Also check: blob_on_nozzle: a loose part often ends up stuck on the nozzle; look for a lump around the heater block
-Also check: first_layer: a first-layer problem leaves the part stuck but with gaps or ridges
-Also check: warping: warping lifts only the corners while the middle stays stuck; a loose part came off whole
+Also check: spaghetti: a tangle of loose filament (a bird nest) where the part should be, often around the nozzle
+Also check: under_extrusion: walls or top with gaps, holes or missing lines you can see through; ...
 Cause 1: Oil from fingers, dust or old glue on the plate (plate_contaminated) 58%
 Cause 2: First layer too far from the plate (leveling or Z offset) (first_layer_too_high) 17%
 Cause 3: Bed too cold for the filament, or the slicer's plate or filament setting does not match (wrong_settings) 12%
@@ -59,6 +61,7 @@ Plate: PEI double-sided frosted (textured) flexible plate, 270 x 293 mm
 Clean it (maker's steps): Hand sweat is the first cause Creality lists: wash the plate with dish soap and water; ...
 SAFETY: Heat the hotend to about 30 C above the print temperature (PLA: about 250 C) before you pull plastic off; ...
 SAFETY: The thermistor and heater wires are probably inside the blob: pull gently and never yank.
+Image match (nearest gallery photos): ...
 NEXT: ask the person: Wet the cold plate with a little water: does the water bead into drops, or spread as a thin film? (beads / spreads as a film / can't tell) Then: stone doctor answer "<their answer>"
 
 $ stone doctor answer "the water beads up"
