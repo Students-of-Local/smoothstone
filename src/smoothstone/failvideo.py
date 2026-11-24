@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import math
-import shlex
 import subprocess
 import time
 from dataclasses import replace
@@ -322,7 +321,7 @@ def plan(tp, inp, fail, rgb):
     tag = WHAT[fail.kind]
     full = (lambda i: 1) if st.kind == "detach" else (lambda i: i + 2)
     t0 = float(lt[L - 1]) if L else 0.0
-    fl = base.get(L) or {"head": None, "z_mm": inp.layer_z[L], "t_s": lt[L]}
+    fl = base.get(L) or base[max(base)]  # only its nozzle place is used
     picks = motion if st.kind != "supports" else [motion[k] for k in sorted(set(np.linspace(0, len(motion) - 1, MOTION).round().astype(int)))] if motion else []
     if st.kind in ("droop", "bridge"):
         picks = list(np.linspace(0.25, 1.0, MOTION // 2))
@@ -339,6 +338,11 @@ def plan(tp, inp, fail, rgb):
             continue
         frs.append(dict(b, full=full(i), note=tag))
         extra.append(st.items(i, b["t_s"], b["head"]))
+    seen = [it["mesh"][0] for e in extra[first:] for it in e if it.get("name") != "blob"]
+    seen += [tp.p1[st.ext & (tp.layer <= L), :3]]
+    lo, hi = (f([f(v, axis=0) for v in seen if len(v)], axis=0) for f in (np.min, np.max))
+    for fr in frs[first:]:  # close in on the failure: the head's box would hide it
+        fr["close"] = [[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
     p1 = tp.p1.copy()
     p1[st.gone, 3] = tp.p0[st.gone, 3]  # the physics draws these: out of the scene
     return replace(tp, p1=p1), frs, extra, first, st
@@ -372,50 +376,29 @@ def numbers_line(f) -> str:
     return ", ".join(f"{k} {v}" for k, v in n.items()) or "no numbers"
 
 
-def again(args, mode: str) -> str:
-    """This command with another mode."""
-    words = ["stone", "timelapse", *([args.file] if args.file else []), "--fail", mode]
-    for name in ("gcode", "printer"):
-        if getattr(args, name):
-            words += [f"--{name}", getattr(args, name)]
-    return shlex.join(words + (["--plate", "dirty"] if args.plate == "dirty" else []))
-
-
-def cmd(args, job, out):
-    """stone timelapse --fail [mode]: build/fail.mp4, fail_sheet.png and fail.json."""
+def cmd(args, job, prof, out):
+    """stone timelapse --fail [mode]: fail.mp4, fail_sheet.png and fail.json."""
     from . import refs
 
     t_start = time.time()
+    if args.fail not in MODES and not args.file and Path(args.fail).suffix:  # stone timelapse --fail part.stl
+        args.file, args.fail = args.fail, "auto"
     mode = args.fail
-    if mode not in MODES and not args.file and mode.lower().endswith(".stl"):  # stone timelapse --fail part.stl
-        args.file, mode = mode, "auto"
     if mode not in MODES:
         out.fix(f"--fail {mode}: one of {', '.join(MODES)}")
-        out.next = again(args, "auto")
+        args.fail = "auto"
+        out.next = timelapse.again(args)
         return out
-    if mode != "auto" and mode != "detach":
+    if args.mode != "per-layer":
+        out.fix("--fail draws one frame a layer; drop --mode")
+        out.next = timelapse.again(args, **{"--mode": None})
+        return out
+    if mode not in ("auto", "detach") and not args.gcode:
         args.supports = "off"  # the what-if of a part printed without them
-    try:
-        prof = timelapse.printer(job, args.printer)
-    except ValueError as e:
-        out.fix(str(e))
-        out.next = "stone printer"
+    got = timelapse.start(args, job, prof, out)
+    if got is None:
         return out
-    f = Path(args.file).expanduser().resolve() if args.file else job.build_dir / "part.stl"
-    if not args.gcode and not f.is_file():
-        out.fix(f"no file at {f}" if args.file else "no built part yet; build first, or name an STL or --gcode file")
-        out.next = "stone build" if not args.file else "stone timelapse <file.stl> --fail"
-        return out
-    if args.gcode and not Path(args.gcode).expanduser().is_file():
-        out.fix(f"no G-code at {args.gcode}")
-        out.next = "stone timelapse --gcode <file.gcode> --fail"
-        return out
-    try:
-        tp, what, f = timelapse.toolpath_from(args, job, prof)
-    except ValueError as e:
-        out.fix(str(e))
-        out.next = "stone timelapse --fail"
-        return out
+    tp, what, f = got
     mat = refs.material_for(job.request()).material.upper() if job.exists() else "PLA"
     note = []
     if mat not in failsim.MATERIALS:
@@ -438,7 +421,8 @@ def cmd(args, job, out):
         else:
             out.add(f"This part has nothing for --fail {mode} to show. --fail detach shows a loose part anyway.")
             out.result = "nothing to show"
-            out.next = again(args, "detach")
+            args.fail = "detach"
+            out.next = timelapse.again(args)
         return out
     dom = failsim.note("contamination") if clean < 1 and fail.kind == "detach" else failsim.note(DOMINANT[fail.kind])
     if what_if:
@@ -452,40 +436,40 @@ def cmd(args, job, out):
         out.fix(f"no video: {no}")
         out.next = "none, the prediction is above; the video needs that program"
         return out
-    cam = timelapse.camera(job, prof)
-    dest = job.build_dir if job.exists() and not args.file and not args.gcode else f.parent
-    dest.mkdir(parents=True, exist_ok=True)
-    cname, rgb = timelapse.color(job)
-    w = timelapse.SIZE[0]
-    size = (w, int(round(w / timelapse.aspect(cam.get("aspect")) / 2)) * 2)
+    dest = timelapse.out_dir(args, job, f)
+    rgb = timelapse.color(job)[1]
     scene, frs, extra, first, st = plan(tp, inp, fail, rgb)
     label = "MODEL, not a recording" + (": what-if" if what_if else "") + f": {WHAT[fail.kind]}"
+    mp4, png, js = dest / "fail.mp4", dest / "fail_sheet.png", dest / "fail.json"
     try:
+        cam = timelapse.camera(job, prof)
+        size = (timelapse.SIZE[0], int(round(timelapse.SIZE[0] / timelapse.aspect(cam.get("aspect")) / 2)) * 2)
         files = timelapse.render(scene, frs, prof, cam, dest / "fail", rgb, args.night, size, extras=lambda k, fr: extra[k],
                                  log=job.log if job.exists() else None)
-    except (RuntimeError, subprocess.TimeoutExpired) as e:
-        out.fix(f"no video: {e}")
+        for p in files[first:]:
+            caption(p, label)
+        secs = timelapse.video(files, mp4, args.seconds)
+        pick = list(range(max(0, first - 2), first)) + sorted(set(np.linspace(first, len(files) - 1, 7).round().astype(int).tolist()))
+        timelapse.sheet(files, frs, png, pick=pick)
+    except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as e:
+        out.fix(f"no video: {timelapse.why(e)}")
         out.next = "none, the prediction is above"
         return out
-    for p in files[first:]:
-        caption(p, label)
-    mp4, png, js = dest / "fail.mp4", dest / "fail_sheet.png", dest / "fail.json"
-    secs = timelapse.video(files, mp4, None)
-    pick = list(range(max(0, first - 2), first)) + sorted(set(np.linspace(first, len(files) - 1, 7).round().astype(int).tolist()))
-    timelapse.sheet(files, frs, png, pick=pick)
-    for x in (dest / "fail").glob("*.npz"):
-        x.unlink()
+    finally:
+        for x in (dest / "fail").glob("*.npz"):
+            x.unlink()
     data = {"model_not_recording": True, "mode": mode, "what_if": what_if, "kind": fail.kind, "taxonomy": fail.taxonomy,
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
             "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
-            "predicted": [x.kind for x in fails], "source": what, "input": str(f), "camera": cam, "video_s": round(secs, 2),
+            "predicted": [x.kind for x in fails], "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
             "pre_failure_frame": str(files[first - 1].relative_to(dest)) if first else None,
             "first_failure_frame": str(files[first].relative_to(dest)),
             "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"], "failing": k >= first,
                         "frame": str(p.relative_to(dest))} for k, (fr, p) in enumerate(zip(frs, files))]}
     js.write_text(json.dumps(data, indent=1, default=float))
-    out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s; frames from layer {(fail.layer or 0) + 1} on are the model)")
+    out.add(f"Video: {mp4} ({len(files)} frames, {secs:.1f} s; from layer {(fail.layer or 0) + 1} on: the model, closer in, "
+            "only the nozzle drawn)")
     out.add(f"Sheet: {png}")
     out.add(f"Data: {js} ({time.time() - t_start:.0f} s)")
     out.result = f"failure video made: {fail.kind}{' (what-if)' if what_if else ''}"

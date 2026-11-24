@@ -8,7 +8,7 @@ first quad (one more entry than layers); bed (2,) mm; rgb (3,) the filament colo
 frames.json holds the camera, the image size, the head size, and per frame: "full" (layers shown
 whole), "part" ([layer, lines] of the layer in progress, or null), "head" ([x, y, z] mm of the
 nozzle, or null when the head is parked out of view), "shift" (mm the camera moves in the bed's frame, for a
-printer that moves its bed) and "extras" (an npz of extra geometry for this
+printer that moves its bed), "close" (mm points to zoom in on, drawn without the head's box) and "extras" (an npz of extra geometry for this
 frame, or null: V0 F0 C0, V1 F1 C1 ... meshes with their colors, added by stone timelapse --fail).
 Writes f_0000.png ... in frame order.
 """
@@ -19,6 +19,7 @@ from pathlib import Path
 
 import bpy
 import numpy as np
+from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:]
@@ -82,7 +83,8 @@ hs = cfg.get("head_mm", [40.0, 40.0, 50.0])
 ns = float(cfg.get("nozzle_mm", 12.0))
 hv = np.array([[x, y, z] for z in (ns, ns + hs[2]) for y in (-hs[1] / 2, hs[1] / 2) for x in (-hs[0] / 2, hs[0] / 2)], float)
 nz = np.array([[x, y, z] for z in (0.0, ns) for y in (-4.0, 4.0) for x in (-4.0, 4.0)], float)
-head = mesh("head", np.vstack([hv, nz]), np.vstack([bed_f, bed_f + 8]), material("head", cfg.get("head_rgb", (70, 72, 76)), 0.6))
+gray = material("head", cfg.get("head_rgb", (70, 72, 76)), 0.6)
+head, nozzle = mesh("head", hv, bed_f, gray), mesh("nozzle", nz, bed_f, gray)
 
 cam_d = bpy.data.cameras.new("cam")
 cam = bpy.data.objects.new("cam", cam_d)
@@ -138,10 +140,20 @@ for k, fr in enumerate(cfg["frames"]):
         while f"V{j}" in e:
             temp.append(mesh(f"extra{j}", e[f"V{j}"], e[f"F{j}"], material(f"extra{j}", e[f"C{j}"], 0.5)))
             j += 1
-    head.hide_render = fr.get("head") is None
+    nozzle.hide_render = fr.get("head") is None
+    head.hide_render = nozzle.hide_render or bool(fr.get("close"))
+    nozzle.scale = (0.25, 0.25, 1.0) if fr.get("close") else (1.0, 1.0, 1.0)
     if fr.get("head") is not None:
-        head.location = Vector([v * M for v in fr["head"]])
+        head.location = nozzle.location = Vector([v * M for v in fr["head"]])
     cam.location = pos + Vector([v * M for v in fr.get("shift", (0, 0, 0))])
+    cam_d.angle, cam_d.shift_x, cam_d.shift_y = math.radians(c["hfov_deg"]), 0.0, 0.0
+    if fr.get("close"):  # zoom: the same camera, its picture cut to these points and drawn at full size
+        bpy.context.view_layer.update()
+        p = np.array([world_to_camera_view(scene, cam, Vector([v * M for v in q])) for q in fr["close"]])[:, :2]
+        wide = min(1.0, 1.4 * float(np.ptp(p, axis=0).max()))
+        x, y = np.clip((p.min(0) + p.max(0)) / 2, wide / 2, 1 - wide / 2) - 0.5
+        cam_d.lens /= wide
+        cam_d.shift_x, cam_d.shift_y = x / wide, y / wide * cfg["size"][1] / cfg["size"][0]
     scene.render.filepath = str(out / f"f_{k:04d}.png")
     bpy.ops.render.render(write_still=True)
     for ob in temp:

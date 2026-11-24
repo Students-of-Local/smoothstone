@@ -1494,10 +1494,6 @@ def cmd_timelapse(args, job: Job) -> Out:
     """The printer's own timelapse of this print, predicted (timelapse.py)."""
     from . import timelapse
 
-    if getattr(args, "fail", None):
-        from . import failvideo
-
-        return failvideo.cmd(args, job, Out(owns_next=False))
     return timelapse.cmd(args, job, Out(owns_next=False))
 
 

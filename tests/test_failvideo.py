@@ -85,14 +85,18 @@ def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
     _box((20, 20, 20), (0, 0, 0)).export(stl)
     text, code = cli.run(["timelapse", str(stl), "--fail"])
     assert code == 0 and "No failure predicted; nothing to show. --fail detach shows a loose part anyway." in text
-    assert "model, not a recording" in text and not (tmp_path / "fail.mp4").exists()
+    assert "model, not a recording" in text and not (tmp_path / "cube.stl-timelapse").exists()
     again, code = cli.run(["timelapse", "--fail", str(stl)])  # the file after --fail is the part, not a mode
     assert code == 0 and "No failure predicted" in again, again
     text, code = cli.run(["timelapse", str(stl), "--fail", "bridge"])
-    assert f"NEXT: stone timelapse {stl} --fail detach" in text, text
+    assert f"NEXT: stone timelapse {stl} --supports off --fail detach" in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "melt"])
     assert code == 1 and "FIX: --fail melt: one of auto" in text, text
-    assert text.strip().splitlines()[-1].startswith("NEXT: ")
+    assert text.strip().splitlines()[-1] == f"NEXT: stone timelapse {stl} --fail auto", text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "detach", "--mode", "realtime", "--plate", "dirty"])
+    assert code == 1 and "drop --mode" in text and f"NEXT: stone timelapse {stl} --fail detach --plate dirty" in text, text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "--gcode", str(tmp_path / "x.gcode")])  # the normal command's checks
+    assert code == 1 and "drop the file" in text, text
 
 
 def test_without_blender_the_prediction_still_comes_out(jobenv, tmp_path, monkeypatch):
@@ -110,21 +114,23 @@ def test_the_frame_before_the_failure_is_the_timelapse_frame(jobenv, tmp_path, m
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     stl = tmp_path / "t.stl"
     _t().export(stl)
+    d = tmp_path / "t.stl-timelapse"
     text, code = cli.run(["timelapse", str(stl), "--supports", "off", "--fail"])
     assert code == 0, text
     assert "model, not a recording" in text and "Main assumption: " in text and "Predicted: supports at layer 21" in text
-    data = json.loads((tmp_path / "fail.json").read_text())
+    data = json.loads((d / "fail.json").read_text())
     for k in ("layer", "time_s", "what", "numbers", "assumptions", "dominant_assumption", "taxonomy", "z_mm"):
         assert data[k] not in (None, [], {}), k
     assert data["model_not_recording"] and data["kind"] == "supports" and data["layer"] == 20
     assert "droop_mm" in data["numbers"] and data["taxonomy"] == "spaghetti"
-    assert (tmp_path / "fail.mp4").stat().st_size > 1000 and (tmp_path / "fail_sheet.png").stat().st_size > 1000
+    assert (d / "fail.mp4").stat().st_size > 1000 and (d / "fail_sheet.png").stat().st_size > 1000
     text, code = cli.run(["timelapse", str(stl), "--supports", "off"])
     assert code == 0, text
-    normal = json.loads((tmp_path / "timelapse.json").read_text())
+    normal = json.loads((d / "timelapse.json").read_text())
     want = [f["frame"] for f in normal["frames"] if f["layer"] == data["layer"] - 1][0]
-    a = np.asarray(Image.open(tmp_path / data["pre_failure_frame"]).convert("RGB"), float)
-    b = np.asarray(Image.open(tmp_path / want).convert("RGB"), float)
+    a = np.asarray(Image.open(d / data["pre_failure_frame"]).convert("RGB"), float)
+    b = np.asarray(Image.open(d / want).convert("RGB"), float)
     assert np.abs(a - b).mean() < 0.5 and (np.abs(a - b).max(2) > 16).mean() < 0.001
-    c = np.asarray(Image.open(tmp_path / data["first_failure_frame"]).convert("RGB"), float)
+    assert (np.abs(a - a[0, 0]).max(2) > 60).mean() < 0.01  # in the whole view the failing part is a speck; close in it is not
+    c = np.asarray(Image.open(d / data["first_failure_frame"]).convert("RGB"), float)
     assert np.abs(c - b).mean() > 0.5  # and the failure itself is not
