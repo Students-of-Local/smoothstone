@@ -864,3 +864,96 @@ alone on Ollama, so the crashes are not only from two models at once.
   b0ac3769424947812e6030e6a8c0ca3b0b65148fa66bd4def71651d776c03bb8  evals/doctor_heldout/f38_pc_cold_split.json
   2da0319e2380c5db0d17571a6a0d61faa9c53fd8dd1db5e1b5feeedbafde3125  evals/doctor_heldout/f39_nozzle_stop.json
   a98993443da7e3ad3f506fbe866e97a7044e6132b802e16f2c1d9b4389ebe378  evals/doctor_heldout/f40_bendy_sparse.json
+
+
+## 2026-11-23 models 1: a landmark no recipe makes, from the best open model
+
+What changed for the person:
+- A request for a landmark no recipe makes ("a model of Cologne Cathedral that fits my 220 mm bed")
+  no longer ends in "no recipe": `stone recipes` sends it to `stone models "<landmark>"`, which looks
+  the landmark up on Wikidata for its names in ten languages, searches Printables and Wikimedia
+  Commons (Sketchfab only with the person's own key in STONE_SKETCHFAB_TOKEN; Thingiverse and
+  MyMiniFactory are left out), leaves out what is not a model of it (keychains, lamps, maps, signs,
+  LEGO sets, paid models, closed licenses) and lists the best five with author, license, files and
+  popularity, plus a plain note for each license that limits the print (NC, ND, standard).
+- `stone models --take <n>` downloads it (STL, 3MF read without lxml, or a glTF zip), keeps the whole
+  model file over its parts and leaves out cranes, pins and an older year's version, writes
+  credits.txt, joins and repairs it (holes closed, torn bodies rebuilt as solids, crumbs dropped) and
+  stands it on its base.
+- `stone build` scales it to the size asked (tall, long, longest side, or the largest that fits the
+  bed), names its thin features (needles, blunt points, rods, thin edges, and how much the slicer
+  drops), cuts it into numbered parts that fit the bed with square pin holes (filament pegs where a pin
+  does not fit, glue where neither does), lays each part flat side down, and runs stone's checks on
+  every part and the pins, with grams and hours each and in total. Every mesh change gets a line.
+  build/views.png shows it assembled, build/layout.png the parts as they print.
+- A failing build's NEXT is the next model (`--take n+1`); with none left, a question for the person.
+
+Evals: evals/models m01 to m06 and evals/models_heldout h01 to h06 (sealed, never run, in GUARDED).
+evals/models_grade.py: credits, every part's fit and checks run again, the parts put back together
+within 3% of the size asked, and a blind Opus judge on the views against the Wikipedia lead photo.
+
+`--driver next`, seed 1, on 8340029:
+
+| spec | result | model it ended on | why |
+| --- | --- | --- | --- |
+| m01_cologne | PASS, judge 8 | 923462 assistantmaster, CC BY-NC-SA | 204 x 109 x 216 mm, all 14 checks |
+| m02_notre_dame | FAIL, judge 7 | none fitted at the end | min_wall 0.28 and 0.40 mm; take 2 fails watertight (touching solids, below); the 10 step budget ran out on take 4 |
+| m03_sagrada | FAIL, judge 7 | 1631289 Ninomalbinho, CC BY-NC-ND | 8 parts, 24 pins; parts 2, 4 to 8 fail islands; takes 1 and 2 fail min_wall 0.55 mm or islands |
+| m04_eiffel | FAIL, judge 8 | none fitted at the end | thin features spoke on every take; all fail min_wall (0.10 to 0.14 mm), overhang 14 to 18% and islands |
+| m05_taj_mahal | PASS, judge 9 | 1791921 Bazzar701, CC BY-NC-ND (3MF) | take 1 failed min_wall 0.41 mm; 150 x 150 x 107 mm, all 14 checks |
+| m06_st_basils | FAIL, judge 9 | St. Basil's, 2 takes | min_wall 0.29 and 0.63 mm, overhang, islands |
+
+The first run (6bd4bcd) found the faults 8340029 fixes: "St. Basil's" searched as "St" and took an
+egg cup named Stockholm (the judge scored it 1), a 3MF needed lxml, a LEGO set was offered, and the
+2014 and 2022 versions of one Eiffel model were merged.
+
+Unchanged: `--driver next` on evals/engineering e01 to e10, 10 of 10. pytest `-n 16 -m "not timing"`
+878 passed, 1 skipped (the network test); `-m timing` 1 passed. `ratchet.py --check-git origin/main` holds.
+
+Open:
+- stone's min_wall (0.8 mm, two nozzle lines, at the 3rd percentile of thickness) fails nearly every
+  real landmark model at a desk size, including ones made and printed by thousands (MiniWorld3D). The
+  thin features report already names them. Whether a found model should keep that bar, report it
+  instead, or use the slicer's own floor (0.1 mm, what Arachne still draws) is a decision for the
+  owner, not this climb; nothing here lowers a check.
+- x and y cuts leave pieces of leaning spires starting in the air in the next part (m03 islands).
+  Cutting only in z where the footprint fits, or laying each piece on its own, is the next step.
+- Models built from solids that only touch keep coincident vertices that a float32 STL merges into
+  non-manifold edges (m02 take 2, m04 take 2). A union with copies shifted 0.01 mm fused them but
+  took over 20 minutes, so it is not in.
+- A run spends 3 of its 10 steps before the first take, so it tries at most 3 or 4 models.
+- The Printables API is undocumented and may change; the search fails softly with a FIX line. The
+  Sketchfab path is untested here: no key was set.
+
+## 2026-11-24 models 2: thin walls measured, supports, cuts only where the bed is too small
+
+What changed (11d596b), as the lead decided after models 1:
+- A found model's min_wall is measured, not a bar: a part fails only when over 1.5% of its volume is
+  under one nozzle line, or when what the slicer drops cuts a piece loose. The 1.5% comes from models
+  people print: the Taj, St. Basil's and Notre-Dame picks sit at 0.03 to 0.10%, and the most made
+  Eiffel model (180 makes) at 0.89%. The report names the remedy: print bigger, a 0.2 mm nozzle, or resin.
+  Recipes and engineering parts keep the 0.8 mm bar and the overhang limit.
+- Overhangs and pieces in the air print on supports; the build reports the grams and hours of support.
+- Splits cut in z first and across only where the footprint is wider than the bed, at the smallest
+  section away from spires, and every part is laid flat.
+- A clear lead in the ranking is taken without a question.
+
+`--driver next`, seed 1, on 11d596b, judged blind against the Wikipedia lead photo:
+
+| spec | result | judge | what the judge marked down |
+| --- | --- | --- | --- |
+| m01_cologne | PASS | 8 | west spires, tower proportion, west facade |
+| m02_notre_dame | PASS | 9 | transept rose windows |
+| m03_sagrada | PASS (take 2) | 8 | facade bell towers, overall massing |
+| m04_eiffel | PASS | 9 | top antenna, lattice and arch detail |
+| m05_taj_mahal | PASS | 9 | main dome, plinth |
+| m06_st_basils | PASS | 9 | domes, bell tower |
+
+6 of 6, up from 2 of 6. Unchanged: `--driver next` on evals/engineering e01 to e10, 10 of 10.
+
+Also found this round: two sessions on Parish1 were killed by systemd-oomd while the suite ran with
+`-n auto` beside these evals, and /tmp there is RAM. Heavy jobs now go through `scripts/heavy` (#81),
+and video frames are packed (#98).
+
+Open: the held-out six stay sealed until the build path (`stone landmark`) is graded too; LFM3-1.7B
+has not driven a landmark run yet.

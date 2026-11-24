@@ -191,6 +191,19 @@ def tier_lines(t: str) -> list[str]:
     return [f"Tier: {t}"] + (["Rules:"] + rules if rules else [])
 
 
+def found_model(job: Job) -> dict | None:
+    """The model stone models --take made the job's part, when no recipe plan has replaced it."""
+    from . import models as mdl
+
+    return None if job.plan() else mdl.taken(job.root)
+
+
+def request_landmark(request: str) -> str | None:
+    from . import models as mdl
+
+    return mdl.names_landmark(request)
+
+
 def need_job(job: Job, out: Out) -> bool:
     if job.exists():
         return True
@@ -240,6 +253,9 @@ def cmd_status(args, job: Job) -> Out:
         else:
             out.add(f"Recipe: {r.name} ({r.title})")
             out.add(f"Params: {params_summary(r, plan['params'])}")
+    elif found_model(job):
+        fm = found_model(job)
+        out.add(f"Model: {fm['name']} by {fm.get('author') or 'unknown'} ({fm.get('url', '')}), found with stone models")
     else:
         out.add("Recipe: none yet")
     out.add(f"Builds: {s.get('builds', 0)}, passed: {'yes' if s.get('passed') else 'no'}")
@@ -322,6 +338,8 @@ def cmd_recipes(args, job: Job) -> Out:
         fits = {r.name: rc.fit(r, query) for _, r in ranked}
         ranked.sort(key=lambda sr: -fits[sr[1].name])  # stable: keeps the word score within a fit
         top = ranked[0][1]
+        if fits[top.name] == 0 and (landmark := request_landmark(query)):
+            return models_route(out, landmark)
         if fits[top.name] == 0:
             # no recipe makes this: handing over the nearest one ready would be a wrong part
             what = top.title.lower()
@@ -1193,6 +1211,8 @@ def cmd_build(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
         return out
+    if found_model(job):
+        return _models_build(job)
     plan = job.plan()
     if not plan:
         out.fix("pick a recipe first")
@@ -2157,10 +2177,243 @@ def cmd_video(args, job: Job) -> Out:
     return out
 
 
+# found models: a landmark no recipe makes, from the best open model made for printing
+
+
+def models_route(out: Out, subject: str) -> Out:
+    """No recipe makes a landmark: stone finds an open model of it made for printing instead."""
+    out.add(f"No recipe makes {subject}: stone finds the best open model of it made for printing, "
+            "credits it, and fits it to your printer.")
+    out.next = f"stone models {shlex.quote(subject)}"
+    out.owns_next = True
+    out.stage = "no_recipe"
+    out.result = f"no recipe: find a model of {subject}"
+    return out
+
+
+def _next_take(job: Job, n: int) -> str:
+    """The next candidate after the n-th, or a question when there is none."""
+    from . import models as mdl
+
+    found = read_json(mdl.found_file(job.root)) or {}
+    if n < len(found.get("kept") or []):
+        return f"stone models --take {n + 1}"
+    return ("ask the person: none of the open models stone found prints well at this size. "
+            "Would a smaller size do, or do you have a model file of your own? When they answer: "
+            'stone note "<their answer>"')
+
+
+def cmd_models(args, job: Job) -> Out:
+    """stone models "<landmark>": the best open models made for printing; --take <n> makes one the part."""
+    from . import models as mdl
+
+    out = Out()
+    if not need_job(job, out):
+        return out
+    if args.take is not None:
+        return _models_take(args.take, job, out)
+    subject = " ".join(args.subject).strip().strip("\"'") or mdl.names_landmark(job.request()) or ""
+    if not subject:
+        out.fix('say which landmark, like stone models "Cologne Cathedral"')
+        out.next = 'stone models "<landmark>"'
+        return out
+    progress(job, f"searching for open models of {subject}")
+    found = mdl.search(subject, job.request(), job.root / "models" / "cache")
+    write_json(mdl.found_file(job.root), found)
+    nm = found["names"]
+    if nm.get("kind") == "person":
+        out.add(f"{nm['label']} is a person ({nm['description'] or 'Wikidata'}): stone makes a figure of a person.")
+        out.next = "stone show figure"
+        out.result = "models: a person, not a landmark"
+        return out
+    head = f"Subject: {nm['label']}" + (f" (wikidata {nm['wikidata']}" + (f", {nm['description']})"
+                                                                         if nm["description"] else ")")
+                                      if nm.get("wikidata") else "")
+    other = [t for t in found["terms"] if mdl.bare(t) not in (mdl.bare(nm["label"]), mdl.bare(subject))]
+    out.add(head + (f"; also searched as {', '.join(other)}" if other else ""))
+    src = found["sources"]
+    sk = src["sketchfab"]
+    sk_text = (f"Sketchfab {sk['found']}" if sk["searched"]
+               else f"Sketchfab not searched (set {mdl.SKETCHFAB_VAR} to your own key to add it)")
+    out.add(f"Searched: Printables {src['printables']['found']}, Wikimedia Commons {src['commons']['found']}, {sk_text}")
+    kept = found["kept"]
+    if src["printables"]["why"]:
+        out.add(f"FIX: Printables could not be searched: {src['printables']['why']}; try stone models again later")
+    if not kept:
+        out.fix(f"no open model of {nm['label']} made for printing was found")
+        out.next = (f"ask the person: stone found no open model of {nm['label']} made for printing. Do you have a "
+                    'model file, or another name for it? When they answer: stone note "<their answer>"')
+        out.result = "models: none found"
+        return out
+    out.code = 0
+    for i, c in enumerate(kept[:mdl.SHOW], 1):
+        out.add(mdl.candidate_line(i, c))
+        note = mdl.license_note(c)
+        if note:
+            out.add(f"   License {mdl.license_short(c)}: {note}.")
+    left = found["left_out"]
+    if left:
+        shown = "; ".join(f"{c['name'][:40]} ({c['why']})" for c in left[:4])
+        out.add(f"Left out {len(left)}: {shown}" + (" ..." if len(left) > 4 else ""))
+    out.next = "stone models --take 1"
+    out.stage = "models"
+    out.result = f"found {len(kept)} models of {nm['label']}"
+    if mdl.clear_lead(kept):
+        # the plain pick: taken now, so the next step is the build (stone models --take <n> for another)
+        out.add("Model 1 leads on makes and likes, so stone takes it; for another: stone models --take <n>.")
+        return _models_take(1, job, out)
+    return out
+
+
+def _models_take(n: int, job: Job, out: Out) -> Out:
+    from . import models as mdl
+
+    found = read_json(mdl.found_file(job.root))
+    if not found:
+        out.fix("search first")
+        out.next = f"stone models {shlex.quote(mdl.names_landmark(job.request()) or '<landmark>')}"
+        return out
+    kept = found.get("kept") or []
+    if not 1 <= n <= len(kept):
+        out.fix(f"there are {len(kept)} models to take; pick 1 to {len(kept)}")
+        out.next = "stone models --take 1"
+        return out
+    c = kept[n - 1]
+    cache = job.root / "models" / "cache"
+    out.add(f"Model {n}: {c['name']} by {c['author'] or 'unknown'}, {mdl.license_short(c)} ({c['url']})")
+    try:
+        if c["source"] == "printables":
+            files = c.get("files") or mdl.printables_files(c, cache)
+        elif c["source"] == "sketchfab":
+            files = [{"id": c["id"], "name": "model.zip", "size": 0}]
+        else:
+            files = c.get("files") or []
+        chosen, left = mdl.choose_files(files)
+        if not chosen:
+            raise mdl.ModelsProblem("it has no mesh files")
+        for f, why in left[:3]:
+            out.add(f"Left out {f['name']}: {why}")
+        progress(job, f"downloading {len(chosen)} file{'s' if len(chosen) > 1 else ''} of {c['name']}")
+        paths = mdl.download(c, chosen, job.root / "models" / re.sub(r"[^\w.-]+", "_", f"{c['source']}-{c['id']}")[:80])
+        mesh = mdl.load_mesh(paths)
+        out.add(f"Downloaded {', '.join(p.name for p in paths)}: {mdl.mesh_line(mesh)}")
+        progress(job, "repairing the mesh")
+        log: list[str] = []
+        fixed = mdl.upright(mdl.repair(mesh, log), log)
+    except Exception as e:  # a model that will not download or load: the next one may
+        job.log("models --take failed:\n" + traceback.format_exc())
+        why = str(e) if isinstance(e, mdl.ModelsProblem) else mdl._why(e)
+        out.fix(f"could not take model {n}: {why}")
+        out.next = _next_take(job, n)
+        out.result = f"take {n} failed: {why}"[:120]
+        return out
+    out.add(*log)
+    out.add(f"Repaired: {mdl.mesh_line(fixed)}")
+    md = job.root / "model"
+    md.mkdir(parents=True, exist_ok=True)
+    stl = md / "model.stl"
+    fixed.export(str(stl))
+    write_json(mdl.model_file(job.root), {**c, "index": n, "subject": found.get("subject"),
+                                          "stl": str(stl), "files": chosen, "faces": len(fixed.faces),
+                                          "watertight": bool(fixed.is_watertight)})
+    credits = job.root / "credits.txt"
+    credits.write_text(mdl.credits_text(c, chosen))
+    note = mdl.license_note(c)
+    if note:
+        out.add(f"License {mdl.license_short(c)}: {note}.")
+    out.add(f"Credits: {credits} (name the author when you share the print)")
+    job.plan_file.unlink(missing_ok=True)  # the found model is the job's part now
+    (job.root / "build" / "model" / "parts.json").unlink(missing_ok=True)
+    job.update(passed=False)
+    out.next = "stone build"
+    out.stage = "found"
+    out.result = f"took model {n}: {c['name']}"[:120]
+    return out
+
+
+def _models_build(job: Job) -> Out:
+    """stone build for a found model: scale, name thin features, split with pins, check every part."""
+    from . import modelprint
+    from . import models as mdl
+
+    out = Out()
+    info = mdl.taken(job.root)
+    n = int(info.get("index") or 1)
+    out.add(f"Model: {info['name']} by {info.get('author') or 'unknown'}, {mdl.license_short(info)}")
+    st = job.status()
+    builds = int(st.get("builds", 0)) + 1
+    try:
+        res = modelprint.make(job.root, job.request(), config.bed(job.root), progress=lambda t: progress(job, t))
+    except Exception as e:
+        job.log("models build failed:\n" + traceback.format_exc())
+        out.fix(f"could not fit this model to the printer ({type(e).__name__}: {str(e)[:100]})")
+        out.next = _next_take(job, n)
+        out.stage = "build_failed"
+        out.result = "model build failed"
+        job.update(builds=builds, passed=False)
+        return out
+    out.add(*res["lines"])
+    files = res["files"]
+    out.add(f"Parts: {files[0]} to {Path(files[-1]).name}" if len(files) > 1 else f"Part: {files[0]}")
+    if res["views"]:
+        out.add(f"Views: {res['views']} (the whole model, assembled)")
+    if res["layout"]:
+        out.add(f"Layout: {res['layout']} (every part as it prints)")
+    show([p for p in (res["views"], res["layout"]) if p], f"{info['name']}, fitted to your printer")
+    out.add(f"Credits: {job.root / 'credits.txt'}")
+    if res["ok"]:
+        out.add(f"Part{'s' if len(files) > 1 else ''} ready: print every file above, then push the pins in and glue "
+                "the joints." if len(files) > 1 else f"Part ready: {files[0]}")
+        out.next = DONE_NEXT
+        out.stage = "done"
+        out.result = f"model fitted: {len(files)} part{'s' if len(files) > 1 else ''}"
+        job.update(builds=builds, failed_builds=0, passed=True)
+        return out
+    if res.get("broken"):
+        k = res["broken"]
+        out.fix(f"this model's solids only touch, so part{'s' if len(k) > 1 else ''} {', '.join(map(str, k))} "
+                "save with broken edges a slicer rejects; the next model may be built cleaner")
+    else:
+        out.fix("a part does not pass the print checks at this size; another model may print better")
+    out.next = _next_take(job, n)
+    out.stage = "build_failed"
+    out.result = "a part fails the print checks"
+    job.update(builds=builds, failed_builds=int(st.get("failed_builds", 0)) + 1, passed=False)
+    return out
+
+
+def _models_done(job: Job) -> Out:
+    from . import models as mdl
+
+    out = Out()
+    info = mdl.taken(job.root)
+    data = read_json(job.root / "build" / "model" / "parts.json") or {}
+    files = [p["file"] for p in data.get("parts") or []]
+    if not data or not job.status().get("passed") or not all(Path(f).is_file() for f in files):
+        out.add("Not done: the model has not been fitted and checked yet.")
+        out.next = "stone build"
+        out.code = 1
+        return out
+    e = data["size_mm"]
+    out.add(f"Done: {info['name']} by {info.get('author') or 'unknown'}, {e[0]:.1f} x {e[1]:.1f} x {e[2]:.1f} mm "
+            f"in {len(files)} part{'s' if len(files) > 1 else ''}, all checks pass.")
+    out.add(f"Request: {job.request()}")
+    out.add(*[f"STL: {f}" for f in files[:8]])
+    if data.get("pins"):
+        out.add(f"Pins: {data['pins']['file']}")
+    out.add(f"Credits: {job.root / 'credits.txt'}")
+    out.next = DONE_NEXT
+    out.stage = "done"
+    out.result = "done, found model"
+    return out
+
+
 def cmd_done(args, job: Job) -> Out:
     out = Out()
     if not need_job(job, out):
         return out
+    if found_model(job):
+        return _models_done(job)
     plan = job.plan()
     s = job.status()
     if not plan:
@@ -3085,6 +3338,11 @@ def make_parser() -> Parser:
                    help="frames in one turn of the figure (8 or more; 144 for one run, 120 each in a series)")
     s.add_argument("--with", dest="runs", action="append", metavar="RUN",
                    help="another finished run (a folder with job/ and log.json); the clip shows every figure")
+
+    s = sub.add_parser("models", parents=[common],
+                       help='open models of a landmark made for printing: stone models "Cologne Cathedral"')
+    s.add_argument("subject", nargs="*")
+    s.add_argument("--take", type=int, help="make the n-th model the job's part")
     s = sub.add_parser("printer", parents=[common], help="your printer: stone printer [set <id> | show | status | camera]")
     s.add_argument("action", nargs="?")
     s.add_argument("id", nargs="?")
@@ -3129,6 +3387,7 @@ COMMANDS = {
     "done": cmd_done,
     "colors": cmd_colors,
     "video": cmd_video,
+    "models": cmd_models,
     "printer": printers.cmd_printer,
     "fit": cmd_fit,
     "doctor": doctor.cmd_doctor,

@@ -68,3 +68,15 @@ def jobenv(tmp_path, monkeypatch, recipes_root):
     monkeypatch.delenv("STONE_TIER", raising=False)
     monkeypatch.setenv("STONE_JOB", str(work / "stone-job"))
     return work
+
+
+def pytest_collection_modifyitems(config, items):
+    """A test marked network reaches a live site: it runs only with STONE_NETWORK=1."""
+    import os
+
+    if os.environ.get("STONE_NETWORK") == "1":
+        return
+    skip = pytest.mark.skip(reason="reaches the network; set STONE_NETWORK=1 to run it")
+    for item in items:
+        if "network" in item.keywords:
+            item.add_marker(skip)

@@ -1,0 +1,21 @@
+{
+  "id": "h04_big_ben",
+  "request": "A 250 mm tall Big Ben for my 220 mm bed.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Big Ben",
+      "size": {
+        "mode": "z",
+        "mm": 250
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "parts_min": 2
+    }
+  },
+  "why": "Held out: taller than the bed, so it must split."
+}

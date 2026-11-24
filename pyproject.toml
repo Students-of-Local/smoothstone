@@ -39,4 +39,5 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # timing: a wall-clock budget; CI runs these alone, after the parallel run
-markers = ["timing: wall-clock budget, run without other workers"]
+markers = ["timing: wall-clock budget, run without other workers",
+           "network: reaches a live site; skipped unless STONE_NETWORK=1, so CI never runs it"]

@@ -271,3 +271,23 @@ measured in the mesh, so engineering.json cannot claim a part it does not have.
 - sources: every body size and feature has one, as above.
 
 The sources of every material number are in the comments of `engineering_grade.py`.
+
+## Found model specs
+
+`models/`: a landmark no recipe makes (a cathedral, a tower), which stone finds as an open model,
+credits, repairs and fits to the printer (`stone models`). `models_heldout/` holds six more that are
+never tuned on (its README).
+
+```json
+{"id": "m03_sagrada", "request": "A 300 mm tall model of the Sagrada Familia for my 220 mm bed.",
+ "expect": {"models": {"wikipedia": "Sagrada Familia", "size": {"mode": "z | long | max | fit", "mm": 300},
+                       "bed": [220, 220, 220], "parts_min": 2, "thin": true}}}
+```
+
+`evals/models_grade.py` grades it outside the model's reach: credits.txt names the author, an open or
+printable license and the source page; every part file and the pins fit the bed and pass stone's
+checks, run again on the files; the parts put back together by parts.json's `to_print` are within 3%
+of the size asked (`fit`: 97% of the bed or more in its tightest direction); `parts_min` parts or
+more; with `thin`, the thin features report is not empty. Then a blind Opus judge (the claude CLI)
+compares build/views.png with the lead photo of the `wikipedia` article and scores 1 to 10; under 6,
+or no answer, fails the run (landmark.json next to the run).

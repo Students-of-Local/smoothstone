@@ -1,0 +1,20 @@
+{
+  "id": "m06_st_basils",
+  "request": "A 150 mm tall model of St. Basil's Cathedral.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Saint Basil's Cathedral",
+      "size": {
+        "mode": "z",
+        "mm": 150
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "Onion domes and crosses: a found model with fine tips at a shelf size."
+}

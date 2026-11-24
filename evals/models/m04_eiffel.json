@@ -1,0 +1,21 @@
+{
+  "id": "m04_eiffel",
+  "request": "A 200 mm tall model of the Eiffel Tower.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Eiffel Tower",
+      "size": {
+        "mode": "z",
+        "mm": 200
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ],
+      "thin": true
+    }
+  },
+  "why": "A lattice at 200 mm has members thinner than a nozzle: the thin features check must speak and name them."
+}

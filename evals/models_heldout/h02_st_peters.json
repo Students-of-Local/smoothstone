@@ -1,0 +1,19 @@
+{
+  "id": "h02_st_peters",
+  "request": "A model of St. Peter's Basilica that fits my 220 mm bed.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "St. Peter's Basilica",
+      "size": {
+        "mode": "fit"
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ]
+    }
+  },
+  "why": "Held out: a domed basilica scaled to the bed."
+}

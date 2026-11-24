@@ -33,6 +33,12 @@ For a figure, statue or bust of a person, pet or thing, the recipe is figure. Se
 name only. stone set then says NEXT: stone find "<name>"; run that line, then run
 stone build. The build takes a few minutes.
 
+## Landmarks
+For a cathedral, tower or other landmark no recipe makes, stone recipes says
+NEXT: stone models "<landmark>". Run it, then stone models --take 1, then stone build.
+If the build prints FIX, its NEXT is the next model (--take 2); run it, then stone build.
+A big model prints as numbered parts with pins. Stop when stone says the parts are ready.
+
 ## Example
 Request: A guard for a 92 mm fan with a honeycomb grille.
 stone status -> NEXT: stone recipes

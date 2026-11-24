@@ -1,0 +1,20 @@
+{
+  "id": "h06_hagia_sophia",
+  "request": "A 120 mm tall model of the Hagia Sophia.",
+  "input": "text",
+  "expect": {
+    "models": {
+      "wikipedia": "Hagia Sophia",
+      "size": {
+        "mode": "z",
+        "mm": 120
+      },
+      "bed": [
+        256,
+        256,
+        256
+      ]
+    }
+  },
+  "why": "Held out: a dome with four minarets."
+}
