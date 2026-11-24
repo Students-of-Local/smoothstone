@@ -76,8 +76,8 @@ def stone(*argv):
 class FakeGh:
     """gh as the tests see it: every call is recorded, none reaches GitHub."""
 
-    def __init__(self, login="somefan", fail=()):
-        self.calls, self.login, self.fail = [], login, fail
+    def __init__(self, login="somefan", fail=(), open_pr=""):
+        self.calls, self.login, self.fail, self.open_pr = [], login, fail, open_pr
 
     def __call__(self, args, timeout=60):
         self.calls.append(args)
@@ -89,6 +89,8 @@ class FakeGh:
             return 0, "abc123"
         if args[:2] == ["pr", "create"]:
             return 0, "https://github.com/baney75/smoothstone/pull/999"
+        if args[:2] == ["pr", "list"]:
+            return 0, self.open_pr
         return 0, ""
 
 
@@ -167,6 +169,54 @@ def test_send_refuses_a_bundle_changed_after_preview(work, monkeypatch):
     stone("doctor", "share")
     text, code, nxt = stone("doctor", "share", "--send")
     assert "Sent: " in text
+
+
+def _kinds(gh, *kinds):
+    return [c for c in gh.calls if any(c[:len(k)] == k for k in kinds)]
+
+
+def test_partial_upload_says_what_is_public_and_resumes(work, monkeypatch):
+    gh = FakeGh(fail=("photo.jpg",))
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    _fixed_case(work)
+    stone("doctor", "share")
+    d = json.loads(next((work / "stone-job" / "doctor").glob("*/share/case.json")).read_text())
+    text, code, nxt = stone("doctor", "share", "--send")
+    tree = f"https://github.com/somefan/smoothstone/tree/fix/{d['id']}/failures/community/{d['id']}"
+    assert "Nothing was sent" not in text and "Public on GitHub now: case.json" in text and tree in text, text
+    assert "photo.jpg" not in text.split("Public on GitHub now:")[1].splitlines()[0]
+    assert nxt.startswith("ask the person:") and "stone doctor share --send" in nxt
+    gh.fail = ()
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert "Sent: https://github.com/baney75/smoothstone/pull/999" in text and nxt == doctor.DONE
+    assert len(_kinds(gh, ["api", "-X", "POST", "repos/somefan/smoothstone/git/refs"])) == 1  # the branch made once
+    puts = [c[3].rsplit("/", 1)[1] for c in _kinds(gh, ["api", "-X", "PUT"])]
+    assert puts == ["case.json", "photo.jpg", "photo.jpg"]  # case.json is not sent twice
+
+
+def test_retry_finds_the_open_pull_request(work, monkeypatch):
+    gh = FakeGh(fail=("pr create",))
+    monkeypatch.setattr(share, "_gh", gh)
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    _fixed_case(work)
+    stone("doctor", "share")
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert "Public on GitHub now: case.json, photo.jpg" in text and "gh could not open the pull request" in text
+    gh.fail, gh.open_pr = (), "https://github.com/baney75/smoothstone/pull/998"
+    text, code, nxt = stone("doctor", "share", "--send")
+    assert "Sent: https://github.com/baney75/smoothstone/pull/998" in text
+    assert len(_kinds(gh, ["pr", "create"])) == 1 and len(_kinds(gh, ["api", "-X", "PUT"])) == 2
+
+
+def test_decline_after_a_partial_upload_names_what_stays_public(work, monkeypatch):
+    monkeypatch.setattr(share, "_gh", FakeGh(fail=("photo.jpg",)))
+    monkeypatch.setattr(shutil, "which", lambda n, *a, **k: "/fake/gh")
+    _fixed_case(work)
+    stone("doctor", "share")
+    stone("doctor", "share", "--send")
+    text, code, nxt = stone("doctor", "share", "no")
+    assert "stays on this machine" not in text and "Still public on GitHub: case.json" in text
 
 
 def test_owner_skips_the_fork(work, monkeypatch):
