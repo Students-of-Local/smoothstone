@@ -101,6 +101,38 @@ def test_the_fan_blows_a_strand_down():
     assert out[0] > 2 * out[1]
 
 
+def test_the_fans_air_is_under_the_nozzle_and_not_above_or_beside_it():
+    def speed(x, z):
+        s = st.Strand([[x + k, 0, z] for k in range(9)], 0.4, PLA, temp=25, air=25)
+        s.step(head=(4, 0, 30))
+        return -float(s.v[:, 2].mean())
+
+    still = 9.80665 / 240
+    assert speed(0, 5) > 3 * still and speed(0, 29) > 3 * still  # at any height below
+    assert speed(0, 40) == pytest.approx(still, rel=0.05)  # above
+    assert speed(20, 29) == pytest.approx(still, rel=0.05)  # beside
+
+
+def test_air_along_a_strand_cools_it():
+    """Kase and Matsuo: a strand hanging straight under the fan, whose air blows along it, cools faster than in still air."""
+    d, t, air, v = 0.48e-3, 150.0, 35.0, 5.0
+    p = fs.air((t + air) / 2)
+    nu = 0.42 * (v * d / p["nu"]) ** 0.344
+    still = float(fs.h_strand(0.48, t, air))
+    a, b = t + 273.15, air + 273.15
+    rad = fs.fact("emissivity") * fs.fact("stefan_boltzmann") * (a * a + b * b) * (a + b)
+    assert float(fs.h_strand(0.48, t, air, 0.0, v)) == pytest.approx(nu * p["k"] / d + rad, rel=1e-6)
+    assert float(fs.h_strand(0.48, t, air, 0.0, v)) > 1.3 * still
+    z = np.linspace(30, 10, 41)
+    end = []
+    for fan in (True, False):
+        s = st.Strand(np.c_[0 * z, 0 * z, z], 0.48, PLA, fan=fan, held=range(41))
+        for _ in range(120):
+            s.step(head=(0, 0, 30))
+        end.append(float(s.t[20]))
+    assert end[0] < end[1] - 15
+
+
 def test_a_bent_cold_strand_keeps_the_bend_past_what_its_skin_takes():
     """Sharper than strength / E at the skin it stays bent; gentler, it springs back."""
     for radius, stays in ((2.0, True), (60.0, False)):
@@ -116,17 +148,64 @@ def test_a_bent_cold_strand_keeps_the_bend_past_what_its_skin_takes():
         assert left == pytest.approx(min(1.0, most * radius * 1e-3) if stays else 1.0, rel=0.05)
 
 
-def test_a_whipping_strand_keeps_its_length(monkeypatch):
-    """Ten turns in ten steps: a step that swings an edge too far is taken in halves."""
-    def spun(**kw):
-        s = rod(12, temp=25, air=25, n=11)
-        quiet(s, monkeypatch)
-        s.v[:, 1] = 250 * (s.x[:, 0] - 6e-3)  # rad/s about its middle: 60 degrees a step
-        longest = 0.0
-        for _ in range(10):
-            s.step(**kw)
-            longest = max(longest, float(s.lengths()[1].sum()) * 1e3)
-        return longest
+def bent(radius, **kw):
+    """A quarter turn, straight when it was hot."""
+    a = np.linspace(0, math.pi / 2, 21)
+    s = st.Strand(np.c_[radius * np.sin(a), 0 * a, 30 + radius * (1 - np.cos(a))], 0.4, "PLA", fan=False, **kw)
+    s.eb = s._curve(*s.lengths())
+    return s
 
-    assert spun() == pytest.approx(12, rel=0.05)
-    assert spun(halve=0) > 14
+
+def turned(s):
+    tan = s.lengths()[0]
+    return math.degrees(math.acos(float(np.clip(tan[0] @ tan[-1], -1, 1))))
+
+
+def rest(s, monkeypatch, steps=600):
+    quiet(s, monkeypatch)
+    monkeypatch.setattr(st.failsim, "fact", lambda key, was=fs.fact: 0.0 if key == "gravity" else was(key))
+    s.fixed[2:] = False
+    for _ in range(steps):
+        s.step()
+        s.v *= 0.9
+    return turned(s)
+
+
+def test_a_strand_keeps_the_curve_it_set_in(monkeypatch):
+    s = bent(12, temp=85, air=25, held=range(21))  # still holding part of its bend when it sets
+    was = turned(s)
+    stress = []
+    for _ in range(2400):
+        s.step()
+        stress.append(float(np.linalg.norm(s.eb[10]) * s.m.e * float(s.m.ratio(s.t[10]))))
+    assert float(s.t.max()) < 40
+    assert max(stress[5:]) <= stress[4] * 1.1  # E grows 300 times, the stress left in it does not
+    assert rest(s, monkeypatch) == pytest.approx(was, rel=0.1)
+
+
+def test_hot_and_cold_lengths_bend_in_series(monkeypatch):
+    """Two hot edges and a cold one, over and over: the cold third alone is stiff, not the hot edges beside it."""
+    def droop(temps):
+        s = rod(4, temp=140, air=140, held=(0, 1))
+        s.t[:] = temps
+        quiet(s, monkeypatch)
+        monkeypatch.setattr(fs, "h_strand", lambda *a, **k: np.zeros(41))
+        for _ in range(5):
+            s.step()
+        return 30 - float(s.points()[-1, 2])
+
+    some = droop(np.where(np.arange(41) % 3 == 0, 255.0, 25.0))  # an edge is at its ends' mean: 140, 25, 140
+    assert some == pytest.approx(2 / 3 * droop(np.full(41, 140.0)), rel=0.15)
+
+
+@pytest.mark.parametrize("n", (3, 11))
+@pytest.mark.parametrize("speed", (30, 60, 110, 250))  # rad/s about its middle: 7 to 60 degrees a step
+def test_a_whipping_strand_keeps_its_length(monkeypatch, n, speed):
+    for temp in (25, 170):
+        s = rod(12 if n > 3 else 3, temp=temp, air=temp, n=n)
+        was = float(s.lengths()[1].sum())
+        quiet(s, monkeypatch)
+        s.v[:, 1] = speed * (s.x[:, 0] - was / 2)
+        for _ in range(10):
+            s.step()
+            assert float(s.lengths()[1].sum()) == pytest.approx(was, rel=0.02)

@@ -514,12 +514,25 @@
    "checked": "2026-11-24"
   },
   {
+   "id": "failsim.along_nusselt",
+   "topic": "failsim",
+   "key": "along_nusselt",
+   "value": [0.42, 0.344],
+   "unit": "Nu = 0.42 Re^0.344",
+   "note": "Air blowing along a thin thread, as in fiber spinning: Kase and Matsuo measured it on a heated 0.2 mm wire, 0.5 < Re < 50. A strand straight under the part fan is at Re 100, a little past that. h_strand takes the larger of this and the air across it.",
+   "quote": "Nu=0.42.Re0.344 Kase and Matsuo [1965] Found by simulation of electrically heated 0.2 mm heated wire for 0.5<Re<50",
+   "source": "M. Golzar, Melt Spinning of the Fine PEEK Filaments, TU Dresden, 2004, Table 5.2.2 (p. 83), from S. Kase and T. Matsuo, J. Polym. Sci. A 3, 1965",
+   "cite": "Golzar 2004 Table 5.2.2",
+   "url": "https://tud.qucosa.de/id/qucosa%3A24409",
+   "checked": "2026-11-24"
+  },
+  {
    "id": "failsim.fan_reach",
    "topic": "failsim",
    "key": "fan_reach",
    "value": 10,
    "unit": "mm",
-   "note": "How far from the nozzle the part fan's air still blows at failsim.fan_air_speed; past it the air is still. No maker publishes it.",
+   "note": "How far to the side of the nozzle the part fan's air blows down at failsim.fan_air_speed; past it, and above the nozzle, the air is still. A jet keeps its speed for about six of its own widths, so it is not slowed on its way down here. No maker publishes any of it.",
    "source": "stone assumption",
    "cite": "assumption",
    "url": "",
@@ -528,7 +541,7 @@
     5,
     30
    ],
-   "assumption": "The part fan blows straight down at full speed within 10 mm of the nozzle and not at all past it"
+   "assumption": "The part fan blows straight down at full speed from the nozzle to what is below it, within 10 mm to the side, and not at all past that"
   },
   {
    "id": "failsim.strand_friction",

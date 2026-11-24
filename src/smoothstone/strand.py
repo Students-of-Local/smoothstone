@@ -6,7 +6,7 @@ A chain of nodes, each edge holding a fixed volume of plastic, stepped implicitl
 - its weight, the air's drag on the part of the wind square to it (measured on wires: NACA TN 84) and the
   part fan's jet move it; each node cools in the wind it feels (failsim.h_strand);
 
-Inside: meters, kilograms, seconds, newtons. In and out: mm, mm/s, mm3/s, C. A model, not a recording."""
+Inside: meters, kilograms, seconds, newtons. In and out: mm, C. A model, not a recording."""
 
 from __future__ import annotations
 
@@ -17,10 +17,11 @@ from scipy.linalg import solveh_banded
 
 from . import failsim
 
-BIG = 1e7  # kg/s: a node held on a place or a speed
+BIG = 1e7  # kg/s: a node held in place
 SEG = 1.2e-3  # m between nodes
 DT = 1 / 240  # s
 TURN = 0.5  # of an edge's length its ends may move against each other in one step
+SWING = 0.05  # past this the step is solved again along the edges' mean direction: turning does not stretch them
 
 
 def drag_coefficient(re) -> np.ndarray:
@@ -37,6 +38,11 @@ def _norm(v):
 
 def _unit(v):
     return v / np.maximum(_norm(v), 1e-12)[:, None]
+
+
+def _series(q):
+    """What two edges give between them at a node: the softer one bends."""
+    return 2 / (1 / q[1:] + 1 / q[:-1])
 
 
 def _cross(a, b):
@@ -107,9 +113,8 @@ class Strand:
         te = (self.t[1:] + self.t[:-1]) / 2
         e_mod = m.e * 1e6 * m.ratio(te)
         if np.isfinite(self.e).all():  # as it sets, the stress stays, not the strain: stiffening adds no energy
-            keep = np.minimum(1.0, self.e / e_mod)
-            self.es *= keep
-            self.eb[1:-1] *= np.minimum(keep[1:], keep[:-1])[:, None]
+            self.es *= np.minimum(1.0, self.e / e_mod)
+            self.eb[1:-1] *= np.minimum(1.0, _series(self.e) / _series(e_mod))[:, None]
         self.e = e_mod
         eta = np.minimum(failsim.viscosity(te, math.sqrt(3) * np.abs(self.rate), m), 1e14)
         lam = failsim.fact("trouton") * eta / e_mod
@@ -122,10 +127,12 @@ class Strand:
         tn = _unit(tn)
         wind = np.zeros_like(self.x)
         if self.fan and head is not None:
-            near = np.hypot(*(self.x[:, :2] - np.asarray(head[:2]) * 1e-3).T) < self.reach
+            away = self.x - np.asarray(head) * 1e-3
+            near = (np.hypot(away[:, 0], away[:, 1]) < self.reach) & (away[:, 2] < 1e-4)
             wind[near, 2] = -self.fan
         rel = wind - self.v
-        rel -= (rel * tn).sum(1, keepdims=True) * tn
+        along = (rel * tn).sum(1)
+        rel -= along[:, None] * tn
         speed = _norm(rel)
         dn = self._nodes(d * ln) / np.maximum(self._nodes(ln), 1e-12)
         p = failsim.air((self.t + self.air) / 2)
@@ -139,22 +146,13 @@ class Strand:
         eye = np.eye(3)
         block = (mass / dt)[:, None, None] * eye + drag[:, None, None] * (eye - tn[:, :, None] * tn[:, None, :])
         off = np.zeros((n - 1, 3, 3))
-        tt = tan[:, :, None] * tan[:, None, :]
-        stiff = dt * ks[:, None, None] * tt + (dt * np.maximum(self.tens, 0) / ln)[:, None, None] * (eye - tt)
-        block[:-1] += stiff
-        block[1:] += stiff
-        off -= stiff
-        pull = (ks * self.es * ln)[:, None] * tan
-        rhs[:-1] += pull
-        rhs[1:] -= pull
         curve = self._curve(tan, ln)
         if n > 2:
             lb = (ln[1:] + ln[:-1]) / 2
             a, c = 1 / (ln[:-1] * lb), 1 / (ln[1:] * lb)
             b = -(a + c)
             inertia = math.pi * ((d[1:] + d[:-1]) / 2) ** 4 / 64
-            s2 = np.minimum(soft[1:], soft[:-1])
-            kb = (e_mod[1:] + e_mod[:-1]) / 2 * inertia * s2 * lb
+            kb = _series(e_mod * soft) * inertia * lb
             part = self.eb[1:-1] - dt * _cross(self.turn[1:-1], curve[1:-1])  # the part that only turns with the strand
             mom = kb[:, None] * part
             rhs[:-2] -= a[:, None] * mom
@@ -168,16 +166,32 @@ class Strand:
                 off[:-1, k, k] += kd * a * b
                 off[1:, k, k] += kd * b * c
                 ab[0, 6 + k::3][:n - 2] = kd * a * c
-        for i in range(3):
-            for j in range(i, 3):
-                ab[6 - (j - i), j::3] = block[:, i, j]
-        for i in range(3):
-            for j in range(3):
-                ab[6 - (3 + j - i), 3 + j::3] = off[:, i, j]
         ab[6] += np.repeat(np.where(self.fixed, BIG, 0.0), 3)
-        v = solveh_banded(ab, rhs.ravel(), check_finite=False).reshape(n, 3)
+        way, gain, rest = tan, np.ones(n - 1), 1.0
+        for again in (True, False):  # each edge's stretch, and the turn of what it carries, along way
+            tt = way[:, :, None] * way[:, None, :]
+            stiff = dt * (ks * gain)[:, None, None] * tt + (rest * dt * np.maximum(self.tens, 0) / ln)[:, None, None] * (eye - tt)
+            pull = (ks * self.es * ln)[:, None] * way
+            bl, of, rh, band = block.copy(), off - stiff, rhs.copy(), ab.copy()
+            bl[:-1] += stiff
+            bl[1:] += stiff
+            rh[:-1] += pull
+            rh[1:] -= pull
+            for i in range(3):
+                for j in range(i, 3):
+                    band[6 - (j - i), j::3] += bl[:, i, j]
+            for i in range(3):
+                for j in range(3):
+                    band[6 - (3 + j - i), 3 + j::3] = of[:, i, j]
+            v = solveh_banded(band, rh.ravel(), check_finite=False).reshape(n, 3)
+            move = np.diff(dt * v, axis=0)
+            far = _norm(move) / ln
+            if not again or far.max() <= SWING:
+                break
+            mid = tan * ln[:, None] + move / 2
+            way, gain, rest = _unit(mid), 2 * _norm(mid) / (ln + _norm(mid + move / 2)), 0.5
         x = self.x + dt * v
-        if check and n > 3 and (_norm(np.diff(dt * v, axis=0)) / ln).max() > TURN:
+        if check and far.max() > TURN:
             return False
         old_l, old_k, old_tn = ln, curve, tn
         self.v, self.x = v, x
@@ -193,13 +207,13 @@ class Strand:
         w = _cross(old_tn, tn)  # carry the curvature along as the strand turns
         rot = lambda q: q + _cross(w, q) + _cross(w, _cross(w, q)) / (1 + (old_tn * tn).sum(1))[:, None].clip(0.1)  # noqa: E731
         sn = np.ones(n)
-        sn[1:-1] = np.minimum(soft[1:], soft[:-1])
+        sn[1:-1] = _series(e_mod * soft) / _series(e_mod)
         self.eb = sn[:, None] * (rot(self.eb) + self._curve(tan, ln) - rot(old_k))
         most = np.full(n, np.inf)
         most[1:-1] = 2 * np.minimum(limit[1:], limit[:-1]) / np.maximum(d[1:], d[:-1])  # 1/m, where its skin gives
         self.eb *= np.minimum(1.0, most / np.maximum(_norm(self.eb), 1e-9))[:, None]
         self.turn = w / dt
-        h = failsim.h_strand(dn * 1e3, self.t, self.air, speed)
+        h = failsim.h_strand(dn * 1e3, self.t, self.air, speed, np.abs(along))
         self.t = self.air + (self.t - self.air) * np.exp(-4 * h * dt / (self.rho * m.cp * np.maximum(dn, 1e-6)))
         self._grow()
         return True
@@ -212,11 +226,10 @@ class Strand:
         if not len(at):
             return
         i = at + 1
-        for k in ("x", "v", "turn"):
+        for k in ("x", "v", "turn", "eb"):
             q = getattr(self, k)
             setattr(self, k, np.insert(q, i, (q[at] + q[at + 1]) / 2, 0))
         self.t = np.insert(self.t, i, (self.t[at] + self.t[at + 1]) / 2)
-        self.eb = np.insert(self.eb, i, 0.0, 0)
         self.fixed = np.insert(self.fixed, i, self.fixed[at] & self.fixed[at + 1])
         for k in ("es", "rate", "tens", "e"):
             setattr(self, k, np.insert(getattr(self, k), i, getattr(self, k)[at]))
