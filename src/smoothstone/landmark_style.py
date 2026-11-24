@@ -82,6 +82,12 @@ def chhatri(cs, eave, height):
     return pieces
 
 
+def _tapered(section, point, rise, ratio, z):
+    """Extrude a section drawn around the origin, narrowing about its own center, and stand it at a point.
+    Manifold's scale_top scales about the origin: a section already moved to its place would lean."""
+    return section.extrude(rise, scale_top=[ratio, ratio]).translate([*point, z])
+
+
 def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, protected, notes):
     """Build the surveyed gable, portal bays and paired buttress spires."""
     import manifold3d as m3
@@ -106,12 +112,16 @@ def _surveyed_west_facade(man, width, height, x, middle, along, across, facts, p
     man = (man - trim) + wall
 
     additions, cuts = [], []
-    for where, peak in facts["west_buttress_spires"]["value"]:
+    widths = facts.get("west_buttress_widths", {}).get("value", [])
+    for index, (where, peak) in enumerate(facts["west_buttress_spires"]["value"]):
         shoulder = float(np.interp(where, *np.asarray(silhouette).T)) * height
         xy = point + where * width * across - along * .55
-        section = m3.CrossSection.square([3.8, 3.4], True).translate(xy.tolist())
-        foot = section.offset(.5).extrude(height * .09).translate([0., 0., z0 - .06])
-        pier = section.extrude(shoulder + .1, scale_top=[.86, .86]).translate([0., 0., z0 - .04])
+        # A surveyed pier keeps its measured width; 2.4 mm is the narrowest that holds its spire.
+        broad = max(2.4, widths[index] * width) if index < len(widths) else 3.8
+        section = _section([[a * broad / 2 * across + b * 1.7 * along
+                             for a, b in ((-1, -1), (-1, 1), (1, 1), (1, -1))]])
+        foot = section.offset(.5).extrude(height * .09).translate([*xy, z0 - .06])
+        pier = _tapered(section, xy, shoulder + .1, .86, z0 - .04)
         additions.extend([foot, pier])
         for shift in (() if "spire_plan" in facts else (-1.05, 1.05)):
             spot = xy + shift * across
@@ -576,13 +586,13 @@ def decorate(man, records, sections, scale, styles, facts=None, outline=None, *,
                     point = np.asarray(vertex) + vector / np.linalg.norm(vector) * 1.5
                     if any(np.linalg.norm(point - prior) < 1.8 for prior in corners):
                         continue
-                    base = m3.CrossSection.circle(.85, 12).translate(point.tolist())
-                    if (base - man.slice(eave - .2)).area() > .02:
+                    base = m3.CrossSection.circle(.85, 12)
+                    if (base.translate(point.tolist()) - man.slice(eave - .2)).area() > .02:
                         continue
                     height = min(4, max(0, maximum_top - eave), wall_height * .25)
                     if height < 1:
                         continue
-                    pinnacle = base.extrude(height + .25, scale_top=[.95, .95]).translate([0, 0, eave - .25])
+                    pinnacle = _tapered(base, point, height + .25, .95, eave - .25)
                     additions.append(pinnacle)
                     corners.append(point)
         if keys & {"byzantine", "baroque", "russian"} and rec["roof_shape"] in ("dome", "onion"):
