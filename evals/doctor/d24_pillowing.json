@@ -1,0 +1,12 @@
+{
+ "id": "d24_pillowing",
+ "said": "top surface has holes and bumpy pillows, you can see the infill showing through",
+ "printer": "elegoo_neptune_4_pro",
+ "material": "PLA",
+ "expect": {
+  "top": "pillowing",
+  "top3_includes": [
+   "under_extrusion"
+  ]
+ }
+}

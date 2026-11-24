@@ -1,0 +1,13 @@
+{
+ "id": "d40_brittle_snap",
+ "said": "filament keeps snapping in the tube and the extruder skips, clicking noise, then under extrusion",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "feeder_grinding",
+  "top3_includes": [
+   "wet_filament",
+   "clog"
+  ]
+ }
+}

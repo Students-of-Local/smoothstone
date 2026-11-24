@@ -1,0 +1,12 @@
+{
+ "id": "d21_grinding",
+ "said": "the extruder is grinding the filament, there's a chewed up flat spot and plastic dust in the gears",
+ "printer": "creality_ender3_v3",
+ "material": "TPU",
+ "expect": {
+  "top": "feeder_grinding",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

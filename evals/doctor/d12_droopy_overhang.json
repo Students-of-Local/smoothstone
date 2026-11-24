@@ -1,0 +1,12 @@
+{
+ "id": "d12_droopy_overhang",
+ "said": "the underside of the overhang is a droopy mess, edges curl up and the bottom looks saggy and stringy",
+ "printer": "bambu_a1_mini",
+ "material": "PLA",
+ "expect": {
+  "top": "overhang_droop",
+  "top3_includes": [
+   "poor_bridging"
+  ]
+ }
+}

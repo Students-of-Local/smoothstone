@@ -1,0 +1,12 @@
+{
+ "id": "d05_gaps_in_walls",
+ "said": "my walls have gaps in them and the infill looks thin and spotty, layers aren't fully fused, like the printer isn't pushing enough plastic",
+ "printer": "creality_ender3_v3_se",
+ "material": "PLA",
+ "expect": {
+  "top": "under_extrusion",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

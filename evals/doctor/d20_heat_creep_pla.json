@@ -1,0 +1,12 @@
+{
+ "id": "d20_heat_creep_pla",
+ "said": "prints fine for an hour then extrusion slowly stops, I pull the filament and the end is a fat mushroom bulb, enclosed printer with the door closed printing PLA",
+ "printer": "bambu_p1s",
+ "material": "PLA",
+ "expect": {
+  "top": "heat_creep",
+  "top3_includes": [
+   "clog"
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "id": "d29_never_stuck",
+ "said": "nothing will stick to my bed, the first layer just drags around with the nozzle and balls up",
+ "printer": "prusa_mk4s",
+ "material": "PETG",
+ "expect": {
+  "top": "bed_adhesion",
+  "top3_includes": [
+   "first_layer"
+  ]
+ }
+}

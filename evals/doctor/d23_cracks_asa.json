@@ -1,0 +1,13 @@
+{
+ "id": "d23_cracks_asa",
+ "said": "ASA enclosure has cracks between layers running horizontally around the corners, worse at the top",
+ "printer": "bambu_x1c",
+ "material": "ASA",
+ "expect": {
+  "top": "cracking",
+  "top3_includes": [
+   "layer_separation",
+   "warping"
+  ]
+ }
+}
