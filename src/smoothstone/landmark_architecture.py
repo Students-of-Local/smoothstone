@@ -143,7 +143,44 @@ def _matched_spires(parts, heights, facts, notes):
         record["spire_tracery"] = facts.get("spire_tracery", {}).get("value", True)
         out.append((record, cs))
     notes.append("Matched west spires share one shaft and tracery profile. The two mapped centres and sourced individual heights are retained.")
-    return out
+    return out + _twin_detail(out, centres, span, foot, notes)
+
+
+def _twin_detail(parts, centres, span, foot, notes):
+    """The gables, pinnacles and bands a map draws around only one of two matched towers, for the other."""
+    from .landmark import bearing
+
+    def around(c):
+        return [(p, cs) for p, cs in parts if p.get("feature") != "west_spire" and p["height"]["metres"] > foot + 1
+                and np.linalg.norm(_dimensions(cs)[0] - c) < span * .75]
+
+    near = [around(c) for c in centres]
+    dense = int(len(near[1]) > len(near[0]))
+    if len(near[dense]) < 3 * max(1, len(near[1 - dense])):
+        return []
+    bare = near[1 - dense]
+    axis = centres[1] - centres[0]
+    axis = axis / np.linalg.norm(axis)
+    mirror = np.eye(2) - 2 * np.outer(axis, axis)
+    shift = (centres[0] + centres[1]) / 2 - mirror @ ((centres[0] + centres[1]) / 2)
+    added = []
+    for p, cs in near[dense]:
+        twin = cs.transform([[*mirror[0], shift[0]], [*mirror[1], shift[1]]])
+        top = p["height"]["metres"]
+        if any((twin ^ other).area() > twin.area() * .5 and abs(q["height"]["metres"] - top) < 3 for q, other in bare):
+            continue
+        record = {**p, "id": f"{p['id']}-twin", "footprint": [ring.tolist() for ring in twin.to_polygons()],
+                  "tags": dict(p["tags"])}
+        way = bearing(p["tags"])
+        if way is not None:
+            east, north = mirror @ [math.sin(math.radians(way)), math.cos(math.radians(way))]
+            record["tags"]["roof:direction"] = str(round(math.degrees(math.atan2(east, north)) % 360, 2))
+        for key in ("height", "min_height", "roof_height"):
+            record[key] = {**p[key], "guessed": True, "reason": "Mirrored from the matched tower, which the map draws in detail."}
+        added.append((record, twin))
+    if added:
+        notes.append(f"Mirrored {len(added)} mapped details from one matched west tower onto its twin.")
+    return added
 
 
 def _flat_west_towers(parts, facts, notes):
