@@ -211,7 +211,8 @@ LOOK_LR = (3.0, 1.5, 1.0)
 LOOK_FLOOR = 1.0
 LOOKS_CHECKED = "evals/doctor/photo_runs.jsonl, split dev"
 # --image: the k most similar gallery photos vote (photo_match.py); a failure's share v multiplies its
-# weight by 1 + KNN_W * v, from the same LOOK_FLOOR start. Set on the dev photos too.
+# weight by 1 + KNN_W * v, from the same LOOK_FLOOR start. Set on the dev photos; on dev scored without
+# any held-out neighbor, 7 and 12 are within one photo of the best of 25 pairs.
 KNN_K = 7
 KNN_W = 12.0
 # a failure only the vote names stays below the KNN_HOLD likeliest described ones, so the vote can fill the
@@ -776,7 +777,7 @@ def _new(args, job, said: str, out):
             case["image"] = str(save_photo(frame, frame))
             case["camera"] = {"name": device["name"], "model": device.get("model")}
     match_line = None
-    if case["image"] and "knn" not in case:
+    if case["image"] and case.get("knn") is None:  # off before: try again, the extra may be installed now
         case["knn"], match_line = image_match(Path(case["image"]))
     case.update(said=said, looks=looks, printer=p["id"] if p else None, printer_set=cur_id, material=material)
     d = diagnose(said, p, material, looks, case.get("knn")) if said or looks else {"failures": []}
@@ -787,7 +788,7 @@ def _new(args, job, said: str, out):
         save_case(job, case)
         out.add(head)
         if case["image"]:
-            out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}", match_line,
+            out.add(f"Photo saved (EXIF removed, at most {MAX_PX} px): {case['image']}", *([match_line] if match_line else []),
                     "Look at it: describe what you see, and pass the ids that match it with --looks (each id and "
                     "its look: stone doctor looks). If you cannot see images, ask the person what it looks like.")
             out.next = case_next(case)

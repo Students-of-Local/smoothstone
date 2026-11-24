@@ -23,7 +23,8 @@ left out) and records, in photo_knn.jsonl, the ones scoring reads: down to the K
 held-out photo, as [file, cosine to 3 places]; a neighbor's failure is its folder. Scoring needs no model
 either; a new KNN_K means running knn again. "knn" ranks by words, --looks and the
 neighbors' vote, the way stone doctor --image does; "knn_strict" also drops every held-out photo from the
-neighbors, the bound if the gallery held only what tuning saw.
+neighbors, the bound if the gallery held only what tuning saw; dev always scores that way, so no
+held-out label reaches the tuning.
 """
 
 from __future__ import annotations
@@ -194,10 +195,10 @@ def score(split: str, skill: str | None = None) -> dict:
     held = {r["file"] for r in _rows(SPLIT) if r["split"] == "heldout"}
     out = {}
     for way in ("words", "looks", "looks_only", "knn", "knn_strict", "knn_only"):
-        rows = []
+        rows, strict = [], split == "dev" or way == "knn_strict"  # tuning on dev sees no held-out label
         for f, r in sorted(runs.items()):
             said = "" if way in ("looks_only", "knn_only") else r["words"]
-            nb = [n for n in near.get(f, []) if way != "knn_strict" or n[0] not in held]
+            nb = [n for n in near.get(f, []) if not strict or n[0] not in held]
             votes = photo_match.votes(nb, doctor.KNN_K) if way.startswith("knn") else {}
             d = doctor.diagnose(said, None, None, [] if way in ("words", "knn_only") else r["looks"], votes)
             ranked = [fid for fid, _ in d["failures"]][:3]

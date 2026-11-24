@@ -609,6 +609,18 @@ def test_image_match_off_says_so(work):
     assert "--looks" in nxt
 
 
+def test_an_open_photo_case_run_again_prints_no_none(work, monkeypatch):
+    """Review #105 F2 and F4: the case keeps its vote, and a match that was off is tried again."""
+    from smoothstone import photo_match
+    stone("doctor", "--image", str(_photo(work / "a.jpg")))  # off: STONE_IMAGE_MATCH
+    monkeypatch.setattr(photo_match, "available", lambda: (True, ""))
+    monkeypatch.setattr(photo_match, "neighbors", lambda *a, **k: [("a.jpg", "spaghetti", 0.9)])
+    text, code, nxt = stone("doctor")
+    assert doctor.IMAGE_MATCH_ON in text
+    text, code, nxt = stone("doctor")
+    assert "None" not in text and doctor.IMAGE_MATCH_ON not in text and "--looks" in nxt
+
+
 def test_knn_votes_and_frames_of_one_print():
     from smoothstone import photo_match
     near = [("a.jpg", "spaghetti", 0.9), ("b.jpg", "healthy", 0.9), ("c.jpg", "bed_adhesion", 0.2)]

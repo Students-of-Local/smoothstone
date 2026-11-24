@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 
@@ -56,13 +57,17 @@ def _model():
 def embed(paths: list[Path]):
     """Unit-length image embeddings, one row per path."""
     import torch
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     model, prep = _model()
     out = []
     with torch.no_grad():
         for i in range(0, len(paths), 16):
-            batch = torch.stack([prep(Image.open(p).convert("RGB")) for p in paths[i:i + 16]])
+            batch = []
+            for p in paths[i:i + 16]:
+                with Image.open(p) as im:
+                    batch.append(prep(ImageOps.exif_transpose(im).convert("RGB")))  # as save_photo turns the query
+            batch = torch.stack(batch)
             e = model.encode_image(batch)
             out.append(e / e.norm(dim=-1, keepdim=True))
     return torch.cat(out).numpy()
@@ -88,7 +93,9 @@ def gallery():
         return rows, np.load(cache)
     emb = embed([GALLERY / r["file"] for r in rows])
     cache.parent.mkdir(parents=True, exist_ok=True)
-    np.save(cache, emb)
+    with tempfile.NamedTemporaryFile(dir=cache.parent, suffix=".npy", delete=False) as tmp:
+        np.save(tmp, emb)
+    os.replace(tmp.name, cache)  # whole or not at all: an interrupted write never leaves a broken cache
     return rows, emb
 
 
