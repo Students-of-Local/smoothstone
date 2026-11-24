@@ -486,10 +486,32 @@ def status_hook(job) -> tuple[str, str] | None:
     return f"Doctor case {case['id']}: {what} (its NEXT: {case_next(case)})", case_next(case)
 
 
+SCRUB = [
+    re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+"),  # emails
+    re.compile(r"(https?://|www\.)\S+", re.I),  # links
+    re.compile(r"(~|\b[A-Za-z]:)?[\\/][\w.-]+([\\/][\w.-]+)+"),  # file paths
+    re.compile(r"\+?\d[\d ().-]{7,}\d"),  # phone numbers
+    re.compile(r"\b\d{1,6}\s+(\w+\s+){1,3}(st|street|ave|avenue|rd|road|blvd|boulevard|ln|lane|dr|drive|ct|court|"
+               r"way|pl|place|hwy|highway)\b\.?", re.I),  # street addresses
+]
+
+
+def scrub(text: str | None) -> str | None:
+    """The person's words with emails, links, file paths, phone numbers and street addresses removed."""
+    if not text:
+        return text
+    for pat in SCRUB:
+        text = pat.sub("[removed]", text)
+    return text
+
+
 def share_payload(case: dict) -> dict:
-    """What Track C's stone doctor share sends: the outcome without the person's words or photo."""
+    """What Track C's stone doctor share sends: the outcome, no photo, and what worked with emails, links,
+    paths, phone numbers and addresses removed (case.json keeps the original on this machine)."""
     o = case.get("outcome") or {}
-    return {k: o.get(k) for k in ("failure", "cause", "what_worked", "printer", "material", "date")}
+    out = {k: o.get(k) for k in ("failure", "cause", "what_worked", "printer", "material", "date")}
+    out["what_worked"] = scrub(out["what_worked"])
+    return out
 
 
 # what the person reads
