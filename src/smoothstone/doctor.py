@@ -541,13 +541,14 @@ def _new(args, job, said: str, out):
         out.fix(f"no printer {args.printer}; ids: stone printer")
         out.next = "stone printer"
         return out
-    named, clear = printer_named(said)
-    # the printer asked for, then the one set with stone printer set, then a guess from the words; words
-    # that name a model clearly ("Creality K2 Plus", "mk4s") outrank the set one
-    p = p or (named if clear else None) or printers.current(job.root) or named
-    material = (args.material or find_material(said) or "").upper() or None
     prior = open_case(job)
     reuse = prior if prior and prior.get("state") == "look" and not args.image and not args.camera else None
+    named, clear = printer_named(said)
+    # the printer asked for, then a model the words name clearly ("Creality K2 Plus", "mk4s"), then the one
+    # a photo's case was opened with, then the one set with stone printer set, then a guess
+    kept = printers.get((reuse or {}).get("printer"))
+    p = p or (named if clear else None) or kept or printers.current(job.root) or named
+    material = (args.material or find_material(said) or (reuse or {}).get("material") or "").upper() or None
     now = _dt.datetime.now()
     case = reuse or {"id": now.strftime("%Y%m%d-%H%M%S"), "created": now.isoformat(timespec="seconds"),
                      "image": None, "asked": [], "answers": [], "tried": []}

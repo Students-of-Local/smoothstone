@@ -315,6 +315,15 @@ def test_f1sol_a_blob_with_a_thermal_fault_keeps_power_off_first(work):
     assert not any("Heat the hotend" in ln for ln in safety), text
 
 
+def test_f2sol_photo_case_keeps_its_printer_and_material(work):
+    stone("printer", "set", "creality_k2")
+    stone("doctor", "--image", str(_photo(work / "f.jpg")), "--printer", "bambu_a1", "--material", "PETG")
+    text, code, nxt = stone("doctor", "the part came off the bed")
+    assert text.splitlines()[0].endswith("Bambu Lab A1, PETG"), text
+    case = doctor.open_case(cli.Job(work / "stone-job"))
+    assert case["printer"] == "bambu_a1" and case["material"] == "PETG"
+
+
 def test_gallery_from_the_repo_is_found():
     ex = doctor.examples("spaghetti", None)
     assert ex and all(Path(p).is_file() for p in ex)
