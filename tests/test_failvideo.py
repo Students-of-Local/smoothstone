@@ -104,6 +104,21 @@ def test_a_strand_has_no_gaps_at_any_slope():
     assert Q.max() == 31
 
 
+def test_a_strand_with_corners_stays_pinned_where_it_lies_on_plastic():
+    tp, inp, fail, _ = _story(_box((20, 20, 3), (0, 0, 0)))
+    st = failvideo.Story(tp, inp, fail or failsim.Failure("supports", 5, 1.2, 1.0, "spaghetti", None, {}, []), (255, 255, 255), (260, 260))
+    st.layer_now = 5
+    st.field[:] = 0.0
+    moves = np.flatnonzero(st.ext & (tp.layer == 5))  # walls and infill, full of corners
+    xs = inp.origin[0] + (np.arange(st.field.shape[1]) + 0.5) * inp.cell
+    loose = np.broadcast_to(xs > np.median(tp.p1[moves, 0]), st.field.shape)
+    st.strand(moves, loose)
+    _, a, b, w = st.links[-1]
+    r, c = st.px(a)
+    far = np.abs(a[:, 0] - np.median(tp.p1[moves, 0])) > 2
+    assert a[far & ~loose[r, c], 2] == pytest.approx(inp.layer_z[5], abs=1e-6) and a[far & loose[r, c], 2].max() < 1.0
+
+
 def test_a_tall_part_tips_about_its_edge():
     tp, inp, fail, _ = _story(_box((20, 20, 8), (0, 0, 0)))
     fail = failsim.Failure("topple", 30, 6.2, 60.0, "bed_adhesion", (130, 130), {"direction": [1.0, 0.0]}, ["x"])

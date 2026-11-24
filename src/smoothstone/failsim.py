@@ -278,13 +278,15 @@ def _resample(path: np.ndarray, seg: float) -> np.ndarray:
 
 
 def drop_strand(path_xyz, speed_mm_s: float = 200.0, flow_mm3_s: float = 10.0, ground=0.0, steps: int = 2000,
-                dt: float = 1 / 600, mu: float | None = None, seg_mm: float = 0.5, iters: int = 30,
+                dt: float = 1 / 600, mu: float | None = None, seg_mm: float | None = 0.5, iters: int = 30,
                 pins=(), damping: float = 0.0, rest_mm_s: float = 1.0) -> list[np.ndarray]:
     """Frames of a strand laid along path_xyz (mm) into air. Vertex i leaves the nozzle at s_i / speed
     and is held on the path until then; the strand is flow / speed mm2 thick. ground is a z (mm), a
-    Heightfield or any f(x, y) -> z. pins: vertex indices held for good (a bridge's ends). Each frame
-    is the extruded part of the strand as an (n, 3) polyline; frames stop once it is at rest."""
-    p = _resample(np.asarray(path_xyz, float), seg_mm)
+    Heightfield or any f(x, y) -> z. pins: vertex indices held for good (a bridge's ends). seg_mm None
+    keeps path_xyz's own vertices. Each frame is the extruded part of the strand as an (n, 3) polyline; frames stop
+    once it is at rest."""
+    p = np.asarray(path_xyz, float)
+    p = p if seg_mm is None else _resample(p, seg_mm)
     n = len(p)
     rest = np.linalg.norm(np.diff(p, axis=0), axis=1)
     out_t = np.r_[0.0, np.cumsum(rest)] / speed_mm_s

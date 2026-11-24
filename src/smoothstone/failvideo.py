@@ -199,7 +199,7 @@ class Story:
         hf = failsim.Heightfield(self.field.copy(), self.cell, self.inp.origin)
         m = int(np.searchsorted(s, MAX_SIM, "right"))
         steps = int(min(2400, (s[min(m, len(s)) - 1] / speed + 0.5) * 300))
-        frs = failsim.drop_strand(R[:m], speed, flow, hf, steps=steps, dt=1 / 300, iters=10, seg_mm=STEP,
+        frs = failsim.drop_strand(R[:m], speed, flow, hf, steps=steps, dt=1 / 300, iters=10, seg_mm=None,
                                   pins=pins[pins < m])
         rest = frs[-1] if frs else R[:0]
         tail = R[len(rest):].copy()  # past MAX_SIM, or not laid when the steps ran out: straight down
