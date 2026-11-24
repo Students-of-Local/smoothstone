@@ -145,7 +145,7 @@ def viscosity(t_c, rate=0.0, mat="PLA") -> np.ndarray:
         eta0 = np.where(den > 0, p["D1_Pa_s"] * np.exp(-p["A1"] * dt / np.where(den > 0, den, 1.0)), np.inf)
         rate = np.asarray(rate, float)
         thin = np.where(rate > 0, (eta0 * rate / p["tau_star_Pa"]) ** (1.0 - p["n"]), 0.0)
-        return np.where(np.isinf(eta0), np.inf, eta0 / (1.0 + thin))
+        return np.where(np.isinf(eta0) | np.isinf(thin), np.inf, eta0 / (1.0 + thin))
 
 
 # air
