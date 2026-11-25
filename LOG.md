@@ -1263,6 +1263,11 @@ the photographs. One attempt each at 398a5b3: judged 8, pass; LFM3-1.7B, card S,
 taken as 46 m above the sea, so the 39.3 m height holds the print to the pack. The judge's notes stay open: the Round Tower
 reads low, and the George IV Gateway's two towers do not stand out.
 
+The review's geometry findings were fixed after that: towers and gates that hung past their terrace stand on the ground,
+tower caps follow their towers, windows are shallow and clear of Augusta Tower, and the chapel's bays are three where
+they were four so a window prints between its buttresses. Judged once at d749999: 9, pass, with the same two notes.
+LFM3 was not rerun.
+
 ### 2026-11-24: a card for landmarks
 
 `skill/landmarks.md` says how a large model writes the shapes a map lacks, and what makes a landmark read as itself at
