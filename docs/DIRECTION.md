@@ -26,7 +26,7 @@ And in the next message:
 ### 2. Integrate very well and easily
 
 - Parts open in the slicers people use, with nothing to fix by hand: Creality Print, OrcaSlicer, Bambu Studio and PrusaSlicer, as STL and as 3MF with color.
-- smoothstone is the part maker inside [Gantrel](https://github.com/baney75/Gantrel), which sends parts to printers through Creality's tools and the open printer standards. A change to `stone`'s output is checked against what Gantrel reads.
+- smoothstone is the part maker inside [Gantrel](https://github.com/Students-of-Local/Gantrel), which sends parts to printers through Creality's tools and the open printer standards. A change to `stone`'s output is checked against what Gantrel reads.
 
 ### 3. Distill through skills to small models
 
@@ -36,8 +36,8 @@ And in the next message:
 ### 4. An MCP server for Grok Bot
 
 - `stone` is reachable over MCP so Grok Bot, and any assistant that speaks MCP, can make a part with it, directly or through Gantrel's server.
-- Reaching it from away from home follows Local Studio's tunnel rule ([local-studio docs/tunnel.md](https://github.com/baney75/local-studio/blob/main/docs/tunnel.md)): there is no hosted tunnel and no waitlist (Donovan, 2026-11-24). Everyone sets up a tunnel on their own free Cloudflare account and domain, and `local-studio tunnel byo` walks them through it; Tailscale stays the option without a domain. This replaces the earlier waitlist rule quoted above.
-- A server reached through a tunnel needs auth on every path and the public-tools consent ([local-studio#13](https://github.com/baney75/local-studio/issues/13)).
+- Reaching it from away from home follows Local Studio's tunnel rule ([local-studio docs/tunnel.md](https://github.com/Students-of-Local/local-studio/blob/main/docs/tunnel.md)): there is no hosted tunnel and no waitlist (Donovan, 2026-11-24). Everyone sets up a tunnel on their own free Cloudflare account and domain, and `local-studio tunnel byo` walks them through it; Tailscale stays the option without a domain. This replaces the earlier waitlist rule quoted above.
+- A server reached through a tunnel needs auth on every path and the public-tools consent ([local-studio#13](https://github.com/Students-of-Local/local-studio/issues/13)).
 
 ### 5. A high standard
 

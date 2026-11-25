@@ -167,7 +167,7 @@ def test_status_without_gantrel(work, monkeypatch):
     for action in ("status", "camera"):
         text, code, nxt = stone("printer", action)
         lines = text.splitlines()
-        assert "uv tool install git+https://github.com/baney75/Gantrel" in lines[1]
+        assert "uv tool install git+https://github.com/Students-of-Local/Gantrel" in lines[1]
         assert "--type creality" in lines[2] and "--model creality-k2" in lines[2]
         assert nxt.startswith("ask the person: install and pair")
 

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import config, doctor, printers
 
-REPO = "baney75/smoothstone"
+REPO = "Students-of-Local/smoothstone"
 COMMUNITY_DIR = "failures/community"
 PX = 1024
 LICENSE_LINE = "The photo and the words become public on GitHub under smoothstone's MIT license."

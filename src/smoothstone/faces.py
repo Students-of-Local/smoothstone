@@ -26,7 +26,7 @@ MODELS = {
 }
 MIRRORS = ("https://huggingface.co/opencv/{repo}/resolve/main/{name}",
            "https://github.com/opencv/opencv_zoo/raw/main/models/{repo}/{name}")
-AGENT = "smoothstone/0.3 (https://github.com/baney75/smoothstone; stone find)"
+AGENT = "smoothstone/0.3 (https://github.com/Students-of-Local/smoothstone; stone find)"
 
 # SFace's own cosine bar (opencv_zoo), checked on Commons photos of seven people (LOG.md, 2026-11-20):
 # one person's main photo against another's photos 0.26 at most, against their own mostly 0.39 to

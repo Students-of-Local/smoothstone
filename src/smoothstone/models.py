@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-AGENT = "smoothstone/0.3 (https://github.com/baney75/smoothstone; stone models)"
+AGENT = "smoothstone/0.3 (https://github.com/Students-of-Local/smoothstone; stone models)"
 PRINTABLES = "https://api.printables.com/graphql/"
 SKETCHFAB = "https://api.sketchfab.com/v3"
 COMMONS = "https://commons.wikimedia.org/w/api.php"
