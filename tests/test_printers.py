@@ -257,6 +257,7 @@ def test_every_printer_has_its_slicer_settings_for_every_plastic(pid):
         raw, s = e["value"], printers.settings(p, m)
         assert 190 <= raw["nozzle"] <= 320 and 20 <= raw["bed"] <= 120 and 20 <= raw.get("chamber", 20) <= 70, (m, raw)
         assert 0 <= raw["fan_min"] <= raw["fan_max"] <= 100 and 0 <= raw["fan_max_layer_s"] <= raw["fan_min_layer_s"] <= 100, (m, raw)
+        assert raw["fan_min"] <= raw["fan_over"] <= 100, (m, raw)
         assert 1 <= raw["max_flow"] <= 40 and raw["diameter"] == 1.75 and e["url"].startswith("https://github.com/OrcaSlicer/")
         assert s["nozzle"] <= (p["max_hotend_c"] or 320) and s["bed"] <= (p["max_bed_c"] or 120) and (p["enclosed"] or "chamber" not in s)
     heat = {m: printers.settings(p, m)["nozzle"] for m in PLASTICS}
@@ -312,6 +313,7 @@ def test_heat_the_printer_does_not_reach_is_cut_and_said():
 
 @pytest.mark.parametrize("layer_s, share", [(40, 0.0), (30, 0.10), (21, 0.35), (12, 0.6), (3, 0.6)])
 def test_the_fan_runs_faster_on_layers_that_take_less_time(layer_s, share):
-    s = {"fan_min": 10, "fan_max": 60, "fan_long": 0, "fan_min_layer_s": 30, "fan_max_layer_s": 12}
+    s = {"fan_min": 10, "fan_max": 60, "fan_long": 0, "fan_min_layer_s": 30, "fan_max_layer_s": 12, "fan_over": 50}
     assert printers.fan(s, layer_s) == pytest.approx(share)
     assert printers.fan({**s, "fan_max_layer_s": 30}, 30) == 0.6  # no slope to speak of
+    assert printers.fan(s, layer_s, over=True) == pytest.approx(max(share, 0.5))  # Orca never slows it there

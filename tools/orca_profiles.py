@@ -161,13 +161,14 @@ def build(checkout: Path) -> list[dict]:
             value = {"nozzle": num(d["nozzle_temperature"]), "bed": bed, "chamber": num(d.get("chamber_temperature", d.get("chamber_temperatures"))) or None,
                      "fan_min": num(d.get("fan_min_speed")), "fan_max": num(d.get("fan_max_speed")),
                      "fan_long": None if num(d.get("reduce_fan_stop_start_freq")) or not num(d.get("fan_min_speed")) else 0,
+                     "fan_over": num(d.get("overhang_fan_speed")) if num(d.get("enable_overhang_bridge_fan", 1)) else None,
                      "fan_min_layer_s": num(d.get("fan_cooling_layer_time")), "fan_max_layer_s": num(d.get("slow_down_layer_time")),
                      "max_flow": num(d.get("filament_max_volumetric_speed")),
                      "diameter": num(d.get("filament_diameter"))}
             own = machine in d.get("compatible_printers", [])
             out.append(entry(f"{pid}.{m}", {k: v for k, v in value.items() if v is not None},
                              f"{m} on the {prof['name']}: C, the flow the hotend melts in mm3/s, filament mm, and the fan in %: at fan_min on "
-                             "layers longer than fan_min_layer_s, at fan_max on ones shorter than fan_max_layer_s, in between between."
+                             "layers longer than fan_min_layer_s, at fan_max on ones shorter than fan_max_layer_s, in between between, and at least at fan_over on overhangs and bridges."
                              + ("" if value["fan_long"] is None else " It stops the fan on the longer ones: fan_long.")
                              + ("" if own else " OrcaSlicer's profile for any printer: it has none for this one."),
                              f"\"name\": \"{d['name']}\"", p, d))

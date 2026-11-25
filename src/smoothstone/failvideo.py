@@ -65,6 +65,9 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True, prof: dict | 
     fan, bed, nozzle, chamber = (float(np.median(c[ok])) if (ok := np.isfinite(c)).any() else None for c in run)
     speed, width = (float(np.median(q[s])) if (s := on & (tp.feature == F.index(k))).any() else None
                     for q, k in ((tp.feed, "inner wall"), (tp.width, "outer wall")))
+    given, over = fan is not None, fan
+    if given and (flat := on & (tp.feature == F.index("bridge")) & np.isfinite(tp.run[:, 0])).any():
+        over = float(np.median(tp.run[flat, 0]))
     prof = prof or printers.get("creality_k2")
     slicer, process = printers.settings(prof, material), printers.process(prof)
     m = failsim.material(material, prof["id"])
@@ -74,23 +77,24 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True, prof: dict | 
     m = replace(m, nozzle=nozzle or m.nozzle)
     got = {"bed": bed, "infill": tp.infill, "speed": speed, "width": width}
     said = [f"{k} {v:.3g} {u}" for k, v, u in (("bed", bed, "C"), ("nozzle", nozzle, "C"), ("chamber", chamber if enclosed else None, "C"),
-            ("fan", None if fan is None else 100 * fan, "%"), ("infill", tp.infill, "%"), ("inner wall", speed, "mm/s"),
+            ("fan", None if fan is None else 100 * fan, "%"), ("fan on bridges", 100 * over if over != fan else None, "%"), ("infill", tp.infill, "%"), ("inner wall", speed, "mm/s"),
             ("line", width, "mm")) if v is not None]
     missing = [k for k, v in (("bed", bed), ("nozzle", nozzle), ("fan", fan), ("infill", tp.infill),
                                 ("inner wall speed", speed), ("line width", width)) if v is None]
     if enclosed and chamber is None and not unsaid:
         missing.append("chamber")
     notes = [f"this print's own settings: {', '.join(said)}"] if said else []
-    given = fan is not None
     if not given:
-        fan = printers.fan(slicer, float(np.median(np.diff(layer_times(tp), prepend=0.0)))) if slicer else 1.0
+        secs = float(np.median(np.diff(layer_times(tp), prepend=0.0)))
+        fan, over = (printers.fan(slicer, secs, o) if slicer else 1.0 for o in (False, True))
+    over_air = f", {100 * over:.0f}% over air" if over != fan else ""
     if missing:
-        notes.append(f"the {printers.short_name(prof) if slicer and process else 'K2'} profile's, not the print's own: {', '.join(missing)}" + ("" if given else f" (fan {100 * fan:.0f}%)"))
+        notes.append(f"the {printers.short_name(prof) if slicer and process else 'K2'} profile's, not the print's own: {', '.join(missing)}" + ("" if given else f" (fan {100 * fan:.0f}%{over_air})"))
     if enclosed and chamber is None and unsaid:
         notes.append(unsaid)
     if slicer:
         notes += [c for c in slicer["cut"] for k, v in (("bed", bed), ("nozzle", nozzle)) if v is None and f"wants the {k} at" in c]
-    return {**got, "material": m, "fan": fan, "process": process, "notes": notes}
+    return {**got, "material": m, "fan": fan, "fan_over": over, "process": process, "notes": notes}
 
 
 def moves_of(tp, *features) -> np.ndarray:
@@ -157,7 +161,7 @@ def pieces(mk: np.ndarray, d: np.ndarray, inp: failsim.Inputs):
         elif ndimage.label(ring, eight)[1] >= 2 or whole[comp].all():
             yield comp, big, "bridge" if 2 * big > failsim.fact("max_bridge_length") else "fine"
         else:
-            tip, rule = -float(failsim.droop([big], inp.material, inp.layer, _width(inp), inp.fan, inp.air)[0]), failsim.fact("droop_rule")
+            tip, rule = -float(failsim.droop([big], inp.material, inp.layer, _width(inp), inp.over, inp.air)[0]), failsim.fact("droop_rule")
             yield comp, big, next((m for m in ("supports", "droop") if tip >= rule[m] * inp.layer), "fine")
 
 
@@ -202,7 +206,7 @@ def choose(fails: list, mode: str, inp: failsim.Inputs):
         i, piece, big = got
         span = 2 * big
         nums = ({"island": True} if math.isinf(big) else {"past_reach_mm": round(big - failsim.reach(lay), 2)}) if mode == "supports" else (
-            {"ledge_mm": round(big, 2), "droop_mm": round(-float(failsim.droop([big], inp.material, lay, _width(inp), inp.fan, inp.air)[0]), 3)} if mode == "droop" else
+            {"ledge_mm": round(big, 2), "droop_mm": round(-float(failsim.droop([big], inp.material, lay, _width(inp), inp.over, inp.air)[0]), 3)} if mode == "droop" else
             {"span_mm": round(span, 1), "sag_mm": round(-float(failsim.bridge_sag(span, [span / 2], lay)[0]), 3),
              "usable_mm": failsim.fact("max_bridge_length")})
         tax = failsim.TAXONOMY[mode]
@@ -225,6 +229,7 @@ class Story:
         self.L = int(fail.layer or 0)
         self.gone = np.zeros(tp.n, bool)
         self.rch, self.cell = failsim.reach(inp.layer), inp.cell
+        self.wind = inp.fan if self.kind == "detach" else inp.over  # the slicer does not know the part is loose
         self.field = np.zeros(np.shape(inp.masks[0]))  # mm, top of what is printed or piled
         self.origin = inp.origin
         skirt = moves_of(tp, "skirt")  # this and a prime tower stay when the part goes; a brim goes with it
@@ -353,7 +358,7 @@ class Story:
                     was = head
                     continue
                 first_up = was - (0, 0, min(d, max(was[2] - d / 2, d / 4)))
-                self.rod = strand.Strand([first_up, was], d, m, bore=d / failsim.fact("die_swell"), fan=self.inp.fan, air=self.inp.air,
+                self.rod = strand.Strand([first_up, was], d, m, bore=d / failsim.fact("die_swell"), fan=self.wind, air=self.inp.air,
                                          ground=ground, plastic=plastic, nozzle=True, held=() if loose[self.px(was[None])][0] else (0,))
                 self.owed += float(self.rod.vol[0]) * 1e9
             s, was, paid = self.rod, head, min(self.owed, out * dt)  # what it starts with comes out of the flow that follows
@@ -440,7 +445,7 @@ class Story:
                 if kind != "fine":
                     dd = d[comp]
                     self.dz[comp] = (failsim.bridge_sag(2 * big, np.minimum(dd, big), inp.layer) if kind == "bridge" else
-                                     failsim.droop(dd, inp.material, inp.layer, _width(inp), inp.fan, inp.air))
+                                     failsim.droop(dd, inp.material, inp.layer, _width(inp), inp.over, inp.air))
                     self.far[comp], self.droops[comp], self.since[comp] = np.minimum(dd, 100.0), kind == "droop", i
             solid = mk & ~falls  # what fell supports nothing above it
             self.since[falls] = -1
@@ -771,7 +776,7 @@ def cmd(args, job, prof, out):
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
             "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
-            "predicted": [x.kind for x in fails], "strand": strand.numbers(inp.material, st.flow, st.mean_speed, air_c=inp.air, fan=float(inp.fan)), "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
+            "predicted": [x.kind for x in fails], "strand": strand.numbers(inp.material, st.flow, st.mean_speed, air_c=inp.air, fan=float(st.wind)), "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
             "pre_failure_frame": str(files[first - 1].relative_to(dest)) if first else None,
             "first_failure_frame": str(files[first].relative_to(dest)),
             "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"], "failing": k >= first,
@@ -785,7 +790,7 @@ def cmd(args, job, prof, out):
                 f"Pulling it that fast takes {n['draw_mn']} mN; 100 mm of it on the plate holds {n['plate_grip_mn_per_100mm']} mN, so "
                 f"the hotend {'lets it fall slack' if not n['draw_mn'] else 'drags it along' if n['draw_mn'] > n['plate_grip_mn_per_100mm'] else 'draws it thin'} until something holds it.")
         out.add(f"Air and heat: it falls at {n['fall_mm_s'] / 1000:.1f} m/s at most, and sets in {n['set_s_still_air']} s"
-                + (f" ({n['set_s_fan']} s in the fan's air)" if inp.fan else "") + f". The nozzle's tip carries {n['blob_mm3']} mm3.")
+                + (f" ({n['set_s_fan']} s in the fan's air)" if st.wind else "") + f". The nozzle's tip carries {n['blob_mm3']} mm3.")
     for x in (x for x in st.notes if LIMIT in x):
         out.add(f"Limit: {x}.")
     out.add(f"Sheet: {png}")
