@@ -161,7 +161,7 @@ def choose(fails: list, mode: str, inp: failsim.Inputs):
     for f in real:
         if f.kind in want:
             return f, False
-    held = fails[0].numbers if fails and fails[0].kind == "none" else {}
+    held = fails[0].numbers if fails and (fails[0].kind == "none" or inp.material.peel is None) else {}
     lay, cell, (ox, oy) = inp.layer, inp.cell, inp.origin
     if mode == "detach":
         i, piece = len(inp.masks) // 3, np.asarray(inp.masks[0], bool)
@@ -180,7 +180,8 @@ def choose(fails: list, mode: str, inp: failsim.Inputs):
         tax = failsim.TAXONOMY[mode]
     r, c = np.nonzero(piece)
     where = (round(ox + (c.mean() + 0.5) * cell, 1), round(oy + (r.mean() + 0.5) * cell, 1))
-    why = f"what-if: --fail {mode} asked for it; the model does not predict it for this print"
+    blind = mode == "detach" and inp.material.peel is None
+    why = f"what-if: --fail {mode} asked for it; the model " + ("cannot judge a corner lifting for this plastic" if blind else "does not predict it for this print")
     base = fails[0].assumptions if fails else []
     return failsim.Failure(mode, i, round(float(inp.layer_z[i]), 2), round(float(inp.layer_t[i]), 1), tax, where, nums,
                            [*base, why]), True
@@ -580,8 +581,10 @@ def numbers_line(f) -> str:
         return f"span {n['span_mm']} mm (usable {n.get('usable_mm')} mm) sags {n['sag_mm']} mm"
     if "droop_mm" in n:
         return f"ledge {n.get('ledge_mm')} mm past the layer below droops {n['droop_mm']} mm"
-    if n.get("island"):
+    if "island" in n or "island_mm2" in n:
         return "a piece starts in mid air"
+    if "edge_stress_mpa" in n:
+        return f"edge pull about {n['edge_stress_mpa']} MPa, and nobody has published how hard this plastic holds a plate"
     return ", ".join(f"{k} {v}" for k, v in n.items()) or "no numbers"
 
 
@@ -626,30 +629,38 @@ def cmd(args, job, prof, out):
             f"material: {mat}" + ("" if mat == said else f", for {said}") + ("" if args.material or not tp.material else ", the G-code says")]
     if failsim.like(mat) != mat:
         note.append(failsim.note("like"))
+    elif mat in ("PA", "TPU"):  # which grade's
+        note.append(failsim.note(f"{mat.lower()}.set"))
     heat = file == mat or bool(own) and not file  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
     inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat)
     fails = failsim.predict(inp)
     fail, what_if = choose(fails, mode, inp)
+    blind = inp.material.peel is None
+    if blind:
+        pull = failsim.Failure("none", numbers={"edge_stress_mpa": fails[0].numbers["edge_stress_mpa"]})
+        note.append(f"a corner lifting is not judged: {numbers_line(pull)}")
     taken = without and asked != "off"
     out.add(f"This is a model, not a recording: failsim's physics on the toolpath {what}.", *(f"{x[0].upper()}{x[1:]}." for x in (*note, *inp.notes)))
     nxt = job.status().get("next") if job.exists() else None
     if fail is None:
         if mode == "auto":
-            out.add("No failure predicted; nothing to show. --fail detach shows a loose part anyway.")
+            out.add(f"No {'other ' if blind else ''}failure predicted; nothing to show. --fail detach shows a loose part anyway.")
             n = fails[0].numbers if fails else {}
             if "margin" in n:
                 out.add(f"Plate bond margin {n['margin']} (above 1 holds).")
-            out.result = "no failure predicted"
-            out.next = nxt if nxt and nxt != "stone status" else "none, no failure predicted"
+            out.result = "no other failure predicted, corners not judged" if blind else "no failure predicted"
+            out.next = nxt if nxt and nxt != "stone status" else f"none, {out.result}"
         else:
             out.add(f"Nothing here fails by {mode}, so there is nothing to show. --fail detach shows a loose part anyway.")
             out.result = "nothing to show"
             out.next = "none, nothing to show"
         return out
     loose = fail.kind in ("detach", "topple")
-    dom = failsim.note("contamination" if clean < 1 and loose else "nozzle_tip" if "hold_n" in fail.numbers else DOMINANT[fail.kind])
+    blind &= what_if and fail.kind == "detach"
+    dom = failsim.note("no_peel" if blind else "contamination" if clean < 1 and loose else "nozzle_tip" if "hold_n" in fail.numbers else DOMINANT[fail.kind])
     said = "What-if (drawn without supports, which this print has)" if taken else (
+        "What-if (you asked for it, the model cannot judge a corner lifting for this plastic)" if blind else
         "What-if (you asked for it, the model does not predict it)" if what_if else "Predicted")
     what_if = what_if or taken
     real = fails[0] if fails[0].kind != "none" and (fails[0].layer or 0) < (fail.layer or 0) else None

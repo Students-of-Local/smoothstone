@@ -34,7 +34,8 @@ from . import config, printers
 REFS = config.REPO_ROOT / "recipes" / "lib" / "refs"
 KINDS = ("supports", "droop", "bridge", "detach", "topple", "none")
 TAXONOMY = {"supports": "spaghetti", "droop": "overhang_droop", "bridge": "poor_bridging", "topple": "toppled"}
-MATERIALS = ("PLA", "PETG", "ABS", "ASA", "PLA-CF", "PETG-CF")
+MATERIALS = ("PLA", "PETG", "ABS", "ASA", "PC", "PA", "TPU", "PLA-CF", "PETG-CF")
+GAS = 8.314  # J/(mol K)
 
 
 @lru_cache(maxsize=1)
@@ -65,8 +66,9 @@ class Material:
     tensile_z: float  # MPa, between layers
     cp: float  # J/(kg K)
     k: float  # W/(m K)
-    peel: float  # N, 90 degree peel peak on glass
-    peel_bed: float  # C, the plate it was peeled from
+    peel: float | None  # N, 90 degree peel peak on glass; None: nobody has published it
+    peel_bed: float | None  # C, the plate it was peeled from
+    set: float  # C, where it turns solid: its glass transition, or where it crystallizes
     bed: float  # C, K2 profile
     chamber: float
     nozzle: float
@@ -95,11 +97,11 @@ def _props(m: str) -> tuple[dict, str]:
 PLASTICS = (("PLA", r"(HT|E)?PLA"), ("PETG", r"PETG|PCTG"), ("ABS", r"ABS"), ("ASA", r"ASA"), ("PC", r"PC|POLYCARBONATE"),
             ("PA", r"PA(6|11|12|66|612)?|COPA|NYLON"), ("TPU", r"TPU(\d\dA)?"))
 OTHER = re.compile(r"[GK]F\d*|\w*GLASS\w*|KEVLAR|ARAMID|AERO|LW|\w*FOAM\w*|WOOD\w*|METAL\w*|IRON|MAGNETIC|\w*FILL(ED)?|SUPPORT|PET|PHA|PBAT|PBT|PP|PVA|"
-                   r"PVB|PTFE|PMMA|TPE|HIPS")
+                   r"PVB|PTFE|PMMA|TPE|HIPS|BLEND|ALLOY")
 
 
 def named(text: str) -> str | None:
-    """The plastic of MATERIALS a file or a person names (PLA Silk, PETG-CF), or None: no numbers for it."""
+    """The plastic of MATERIALS a file or a person names (PLA Silk, PETG-CF, nylon, TPU 95A), or None: no numbers for it."""
     words = re.findall(r"[A-Z0-9]+", (text or "").upper().replace("CARBON BLACK", "BLACK"))
     got = {m for w in words for m, names in PLASTICS if re.fullmatch(names, w)}
     if len(got) != 1 or any(map(OTHER.fullmatch, words)):
@@ -129,22 +131,34 @@ def material(name: str = "PLA") -> Material:
     base, tg = like(m), p["tg"]["value"]
     k2 = f"k2.{m.lower()}"
     heat = fact(k2) if "failsim." + k2 in facts() else printers.settings(printers.get("creality_k2"), m)
-    cp, k = fact("pla.cp"), _own(m, "k")
+    solid, cp = _own(m, "set") or tg, fact("pla.cp")
+    k = _own(m, "k")
     if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg
         tab = np.asarray(fact("abs.cp_k"), float)
         cp = float(np.interp(np.linspace(tg, heat["nozzle"], 50), tab[:, 0], tab[:, 2]).mean())
         k = k or float(np.interp(np.linspace(fact("room_air"), tg, 50), tab[:, 0], tab[:, 1]).mean())
+    elif m == "PA":
+        q = fact("pa.cp")
+        cp = (q["per_K"] * ((solid + heat["nozzle"]) / 2 + 273.15) + q["at_0K"]) / q["g_mol"] * 1000
+    elif m == "TPU":
+        cp, k = fact("tpu.cp_k")
+    elif m == "PC":
+        cp = fact("pc.cp")
+    k = k or p["k"]["value"]
     stand = [note("mfi_rig"), *([note("like")] if base != m else [])]
     stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith((f"failsim.{base.lower()}.", f"failsim.{m.lower()}."))]
     if "chamber" not in heat:
         stand.append(note("k2_air"))
     if base == "PETG":
-        stand.append("PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity")
-    stand += [f"{p[key]['assumption']} (materials.json {p[key]['id']})" for key in ("cte", "modulus_vs_temp")
+        stand.append("PETG uses PLA's specific heat (no sourced value for the melt)")
+    if base not in ("PLA", "ABS"):
+        stand.append(f"{base} radiates as ABS and PLA do (failsim.emissivity)")
+    stand += [note(no) for no, key in (("no_peel", f"failsim.peel.{base.lower()}"), ("no_angle", f"failsim.{base.lower()}.contact_angle")) if key not in facts()]
+    stand += [f"{p[key]['assumption']} ({'' if p[key]['id'].startswith('failsim.') else 'materials.json '}{p[key]['id']})" for key in ("cte", "modulus_vs_temp")
               if "assumption" in p[key]]
     return Material(m, p["density"]["value"], tg, p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
-                    tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()),
-                    fact("peel_bed")[base], heat["bed"], heat.get("chamber", fact("k2_air")), heat["nozzle"], tuple(dict.fromkeys(stand)), src)
+                    tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()) if base in fact("peel_bed") else None,
+                    fact("peel_bed").get(base), solid, heat["bed"], heat.get("chamber", fact("k2_air")), heat["nozzle"], tuple(dict.fromkeys(stand)), src)
 
 
 def _mat(m) -> Material:
@@ -162,6 +176,16 @@ def flow_index(name: str) -> tuple[float, float, float]:
     return t_c, rate, kg * fact("gravity") / area * rig["die_mm"] / 2 / (2 * rig["length_mm"]) / rate
 
 
+def _rest(p: dict, t_c) -> np.ndarray:
+    """A melt's viscosity at rest over its D1 at t_c: Cross-WLF's, infinite at and below its pole, or Arrhenius'."""
+    t = np.asarray(t_c, float) + 273.15
+    with np.errstate(over="ignore"):
+        if "E" in p:
+            return np.exp(p["E"] / (GAS * t))
+        dt, den = t - p["T_star_K"], p["A2_K"] + t - p["T_star_K"]
+        return np.where(den > 0, np.exp(-p["A1"] * dt / np.where(den > 0, den, 1.0)), np.inf)
+
+
 @lru_cache(maxsize=None)
 def _melt(name: str) -> dict:
     """Its melt's shape (its own, or the one it borrows), set to its filament's melt flow index."""
@@ -169,23 +193,25 @@ def _melt(name: str) -> dict:
     p = _own(name, "cross_wlf") or fact("pla.cross_wlf")
     if base == "PETG":
         p = {**p, "A1": u["C1"] * math.log(10), "A2_K": u["C2_K"], "T_star_K": _props(base)[0]["tg"]["value"] + 273.15}
+    elif flow := _own(name, "flow"):
+        p = {"n": p["n"], "tau_star_Pa": p["tau_star_Pa"], "E": flow}
     t_c, rate, eta = flow_index(name)
     lo, hi = math.log(eta), math.log(eta) + 20  # of the melt at rest: what thins to eta at the test's rate
     for _ in range(80):
         eta0 = math.exp((lo + hi) / 2)
         lo, hi = (lo, (lo + hi) / 2) if eta0 / (1 + (eta0 * rate / p["tau_star_Pa"]) ** (1 - p["n"])) > eta else ((lo + hi) / 2, hi)
-    dt = t_c + 273.15 - p["T_star_K"]
-    return {**p, "D1_Pa_s": eta0 * math.exp(p["A1"] * dt / (p["A2_K"] + dt))}
+    return {**p, "D1_Pa_s": eta0 / float(_rest(p, t_c))}
 
 
 def viscosity(t_c, rate=0.0, mat="PLA") -> np.ndarray:
-    """Pa s of the melt at t_c (C) and shear rate (1/s): each plastic's own Cross-WLF. Infinite at and
-    below the WLF pole (T* - A2; 48.4 C for PLA), where the fit stops meaning anything."""
-    p = _melt(_mat(mat).name)
-    dt = np.asarray(t_c, float) + 273.15 - p["T_star_K"]
-    den = p["A2_K"] + dt
+    """Pa s of the melt at t_c (C) and shear rate (1/s): each plastic's own curve. Infinite at and below the WLF
+    pole (T* - A2; 48.4 C for PLA), where the fit stops meaning anything, and below where a nylon or a TPU sets."""
+    m = _mat(mat)
+    p, t = _melt(m.name), np.asarray(t_c, float)
     with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
-        eta0 = np.where(den > 0, p["D1_Pa_s"] * np.exp(-p["A1"] * dt / np.where(den > 0, den, 1.0)), np.inf)
+        eta0 = p["D1_Pa_s"] * _rest(p, t)
+        if "E" in p:
+            eta0 = np.where(t < m.set, np.inf, eta0)
         rate = np.asarray(rate, float)
         thin = np.where(rate > 0, (eta0 * rate / p["tau_star_Pa"]) ** (1.0 - p["n"]), 0.0)
         return np.where(np.isinf(eta0) | np.isinf(thin), np.inf, eta0 / (1.0 + thin))
@@ -232,31 +258,31 @@ def _wind(fan: float) -> float:
 
 
 def _cool(m: Material, layer: float, width: float, fan: bool, n: int = 2001, air_c: float | None = None):
-    """(C from Tg to the nozzle, seconds the bead takes to cool by each degree there). air_c: default the chamber's."""
+    """(C from where it sets to the nozzle, seconds the bead takes to cool by each degree there). air_c: default the chamber's."""
     air_c = m.chamber if air_c is None else air_c
     a, per = _bead(width, layer)
-    ts = np.linspace(m.tg, m.nozzle, n)
+    ts = np.linspace(m.set, m.nozzle, n)
     h = h_strand(4 * a / per, ts, air_c, _wind(fan))
     with np.errstate(divide="ignore"):
         return ts, np.where(ts > air_c, m.density * 1000 * m.cp * (a / per * 1e-3) / (h * (ts - air_c)), math.inf)
 
 
 def cooling(mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True, air_c: float | None = None) -> dict:
-    """Lumped cooling of a bead from the nozzle to Tg: the mean h (W/m2 K), time constant tau, Biot number and
-    seconds above Tg."""
+    """Lumped cooling of a bead from the nozzle to where it sets: the mean h (W/m2 K), time constant tau,
+    Biot number and seconds above that."""
     m = _mat(mat)
     air_c = m.chamber if air_c is None else air_c
     a, per = _bead(width, layer)
     ts, dt = _cool(m, layer, width, fan, air_c=air_c)
     soft = float(np.sum((dt[1:] + dt[:-1]) * np.diff(ts)) / 2)
     rho_cp = m.density * 1000 * m.cp * (a / per * 1e-3)
-    span = math.log((m.nozzle - air_c) / (m.tg - air_c)) if m.tg > air_c else math.inf
-    h = rho_cp * span / soft if math.isfinite(soft) else float(h_strand(4 * a / per, m.tg, air_c, _wind(fan)))
+    span = math.log((m.nozzle - air_c) / (m.set - air_c)) if m.set > air_c else math.inf
+    h = rho_cp * span / soft if math.isfinite(soft) else float(h_strand(4 * a / per, m.set, air_c, _wind(fan)))
     return {"h": h, "tau_s": rho_cp / h, "biot": h * (a / per * 1e-3) / m.k, "soft_s": soft}
 
 
 def _compliance(m: Material, layer: float, width: float, fan: bool, air_c: float | None = None) -> float:
-    """The integral of dt / (3 eta) while the bead cools from the nozzle to Tg, in mm2/N."""
+    """The integral of dt / (3 eta) while the bead cools from the nozzle to where it sets, in mm2/N."""
     ts, dt = _cool(m, layer, width, fan, 4001, air_c)
     f = dt / (fact("trouton") * viscosity(ts, 0.0, m))
     return float(np.sum((f[1:] + f[:-1]) * np.diff(ts)) / 2) * 1e6  # 1/Pa -> mm2/N
@@ -286,15 +312,15 @@ def droop(dist_mm, mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool
 
 @lru_cache(maxsize=None)
 def _stress_table(m: Material) -> tuple[np.ndarray, np.ndarray]:
-    ts = np.linspace(-40.0, m.tg, 4001)
+    ts = np.linspace(-40.0, m.set, 4001)
     r = m.ratio(ts)
     seg = (r[1:] + r[:-1]) / 2 * np.diff(ts)
     return ts, m.cte * m.e * np.append(np.cumsum(seg[::-1])[::-1], 0.0)
 
 
 def layer_stress(mat="PLA", t_part=None):
-    """MPa a layer carries once it cools bonded from Tg to t_part: alpha x integral of E(T) dT, and
-    nothing while it is above Tg. Takes one temperature or an array of them."""
+    """MPa a layer carries once it cools bonded from where it sets to t_part: alpha x integral of E(T) dT, and
+    nothing while it is hotter. Takes one temperature or an array of them."""
     m = _mat(mat)
     ts, s = _stress_table(m)
     out = np.interp(np.asarray(m.bed if t_part is None else t_part, float), ts, s, right=0.0)
@@ -425,11 +451,14 @@ def drop_strand(path_xyz, speed_mm_s: float = 200.0, flow_mm3_s: float = 10.0, g
 
 # detachment and toppling
 
-def bond_stress(mat="PLA", clean: float = 1.0, bed: float | None = None) -> float:
+def bond_stress(mat="PLA", clean: float = 1.0, bed: float | None = None) -> float | None:
     """MPa the plate's bond holds at the edge: the peel force as an edge stress, 2 P lambda / b
     (Hetenyi, first layer as the foundation), capped at the plastic's own strength between layers,
-    less on a plate hotter than the peel test's that holds less than it did (failsim.bond_rule), times the plate factor."""
+    less on a plate hotter than the peel test's that holds less than it did (failsim.bond_rule), times the plate factor. None: nobody has
+    published this plastic's peel."""
     m = _mat(mat)
+    if m.peel is None:
+        return None
     sp = fact("peel_specimen")
     lam = (3 / (sp["thickness"] * sp["thickness"] ** 3)) ** 0.25
     past, hold = np.asarray(fact("hold_curve"), float).T
@@ -535,7 +564,7 @@ def tension(t_c, mat="PLA") -> float:
 
 def wetting(t_c, mat="PLA") -> float:
     """Degrees, the angle a drop of the melt rests at on metal: under 90 it spreads over the nozzle's tip."""
-    tab = np.asarray(_own(_mat(mat).name, "contact_angle"), float)
+    tab = np.asarray(_own(_mat(mat).name, "contact_angle") or [[t_c, fact("no_angle")]], float)
     return float(np.interp(t_c, tab[:, 0], tab[:, 1]))
 
 
@@ -675,7 +704,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
         base.append(note("contamination"))
     if not inp.enclosed:
         base.append(note("room_air"))
-    warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), note("bond_rule"),
+    warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), *([] if m.peel is None else [note("bond_rule")]),
             note("h_part") if fact("h_part") * math.sqrt(inp.fan) > fact("h_still") else note("h_still")]
 
     def xy(r, c):
@@ -757,7 +786,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
         es = edge_stress(m, temps, lay, narrow, bed)
         if es["edge"] > worst["edge"]:
             worst = {**es, "layer": i, "temps": temps}
-        if es["edge"] > bond:
+        if bond is not None and es["edge"] > bond:
             hit("detach", i, xy(fr.mean(), fc.mean()), {"edge_stress_mpa": round(es["edge"], 2), "bond_mpa": round(bond, 2),
                 "margin": round(bond / es["edge"], 2), "hetenyi_mpa": round(es["hetenyi"], 2),
                 "edge_zone_mpa": round(es["zone"], 2), "moment_nmm_per_mm": round(es["moment"], 2),
@@ -782,10 +811,13 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
             break  # everything after prints onto a loose part
     out = sorted(found.values(), key=lambda f: (f.layer, KINDS.index(f.kind)))
     if out:
+        for f in out if bond is None else ():  # nothing judges it, so it is given with whatever fails
+            f.numbers.setdefault("edge_stress_mpa", round(worst["edge"], 2))
+            f.assumptions += [x for x in warp if x not in f.assumptions]
         return out
     t = worst.get("temps", np.zeros(1))
     return [Failure("none", numbers={"layers": len(inp.masks), "edge_stress_mpa": round(worst["edge"], 2),
-                                     "bond_mpa": round(bond, 2), "margin": round(bond / max(worst["edge"], 1e-9), 2),
+                                     **({} if bond is None else {"bond_mpa": round(bond, 2), "margin": round(bond / max(worst["edge"], 1e-9), 2)}),
                                      "worst_layer": worst.get("layer"), "bottom_c": round(float(t[0]), 1),
                                      "top_c": round(float(t[-1]), 1), "air_c": air, "push_n": round(push, 4),
                                      "tip_drive_nmm": round(tipping[1], 2), "tip_hold_nmm": round(tipping[2], 2)},

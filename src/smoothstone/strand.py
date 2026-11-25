@@ -78,12 +78,12 @@ def fall_speed(mat="PLA", d_mm: float | None = None, air_c: float = 25.0) -> flo
 
 
 def set_time(mat="PLA", d_mm: float | None = None, air_c: float | None = None, wind: float = 0.0, nozzle_c: float | None = None) -> float:
-    """s a strand takes from the nozzle's heat to its glass transition in that wind (m/s)."""
+    """s a strand takes from the nozzle's heat to where it sets in that wind (m/s)."""
     m, d = failsim._mat(mat), exit_diameter() if d_mm is None else d_mm
     air_c = m.chamber if air_c is None else air_c
-    if air_c >= m.tg:
+    if air_c >= m.set:
         return math.inf
-    t = np.linspace(m.tg, m.nozzle if nozzle_c is None else nozzle_c, 400)
+    t = np.linspace(m.set, m.nozzle if nozzle_c is None else nozzle_c, 400)
     q = m.density * 1000 * m.cp * d * 1e-3 / 4 / (failsim.h_strand(d, t, air_c, wind) * (t - air_c))
     return float(((q[1:] + q[:-1]) / 2 * np.diff(t)).sum())
 
@@ -405,7 +405,7 @@ class Strand:
             self.t[-1] = self.hot
             self.vol[-1] += self.flow * dt
         if floor is not None and self.plastic is not None:
-            on = touch & (x[:, 2] < f2 + 1e-5) & (self.air + failsim.fact("weld_rule") * (self.t - self.air) > m.tg)
+            on = touch & (x[:, 2] < f2 + 1e-5) & (self.air + failsim.fact("weld_rule") * (self.t - self.air) > m.set)
             if on.any():
                 at = self.x[on] * 1e3
                 self.fixed[np.flatnonzero(on)[np.asarray(self.plastic(at[:, 0], at[:, 1]), bool)]] = True
@@ -539,7 +539,7 @@ class Strand:
         ln, n = self.lengths()[1], len(self.x)
         arc = np.r_[np.cumsum(ln[::-1])[::-1], 0.0]
         lies = self.fixed | self.touch
-        still = (lies | (self.t < self.m.tg)) & (_norm(self.v) < 20 * CREEP) & (arc > keep * 1e-3)
+        still = (lies | (self.t < self.m.set)) & (_norm(self.v) < 20 * CREEP) & (arc > keep * 1e-3)
         ends = np.r_[np.flatnonzero(~lies), n - 1]  # of the run of lying nodes a node is in, and the next one that lies
         run = arc - arc[ends[np.searchsorted(ends, np.arange(n))]]
         rests = np.flatnonzero(lies)
