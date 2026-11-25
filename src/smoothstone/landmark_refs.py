@@ -658,8 +658,9 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
                 if not small:
                     _write_atomic(raw_cache, raw_text)
                 ways = {e['id'] for e in raw.get('elements', []) if e.get('type') == 'way'}
-                if small and any(m.get('type') == 'way' and m['ref'] not in ways for e in raw.get('elements', [])
-                                 if e.get('type') == 'relation' and _own(e, refs) for m in e.get('members', [])):
+                own = [e for e in raw.get('elements', []) if e.get('type') in ('way', 'relation') and _own(e, refs)]
+                if small and not (own and all(m['ref'] in ways for e in own for m in e.get('members', [])
+                                              if m.get('type') == 'way')):
                     raise LandmarkProblem(CROWDED)
                 data = _map_as_overpass(raw, refs)
                 data['_smoothstone_response_url'] = url

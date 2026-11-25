@@ -1135,6 +1135,20 @@ def test_one_tower_on_a_wide_plan_is_not_the_building(recorded, monkeypatch, tmp
         landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low", plain=True)
 
 
+def test_a_tall_bell_tower_does_not_hide_a_church_without_its_dome(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    tower = _way(5, 60, 0, 70, 10, building="bell_tower", wikidata="Q5", height="73")
+    item = [{"mainsnak": {"datavalue": {"value": {"id": "Q5"}}}}]
+    site = _site_refs(wikidata_raw={"claims": {"P527": item}})
+    _drawn(monkeypatch, recorded, OUTLINE)
+    monkeypatch.setattr(landmark_refs, "fetch", lambda r, root: landmark_refs.parse_osm({"elements": [
+        OUTLINE, tower, _way(2, -40, -10, 0, 10, building__part="yes", height="20"),
+        _way(3, 0, -10, 40, 10, building__part="yes", height="21")]}, site))
+    with pytest.raises(landmark_refs.LandmarkProblem, match="tallest part of Taj Mahal is 21 m"):
+        landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
+
+
 def test_a_whole_pyramid_is_no_plain_shape(recorded, monkeypatch, tmp_path):
     from smoothstone import landmark
 
@@ -1151,7 +1165,9 @@ def test_a_crowded_map_is_asked_again_for_a_smaller_area(monkeypatch, tmp_path):
     wide = _way(4, -900, -9, 900, 9, building="yes", height="12", wikidata="Q1")
     cut = {"type": "relation", "id": 8, "tags": {"building": "yes", "type": "multipolygon", "wikidata": "Q1"},
            "members": [{"type": "way", "ref": 404, "role": "outer"}]}
-    for i, (drawn, found, more) in enumerate(((house, True, []), (wide, False, []), (house, False, [cut]))):
+    for i, (drawn, found, more) in enumerate((
+            (house, True, []), (wide, False, []), (house, False, [cut]),
+            (_way(3, -8, -8, 8, 8, building="yes", height="12"), False, []))):  # and its own outline is not in the answer
         home = tmp_path / str(i)
         nodes, asked = _map_answer(monkeypatch, home, [drawn])
         nodes += more

@@ -723,11 +723,12 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     is_lattice = "steel" in keys and replace != "all" and all(fact in pack for fact in (
         "deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m"))
     if replace != "all" and not is_lattice and refs.get("height"):
-        tallest = max(p["height"]["metres"] for p in records)
+        tallest = max(p["height"]["metres"] for p in records if "association_source" not in p)  # not a linked tower
         if tallest < LEAST_HEIGHT * refs["height"]:
             raise LandmarkProblem(f"the map's tallest part of {name} is {tallest:g} m, and the whole stands "
                                   f"{refs['height']:g} m.")
-    if not extra and replace != "all" and _plain(records) and not plain:
+    bare = replace != "all" and not (extra or is_lattice) and _plain(records)
+    if bare and not plain:
         raise PlainShape(f"the map draws {name} as one plain shape, with its outline and height and nothing else.")
     chosen = detail or ("high" if len(records) - len(extra) < 400 else "low")
     if chosen not in ("low", "high"):
@@ -880,7 +881,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     omitted = [note for note in notes if note.startswith("Omitted detail below the print floor")]
     lines = [f"Built {len(records)} modeled 3D parts with {chosen} detail.",
              "© OpenStreetMap contributors, ODbL 1.0." if osm else "Drawn from the reference pack's sources.", f"References and modeling notes: {refpath}"]
-    if not extra and replace != "all" and _plain(records):
+    if bare:
         lines.append(f"NOTE, tell the person: the map has {name} as one plain shape, and its real shape has more.")
     if omitted:
         lines.append("Omitted architectural detail below the print floor. See the modeling notes for each feature.")
