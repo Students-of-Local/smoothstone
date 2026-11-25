@@ -67,11 +67,12 @@ class Out:
         if self.raw is not None:
             return self.raw
         body = [ln for ln in self.lines if ln is not None]
-        reply = []
-        if self.next.startswith(LANDMARK_ASK):  # a small model loses the thread working out how to ask
-            said = self.next.removeprefix("ask the person: ")
-            reply = [f'Reply with just this and no tool call: "{said[0].upper()}{said[1:]}"']
-        room = MAX_LINES - 1 - len(reply)
+        nxt = self.next
+        if nxt.startswith(LANDMARK_ASK):  # LFM3-1.7B loses the thread on who "the person" is and what is left to FIX
+            body = [ln for ln in body if not ln.startswith(("Subject: ", "Searched: ", "FIX: no open model"))]
+            body.append("stone can go no further until the user answers.")
+            nxt = REPLY + nxt[len("ask the person: ")].upper() + nxt[len("ask the person: ") + 1:]
+        room = MAX_LINES - 1
         passes = [ln for ln in body if ln.startswith("PASS ")]
         if len(body) > room and len(passes) > 1:
             # a passing check asks for nothing; the lines after the checks (the STL, the views)
@@ -87,7 +88,7 @@ class Out:
             rest = [i for i in range(len(body)) if i not in set(must)]
             keep = sorted(must + rest[: room - 1 - len(must)])
             body = [body[i] for i in keep] + [f"({len(body) - len(keep)} more lines in log.txt)"]
-        return "\n".join(body + reply + [f"NEXT: {self.next}"] + self.after)
+        return "\n".join(body + [f"NEXT: {nxt}"] + self.after)
 
 
 class UsageError(Exception):
@@ -2277,6 +2278,7 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
     return out
 
 
+REPLY = "none. Your reply to the user is: "  # how a LANDMARK_ASK is printed
 LANDMARK_ASK = "ask the person: no open model of "
 MAKERS = ("recipes", "show", "set", "build", "product", "image")  # commands that make some other part
 

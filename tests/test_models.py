@@ -684,7 +684,7 @@ def test_landmark_without_parts_routes_to_models_and_does_not_loop(jobenv, monke
     }
     monkeypatch.setattr(models, "search", lambda *args: found)
     text, code, nxt = stone("models", "Cologne Cathedral")
-    assert code == 1 and nxt.startswith("ask the person:"), text
+    assert code == 1 and nxt.startswith("none. Your reply to the user is: No open model"), text
 
 
 def test_a_refused_landmark_tells_a_large_model_it_may_write_the_shapes(jobenv, monkeypatch):
