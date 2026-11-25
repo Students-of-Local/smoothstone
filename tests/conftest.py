@@ -1,5 +1,9 @@
+import ctypes
+import gc
 import json
+import os
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -7,6 +11,17 @@ import pytest
 from smoothstone import config
 
 REPO = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture(autouse=True)
+def memory_returned_after():
+    """A test's meshes hold their own caches in cycles, and glibc keeps what they free. A worker past
+    test_parts.py held 1.7 GB and 0.2 GB once trimmed. Four such workers ran the suite out of memory."""
+    yield
+    gc.collect()
+    trim = getattr(ctypes.CDLL(None), "malloc_trim", None) if sys.platform == "linux" else None
+    if trim:
+        trim(0)
 
 
 @pytest.fixture(autouse=True)
@@ -71,12 +86,15 @@ def jobenv(tmp_path, monkeypatch, recipes_root):
 
 
 def pytest_collection_modifyitems(config, items):
-    """A test marked network reaches a live site: it runs only with STONE_NETWORK=1."""
-    import os
-
-    if os.environ.get("STONE_NETWORK") == "1":
-        return
-    skip = pytest.mark.skip(reason="reaches the network; set STONE_NETWORK=1 to run it")
+    """A test marked network reaches a live site: it runs only with STONE_NETWORK=1. A timing test measures
+    this machine alone, and the largest takes 3.7 GB: beside other workers it fails on their load and runs
+    the suite out of memory, so it runs only without them, as CI's own pass does."""
+    skips = {}
+    if os.environ.get("STONE_NETWORK") != "1":
+        skips["network"] = "reaches the network; set STONE_NETWORK=1 to run it"
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        skips["timing"] = "runs without other workers: pytest -m timing"
     for item in items:
-        if "network" in item.keywords:
-            item.add_marker(skip)
+        for marker, reason in skips.items():
+            if marker in item.keywords:
+                item.add_marker(pytest.mark.skip(reason=reason))
