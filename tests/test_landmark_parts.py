@@ -287,3 +287,75 @@ def test_a_lean_tips_all_above_a_level_base(build):
 def test_a_bad_lean_is_refused(value, build):
     with pytest.raises(landmark_refs.LandmarkProblem, match="lean"):
         build({**_pack(BLOCK, replace="all"), "lean": {"source": SOURCE, "value": value}})
+
+
+def test_a_beam_tapers_along_its_path_and_may_be_round():
+    path = [[0, 0, 0], [0, 0, 10]]
+    taper = _solid({"kind": "beam", "path": path, "size": [[4, 4], [2, 2]]})
+    assert taper.volume() == pytest.approx(10 * (16 + 8 + 4) / 3, rel=.01)
+    post = _solid({"kind": "beam", "path": path, "size": [2, 2], "round": True})
+    assert post.volume() == pytest.approx(math.pi * 10, rel=.03)
+
+
+def test_a_beam_whose_thin_end_is_widened_says_so():
+    beam = {"kind": "beam", "path": [[0, 0, 0], [0, 0, 10]], "size": [[4, 4], [.2, .2]]}
+    for part, widened in ((beam, True), ({**beam, "size": [[4, 4], [2, 2]]}, False)):
+        record = landmark_parts.read(_pack(part), REFS)[0][0]
+        record["_build"](1., [])
+        assert ("print_modifications" in record) is widened
+
+
+def test_a_finer_minimum_keeps_a_roof_in_print_millimetres():
+    roof = {"kind": "prism", "rect": [9, 9], "to": 9, "roof": "pyramidal", "roof_rise": 6}
+    fine = _solid({**roof, "least": .8}, scale=2.)
+    assert fine.volume() == pytest.approx(_solid(roof, scale=2.).volume(), rel=1e-6)
+
+
+def test_a_slender_part_may_ask_for_a_finer_minimum():
+    part = {"kind": "beam", "path": [[0, 0, 5], [0, 20, 5]], "size": [.1, .1], "least": .8}
+    box = _solid(part, scale=1.).bounding_box()
+    assert box[3] - box[0] == pytest.approx(.8, abs=.02)
+
+
+@pytest.mark.parametrize("part, says", [
+    ({**BLOCK, "least": .5}, "least must be 0.8 to 1.2 mm"),
+    ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5], [0, 0, 9]], "size": [[1, 1], [2, 2]]}, "one for each point"),
+    ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5]], "size": [1, 1], "round": 1}, "round must be"),
+])
+def test_a_bad_finer_part_is_refused(part, says):
+    with pytest.raises(landmark_refs.LandmarkProblem, match=r"parts\[0\].*" + says):
+        landmark_parts.read(_pack(part), REFS)
+
+
+def test_a_plinth_stands_where_the_pack_puts_it():
+    base = landmark_parts.plinth(_pack(BLOCK, axis=90, plinth={"rect": [40, 60], "at": [0, 10]}), REFS)
+    assert base.bounds() == pytest.approx((-20, -20, 40, 20), abs=.02)
+    assert landmark_parts.plinth(_pack(BLOCK), REFS) is None
+    for bad in ({}, {"rect": [4, 0]}, {"rect": [4, 4], "to": 3}, 5):
+        with pytest.raises(landmark_refs.LandmarkProblem, match="Reference plinth"):
+            landmark_parts.plinth(_pack(BLOCK, plinth=bad), REFS)
+
+
+def test_a_build_stands_on_the_packs_plinth_and_keeps_a_foot_past_it(build):
+    man, _, scale, _ = build(_pack(BLOCK, replace="all", plinth={"rect": [40, 60]}))
+    x0, y0, x1, y1 = man.slice(1.).bounds()
+    assert (x1 - x0, y1 - y0) == pytest.approx((40 * scale, 60 * scale), abs=.05) and scale == pytest.approx(100 / 60, rel=.01)
+    man, _, scale, _ = build(_pack(BLOCK, {**BLOCK, "at": [0, 50]}, replace="all", plinth={"rect": [40, 60]}))
+    assert man.slice(1.).bounds()[3] == pytest.approx(53 * scale, abs=1) and len(man.decompose()) == 1
+
+
+def test_a_plinths_guess_is_noted_and_its_source_kept(build):
+    asked = {"rect": [40, 60], "guess": "wide enough for the lawn", "source": "https://example.org/lawn"}
+    _, refs, *_ = build(_pack(BLOCK, replace="all", plinth=asked))
+    assert "Guessed the base's outline: wide enough for the lawn." in refs["modeling_additions"]
+    assert "https://example.org/lawn" in json.dumps(refs)
+    with pytest.raises(landmark_refs.LandmarkProblem, match="Reference plinth: guess"):
+        landmark_parts.plinth(_pack(BLOCK, plinth={"rect": [4, 4], "guess": ""}), REFS)
+
+
+def test_a_lattice_tower_refuses_a_plinth(build, monkeypatch):
+    facts = ("deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m")
+    monkeypatch.setattr("smoothstone.landmark_style.style_keys", lambda styles: {"steel"})
+    pack = {**_pack(BLOCK, plinth={"rect": [40, 60]}), **{f: {"source": SOURCE, "value": 5} for f in facts}}
+    with pytest.raises(landmark_refs.LandmarkProblem, match="Leave plinth out"):
+        build(pack, parts=[(1, 20)])

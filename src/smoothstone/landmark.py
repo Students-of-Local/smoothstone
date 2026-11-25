@@ -706,7 +706,11 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     reach = 0.
     if chosen == "high" and "gothic" in keys and {"west_facade_profile", "west_buttress_spires"} <= pack.keys():
         from .landmark_style import WEST_PIER_REACH as reach
-    scale = _scale([outline] if is_lattice and not outline.is_empty() else sections, records, target, reach)
+    ground = landmark_parts.plinth(pack, refs)
+    if ground is not None and is_lattice:
+        raise LandmarkProblem("Reference plinth: a lattice tower has its own base. Leave plinth out.")
+    scale = _scale([outline] if is_lattice and not outline.is_empty() else [*sections, *([ground] if ground is not None else [])],
+                   records, target, reach)
     notes = ["Dimensions use local east/north metres, uniformly scaled to millimetres.",
              "Added a 2 mm plinth following the mapped plan, with short joiners where needed.",
              "Mapped faces overlap by 0.01 metre at wall and roof joins; coordinates are otherwise unsnapped.",
@@ -788,7 +792,14 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         from .landmark_massing import linked_plinth
 
         base = footprint
-        if data.get("site"):  # the castle's ground carries its buildings
+        if ground is not None:  # the pack's base, and whatever stands on the ground past it
+            base = ground.scale([scale, scale]) + _union(solids).slice(2.02)
+            notes[1] = "Added a 2 mm base of the outline the reference pack gives."
+            asked = pack["parts"]["plinth"]
+            refs["feature_sources"].append(asked.get("source", pack["parts"]["source"]))
+            if asked.get("guess"):
+                notes.append(f"Guessed the base's outline: {asked['guess']}.")
+        elif data.get("site"):  # the castle's ground carries its buildings
             base += _section(data["site"]).scale([scale, scale]) ^ footprint.hull()
         base = linked_plinth(base.offset(.02))
         if towers:

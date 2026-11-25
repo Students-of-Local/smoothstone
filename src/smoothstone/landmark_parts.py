@@ -13,12 +13,13 @@ from .landmark_refs import LandmarkProblem
 
 MAX_PARTS = 400
 THIN = 1.2  # mm, the narrowest body a print holds
+LEAST = .8  # mm, the narrowest a part held at both ends may ask for
 CUT = .6  # mm, the narrowest gap
 ROOFS = ("flat", "pyramidal", "gabled", "hipped", "dome", "onion", "round", "skillion")
 PLANS = ("rect", "circle", "ngon", "ring")
-ANY = ("kind", "id", "source", "guess", "copies")
+ANY = ("kind", "id", "source", "guess", "copies", "least")
 FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "top_scale", "top_shift"),
-          "lathe": ("at", "profile"), "beam": ("path", "size"),
+          "lathe": ("at", "profile"), "beam": ("path", "size", "round"),
           "opening": ("at", "turn", "width", "depth", "from", "to", "arch")}
 
 
@@ -86,6 +87,7 @@ def _prism(part):
     _need((roof == "flat") == (rise == 0), "a roof needs roof_rise, and a flat roof has none")
     scale = _number(part.get("top_scale", 1), "top_scale", 0)
     shift = _vector(part.get("top_shift", [0, 0]), "top_shift")
+    least_mm = _number(part.get("least", THIN), "least")
 
     def build(floor, notes):
         from .landmark import _roof
@@ -104,7 +106,7 @@ def _prism(part):
             top = body.translate((-mid).tolist()).scale([s, s]).translate((mid + shift).tolist())
         if rise:
             over = min(.02, rise / 4)
-            mm = THIN / floor if floor else 1.  # roofs are lofted in print millimetres
+            mm = least_mm / floor if floor else 1.  # roofs are lofted in print millimetres
             loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {"roof:direction": "0"} if roof == "skillion" else {}},
                          (eave - over) * mm, (rise + over) * mm, notes)
             solids.append(loft.scale([1 / mm] * 3))
@@ -146,29 +148,39 @@ def _lathe(part):
 
 def _beam(part):
     path = _points(part.get("path"), "path", 3, 2)
-    size = _vector(part.get("size"), "size")
-    _need((size > 0).all(), "size must be more than 0")
+    size = part.get("size")
+    each = isinstance(size, list) and bool(size) and isinstance(size[0], list)
+    sizes = _points(size, "size", 2, 2) if each else np.tile(_vector(size, "size"), (len(path), 1))
+    _need(len(sizes) == len(path), "size needs one [width, height], or one for each point of path")
+    _need((sizes > 0).all(), "size must be more than 0")
+    round_ = part.get("round", False)
+    _need(isinstance(round_, bool), "round must be true or false")
     steps = np.diff(path, axis=0)
     runs = np.linalg.norm(steps, axis=1)
     _need((runs > 1e-6).all(), "path repeats a point")
+    corners = ([(math.cos(a), math.sin(a)) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)] if round_
+               else [(a, b) for a in (-1, 1) for b in (-1, 1)])
 
     def build(floor, notes):
         import manifold3d as m3
 
-        half = np.maximum(size, floor) / 2
-        ends = []
+        half = np.maximum(sizes, floor) / 2
+        frames = []
         for step, run in zip(steps, runs):
             along = step / run
             side = np.array([along[1], -along[0], 0.])
             width = np.linalg.norm(side)
             side = side / width if width > 1e-6 else np.array([1., 0, 0])
-            up = np.cross(side, along)
-            ends.append([side * a * half[0] + up * b * half[1] for a in (-1, 1) for b in (-1, 1)])
+            frames.append((side, np.cross(side, along)))
+
+        def end(frame, at):
+            (side, up), (w, h) = frame, half[at]
+            return [path[at] + side * a * w + up * b * h for a, b in corners]
         solids = []
-        for i, corners in enumerate(ends):
-            solids.append(m3.Manifold.hull_points(np.array([path[i + k] + c for k in (0, 1) for c in corners])))
+        for i, frame in enumerate(frames):
+            solids.append(m3.Manifold.hull_points(np.array(end(frame, i) + end(frame, i + 1))))
             if i:  # the elbow
-                solids.append(m3.Manifold.hull_points(np.array([path[i] + c for c in [*ends[i - 1], *corners]])))
+                solids.append(m3.Manifold.hull_points(np.array(end(frames[i - 1], i) + end(frame, i))))
         return [s for s in solids if not s.is_empty()]
     return build, 0, 0, 0, "flat"  # its heights are its solid's
 
@@ -226,6 +238,34 @@ def _place(solids, flat, scale=1.):
     return [s.transform((M * scale).tolist()) for s in solids]
 
 
+def _world(lat, lon, axis, refs):
+    shift = np.array([(lon - refs["longitude"]) * 111320 * math.cos(math.radians(refs["latitude"])),
+                      (lat - refs["latitude"]) * 111320])
+    return np.c_[_turned(axis), shift]
+
+
+def plinth(pack, refs):
+    """The base the pack asks for, in local east and north metres, or None for one that follows the plan."""
+    fact = pack.get("parts", {})
+    if "plinth" not in fact:
+        return None
+    try:
+        spec = fact["plinth"]
+        _need(isinstance(spec, dict), "it must be an object")
+        unknown = set(spec) - {*PLANS, "at", "turn", "source", "guess"}
+        _need(not unknown, f"it has no field {', '.join(sorted(unknown))}")
+        guess, source = spec.get("guess"), spec.get("source", fact["source"])
+        _need(guess is None or isinstance(guess, str) and guess.strip(), "guess must say how it was chosen")
+        _need(isinstance(source, str) and source.startswith(("http://", "https://")), "source must be a URL")
+        cs = _plan(spec)
+        here = np.c_[_turned(_number(spec.get("turn", 0), "turn")), _vector(spec.get("at", [0, 0]), "at")]
+        lat, lon = _vector(fact["origin"], "origin")
+        world = _world(lat, lon, _number(fact.get("axis", 0), "axis"), refs)
+        return cs.transform(here.tolist()).transform(world.tolist())
+    except ValueError as exc:
+        raise LandmarkProblem(f"Reference plinth: {exc}. See docs/REFERENCE_PARTS.md.") from exc
+
+
 def read(pack, refs):
     """The pack's parts: (records, sections, openings). A record's `_build(scale, notes)` gives its solids."""
     import manifold3d as m3
@@ -236,7 +276,7 @@ def read(pack, refs):
         return [], [], []
     records, sections, openings, seen = [], [], [], set()
     try:
-        unknown = set(fact) - {"source", "origin", "axis", "replace", "value"}
+        unknown = set(fact) - {"source", "origin", "axis", "replace", "plinth", "value"}
         _need(not unknown, f"unknown field {', '.join(sorted(unknown))}")
         _need(fact.get("replace", "none") in ("none", "all") or isinstance(fact["replace"], list),
               'replace must be "none", "all" or a list of OSM ids')
@@ -248,9 +288,7 @@ def read(pack, refs):
         _need(isinstance(fact["value"], list) and fact["value"], "value must list the parts")
     except ValueError as exc:
         raise LandmarkProblem(f"Reference parts: {exc}. See docs/REFERENCE_PARTS.md.") from exc
-    shift = np.array([(lon - refs["longitude"]) * 111320 * math.cos(math.radians(refs["latitude"])),
-                      (lat - refs["latitude"]) * 111320])
-    world = np.c_[_turned(axis), shift]
+    world = _world(lat, lon, axis, refs)
     for i, part in enumerate(fact["value"]):
         try:
             _need(isinstance(part, dict) and part.get("kind") in KINDS, "kind must be one of " + ", ".join(KINDS))
@@ -260,6 +298,8 @@ def read(pack, refs):
             guess, source = part.get("guess"), part.get("source", fact["source"])
             _need(guess is None or isinstance(guess, str) and guess.strip(), "guess must say how it was chosen")
             _need(isinstance(source, str) and source.startswith(("http://", "https://")), "source must be a URL")
+            least = _number(part.get("least", THIN), "least")
+            _need(LEAST <= least <= THIN, f"least must be {LEAST} to {THIN} mm")
             build, lo, hi, rise, roof = KINDS[kind](part)
             here = np.eye(2, 3)
             here[:, 2] = _vector(part.get("at", [0, 0]), "at")
@@ -274,11 +314,13 @@ def read(pack, refs):
 
                 record = {}
 
-                def make(scale, notes, flat=flat, build=build, plain=outline, record=record):
-                    solids = build(THIN / scale, notes)
+                def make(scale, notes, flat=flat, build=build, plain=outline, record=record, least=least, kind=kind):
+                    solids = build(least / scale, notes)
                     grown = m3.Manifold.batch_boolean(solids, m3.OpType.Add)
-                    if np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01:
-                        record["print_modifications"] = ["Widened to 1.2 mm."]
+                    # a beam's thin end may widen inside the box of its thick one
+                    if (np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01
+                            or kind == "beam" and grown.volume() > 1.01 * plain.volume()):
+                        record["print_modifications"] = [f"Widened to {least:g} mm."]
                     return _place(solids, flat, scale)
                 def hole(scale, floor=0., flat=flat, build=build):
                     return _place(build(floor, []), flat, scale)[0].translate([0, 0, 2]).trim_by_plane([0, 0, 1], 2.02)
