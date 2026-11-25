@@ -899,6 +899,18 @@ def test_clear_lead_needs_a_name_match_a_license_and_the_most_makes_and_likes():
     assert not models.clear_lead([])
 
 
+def test_solids_that_touch_along_a_line_are_welded_and_saved_whole(tmp_path):
+    """One Tokyo Tower touched itself along six edges, and no slicer took it. Two boxes lost a corner to the repair."""
+    import manifold3d as m3
+    from smoothstone import clean
+
+    man = m3.Manifold.cube([10, 10, 20]) + m3.Manifold.cube([10, 10, 20]).translate([10, 10, 0])
+    written, _, broken = modelprint.export(modelprint.to_trimesh(man), tmp_path / "part.stl")
+    saved = trimesh.load(tmp_path / "part.stl")
+    assert not broken and not clean.problems(clean.slicer_view(saved.vertices, saved.faces))
+    assert written.volume == pytest.approx(man.volume(), rel=1e-4) and saved.body_count == 1
+
+
 def test_a_model_whose_solids_save_broken_says_so_and_offers_the_next(jobenv, monkeypatch):
     stone("new", REQ)
     root = jobenv / "stone-job"

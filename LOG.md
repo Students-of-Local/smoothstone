@@ -1387,3 +1387,12 @@ smaller one. The bridge is refused all the same, since the map has no area for i
 
 The Lotus Temple at 18 cm tall failed on one sliver that 0.03 mm did not collapse. Edges under 0.05 mm are now collapsed
 when nothing finer closes the mesh. A nozzle's line is 0.4 mm.
+
+LFM3-1.7B on four landmarks with no pack (2026-11-25, one run each) passed none of the four. It built the Cape Hatteras
+Lighthouse as a cylinder and said only that it was ready; a plain shape is now a question to the person (#189). It ended
+Rialto Bridge with no message at all. Tokyo Tower's three open models all failed: one was laid out four files in a row
+1.36 m long (#188), one needs 43 g of supports and stands on too little, and one touched itself along six edges. Found
+models are now welded there as landmarks are. The test for that showed the repair before it, which every part goes
+through, closing two touching boxes by cutting 17% off them and calling it clean; a repair that changes the volume by
+over 0.5% is now refused. The one model named for the Temple of Heaven is an owl (#188).
+With the fixes Tokyo Tower prints from its first model, 200 mm tall, all 15 checks passing, on stone's own NEXT lines.
