@@ -321,7 +321,7 @@ def test_an_opening_lets_light_through_and_cuts_the_maps_walls(build):
     ({"arch": "triangle", "arch_rise": 3}, 4 * 5 + 4 * 3 / 2),
 ])
 def test_an_opening_has_the_head_it_asks_for(more, area):
-    hole, width, _, _ = landmark_parts.read(
+    hole, width, *_ = landmark_parts.read(
         _pack(BLOCK, {"kind": "opening", "width": 4, "depth": 1, "from": 1, "to": 9, **more}), REFS)[2][0]
     solid = hole(1.)
     assert width == 4 and solid.volume() == pytest.approx(area, rel=.01)
@@ -331,7 +331,7 @@ def test_an_opening_has_the_head_it_asks_for(more, area):
 def test_an_outline_cuts_its_own_shape_and_is_omitted_when_too_narrow_to_print():
     slot = {"kind": "opening", "outline": [[0, 0], [1, 0], [9, 8], [8, 8]], "depth": 1}
     records, _, openings = landmark_parts.read(_pack(BLOCK, slot), REFS)
-    hole, width, _, _ = openings[0]
+    hole, width, *_ = openings[0]
     assert hole(1.).volume() == pytest.approx(8, rel=.01) and width == pytest.approx(.5 ** .5, rel=.02)
     wall, notes = m3.Manifold.cube([40, 1, 40]).translate([-20, -.5, -5]), []
     assert landmark_parts.cut(wall, openings, 1., notes).volume() == pytest.approx(1600 - 8, rel=1e-3) and not notes
@@ -452,15 +452,23 @@ def test_a_plinths_guess_is_noted_and_its_source_kept(build):
 
 def test_an_opening_another_part_covers_is_left_out_and_not_sealed_in():
     wall = m3.Manifold.cube([20, 20, 20]).translate([-10, -10, 0])
-    window = {"kind": "opening", "width": 2, "depth": 2, "from": 8, "to": 11}
+    window = {"kind": "opening", "id": "lancet", "width": 2, "depth": 2, "from": 8, "to": 11}
     shaft = {"kind": "opening", "at": [0, -5.5], "width": 1, "depth": 12, "from": 9, "to": 10}
     inner = {"kind": "opening", "at": [0, 1.7], "width": 2, "depth": 2, "from": 8, "to": 11}
     for parts, sealed in (([window], True), ([window, shaft], False), ([inner, window, shaft], False)):
         notes = []
         out = landmark_parts.cut(wall, landmark_parts.read(_pack(BLOCK, *parts), REFS)[2], 1., notes)
         assert len(out.decompose()) == 1 and out.genus() == 0
-        assert [n for n in notes if "covers" in n] == ["Left out an opening 2 m wide that another part covers."] * sealed
+        assert [n for n in notes if "covers" in n] == ["Left out openings that another part covers: lancet."] * sealed
         assert (out.volume() == pytest.approx(8000)) == sealed
+
+
+def test_each_covered_opening_is_named_in_one_note():
+    pair = {"kind": "opening", "id": "lancet", "width": 2, "depth": 2, "from": 8, "to": 11, "at": [4, 0], "copies": {"mirror": "x"}}
+    plain = {"kind": "opening", "width": 2, "depth": 2, "from": 14, "to": 17}
+    wall, notes = m3.Manifold.cube([20, 20, 20]).translate([-10, -10, 0]), []
+    landmark_parts.cut(wall, landmark_parts.read(_pack(BLOCK, pair, plain), REFS)[2], 1., notes)
+    assert notes == ["Left out openings that another part covers: lancet-1, lancet-2, part-2."]
 
 
 def test_a_lattice_tower_refuses_a_plinth(build, monkeypatch):
@@ -490,6 +498,13 @@ def test_a_shipped_pack_s_parts_make_one_body_at_a_small_print(path):
     whole = landmark_parts.cut(solid + base, openings, scale, notes)
     assert sum(d.volume() > 1e-3 for d in whole.decompose()) == 1  # less is a sliver of the join
     assert not [n for n in notes if "covers" in n]
+    if any("Omitted" in n for n in notes):  # too narrow to cut here: cut at a print that holds every opening
+        scale = 1.01 * landmark_parts.CUT / min(width for _, width, *_ in openings)
+        solid = m3.Manifold.batch_boolean([s for r in records for s in r["_build"](scale, [])], m3.OpType.Add).translate([0, 0, 2])
+        base = (solid.project() if ground is None else ground.scale([scale, scale])).extrude(2.02)
+        notes = []
+        landmark_parts.cut(solid + base, openings, scale, notes)
+        assert not [n for n in notes if "covers" in n or "Omitted" in n]
     assert all(r["source"].startswith("http") for r in records)
 
 
