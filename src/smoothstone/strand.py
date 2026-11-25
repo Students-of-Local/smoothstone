@@ -224,15 +224,18 @@ class Strand:
             self.step(dt / 2, start + (np.asarray(head) - start) * part if self.nozzle and head is not None else head, halve - 1)
 
     def _restart(self, dt, head):
-        """It broke at the nozzle: nothing hangs there until enough has come out."""
+        """It broke at the nozzle: nothing hangs there until enough has come out, with room to hang or trail in."""
         if not self.nozzle:
             return
-        self.x[-1] = self.x[-1] if head is None else np.asarray(head) * 1e-3
+        at = self.x[-1] if head is None else np.asarray(head) * 1e-3
+        back, self.x = (self.x[-1] - at) * [1, 1, 0], at[None].copy()
         self.came += self.flow * dt
-        ln = self.came / self.area
-        if ln < self.seg / 6:
+        ln = min(self.came / self.area, self.seg)
+        low = ln if self.ground is None else max(0.0, at[2] - float(self._top(at)) - math.sqrt(self.area / math.pi))
+        if ln < self.seg / 6 or (low < ln and not back.any()):
             return
-        self.x = self.x[-1] - np.array([[0, 0, ln], [0, 0, 0]])
+        trail = math.sqrt(max(0.0, ln * ln - low * low)) / max(float(np.linalg.norm(back)), 1e-12)
+        self.x = np.array([at + back * trail - [0, 0, min(ln, low)], at])
         self.v, self.eb, self.t = np.zeros((2, 3)), np.zeros((2, 4)), np.full(2, self.hot)
         self.press, self.touch, self.fixed = np.zeros(2), np.zeros(2, bool), np.zeros(2, bool)
         self.es, self.rate, self.tens, self.e = np.zeros(1), np.zeros(1), np.zeros(1), np.full(1, np.inf)
