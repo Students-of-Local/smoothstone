@@ -1157,6 +1157,11 @@ saved builds pass the new measurements; no judge ran, because no mesh changed.
   the exact name of a part whose Wikipedia title redirects to a much better known building still gives the building.
 - The 98 are a recorded test, `tests/fixtures/landmark/names.json`. No sealed landmark's name is in any set.
 
+### 2026-11-24: reference parts
+
+A pack can carry parts (`docs/REFERENCE_PARTS.md`): prisms, lathes, beams and openings, from cited sources, for what the
+map does not have, and a lean. A strong model writes them once; every model builds them with `stone landmark "<name>"`.
+
 ### 2026-11-24: a guessed height, and rooms that are not parts
 
 From 40 landmarks never built before (no model, no judge), looked at one by one.
