@@ -20,8 +20,8 @@ physics model, not a recording. It does not print.
   "What-if" in the output means the model does not predict it for this print: it holds, or it has
   supports. Say so.
 - "Nothing here fails by bridge" (or another mode): tell them that. There is no video.
-- The heat, fan, line widths, speeds and shells are the print's own (from G-code), or the set printer's
-  slicer profile for that plastic. No printer set: it is a K2's. Ask which printer, then
+- The heat, fan, line widths and speeds are the print's own (from G-code), or the set printer's slicer
+  profile for that plastic; walls and solid layers are the profile's. No printer set: it is a K2's. Ask which printer, then
   stone printer set <id> (or --printer <id>).
 - "PLA is assumed": ask what plastic it is, then add --material (PETG, ABS, ASA, PC, PA for nylon, TPU,
   PLA-CF or PETG-CF). "No numbers for HIPS, so this is PLA's": tell them the video is

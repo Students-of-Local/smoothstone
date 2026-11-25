@@ -473,10 +473,10 @@ def test_a_plastic_at_the_heat_its_printers_profile_says(mat, pid):
     p = printers.get(pid)
     m, s, k2 = fs.material(mat, pid), printers.settings(p, mat), fs.material(mat)
     assert m.set < m.nozzle and replace(m, nozzle=k2.nozzle, bed=k2.bed, chamber=k2.chamber, cp=k2.cp, stand_ins=k2.stand_ins) == k2
-    if pid == "creality_k2":
-        assert m == k2
-    elif s:
-        assert (m.nozzle, m.bed) == (s["nozzle"], s["bed"]) and m.chamber == s.get("chamber", m.chamber)
+    if pid == "creality_k2" and "failsim.k2." + mat.lower() in fs.facts():  # its longer source
+        assert {"nozzle": m.nozzle, "bed": m.bed, "chamber": m.chamber} == fs.fact("k2." + mat.lower())
+    else:
+        assert (m.nozzle, m.bed, m.chamber) == (s["nozzle"], s["bed"], s.get("chamber", 35))  # not the K2's 60 C for ABS
         assert (fs.note("k2_air") in m.stand_ins) is ("chamber" not in s and p["enclosed"])
 
 

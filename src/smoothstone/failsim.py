@@ -133,7 +133,7 @@ def material(name: str = "PLA", printer: str = "creality_k2") -> Material:
     k2 = f"k2.{m.lower()}"
     ours = fact(k2) if "failsim." + k2 in facts() else {}
     heat = ours if ours and printer == "creality_k2" else printers.settings(printers.get(printer), m) or ours
-    air = {"chamber": fact("k2_air"), **ours, **heat}["chamber"]
+    air = heat.get("chamber", fact("k2_air"))
     solid, cp = _own(m, "set") or tg, fact("pla.cp")
     k = _own(m, "k")
     if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg

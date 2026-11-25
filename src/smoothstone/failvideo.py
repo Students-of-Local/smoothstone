@@ -88,8 +88,8 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True, prof: dict | 
         notes.append(f"the {printers.short_name(prof) if slicer and process else 'K2'} profile's, not the print's own: {', '.join(missing)}" + ("" if given else f" (fan {100 * fan:.0f}%)"))
     if enclosed and chamber is None and unsaid:
         notes.append(unsaid)
-    if slicer and None in (bed, nozzle):
-        notes += slicer["cut"]
+    if slicer:
+        notes += [c for c in slicer["cut"] for k, v in (("bed", bed), ("nozzle", nozzle)) if v is None and f"wants the {k} at" in c]
     return {**got, "material": m, "fan": fan, "process": process, "notes": notes}
 
 
