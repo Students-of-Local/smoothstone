@@ -35,6 +35,7 @@ from . import scad
 from .job import Job, read_json, write_json
 
 MAX_LINES = 25
+MUST = ("FIX:", "FAIL ", "ERROR", "NOTE, tell the person", "Part ready")  # lines the cap above never cuts
 FAILS_BEFORE_RESET = 4
 DONE_NEXT = "none, the part is ready"
 NEW_NEXT = 'stone new "<what to make>"'
@@ -77,8 +78,11 @@ class Out:
             body = [ln for ln in body if ln not in fold]
             body.insert(at, f"PASS {len(fold)} checks: " + ", ".join(ln[5:].split(":")[0] for ln in passes if ln in fold))
         if len(body) > room:
-            cut = len(body) - (room - 1)
-            body = body[: room - 1] + [f"({cut} more lines in log.txt)"]
+            # what went wrong, and what is done, stay; the first of the other lines fill the room left
+            must = [i for i, ln in enumerate(body) if ln.startswith(MUST)][: room - 1]
+            rest = [i for i in range(len(body)) if i not in set(must)]
+            keep = sorted(must + rest[: room - 1 - len(must)])
+            body = [body[i] for i in keep] + [f"({len(body) - len(keep)} more lines in log.txt)"]
         return "\n".join(body + [f"NEXT: {self.next}"] + self.after)
 
 
