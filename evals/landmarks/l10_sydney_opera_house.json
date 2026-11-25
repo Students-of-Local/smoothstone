@@ -8,6 +8,8 @@
       "size": {"mode": "long", "mm": 190},
       "bed": [220, 220, 220],
       "allow_missing_parts": true,
+      "tallest": {"m": 67, "source": "https://www.wikidata.org/wiki/Q45178#P2048"},
+      "dimensions": {"length": 183, "width": 118, "source": "https://www.productivity.nsw.gov.au/sites/default/files/2021-10/Sydney%20Opera%20House%20Trust%20-%20Regulatory%20Impact%20Statement%20%28RIS%29.pdf", "why": "The opera house as a whole: the map has no outline with heights."},
       "references": {
         "identity": "https://www.wikidata.org/wiki/Q45178",
         "footprint": "https://www.openstreetmap.org/relation/9596872",

@@ -1,0 +1,31 @@
+{
+  "id": "l23_dome_of_the_rock",
+  "request": "Make the Dome of the Rock for my printer, 14 cm wide.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Dome of the Rock",
+      "size": {
+        "mode": "long",
+        "mm": 140
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 40.5,
+        "source": "https://www.foraqsa.com/library/studies/the_rock.pdf#page=20",
+        "why": "35.5 m to the crown and the 5 m finial over it"
+      },
+      "dimensions": {
+        "length": 51.5,
+        "width": 51.5,
+        "source": "https://almuslih.org/wp-content/uploads/2024/11/Milwright-M-%E2%80%93-The-Dome-of-the-Rock-.pdf#page=67",
+        "why": "Creswell's octagon, 53.75 m between opposite corners, is 49.7 m between faces, and the porches reach 0.9 m past its square. The porches are the pack's."
+      }
+    }
+  },
+  "why": "The map has an octagon and a half ball: the arched walls, the porches, the drum's windows and the dome's own curve come from the pack."
+}
