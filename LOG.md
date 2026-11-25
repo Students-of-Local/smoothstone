@@ -1267,6 +1267,26 @@ print size, from the three packs judged above. A refused landmark points a tier 
 A collapsed sliver's edge is no longer welded, and no bar goes below the bed; bodies that
 meet only at a corner or across a hairline gap get a real join; the base is widened after the style's detail is added.
 
+### 2026-11-25: the Sydney Opera House, Windsor Castle, the Petronas Towers and the Dome of the Rock
+
+Four packs of reference parts by GPT-6.2 Sol, the first with lofts. Sol's weekly quota ended before it compared its own
+builds with the photographs, so only the judge has. Every attempt, one each:
+
+| spec | judged build | LFM3-1.7B, card S |
+| --- | --- | --- |
+| l10 Sydney | 398a5b3: 9, pass | 398a5b3: 9, pass |
+| l21 Windsor | 398a5b3: 8, pass | 398a5b3: 8, pass |
+| l22 Petronas | 398a5b3: no verdict (Wikipedia's lead image is an SVG logo). 2c50e9d, the judge takes the first photo: 9, pass | 398a5b3: no verdict, same cause. 2c50e9d: fail, no build. 7a998dc: 9, pass |
+| l23 Dome | 398a5b3: 9, pass | 398a5b3: 9, pass |
+
+The failed Petronas run was routing: the request's name was read as "Petronas Towers to 3D print", so `stone new` named no
+landmark and the model went to the figure recipe. Earlier runs reached `stone landmark` by the model's own choice. A
+name in capitals is now read anywhere in a sentence (the figures are in PR 172).
+
+l10's height (67 m, Wikidata) and plan (183 x 118 m, New South Wales) are cited now. Not from a source: Windsor's ground
+is taken as 46 m above the sea, so its 39.3 m holds the print to the pack, and the Dome's porches reach 0.9 m past the
+octagon's square by the pack's choice. Petronas's plan is the pack's measure of the map's podium and bustles.
+
 ### 2026-11-25: openings another part covers, and four packs fixed
 
 The second review of those packs found 14 windows of Himeji's (15 came out) and 2 pockets of Golden Gate's that were sealed inside
