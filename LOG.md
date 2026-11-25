@@ -1283,7 +1283,7 @@ landmark and the model went to the figure recipe. Earlier runs reached `stone la
 name in capitals is now read anywhere in a sentence (the figures are in PR 172).
 
 l10's height (67 m, Wikidata) and plan (183 x 118 m, New South Wales) are cited now. Not from a source: the
-Dome's porches reach 0.9 m past the octagon's square by the pack's choice. Petronas's plan is the pack's measure of the map's podium and bustles.
+Dome's porches reach 28.7 m from the centre along the door axes by the pack's choice, 51.5 m across in the smallest box, at 45 degrees. Petronas's plan is the pack's measure of the map's podium and bustles.
 
 ### 2026-11-25: openings another part covers, and four packs fixed
 
