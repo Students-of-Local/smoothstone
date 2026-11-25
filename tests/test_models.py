@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from smoothstone import cli, modelprint, models
+from smoothstone import cli, landmark_refs, modelprint, models
 
 FIX = Path(__file__).resolve().parent / "fixtures" / "models"
 EVALS = Path(__file__).resolve().parent.parent / "evals"
@@ -437,6 +437,29 @@ def test_names_landmark_leaves_named_products_alone(request_):
 ])
 def test_names_landmark_still_names_buildings(request_, subject):
     assert models.names_landmark(request_) == subject
+
+
+@pytest.mark.parametrize("request_, subject", [
+    ("A 3D print of the Arc de Triomphe, 16 cm tall please.", "Arc de Triomphe"),
+    ("Model Stonehenge for my 3D printer, 16 cm across.", "Stonehenge"),
+    ("make me the alhambra, 15 cm", "alhambra"),
+    ("a 3d model of petra, 12 cm", "petra"),
+    ("A stand for my Kindle Paperwhite", None),
+    ("A clip for the Arc de Triomphe", None),
+    ("a wall thing", None),
+])
+def test_a_structure_without_a_building_word_routes_to_stone_landmark(jobenv, monkeypatch, request_, subject):
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: name in ("Kindle Paperwhite", subject, "Arc de Triomphe"))
+    assert models.known_landmark(request_) == subject
+    if subject:
+        assert _route(monkeypatch, request_)[0] == ["stone", "landmark"]
+
+
+def test_the_lookup_waits_until_no_recipe_fits(jobenv, monkeypatch):
+    asked = []
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: asked.append(name))
+    _route(monkeypatch, "A phone stand for the Arc de Triomphe gift shop")
+    assert not asked
 
 
 def test_the_eval_landmarks_still_route():

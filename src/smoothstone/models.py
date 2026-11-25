@@ -874,6 +874,22 @@ def names_landmark(request: str) -> str | None:
     return s if BUILDING.search(s) or asks_found_model(request) else None
 
 
+THE_THING = re.compile(r"\b(?:make|print|model|build|want|need|like)\s+(?:me\s+|us\s+)?the\s+(.+)", re.I)
+HOLDS = r"\b(?:for|on|onto|with|from|to|fits?|my|our|your|his|her|their)\s+(?:(?:my|our|your|his|her|their|the|an?)\s+)?"
+
+
+def known_landmark(request: str) -> str | None:
+    """The subject when a pack or Wikidata knows it as a structure: "a 3D print of the Arc de Triomphe" has no
+    building word in it. For a request no recipe fits, as it asks the network."""
+    from . import find, landmark_refs
+
+    the = THE_THING.search(request)
+    s = subject_of(request) or (find._phrase(the.group(1)) if the else None)
+    if not s or re.search(HOLDS + re.escape(s), request, re.I):  # a stand for my Kindle Paperwhite
+        return None
+    return s if landmark_refs.is_structure(s) else None
+
+
 def asks_found_model(request: str) -> bool:
     """True when a request asks to find, download or get an existing or open model, not to build one."""
     return bool(FIND_MODEL.search(request))

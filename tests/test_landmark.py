@@ -14,6 +14,7 @@ from smoothstone import landmark_refs, modelprint
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "landmark"
+IS_STRUCTURE = landmark_refs.is_structure  # conftest keeps the tests off the network
 CASES = {
     "Cologne Cathedral": ("cologne", "Q4176", "Roman Catholic cathedral"),
     "Taj Mahal": ("taj", "Q9141", "marble mausoleum"),
@@ -315,6 +316,34 @@ def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_pat
     hits, _, answered = landmark_refs._matches("white example")
     assert {hit["id"]: hit.get("article", False) for hit in hits if hit["id"] == "Q3"} in ({}, {"Q3": False})
     assert answered == kept
+
+
+@pytest.mark.parametrize("name, label, description, claims, wikis, built", [
+    ("Arc de Exemple", "Arc de Exemple", "triumphal arch in Paris", {}, 5, True),
+    ("arc de exemple", "Arc de Exemple", "triumphal arch in Paris", {}, 5, True),
+    ("Arc de Exemple", "Arc de Exemple", "triumphal arch in Paris", {}, 4, False),  # too little known
+    ("Arc de", "Arc de Exemple", "triumphal arch in Paris", {}, 90, False),  # not its name
+    ("Exemple", "Exemple", "town in Kent", {}, 90, False),
+    ("Exemple", "Exemple", "summit in Nepal", {}, 90, False),  # nothing says it is built
+    ("Exemple", "Exemple", "summit in Nepal", {"P84": [{"mainsnak": {"datavalue": {"value": {"id": "Q9"}}}}]}, 5, True),
+    ("Exemple", "Exemple", "ancient city in Jordan",
+     {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q839954"}}}}]}, 5, True),
+])
+def test_a_name_that_is_a_known_structure(monkeypatch, name, label, description, claims, wikis, built):
+    here = {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1, "longitude": 1}}}}]}
+    hit = {"id": "Q1", "label": label, "description": description}
+    entity = {"labels": {"en": {"value": label}}, "claims": here | claims, "sitelinks": {str(n): {} for n in range(wikis)}}
+    monkeypatch.setattr(landmark_refs, "_matches", lambda wanted: ([hit], {"Q1": entity}, True))
+    assert IS_STRUCTURE(name) is built
+
+
+def test_a_shipped_pack_is_a_known_structure_and_offline_nothing_else_is(monkeypatch):
+    def offline(name):
+        raise OSError("no network")
+
+    monkeypatch.setattr(landmark_refs, "_matches", offline)
+    assert IS_STRUCTURE("Taj Mahal")
+    assert not IS_STRUCTURE("Arc de Exemple")
 
 
 @pytest.mark.parametrize("a, b", [("Sacr\u00e9-C\u0153ur", "Sacre Coeur"), ("Saint Paul's", "St. Pauls"), ("The Alamo", "Alamo")])

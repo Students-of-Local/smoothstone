@@ -201,7 +201,7 @@ def found_model(job: Job) -> dict | None:
 def request_landmark(request: str) -> str | None:
     from . import models as mdl
 
-    return mdl.names_landmark(request)
+    return mdl.names_landmark(request) or mdl.known_landmark(request)
 
 
 def need_job(job: Job, out: Out) -> bool:

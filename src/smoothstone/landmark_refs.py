@@ -124,47 +124,79 @@ def _lived_in(entity):
     return False
 
 
+def _what(hit, entity):
+    """What a hit is, from the first words of its description."""
+    description = hit.get('description') or entity.get('descriptions', {}).get('en', {}).get('value', '')
+    return KIND.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip(), description
+
+
+def _names(hit, entity):
+    return [_words(text) for text in (hit.get('label', ''), hit.get('match', {}).get('text', ''),
+                                      entity.get('labels', {}).get('en', {}).get('value', ''),
+                                      *(a['value'] for a in entity.get('aliases', {}).get('en', [])))]
+
+
+def _made(what, entity):
+    """True for something built, False for a place people live in or go through, None when nothing says."""
+    # A "siege castle" or a "fire station" ends in its kind, as a "parish church" does.
+    ends = any(m.end() == len(what) for m in STRUCTURE.finditer(what))
+    # An archaeological site, whatever it once was, unless people still live there.
+    if 'Q839954' in _item_ids(entity, 'P31') and not _lived_in(entity):
+        return True
+    designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
+    places = {word.group().casefold() for word in PLACE.finditer(what)}
+    # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
+    # A station or a school is a building when it has an architect; a town of one style is still a town.
+    if places and not ends and not (designed and places <= {'station', 'school', 'airport'}):
+        return False
+    return True if designed or STRUCTURE.search(what) else None
+
+
 def _choose(name, hits, entities):
     """The hit a person most likely means: its name, what kind of thing it is, and how widely it is written about."""
     wanted, best = _words(name), None
     for hit in hits:
         entity = entities.get(hit['id'], {})
-        description = hit.get('description') or entity.get('descriptions', {}).get('en', {}).get('value', '')
+        what, description = _what(hit, entity)
         if not _value(entity, 'P625') or FORBIDDEN.search(description):
             continue
-        names = [_words(text) for text in (hit.get('label', ''), hit.get('match', {}).get('text', ''),
-                                           entity.get('labels', {}).get('en', {}).get('value', ''),
-                                           *(a['value'] for a in entity.get('aliases', {}).get('en', [])))]
-        what = KIND.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip()
+        names = _names(hit, entity)
         named = wanted in names
         # A page Wikipedia only thinks related is no answer. Wikidata's own hits match the start of a name.
         near = hit.get('article') or any(set(wanted) <= set(n) for n in names)
         # "Example Tower Paris" is the Example Tower whose description says Paris.
         told = set(_words(description))
         near = near or any(n and set(n) < set(wanted) and set(wanted) - set(n) <= told for n in names)
-        # A "siege castle" or a "fire station" ends in its kind, as a "parish church" does.
         ends = any(m.end() == len(what) for m in STRUCTURE.finditer(what))
         if (EVENT.search(what) and not ends and not what.casefold().endswith('station')) \
                 or not (named or near or 'match' in hit):
             continue
-        designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
-        places = {word.group().casefold() for word in PLACE.finditer(what)}
-        # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
-        placed = bool(places) and not ends
-        # A station or a school is a building when it has an architect; a town of one style is still a town.
-        if placed and designed and places <= {'station', 'school', 'airport'}:
-            placed = False
-        # An archaeological site, whatever it once was, unless people still live there.
-        dug = 'Q839954' in _item_ids(entity, 'P31') and not _lived_in(entity)
+        made = _made(what, entity)
         score = 1 + len(entity.get('sitelinks', {}))
         score *= 8 if named else 1 if near else .05
         score *= 2 if hit.get('article') else 1
-        score *= (4 if dug else .02 if placed else 4 if designed or STRUCTURE.search(what) else 1 if what else .5)
+        score *= 4 if made else .02 if made is False else 1 if what else .5
         if best is None or score > best[0]:
             best = score, {**hit, 'description': description}, entity
     if best is None:
         raise LandmarkProblem(f'No building with coordinates found for {name}.')
     return best[1:]
+
+
+KNOWN = 5  # the wikis that write about a structure someone asks for by its bare name
+
+
+def is_structure(name: str) -> bool:
+    """True when a shipped pack or Wikidata knows this exact name as a building, a monument or a ruin."""
+    try:
+        if load_pack(name):
+            return True
+        hit, entity = _choose(name, *_matches(name)[:2])
+    except Exception:  # offline, a busy server, or no such thing: nobody can say it is one
+        return False
+    what, _ = _what(hit, entity)
+    return (_words(name) in _names(hit, entity) and len(entity.get('sitelinks', {})) >= KNOWN
+            and _made(what, entity) is True)
 
 
 def resolve(name: str, job_root: Path) -> dict:
