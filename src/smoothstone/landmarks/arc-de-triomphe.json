@@ -3,12 +3,12 @@
   "overall_plan_m": {"value": [44.82, 22.21], "source": "https://www.monuments-nationaux.fr/var/cmn_inter/storage/original/application/8b8758daa9afa0ce5606f26088e0b928.pdf"},
   "great_arch_width_and_height_m": {"value": [14.62, 29.19], "source": "https://irem.univ-nantes.fr/wp-content/uploads/2022/07/arc-de-triomphe-demarche.pdf"},
   "cross_arch_width_and_height_m": {"value": [8.44, 18.68], "source": "https://irem.univ-nantes.fr/wp-content/uploads/2022/07/arc-de-triomphe-demarche.pdf"},
-  "reference_alignment": {"value": [48.87378, 2.29504, 24.6], "source": "https://www.openstreetmap.org/way/226413508", "guess": "Centered on the map coordinate and rounded the bearing of the long arch passage from the mapped edges."},
+  "reference_alignment": {"value": [48.87378, 2.29504, 114.6], "source": "https://www.openstreetmap.org/way/226413508", "guess": "Centered on the map coordinate; the long front lies along the mapped outline, across the passage under the great arch."},
   "parts": {
     "source": "https://www.openstreetmap.org/way/226413508",
     "origin": [48.87378, 2.29504],
-    "axis": 24.6,
-    "replace": [226413509, 226413510, 226413511, 226413512, 226413513, 226413514, 226413515, 226413516, 226413517, 226413519, 226413520, 226413521, 226413522, 226520145, 226520146],
+    "axis": 114.6,
+    "replace": "all",
     "value": [
       {"kind": "prism", "id": "plinth-foot-of-piers", "rect": [43.95, 21.6], "at": [0, 0], "source": "https://commons.wikimedia.org/wiki/File:Arc_de_Triomphe,_Paris_16_February_2018_001.jpg", "guess": "Shallow projecting course traced against the official overall plan dimensions. Both passages divide this course into four feet.", "from": 0, "to": 1.05},
       {"kind": "prism", "id": "plinth-bevel", "rect": [43.95, 21.6], "at": [0, 0], "source": "https://commons.wikimedia.org/wiki/File:Arc_de_Triomphe,_Paris_16_February_2018_001.jpg", "guess": "Sloped transition to the pier skirting, sized from the base profile in photographs.", "from": 0.97, "to": 1.8, "top_scale": 0.975},
