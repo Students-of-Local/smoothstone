@@ -90,6 +90,23 @@ def _fake(monkeypatch, title, score, conflicts=()):
     return asked
 
 
+def test_an_article_that_leads_with_a_logo_gives_its_first_photo(monkeypatch):
+    """Petronas Towers: the lead image is a logo, and the judge could not answer."""
+    items = [{"title": "File:Logo.svg", "srcset": [{"src": "//up/logo.svg.png"}]}, {"title": "File:Anthem.ogg"},
+             {"title": "File:Twins 2019.JPG", "srcset": [{"src": "//up/small.jpg"}, {"src": "//up/large.jpg"}]}]
+    def get(url, timeout=60):
+        if "media-list/Petronas_Towers" in url:
+            return json.dumps({"items": items}).encode()
+        return json.dumps({"query": {"pages": {"1": {"title": "Petronas Towers",
+                                                     "original": {"source": "https://up/Logo.svg?utm=x"}}}}}).encode()
+
+    monkeypatch.setattr(jl, "_get", get)
+    assert jl.reference("Petronas Towers")["url"] == "https://up/large.jpg"
+    del items[2]
+    with pytest.raises(jl.JudgeProblem, match="no photo"):
+        jl.reference("Petronas Towers")
+
+
 def test_the_reference_comes_from_the_article_the_judge_names_not_the_tools_photos(tmp_path, monkeypatch):
     """For "DHH" the tool styled a protein and every check passed a made up man (judged 3/10)."""
     job = _job(tmp_path)
