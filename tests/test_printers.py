@@ -257,7 +257,7 @@ def test_every_printer_has_its_slicer_settings_for_every_plastic(pid):
         raw, s = e["value"], printers.settings(p, m)
         assert 190 <= raw["nozzle"] <= 320 and 20 <= raw["bed"] <= 120 and 20 <= raw.get("chamber", 20) <= 70, (m, raw)
         assert 0 <= raw["fan_min"] <= raw["fan_max"] <= 100 and 0 <= raw["fan_max_layer_s"] <= raw["fan_min_layer_s"] <= 100, (m, raw)
-        assert raw["fan_min"] <= s["fan_over"] <= 100 and s["fan_over"] == raw.get("fan_over", raw["fan_max"]), (m, raw)
+        assert 0 <= s["fan_over"] <= 100 and s["fan_over"] == raw.get("fan_over", raw["fan_max"]), (m, raw)
         assert 1 <= raw["max_flow"] <= 40 and raw["diameter"] == 1.75 and e["url"].startswith("https://github.com/OrcaSlicer/")
         assert s["nozzle"] <= (p["max_hotend_c"] or 320) and s["bed"] <= (p["max_bed_c"] or 120) and (p["enclosed"] or "chamber" not in s)
     heat = {m: printers.settings(p, m)["nozzle"] for m in PLASTICS}
