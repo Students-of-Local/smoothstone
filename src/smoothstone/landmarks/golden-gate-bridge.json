@@ -4,7 +4,7 @@
   "stiffening_truss_depth_m": {"value": 7.62, "source": "https://www.goldengate.org/assets/1/25/2025-0626-bocomm-no8-seismicpresentation.pdf#page=8"},
   "main_cable_sag_m": {"value": 144, "source": "https://www.goldengate.org/assets/1/6/ggb-exhibit-chapter-statistics1.pdf#page=9"},
   "parts": {
-    "source": "https://api.openstreetmap.org/api/0.6/relation/451971/full.json",
+    "source": "https://www.goldengate.org/assets/1/25/2025-0626-bocomm-no8-seismicpresentation.pdf#page=4",
     "origin": [37.819774, -122.478558],
     "axis": 354.67,
     "replace": "all",

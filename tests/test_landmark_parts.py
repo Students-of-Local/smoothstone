@@ -266,8 +266,9 @@ def test_an_openings_source_and_guess_are_kept_and_the_map_is_not_credited(build
     assert any("a door" in note for note in refs["modeling_additions"])
     fact = {**_pack(BLOCK, replace="all"), "axis_note": {"value": 4, "unit": "degrees", "source": "https://www.openstreetmap.org/way/7"}}
     build(fact)  # a fact about which way it faces draws nothing
-    credits = (tmp_path / "job/model/credits.txt").read_text()
-    assert "ODbL" not in credits
+    assert "ODbL" not in (tmp_path / "job/model/credits.txt").read_text()
+    build(_pack(BLOCK, replace="all", plinth={"rect": [40, 60], "source": "https://www.openstreetmap.org/way/7"}))
+    assert "ODbL" in (tmp_path / "job/model/credits.txt").read_text()  # its base is traced from the map
 
 
 def test_an_opening_lets_light_through_and_cuts_the_maps_walls(build):
@@ -421,8 +422,9 @@ def test_a_plinths_guess_is_noted_and_its_source_kept(build):
 def test_an_opening_another_part_covers_is_left_out_and_not_sealed_in():
     wall = m3.Manifold.cube([20, 20, 20]).translate([-10, -10, 0])
     window = {"kind": "opening", "width": 2, "depth": 2, "from": 8, "to": 11}
-    shaft = {"kind": "opening", "at": [0, -5], "width": 1, "depth": 12, "from": 9, "to": 10}
-    for parts, sealed in (([window], True), ([window, shaft], False)):
+    shaft = {"kind": "opening", "at": [0, -5.5], "width": 1, "depth": 12, "from": 9, "to": 10}
+    inner = {"kind": "opening", "at": [0, 1.7], "width": 2, "depth": 2, "from": 8, "to": 11}
+    for parts, sealed in (([window], True), ([window, shaft], False), ([inner, window, shaft], False)):
         notes = []
         out = landmark_parts.cut(wall, landmark_parts.read(_pack(BLOCK, *parts), REFS)[2], 1., notes)
         assert len(out.decompose()) == 1 and out.genus() == 0
@@ -451,8 +453,8 @@ def test_a_shipped_pack_s_parts_make_one_body_at_a_small_print(path):
     tall = max(r["height"]["metres"] for r in records)
     wide = max(abs(v) for r in records for ring in r["footprint"] for point in ring for v in point)
     scale = 150 / max(tall, 2 * wide)
-    solid = m3.Manifold.batch_boolean([s for r in records for s in r["_build"](scale, [])], m3.OpType.Add)
-    base = (solid.project() if ground is None else ground.scale([scale, scale])).extrude(2).translate([0, 0, -1.98])
+    solid = m3.Manifold.batch_boolean([s for r in records for s in r["_build"](scale, [])], m3.OpType.Add).translate([0, 0, 2])
+    base = (solid.project() if ground is None else ground.scale([scale, scale])).extrude(2.02)  # as generate() stacks them
     notes = []
     whole = landmark_parts.cut(solid + base, openings, scale, notes)
     assert sum(d.volume() > 1e-3 for d in whole.decompose()) == 1  # less is a sliver of the join

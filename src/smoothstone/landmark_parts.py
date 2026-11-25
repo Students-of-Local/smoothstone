@@ -406,11 +406,10 @@ def cut(man, openings, scale, notes):
                 buried.append((solid, width))
                 continue
         man = man - solid
-    for solid, width in buried:  # another opening may have reached it
-        if (solid - man).volume() < 1e-6 * solid.volume():
-            notes.append(f"Left out an opening {width:g} m wide that another part covers.")
-        else:
-            man = man - solid
+    while open_ := [b for b in buried if (b[0] - man).volume() >= 1e-6 * b[0].volume()]:  # another opening reached it
+        for b in open_:
+            man, buried = man - b[0], [c for c in buried if c is not b]
+    notes.extend(f"Left out an opening {width:g} m wide that another part covers." for _, width in buried)
     return man
 
 

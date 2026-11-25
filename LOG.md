@@ -1269,7 +1269,7 @@ meet only at a corner or across a hairline gap get a real join; the base is wide
 
 ### 2026-11-25: openings another part covers, and four packs fixed
 
-The second review of those packs found 14 windows of Himeji's and 2 pockets of Golden Gate's that were sealed inside
+The second review of those packs found 14 windows of Himeji's (15 came out) and 2 pockets of Golden Gate's that were sealed inside
 another part or cut the tower legs, and that no test cut the openings. A sealed one is now left out and named in the
 notes, and the shipped-pack test cuts every opening and refuses a pack that has one. Golden Gate's shafts and struts keep
 their own width (`least`), and its cables end at the saddle's published height. The credits name OpenStreetMap only where

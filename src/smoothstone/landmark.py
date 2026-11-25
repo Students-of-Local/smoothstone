@@ -844,8 +844,10 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     save()
     urls = {refs["source"], refs["geometry_source"], *refs["sources"].values(),
             *refs["feature_sources"], *(p["source"] for p in records)}
-    drawn_from = {refs["geometry_source"], *(p["source"] for p in records), *(source for _, _, source, _ in openings)}
-    osm = replace != "all" or any(re.match(r"https?://([a-z.]+\.)?openstreetmap\.org/", url or "") for url in drawn_from)
+    drawn_from = [refs["geometry_source"], *(p["source"] for p in records), *(source for _, _, source, _ in openings)]
+    if ground is not None:
+        drawn_from.append(pack["parts"]["plinth"].get("source", pack["parts"]["source"]))
+    osm = replace != "all" or any("openstreetmap.org/" in (url or "") for url in drawn_from)
     credits = ("© OpenStreetMap contributors. Building geometry: ODbL 1.0, https://www.openstreetmap.org/copyright\n" if osm
                else "Geometry drawn from the sources below.\n")
     credits += "\n".join(sorted(url for url in urls if url)) + "\n"
