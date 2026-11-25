@@ -327,6 +327,9 @@ def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_pat
     ("Arc de", "Arc de Exemple", "triumphal arch in Paris", {}, 90, False),  # not its name
     ("Exemple", "Exemple", "town in Kent", {}, 90, False),
     ("Exemple", "Exemple", "summit in Nepal", {}, 90, False),  # nothing says it is built
+    ("Mount Exemple", "Mount Exemple", "mountain in South Dakota", {}, 40, True),  # a part's word, and a famous place
+    ("Mount Exemple", "Mount Exemple", "mountain in South Dakota", {}, 39, False),
+    ("Mount Exemple", "Mount", "mountain in South Dakota", {}, 90, False),
     ("Exemple", "Exemple", "summit in Nepal", {"P84": [{"mainsnak": {"datavalue": {"value": {"id": "Q9"}}}}]}, 5, True),
     ("Exemple", "Exemple", "ancient city in Jordan",
      {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q839954"}}}}]}, 5, True),

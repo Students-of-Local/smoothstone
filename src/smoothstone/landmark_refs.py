@@ -184,6 +184,7 @@ def _choose(name, hits, entities):
     return best[1:]
 
 
+FAMOUS = 40  # the wikis that write about a place anyone means by its name, whatever it is
 KNOWN = 5  # the wikis that write about a structure someone asks for by its bare name
 NATURAL = re.compile(r'\bnatural (?!history)|\bgeological (?:feature|formation|structure|site)|\brock formation'
                      r'|\bnational monument|\b(?:ship|submarine|aircraft)$', re.I)
@@ -191,9 +192,9 @@ SCULPTURE = re.compile(r'\b(?:statue|sculpture|bust)$', re.I)
 
 
 def is_structure(name: str) -> bool:
-    """True when a shipped pack or Wikidata knows this exact name best as a building, a monument or a ruin that stands."""
+    """True when a shipped pack or Wikidata knows this exact name best as a building, a monument, a ruin that stands or a famous place."""
     cache = Path.home() / '.cache' / 'smoothstone' / 'structure' / (
-        hashlib.sha256(f'1 {" ".join(_words(name))}'.encode()).hexdigest() + '.json')
+        hashlib.sha256(f'2 {" ".join(_words(name))}'.encode()).hexdigest() + '.json')
     try:
         if load_pack(name):
             return True
@@ -241,7 +242,10 @@ def _known_structure(name, hits, entities):
     listed = any(c.get('rank') != 'deprecated' and 'P582' not in c.get('qualifiers', {})
                  for c in entity.get('claims', {}).get('P1435', []))
     gone = _value(entity, 'P576') and not listed  # an ended place still listed as heritage is a ruin that stands
-    return wikis >= max(KNOWN, best) and not NATURAL.search(what) and not gone and _made(what, entity) is True
+    # Mount Rushmore is a mountain to Wikidata. One word can be a part ("Hook"), and a city of two is no part either.
+    famous = wikis >= FAMOUS and len(_words(name)) > 1
+    built = not NATURAL.search(what) and _made(what, entity) is True
+    return wikis >= max(KNOWN, best) and not gone and (built or famous)
 
 
 def resolve(name: str, job_root: Path) -> dict:

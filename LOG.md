@@ -1368,3 +1368,7 @@ to the lookup and still go to a recipe.
 
 After that change LFM3-1.7B, one attempt at f6d4ce3, builds the Empire State Building: every check passes and the judge
 gives 7, the same open mast.
+
+Mount Rushmore is a mountain to Wikidata, so its request went to the under desk mount. A place of two or more words that
+40 or more wikis write about now counts as a known landmark; the job goes on to the open models. "Mont Saint-Michel" is
+still no known name: its item is called "Mount Saint-Michel" and the abbey is another. It needs a pack.
