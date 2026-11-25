@@ -581,10 +581,10 @@ def numbers_line(f) -> str:
         return f"span {n['span_mm']} mm (usable {n.get('usable_mm')} mm) sags {n['sag_mm']} mm"
     if "droop_mm" in n:
         return f"ledge {n.get('ledge_mm')} mm past the layer below droops {n['droop_mm']} mm"
-    if n.get("island"):
+    if "island" in n or "island_mm2" in n:
         return "a piece starts in mid air"
     if "edge_stress_mpa" in n:
-        return f"edge pull at least {n['edge_stress_mpa']} MPa, and nobody has published how hard this plastic holds a plate"
+        return f"edge pull about {n['edge_stress_mpa']} MPa, and nobody has published how hard this plastic holds a plate"
     return ", ".join(f"{k} {v}" for k, v in n.items()) or "no numbers"
 
 
@@ -649,8 +649,8 @@ def cmd(args, job, prof, out):
             n = fails[0].numbers if fails else {}
             if "margin" in n:
                 out.add(f"Plate bond margin {n['margin']} (above 1 holds).")
-            out.result = "no failure predicted"
-            out.next = nxt if nxt and nxt != "stone status" else "none, no failure predicted"
+            out.result = "no other failure predicted, corners not judged" if blind else "no failure predicted"
+            out.next = nxt if nxt and nxt != "stone status" else f"none, {out.result}"
         else:
             out.add(f"Nothing here fails by {mode}, so there is nothing to show. --fail detach shows a loose part anyway.")
             out.result = "nothing to show"

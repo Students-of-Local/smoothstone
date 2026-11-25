@@ -813,6 +813,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     if out:
         for f in out if bond is None else ():  # nothing judges it, so it is given with whatever fails
             f.numbers.setdefault("edge_stress_mpa", round(worst["edge"], 2))
+            f.assumptions += [x for x in warp if x not in f.assumptions]
         return out
     t = worst.get("temps", np.zeros(1))
     return [Failure("none", numbers={"layers": len(inp.masks), "edge_stress_mpa": round(worst["edge"], 2),

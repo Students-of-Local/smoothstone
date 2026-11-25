@@ -619,7 +619,7 @@
    "cite": "assumption",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "A strand stays where it lands on plastic if their mean temperature is above the glass transition; the plastic below is taken at the air's, so one just printed holds better than this says"
+   "assumption": "A strand stays where it lands on plastic if their mean temperature is above where it sets; the plastic below is taken at the air's, so one just printed holds better than this says"
   },
   {
    "id": "failsim.fan_reach",
@@ -786,7 +786,7 @@
    "cite": "Polymaker PolyMide CoPA datasheet",
    "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyMide_CoPA_TDS_V5.4.pdf",
    "checked": "2026-11-24",
-   "assumption": "Nylon is Polymaker's CoPA: it sets where that crystallizes cooling at 10 C a minute, 148 C (faster cooling sets it lower, PA6 sets hotter), and neither gives off heat nor shrinks doing so, so its pull and curl are the least they are"
+   "assumption": "Nylon is Polymaker's CoPA: it sets where that crystallizes cooling at 10 C a minute, 148 C (faster cooling sets it lower, PA6 sets hotter; a strand of it welds only where it meets plastic above that), and neither gives off heat nor shrinks doing so"
   },
   {
    "id": "failsim.tpu.set",
@@ -799,7 +799,7 @@
    "cite": "materials.json tpu.vicat",
    "url": "",
    "checked": "2026-11-24",
-   "assumption": "TPU is a 95A (Prusament's): it sets at its Vicat softening point, 101.6 C, and neither gives off heat nor shrinks doing so, so its pull and curl are the least they are"
+   "assumption": "TPU is a 95A (Prusament's): it sets at its Vicat softening point, 101.6 C, and neither gives off heat nor shrinks doing so"
   },
   {
    "id": "failsim.mat.tpu.tg",
