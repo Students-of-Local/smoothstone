@@ -516,9 +516,16 @@ def _closed(man, raw, notes):
     try:
         return clean.for_slicer(welded)
     except ValueError:
-        mesh = clean.for_slicer(welded, .03)
-        notes.append("Collapsed edges under 0.03 mm, far below a nozzle's line, to close the mesh.")
-        return mesh
+        pass
+    for least in (.03, .05):
+        try:
+            mesh = clean.for_slicer(welded, least)
+            break
+        except ValueError:
+            if least == .05:
+                raise
+    notes.append(f"Collapsed edges under {least} mm, far below a nozzle's line, to close the mesh.")
+    return mesh
 
 
 def _anchor(man, notes):

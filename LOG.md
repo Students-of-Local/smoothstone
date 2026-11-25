@@ -1382,3 +1382,6 @@ there is none, `stone landmark --plain` builds the plain shape and says so. Rial
 landmarks' saved references the two floors refuse only two old wrong readings (White House, Sagrada Familia).
 The Brooklyn Bridge stopped at "HTTP Error 400": the map API refuses an area with over 50,000 nodes, and is now asked for a
 smaller one. The bridge is refused all the same, since the map has no area for it.
+
+The Lotus Temple at 18 cm tall failed on one sliver that 0.03 mm did not collapse. Edges under 0.05 mm are now collapsed
+when nothing finer closes the mesh. A nozzle's line is 0.4 mm.
