@@ -12,7 +12,8 @@ physics model, not a recording. It does not print.
 - Run: stone timelapse --fail (the built part) or stone timelapse <file.stl> --fail.
   That is auto: it shows the first failure the model predicts for this print.
 - "No failure predicted; nothing to show." means the model says it prints. Tell them that. Make a
-  video only if they still want one: --fail detach shows a loose part anyway.
+  video only if they still want one: --fail detach shows a loose part anyway. "No other failure": it
+  says so of everything but its corners (below).
 - To see it without supports: add --supports off. --fail supports, droop and bridge draw the part
   without supports by themselves (not with --gcode).
 - Named modes, only when asked: --fail supports, --fail detach, --fail droop, --fail bridge.
@@ -23,7 +24,8 @@ physics model, not a recording. It does not print.
   PLA-CF or PETG-CF). "No numbers for HIPS, so this is PLA's": tell them the video is
   that plastic's (the line names it), not theirs.
 - "A corner lifting is not judged" (PC, nylon, TPU): nobody has published how hard these hold a plate.
-  Say the model cannot tell whether a corner lifts; it can still show one, with --fail detach.
+  Say the model cannot tell whether a corner lifts. --fail detach still shows one; its what-if then does
+  not mean the part holds.
 - --plate dirty: a plate that needs cleaning (holds about 5% as well). Use it when they ask about
   a dirty plate or a part that came loose.
 - Always tell the person:

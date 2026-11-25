@@ -9,6 +9,7 @@ import pytest
 import trimesh
 
 from smoothstone import failsim as fs
+from smoothstone import strand as st
 
 
 def _rect(shape, r0, r1, c0, c1):
@@ -432,7 +433,14 @@ def test_nylon_and_tpu_set_where_they_turn_solid_not_at_the_glass_transition():
         n = fs.material(m)
         assert fs.viscosity(200, 0, m) / fs.viscosity(240, 0, m) == pytest.approx(math.exp(joules / 8.314 * (1 / 473.15 - 1 / 513.15)))
         assert fs.viscosity(n.set - 1, 0, m) == math.inf > fs.viscosity(n.set, 0, m)
+        assert math.isfinite(st.set_time(n)) and (m == "TPU" or st.set_time(n) < 0.7 * st.set_time(glass))
+        assert fs.layer_stress(n, n.set) == 0 < fs.layer_stress(n, n.set - 5)
     assert tpu.e * tpu.ratio(101.6) == pytest.approx(10 * 0.75 / (2 * math.sqrt(1 / math.pi)) / 1, rel=0.01)  # Vicat's 10 N on 1 mm2, 1 mm deep
+    over = dict(ground=lambda x, y: 0 * x, plastic=lambda x, y: np.ones(np.shape(x), bool), fan=False)
+    warm = [st.Strand([[x, 0, 0.22] for x in range(6)], 0.4, pa, temp=t, air=25, **over) for t in (240, 290)]
+    for s in warm:
+        s.step()
+    assert [bool(s.fixed.any()) for s in warm] == [False, True]  # it meets the plastic at 132, over its glass transition and under where it sets, and at 157
     t = (148 + pa.nozzle) / 2 + 273.15
     assert pa.cp == pytest.approx((0.1526 * t + 223.95) / 113.16 * 1000)
 
@@ -452,7 +460,7 @@ def test_a_plastic_nobody_has_peeled_gets_no_verdict_on_its_corners():
     ("ABS+", "ABS"), ("ASA", "ASA"), ("ASA+", "ASA"), ("PLA Silk Bronze", "PLA"), ("PLA Carbon Black", "PLA"),
     ("PLA-CF", "PLA-CF"), ("Carbon Fiber PLA", "PLA-CF"), ("PLA Carbonfiber", "PLA-CF"), ("PLA+CF", "PLA-CF"), ("PETG-CF10", "PETG-CF"), ("PETG-rCF08", "PETG-CF"),
     ("ASA-CF", None), ("PET", None), ("PLA/PHA", None), ("PC+ABS", None), ("Fiberglass PETG", None), ("PLA Bronzefill", None), ("Magnetic Iron PLA", None),
-    ("PC Blend", "PC"), ("nylon", "PA"), ("PA6", "PA"), ("PA 12", "PA"), ("CoPA", "PA"), ("TPU 95A", "TPU"), ("TPU95A", "TPU"),
+    ("PC Blend", None), ("nylon", "PA"), ("PA6", "PA"), ("PA 12", "PA"), ("CoPA", "PA"), ("TPU 95A", "TPU"), ("TPU95A", "TPU"),
     ("HIPS", None), ("PVA", None), ("PP", None), ("PA-CF", None), ("PET-CF", None), ("PC-ABS", None), ("ABS-GF", None), ("PLA-AERO", None),
     ("LW-PLA", None), ("wood", None), ("", None), (None, None)])
 def test_a_plastic_by_the_name_people_give_it(text, plastic):

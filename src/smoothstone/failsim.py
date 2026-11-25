@@ -97,7 +97,7 @@ def _props(m: str) -> tuple[dict, str]:
 PLASTICS = (("PLA", r"(HT|E)?PLA"), ("PETG", r"PETG|PCTG"), ("ABS", r"ABS"), ("ASA", r"ASA"), ("PC", r"PC|POLYCARBONATE"),
             ("PA", r"PA(6|11|12|66|612)?|COPA|NYLON"), ("TPU", r"TPU(\d\dA)?"))
 OTHER = re.compile(r"[GK]F\d*|\w*GLASS\w*|KEVLAR|ARAMID|AERO|LW|\w*FOAM\w*|WOOD\w*|METAL\w*|IRON|MAGNETIC|\w*FILL(ED)?|SUPPORT|PET|PHA|PBAT|PBT|PP|PVA|"
-                   r"PVB|PTFE|PMMA|TPE|HIPS")
+                   r"PVB|PTFE|PMMA|TPE|HIPS|BLEND|ALLOY")
 
 
 def named(text: str) -> str | None:
@@ -132,7 +132,7 @@ def material(name: str = "PLA") -> Material:
     k2 = f"k2.{m.lower()}"
     heat = fact(k2) if "failsim." + k2 in facts() else printers.settings(printers.get("creality_k2"), m)
     solid, cp = _own(m, "set") or tg, fact("pla.cp")
-    k = _own(m, "k") or p.get("k", {}).get("value")
+    k = _own(m, "k")
     if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg
         tab = np.asarray(fact("abs.cp_k"), float)
         cp = float(np.interp(np.linspace(tg, heat["nozzle"], 50), tab[:, 0], tab[:, 2]).mean())
@@ -142,17 +142,20 @@ def material(name: str = "PLA") -> Material:
         cp = (q["per_K"] * ((solid + heat["nozzle"]) / 2 + 273.15) + q["at_0K"]) / q["g_mol"] * 1000
     elif m == "TPU":
         cp, k = fact("tpu.cp_k")
-    elif "cp" in p:
-        cp = p["cp"]["value"] * 1000
+    elif m == "PC":
+        cp = fact("pc.cp")
+    k = k or p["k"]["value"]
     stand = [note("mfi_rig"), *([note("like")] if base != m else [])]
-    stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith((f"failsim.{base.lower()}.", f"failsim.{m.lower()}.", f"failsim.mat.{m.lower()}."))]
+    stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith((f"failsim.{base.lower()}.", f"failsim.{m.lower()}."))]
     if "chamber" not in heat:
         stand.append(note("k2_air"))
     if base == "PETG":
-        stand.append("PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity")
+        stand.append("PETG uses PLA's specific heat (no sourced value for the melt)")
+    if base not in ("PLA", "ABS"):
+        stand.append(f"{base} radiates as ABS and PLA do (failsim.emissivity)")
     stand += [note(no) for no, key in (("no_peel", f"failsim.peel.{base.lower()}"), ("no_angle", f"failsim.{base.lower()}.contact_angle")) if key not in facts()]
-    stand += [f"{p[key]['assumption']} (materials.json {p[key]['id']})" for key in ("cte", "modulus_vs_temp")
-              if "assumption" in p[key] and not p[key]["id"].startswith("failsim.")]
+    stand += [f"{p[key]['assumption']} ({'' if p[key]['id'].startswith('failsim.') else 'materials.json '}{p[key]['id']})" for key in ("cte", "modulus_vs_temp")
+              if "assumption" in p[key]]
     return Material(m, p["density"]["value"], tg, p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
                     tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()) if base in fact("peel_bed") else None,
                     fact("peel_bed").get(base), solid, heat["bed"], heat.get("chamber", fact("k2_air")), heat["nozzle"], tuple(dict.fromkeys(stand)), src)
@@ -701,7 +704,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
         base.append(note("contamination"))
     if not inp.enclosed:
         base.append(note("room_air"))
-    warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), note("bond_rule"),
+    warp = [note("warp_rule"), note("saint_venant"), note("column_rule"), note("section_rule"), *([] if m.peel is None else [note("bond_rule")]),
             note("h_part") if fact("h_part") * math.sqrt(inp.fan) > fact("h_still") else note("h_still")]
 
     def xy(r, c):
@@ -808,6 +811,8 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
             break  # everything after prints onto a loose part
     out = sorted(found.values(), key=lambda f: (f.layer, KINDS.index(f.kind)))
     if out:
+        for f in out if bond is None else ():  # nothing judges it, so it is given with whatever fails
+            f.numbers.setdefault("edge_stress_mpa", round(worst["edge"], 2))
         return out
     t = worst.get("temps", np.zeros(1))
     return [Failure("none", numbers={"layers": len(inp.masks), "edge_stress_mpa": round(worst["edge"], 2),

@@ -228,7 +228,8 @@ def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
     text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "wood"])
     assert code == 1 and "--material wood: the model has no numbers for it; it has PLA, PETG, ABS" in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "--material", "nylon"])
-    assert "Material: PA, for NYLON." in text and "A corner lifting is not judged: edge pull" in text, text
+    assert "Material: PA, for NYLON." in text and "A corner lifting is not judged: edge pull at least" in text, text
+    assert "No other failure predicted" in text and "Nylon is Polymaker's CoPA" in text, text
     text, code = cli.run(["timelapse", str(stl), "--fail", "melt"])
     assert code == 1 and "FIX: --fail melt: one of auto" in text, text
     assert text.strip().splitlines()[-1] == f"NEXT: stone timelapse {stl} --fail auto", text
@@ -248,6 +249,11 @@ def test_without_blender_the_prediction_still_comes_out(jobenv, tmp_path, monkey
     text, code = cli.run(["timelapse", str(stl), "--fail", "supports"])  # this print has supports: not predicted
     assert "What-if (drawn without supports, which this print has): supports at layer 21" in text and "Predicted" not in text, text
     assert "the what-if is above" in text.strip().splitlines()[-1], text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "--supports", "off", "--material", "PC"])  # said whatever else fails
+    assert "A corner lifting is not judged: edge pull at least" in text and "droops" in text, text
+    text, code = cli.run(["timelapse", str(stl), "--fail", "detach", "--material", "PC"])
+    assert "What-if (you asked for it, the model cannot judge a corner lifting for this plastic): detach" in text, text
+    assert "Why: edge pull at least" in text and f"Main assumption: {failsim.note('no_peel')}" in text, text
 
 
 def test_the_video_says_what_it_does_not_simulate(jobenv, tmp_path, monkeypatch):
