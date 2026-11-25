@@ -30,6 +30,7 @@ CREEP = 1e-4  # m/s: slower than this, friction holds
 HEAP = 30.0  # mm of a set heap that follow each mm its end is pulled: folds 20 mm wide, stepped whole; loops 10 mm wide follow at once
 DT = 1 / 240  # s
 TURN = 0.25  # of an edge's length its ends may move against each other in one step
+FLAT = 0.1  # of the drop its plastic makes: an edge squashed shorter than this is part of the next one
 SPIN = 1e-3  # m, where an edge's spin is solved as a speed
 
 
@@ -410,6 +411,7 @@ class Strand:
                 self.fixed[np.flatnonzero(on)[np.asarray(self.plastic(at[:, 0], at[:, 1]), bool)]] = True
             self.v[self.fixed] = 0
         self._grow()
+        self._merge()
         return True
 
     def _top(self, p):
@@ -475,6 +477,33 @@ class Strand:
         if self.ground is not None:  # the new node of an edge hung over a corner is not inside it
             new = i + np.arange(len(i))
             self.x[new, 2] = np.maximum(self.x[new, 2], self._top(self.x[new]) + np.sqrt(first / math.pi / ln[at] / f))
+
+    def _merge(self):
+        """An edge squashed flat is a drop, not a rod: its plastic goes to the edges beside it, and its two nodes are one."""
+        while len(self.vol) > 1:
+            flat = self.lengths()[1] / np.cbrt(6 * self.vol / math.pi)
+            if self.nozzle:
+                flat[-1] = np.inf  # what comes out makes it longer
+            a = int(np.argmin(flat))
+            if flat[a] >= FLAT:
+                return
+            kept = self.fixed[a] or (a == 0 and self.tail is not None)
+            w = np.array([1.0, 0.0] if kept else [0.0, 1.0] if self.fixed[a + 1] else self._nodes(self.vol)[a:a + 2])
+            w /= w.sum()
+            for q in ("x", "v", "t"):
+                getattr(self, q)[a] = w @ getattr(self, q)[a:a + 2]
+            self.eb[a] = self.eb[a:a + 2].mean(0) if 0 < a < len(self.vol) - 1 else 0.0
+            for q in ("touch", "fixed"):
+                getattr(self, q)[a] |= getattr(self, q)[a + 1]
+            self.press[a] += self.press[a + 1]
+            to = [b for b in (a - 1, a + 1) if 0 <= b < len(self.vol)]
+            more = self.vol[a] / len(to)
+            self.es[to] *= self.vol[to] / (self.vol[to] + more)  # thicker, and pulling as hard
+            self.vol[to] += more
+            for q in ("x", "v", "t", "eb", "press", "touch", "fixed"):
+                setattr(self, q, np.delete(getattr(self, q), a + 1, 0))
+            for q in ("es", "rate", "tens", "vol", "e"):
+                setattr(self, q, np.delete(getattr(self, q), a))
 
     def snap(self) -> list:
         """Where it is drawn thinner than a hair it breaks: the pieces off the nozzle, without the hairs between them.

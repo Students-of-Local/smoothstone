@@ -624,6 +624,38 @@ def test_an_edge_slumped_to_nothing_is_a_drop():
     assert s.snap()
 
 
+@pytest.mark.parametrize("where,welded", [(0, False), (2, False), (4, False), (2, True)])
+def test_an_edge_squashed_flat_is_part_of_the_next(where, welded):
+    s = rod(6, d=0.45, n=6, temp=200, air=25, nozzle=where != 4)
+    vol = s.vol.sum()
+    s.x[where] = s.x[where + 1] - [1e-9, 0, 0]
+    s.fixed[[2, 3]] = welded
+    s._merge()
+    assert len(s.x) == len(s.t) == len(s.eb) == len(s.fixed) == 5 and len(s.vol) == len(s.es) == len(s.tens) == 4
+    assert s.vol.sum() == pytest.approx(vol, rel=1e-12) and not s.eb[[0, -1]].any()
+    for _ in range(20):  # it was a matrix with no digits left
+        s.step(head=(6, 0, 30) if s.nozzle else None)
+    assert np.isfinite(s.v).all() and np.abs(s.v).max() < 5
+
+
+def test_the_edge_at_the_nozzle_is_not_squashed_but_new():
+    s = rod(6, d=0.45, n=6, temp=200, air=25, nozzle=True)
+    s.x[4] = s.x[5] - [1e-5, 0, 0]
+    s._merge()
+    assert len(s.x) == 6
+
+
+def test_a_squashed_edge_takes_the_pull_and_the_weld_with_it():
+    s = rod(6, d=0.45, n=6, temp=200, air=25)
+    s.x[2] = s.x[3] - [1e-9, 0, 0]
+    s.fixed[3], s.t[3] = True, 190.0
+    s.v[2], s.es[:] = [0.1, 0, 0], 1e-3
+    pull, place = s.es[1] * s.vol[1], s.x[3].copy()
+    s._merge()
+    assert s.fixed.tolist() == [False, False, True, False, False] and (s.x[2] == place).all() and not s.v[2].any() and s.t[2] == 190
+    assert s.vol[1] == pytest.approx(1.5 * s.vol[0], rel=1e-9) and s.es[1] * s.vol[1] == pytest.approx(pull, rel=1e-12)
+
+
 def test_a_cold_strand_torn_back_and_forth_gives_instead_of_flying():
     """It froze with its stress, not its strain, so stiffening adds no energy, and it gives past its strength."""
     s = laid(True)
