@@ -159,7 +159,7 @@
         "from": 14,
         "to": 28.4,
         "arch": true,
-        "copies": {"row": [0, 7.5], "count": 6},
+        "copies": {"row": [0, 7.5], "count": 4},
         "source": "https://sagradafamilia.org/documents/20142/1693659/SF_Booklet_06_20260227_digital_AF.pdf/df0f7f01-0ebc-3bae-02a2-2e591e41a2ed",
         "guess": "Repeating high windows are reduced to one deep readable arch per bay. Their sizes, spring heights and 7.5 m spacing follow the gable rhythm."
       },
@@ -173,7 +173,7 @@
         "from": 4.2,
         "to": 12.5,
         "arch": true,
-        "copies": {"row": [0, 7.5], "count": 6},
+        "copies": {"row": [0, 7.5], "count": 4},
         "source": "https://sagradafamilia.org/documents/20142/1693656/SF_Cuaderno_09_20260227_digital_AF.pdf/87ebe48d-de10-a60a-4055-bc0d4029600c",
         "guess": "The lower aisle fenestration is reduced to one window per bay; widths, depth and sill levels are approximate."
       },
@@ -227,7 +227,7 @@
         "from": 14,
         "to": 28.4,
         "arch": true,
-        "copies": {"row": [0, 7.5], "count": 6},
+        "copies": {"row": [0, 7.5], "count": 4},
         "source": "https://sagradafamilia.org/documents/20142/1693659/SF_Booklet_06_20260227_digital_AF.pdf/df0f7f01-0ebc-3bae-02a2-2e591e41a2ed",
         "guess": "Repeating high windows are reduced to one deep readable arch per bay. Their sizes, spring heights and 7.5 m spacing follow the gable rhythm."
       },
@@ -241,7 +241,7 @@
         "from": 4.2,
         "to": 12.5,
         "arch": true,
-        "copies": {"row": [0, 7.5], "count": 6},
+        "copies": {"row": [0, 7.5], "count": 4},
         "source": "https://sagradafamilia.org/documents/20142/1693656/SF_Cuaderno_09_20260227_digital_AF.pdf/87ebe48d-de10-a60a-4055-bc0d4029600c",
         "guess": "The lower aisle fenestration is reduced to one window per bay; widths, depth and sill levels are approximate."
       },

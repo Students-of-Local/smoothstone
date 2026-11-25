@@ -1277,3 +1277,19 @@ a shape was drawn from it. One attempt each at bfc50f9, judged: l11 8, l15 9, l1
 7, 8, 9, 9). LFM3-1.7B, card S, l11, one attempt
 on the same commit: 7, fail, on the portals. Two judges on the same shape gave 8 and 7, so l11 stays open at the line:
 at 180 mm its tower legs are 1 mm wide and the gap between them is 1.4 mm.
+
+### 2026-11-25: Tower Bridge, the Sagrada Familia, the White House and the US Capitol
+
+Four packs of reference parts by GPT-6.2 Sol, with grading specs l17 to l20, all redrawn (`"replace": "all"`). I
+corrected three before any judge ran: the White House and Sagrada no longer name map ids a mapper can delete, the White
+House's south stairs run out to where HABS sheet 8 ends them, and Tower Bridge's slab ends at its abutments. One attempt
+each at 2f710fb, judged: l17 9, l18 9, l19 8, l20 8, every check passing. LFM3-1.7B, card S, one attempt each on the same
+commit, judged: 9, 9, 8, 8, pass.
+
+After those runs the 8 Sagrada aisle recesses that lay wholly inside the transepts were taken out. They were sealed
+voids, so nothing on the outside changed, and it was not judged again.
+
+Not from a source: the Capitol's 4 m drop to the west terrace is the pack's guess; the White House chimneys (22.27 m) and
+its depth to the stairs (51.7 m) are scaled from HABS's west elevation; Tower Bridge's 71.99 m is 63 m above the road plus
+the 29 ft 6 in of headway under it. The judges' notes stay open: White House windows and attic too faint, the Capitol's
+drum short, Sagrada's nave windows plain.
