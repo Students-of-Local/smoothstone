@@ -1,0 +1,31 @@
+{
+  "id": "l16_arc_de_triomphe",
+  "request": "A 3D print of the Arc de Triomphe, 16 cm tall please.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Arc de Triomphe",
+      "size": {
+        "mode": "z",
+        "mm": 160
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 49.54,
+        "source": "https://www.monuments-nationaux.fr/var/cmn_inter/storage/original/application/8b8758daa9afa0ce5606f26088e0b928.pdf",
+        "why": "The monument's height"
+      },
+      "dimensions": {
+        "length": 44.82,
+        "width": 22.21,
+        "source": "https://www.monuments-nationaux.fr/var/cmn_inter/storage/original/application/8b8758daa9afa0ce5606f26088e0b928.pdf",
+        "why": "The overall plan in the monument's own dossier"
+      }
+    }
+  },
+  "why": "Two vaults that cross with daylight through both, the sculpture groups and the attic: the map's parts are stacked boxes."
+}

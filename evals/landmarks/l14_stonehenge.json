@@ -1,0 +1,31 @@
+{
+  "id": "l14_stonehenge",
+  "request": "Model Stonehenge for my 3D printer, 16 cm across.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Stonehenge",
+      "size": {
+        "mode": "long",
+        "mm": 160
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 6.7,
+        "source": "https://en.wikipedia.org/wiki/Stonehenge",
+        "why": "The great trilithon's standing stone, above ground"
+      },
+      "dimensions": {
+        "length": 42,
+        "width": 42,
+        "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg",
+        "why": "The 30 m sarsen ring and its furthest fallen stone, 19.6 m out, on a round of turf; the turf's margin is the pack's choice."
+      }
+    }
+  },
+  "why": "A map has no stones: each comes from the numbered plan. The first pack spent the print on the 110 m earthwork, and a stone was 5 mm tall."
+}

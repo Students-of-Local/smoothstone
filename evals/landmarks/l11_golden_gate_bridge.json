@@ -1,0 +1,31 @@
+{
+  "id": "l11_golden_gate_bridge",
+  "request": "Make me a 3D printable Golden Gate Bridge, about 18 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Golden Gate Bridge",
+      "size": {
+        "mode": "long",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 227.4,
+        "source": "https://www.goldengate.org/bridge/history-research/statistics-data/design-construction-stats/",
+        "why": "The towers' height above the water"
+      },
+      "dimensions": {
+        "length": 2010,
+        "width": 246,
+        "source": "https://www.goldengate.org/bridge/history-research/statistics-data/design-construction-stats/",
+        "why": "The 1,966 m suspended structure with 22 m of water past each end; the 246 m of water across is the pack's choice, so this holds the print to the pack and not to the bridge."
+      }
+    }
+  },
+  "why": "A map holds a suspension bridge as a flat deck: the towers, cables, hangers and truss have to come from the engineering figures in its reference pack."
+}

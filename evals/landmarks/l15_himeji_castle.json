@@ -1,0 +1,31 @@
+{
+  "id": "l15_himeji_castle",
+  "request": "I want to print Himeji Castle, the main keep and the small ones, 16 cm on its longest side.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Himeji Castle",
+      "size": {
+        "mode": "max",
+        "mm": 160
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 46.35,
+        "source": "https://japanheritage.jp/hyogo/heritage/himeji-castle/main-keep",
+        "why": "The 31.5 m keep on its 14.85 m stone base"
+      },
+      "dimensions": {
+        "length": 55.5,
+        "width": 44.2,
+        "source": "https://online.bunka.go.jp/suisensyo/himeji/REFERENCE-3/reference3-1.html",
+        "why": "The four keeps' stone bases as the pack draws them from the conservation plan, so this holds the print to the pack."
+      }
+    }
+  },
+  "why": "Curved gables, five roofs on battered stone and a ring of small keeps: the map's main keep is a box."
+}

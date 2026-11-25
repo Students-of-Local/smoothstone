@@ -1232,3 +1232,37 @@ Then built once each from the plain request, as a small model would (l12, l13): 
 A grading spec may now cite a plan's dimensions (`dimensions`, with a source and why) where the map has no outline, or
 not the one that prints: Pisa's axis moves 3.9 m in its height, and its sixth gallery sets the length. The bridge Sol wrote first scored 6 (hangers as fat as
 the tower legs, a bar for a base), so it waits for a redo on the finer parts.
+
+### 2026-11-24: Golden Gate Bridge, Stonehenge, Himeji Castle and the Arc de Triomphe
+
+Four packs of reference parts by GPT-6.2 Sol, with grading specs l11 and l14 to l16. Every attempt, in order, one judge
+each on what the plain command builds:
+
+| spec | attempts (pack commit: result) |
+| --- | --- |
+| l11 Golden Gate | 94bb6a2: likeness 7, fail. 2428759, slimmer legs and a hanger every 100 ft: 7, fail |
+| l14 Stonehenge | 94bb6a2: 9, pass |
+| l15 Himeji | 94bb6a2: build refused, its map id was the outline. 6f3fa96, every part redrawn: 8, pass |
+| l16 Arc | 94bb6a2: likeness 9, fail on width (sculpture past the published 22.21 m). 4908e8b: build refused, axis 90 degrees off. dc120bf: 9, pass |
+
+l11 stays open: at 180 mm true scale its towers are 2.5 mm wide. Stonehenge's 6.7 m is the great trilithon's standing
+stone above ground (Wikipedia). Its turf margin is the pack's choice.
+
+LFM3-1.7B, card S, one attempt each, judged: l11 7, fail (4908e8b, the pack before the variant). l12, l13, l14 and l15:
+9, 9, 9, 9, pass. l16 fail: the request went to the figure recipe, which "a landmark's name is enough" fixes. The packs
+changed under that run: l12 ran on 2428759, l13 to l16 on dc120bf.
+One rerun each on the final code (514914b): l11 7, fail; l16 9, pass.
+
+Of 40 landmarks never built before, 35 now build (30 before). Not built: the Statue of Liberty and Windsor Castle, and
+the Golden Gate, Himeji and Stonehenge, which these packs cover.
+
+### 2026-11-24: a card for landmarks
+
+`skill/landmarks.md` says how a large model writes the shapes a map lacks, and what makes a landmark read as itself at
+print size, from the three packs judged above. A refused landmark points a tier L model there. Smaller tiers still get
+`stone models` alone.
+
+### 2026-11-24: PR 150's review mediums
+
+A collapsed sliver's edge is no longer welded, and no bar goes below the bed; bodies that
+meet only at a corner or across a hairline gap get a real join; the base is widened after the style's detail is added.
