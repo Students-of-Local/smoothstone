@@ -15,10 +15,11 @@ MAX_PARTS = 400
 THIN = 1.2  # mm, the narrowest body a print holds
 LEAST = .8  # mm, the narrowest a part held at both ends may ask for
 CUT = .6  # mm, the narrowest gap
-ROOFS = ("flat", "pyramidal", "gabled", "hipped", "dome", "onion", "round", "skillion")
+ROOFS = ("flat", "pyramidal", "gabled", "hipped", "dome", "onion", "round", "skillion", "half-hipped", "gambrel", "mansard")
+RIDGED = ("gabled", "hipped", "round", "half-hipped", "gambrel", "mansard")
 PLANS = ("rect", "circle", "ngon", "ring")
 ANY = ("kind", "id", "source", "guess", "copies")
-FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "top_scale", "top_shift", "least"),
+FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "ridge", "top_scale", "top_shift", "least"),
           "lathe": ("at", "profile", "least"), "beam": ("path", "size", "round", "least"),
           "opening": ("at", "turn", "width", "depth", "from", "to", "arch")}
 
@@ -85,6 +86,8 @@ def _prism(part):
     _need(roof in ROOFS, "roof must be one of " + ", ".join(ROOFS))
     _need(0 <= rise <= hi - lo, "roof_rise must be from 0 to the part's height")
     _need((roof == "flat") == (rise == 0), "a roof needs roof_rise, and a flat roof has none")
+    _need("ridge" not in part or roof in RIDGED, "ridge needs a roof that has one: " + ", ".join(RIDGED))
+    falls = 0 if roof == "skillion" else _number(part["ridge"], "ridge") + 90 if "ridge" in part else None
     scale = _number(part.get("top_scale", 1), "top_scale", 0)
     shift = _vector(part.get("top_shift", [0, 0]), "top_shift")
     _need(rise == 0 or part.get("least", THIN) == THIN, "a roof keeps its 1.6 mm tip, so a part with one takes no least")
@@ -107,7 +110,7 @@ def _prism(part):
         if rise:
             over = min(.02, rise / 4)
             mm = THIN / floor if floor else 1.  # roofs are lofted in print millimetres
-            loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {"roof:direction": "0"} if roof == "skillion" else {}},
+            loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {} if falls is None else {"roof:direction": str(falls)}},
                          (eave - over) * mm, (rise + over) * mm, notes)
             solids.append(loft.scale([1 / mm] * 3))
         return solids
