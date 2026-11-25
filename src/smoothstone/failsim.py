@@ -693,7 +693,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     fr, fc = np.nonzero(foot)
     px, py = inp.origin[0] + (fc + 0.5) * cell, inp.origin[1] + (fr + 0.5) * cell
     area = foot.sum() * cell * cell
-    grip = area + (0 if inp.brim is None else inp.brim.sum() * cell * cell)
+    grip = area if inp.brim is None else (foot | inp.brim).sum() * cell * cell
     pull, shear = fact("adhesion.pulloff") * inp.clean, fact("adhesion.shear") * inp.clean
     lever = []  # per direction: the far edge, and the sum of each footprint mm2's distance to it
     narrow = math.inf  # the footprint's narrowest width: the layers within it of the plate load it

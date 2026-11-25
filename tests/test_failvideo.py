@@ -395,23 +395,36 @@ def test_a_skirt_is_not_the_part_and_stays_when_it_goes():
     fail, _ = failvideo.choose(failsim.predict(inp), "detach", inp)
     st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
     assert not (st.ext & skirt).any() and st.ext.any()
+    st.loose(30.0)
+    st.moved()
+    at = tp.p1[skirt & (tp.layer == 0), :3]
+    assert (st.field[st.px(at)] >= at[:, 2] - 1e-6).all()  # still there, for strands to land on
+    ring, part = (x["mesh"][0] for x in st.items(st.L, 0.0, None)[::-1])
+    assert np.ptp(ring[:, 0]) == pytest.approx(31.8, abs=0.5) and abs(ring[:, 0].mean() - at[:, 0].mean()) < 0.5
+    tp.feature[(tp.layer > 0) & (tp.feature == timelapse.gcode.FEATURES.index("outer wall"))] = timelapse.gcode.FEATURES.index("support")
+    again = failvideo.inputs(tp, "PLA", enclosed=False)  # supports carry the part, and go with it
+    assert (again.masks[3] == inp.masks[3]).all() and again.supports
 
 
 def test_a_brim_holds_against_sliding_and_goes_with_the_part():
     tp = _toolpath(_box((20, 20, 2), (0, 0, 0)))
     F = timelapse.gcode.FEATURES
     bare = failvideo.inputs(tp, "PLA")
-    tp.feature[(tp.layer == 0) & (tp.feature == F.index("outer wall"))] = F.index("skirt")
+    tp.feature[(tp.layer == 0) & np.isin(tp.feature, [F.index("outer wall"), F.index("inner wall")])] = F.index("skirt")
     inp = failvideo.inputs(tp, "PLA")
     total = int(bare.masks[0].sum())
     assert 0 < inp.brim.sum() and abs(int((inp.brim | inp.masks[0]).sum()) - total) < 0.05 * total
     assert inp.masks[0].sum() < total and any("brim" in n for n in inp.notes)
     hold = [failsim.predict(replace(i, drag=1e6, brim=b))[0].numbers["hold_n"] for i, b in ((inp, None), (inp, inp.brim))]
-    grown = inp.brim.sum() * inp.cell ** 2 * failsim.fact("adhesion.shear")
+    grown = (inp.brim & ~inp.masks[0]).sum() * inp.cell ** 2 * failsim.fact("adhesion.shear")
     assert hold[1] - hold[0] == pytest.approx(grown, rel=1e-3)
     fail, _ = failvideo.choose(failsim.predict(inp), "detach", inp)
     st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
     assert (st.ext == (tp.extruding() & (tp.layer >= 0))).all()
+    tip = failsim.Failure("topple", 5, 1.2, 10.0, "toppled", (100, 100), {"direction": [1.0, 0.0]})
+    st = failvideo.Story(tp, inp, tip, (1, 1, 1), (250, 250))
+    for T in st.loose(30.0):  # about the brim's edge: none of it goes through the plate
+        assert (st.part[0] @ T[:3, :3].T + T[:3, 3])[:, 2].min() > -0.3
 
 
 def test_strands_fall_on_the_part_where_it_slid_to():
@@ -426,4 +439,6 @@ def test_strands_fall_on_the_part_where_it_slid_to():
     near = lambda at: st.field[st.px(np.c_[at + np.stack(np.meshgrid(*[np.linspace(-3, 3, 31)] * 2), -1).reshape(-1, 2), np.zeros(961)])]  # noqa: E731
     assert np.linalg.norm(move) > 15
     assert near(mid + move).max() == pytest.approx(top, abs=0.01)
+    rim = st.field[st.px(np.c_[mid[0] + move[0] + np.linspace(-9.8, 9.8, 99), np.full(99, mid[1] + move[1] - 9.4), np.zeros(99)])]
+    assert (rim > 0).all()  # its walls are as wide as their lines, not a row of threads
     assert near(mid).max() == 0  # it left that spot bare
