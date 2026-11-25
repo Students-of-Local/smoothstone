@@ -303,6 +303,7 @@ def _join(segments):
     return rings
 
 
+WHOLE = ('pyramidal', 'cone', 'dome', 'onion')  # a roof that can be the shape of the whole; a gable is not a cathedral
 UPRIGHT = ('obelisk', 'tower', 'chimney', 'lighthouse', 'column', 'water_tower')
 
 
@@ -354,7 +355,10 @@ def _site(site, candidates, pieces, data):
     buildings = [c for c in candidates if on(c, boundary)]
     areas = [boundary, *(b['footprint'] for b in buildings)]
     parts = [p for p in pieces if any(on(p, a) for a in areas)]
-    parts += [b for b in buildings if not any(on(p, b['footprint']) for p in parts)]
+    mapped = list(parts)
+    for b in buildings:
+        own = [p for p in mapped if on(p, b['footprint'])]
+        parts += _body(b, own, b['footprint']) if own else [b]
     return {'outline': [], 'site': boundary, 'parts': parts, 'source': site['source'], 'tags': site['tags'],
             'linked_towers': [], 'response_url': data.get('_smoothstone_response_url', OVERPASS)}
 
@@ -421,7 +425,7 @@ def parse_osm(data: dict, refs: dict) -> dict:
     parts += _body(selected, parts, boundary)
     form = selected['tags']
     if not parts and form.get('height') and (
-            form.get('roof:shape', 'flat') != 'flat' or form.get('man_made') in UPRIGHT or form.get('building') == 'tower'):
+            form.get('roof:shape') in WHOLE or form.get('man_made') in UPRIGHT or form.get('building') == 'tower'):
         parts = [selected]  # an obelisk or a tower is its own one part
     components = set(_item_ids(refs.get('wikidata_raw', {}), 'P527'))
     linked_towers = [c for c in candidates if c is not selected
@@ -476,7 +480,7 @@ def _map_as_overpass(data, refs):
         if e.get('type') not in ('way', 'relation'):
             continue
         if not any(k in e.get('tags', {}) for k in ('building', 'building:part')) \
-                and not (_own(e, refs) and _is_site(e.get('tags', {}))):
+                and not _own(e, refs):
             continue
         result = {k: v for k, v in e.items() if k in ('type', 'id', 'tags')}
         if e['type'] == 'way':
@@ -511,6 +515,9 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
     nearby = ''.join(f'{kind}["{tag}"](around:{radius},{lat},{lon});'
                      for tag in ('building', 'building:part') for kind in ('way', 'relation'))
     explicit = ''
+    if re.fullmatch(r'Q\d+', refs.get('id') or ''):
+        # `around` measures to the line of an area, and a castle's line can be far from its middle.
+        explicit += ''.join(f'{kind}["wikidata"="{refs["id"]}"](around:1000,{lat},{lon});' for kind in ('way', 'relation'))
     for kind, key_name in (('way', 'osm_way'), ('relation', 'osm_relation')):
         identifier = str(refs.get(key_name) or '')
         if identifier.isdecimal():

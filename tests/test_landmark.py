@@ -681,6 +681,30 @@ def test_the_map_answer_keeps_a_site_and_a_far_site_is_searched_again(monkeypatc
         landmark_refs.fetch(_site_refs(label="Example Bridge", osm_way="1"), tmp_path)
 
 
+def test_overpass_is_asked_for_the_landmarks_own_area(monkeypatch, tmp_path):
+    """A castle's area has no building tag, so the search for buildings alone never returned it."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    asked = []
+
+    def request(url, data=None):
+        asked.append(urllib.parse.parse_qs(data.decode())["data"][0])
+        wanted = '"wikidata"="Q1"' in asked[-1]
+        return {"elements": CASTLE if wanted else CASTLE[1:]}
+    monkeypatch.setattr(landmark_refs, "_request", request)
+    assert [p["id"] for p in landmark_refs.fetch(_site_refs(), tmp_path)["parts"]] == [4, 2, 5]
+    assert 'way["wikidata"="Q1"](around:1000,' in asked[0] and 'relation["wikidata"="Q1"]' in asked[0]
+
+
+def test_a_statue_the_map_answer_has_is_refused_and_a_dome_on_a_site_keeps_its_walls(monkeypatch, tmp_path):
+    _map_answer(monkeypatch, tmp_path, [_way(1, -3, -3, 3, 3, artwork_type="statue", wikidata="Q1"),
+                                        _way(2, -8, -8, 8, 8, building="yes", height="12")])
+    with pytest.raises(landmark_refs.LandmarkProblem, match="statue"):
+        landmark_refs.fetch(_site_refs(), tmp_path)
+    domed = [CASTLE[0], _way(2, -25, -25, 25, 25, building="yes", height="17"),
+             _way(3, -10, -10, 10, 10, building__part="yes", height="34", roof__shape="dome")]
+    assert [p["id"] for p in landmark_refs.parse_osm({"elements": domed}, _site_refs())["parts"]] == [3, 2]
+
+
 def test_a_bridge_with_no_mapped_deck_is_refused_after_the_far_search(monkeypatch, tmp_path):
     """The Golden Gate Bridge was built as two towers and no bridge."""
     _, asked = _map_answer(monkeypatch, tmp_path, [BRIDGE, *CASTLE[1:3]])
@@ -710,6 +734,7 @@ def test_the_walls_around_a_mapped_dome_are_a_part(walls, dome, drum, parts):
     ({"height": "60", "building": "tower"}, [1]),
     ({"height": "20"}, []),  # a box says nothing of a palace
     ({"height": "20", "roof:shape": "flat"}, []),
+    ({"height": "96", "roof:shape": "gabled"}, []),  # 96 m is the cathedral's spire
     ({"roof:shape": "pyramidal"}, []),
 ])
 def test_a_tower_with_its_own_height_is_its_own_part(tags, parts):
