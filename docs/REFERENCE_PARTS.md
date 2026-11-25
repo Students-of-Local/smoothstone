@@ -43,7 +43,7 @@ Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, skillion (high at -y
 `{"mirror": "x"}` (and its mirror image across the y axis) or `"y"` or `"xy"` (all four).
 
 `arch` is true or `round` (rising half the width; another `arch_rise` makes it an ellipse), `pointed` (equilateral; a higher
-rise is sharper) or `triangle`. `arch_rise` is part of the height from `from` to `to`.
+rise is sharper) or `triangle` (half the width). `arch_rise` is part of the height from `from` to `to`.
 
 ## Cases
 

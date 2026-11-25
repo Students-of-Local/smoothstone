@@ -262,6 +262,7 @@ def test_an_opening_lets_light_through_and_cuts_the_maps_walls(build):
     ({"arch": True}, 4 * 6 + math.pi * 2 ** 2 / 2),
     ({"arch": "round", "arch_rise": 1}, 4 * 7 + math.pi * 2 * 1 / 2),
     ({"arch": "pointed"}, 4 * (8 - 12 ** .5) + 16 * (math.pi / 3 - 3 ** .5 / 4)),
+    ({"arch": "pointed", "arch_rise": 5}, 4 * 3 + 7.25 ** 2 * math.atan2(5, 5.25) - 5.25 * 5),
     ({"arch": "triangle", "arch_rise": 3}, 4 * 5 + 4 * 3 / 2),
 ])
 def test_an_opening_has_the_head_it_asks_for(more, area):

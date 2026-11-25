@@ -344,6 +344,7 @@ def read(pack, refs):
             here[:, 2] = _vector(part.get("at", [0, 0]), "at")
             here[:, :2] = _turned(_number(part.get("turn", 0), "turn"))
             copies = _copies(part.get("copies"))
+            width = _narrowest(part) if kind == "opening" else 0
             _need(len(records) + len(openings) + len(copies) <= MAX_PARTS, f"more than {MAX_PARTS} parts")
             outline = m3.Manifold.batch_boolean(build(0, []), m3.OpType.Add)
             if kind == "beam":
@@ -365,7 +366,7 @@ def read(pack, refs):
                 def hole(scale, floor=0., flat=flat, build=build):
                     return _place(build(floor, []), flat, scale)[0].translate([0, 0, 2]).trim_by_plane([0, 0, 1], 2.02)
                 if kind == "opening":
-                    openings.append((hole, _narrowest(part), source, guess))
+                    openings.append((hole, width, source, guess))
                     continue
                 name = f"{part.get('id', f'part-{i}')}" + (f"-{k + 1}" if len(copies) > 1 else "")
                 _need(name not in seen, f"id {name} is used twice")
