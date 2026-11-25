@@ -1162,6 +1162,9 @@ saved builds pass the new measurements; no judge ran, because no mesh changed.
 A pack can carry parts (`docs/REFERENCE_PARTS.md`): prisms, lathes, beams and openings, from cited sources, for what the
 map does not have, and a lean. A strong model writes them once; every model builds them with `stone landmark "<name>"`.
 
+- A pack may give its own `plinth`, a beam may taper along its path and be round, a lathe may be hollow, and a part held
+  at both ends may be as fine as 0.8 mm (`least`). These were the writer's wishes after the first three packs.
+
 ### 2026-11-24: a guessed height, and rooms that are not parts
 
 From 40 landmarks never built before (no model, no judge), looked at one by one.

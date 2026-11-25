@@ -287,3 +287,56 @@ def test_a_lean_tips_all_above_a_level_base(build):
 def test_a_bad_lean_is_refused(value, build):
     with pytest.raises(landmark_refs.LandmarkProblem, match="lean"):
         build({**_pack(BLOCK, replace="all"), "lean": {"source": SOURCE, "value": value}})
+
+
+def test_a_beam_tapers_along_its_path_and_may_be_round():
+    path = [[0, 0, 0], [0, 0, 10]]
+    taper = _solid({"kind": "beam", "path": path, "size": [[4, 4], [2, 2]]})
+    assert taper.volume() == pytest.approx(10 * (16 + 8 + 4) / 3, rel=.01)
+    post = _solid({"kind": "beam", "path": path, "size": [2, 2], "round": True})
+    assert post.volume() == pytest.approx(math.pi * 10, rel=.03)
+
+
+def test_a_hollow_lathe_is_an_open_tube_with_a_printable_wall():
+    tube = _solid({"kind": "lathe", "profile": [[0, 5, 4], [10, 5, 4]]}, scale=100)
+    assert tube.volume() == pytest.approx(math.pi * 9 * 10, rel=.02) and tube.genus() == 1
+    record = landmark_parts.read(_pack({"kind": "lathe", "profile": [[0, 5, 4.9], [10, 5, 4.9]]}), REFS)[0][0]
+    wall = m3.Manifold.batch_boolean(record["_build"](1., []), m3.OpType.Add)
+    assert wall.volume() == pytest.approx(math.pi * (25 - 3.8 ** 2) * 10, rel=.02)
+    bowl = _solid({"kind": "lathe", "profile": [[0, 5, 0], [10, 5, 4]]}, scale=100)
+    assert bowl.genus() == 0 and bowl.volume() < math.pi * 25 * 10
+
+
+def test_a_slender_part_may_ask_for_a_finer_minimum():
+    part = {"kind": "beam", "path": [[0, 0, 5], [0, 20, 5]], "size": [.1, .1], "least": .8}
+    box = _solid(part, scale=1.).bounding_box()
+    assert box[3] - box[0] == pytest.approx(.8, abs=.02)
+
+
+@pytest.mark.parametrize("part, says", [
+    ({**BLOCK, "least": .5}, "least must be 0.8 to 1.2 mm"),
+    ({"kind": "lathe", "profile": [[0, 5, 5], [10, 5, 4]]}, "inner radius"),
+    ({"kind": "lathe", "profile": [[0, 5, 4], [10, 5]]}, "3 numbers"),
+    ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5], [0, 0, 9]], "size": [[1, 1], [2, 2]]}, "one for each point"),
+    ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5]], "size": [1, 1], "round": 1}, "round must be"),
+])
+def test_a_bad_finer_part_is_refused(part, says):
+    with pytest.raises(landmark_refs.LandmarkProblem, match=r"parts\[0\].*" + says):
+        landmark_parts.read(_pack(part), REFS)
+
+
+def test_a_plinth_stands_where_the_pack_puts_it():
+    base = landmark_parts.plinth(_pack(BLOCK, axis=90, plinth={"rect": [40, 60], "at": [0, 10]}), REFS)
+    assert base.bounds() == pytest.approx((-20, -20, 40, 20), abs=.02)
+    assert landmark_parts.plinth(_pack(BLOCK), REFS) is None
+    for bad in ({}, {"rect": [4, 0]}, {"rect": [4, 4], "to": 3}, 5):
+        with pytest.raises(landmark_refs.LandmarkProblem, match="Reference plinth"):
+            landmark_parts.plinth(_pack(BLOCK, plinth=bad), REFS)
+
+
+def test_a_build_stands_on_the_packs_plinth_and_keeps_a_foot_past_it(build):
+    man, _, scale, _ = build(_pack(BLOCK, replace="all", plinth={"rect": [40, 60]}))
+    x0, y0, x1, y1 = man.slice(1.).bounds()
+    assert (x1 - x0, y1 - y0) == pytest.approx((40 * scale, 60 * scale), abs=.05) and scale == pytest.approx(100 / 60, rel=.01)
+    man, _, scale, _ = build(_pack(BLOCK, {**BLOCK, "at": [0, 50]}, replace="all", plinth={"rect": [40, 60]}))
+    assert man.slice(1.).bounds()[3] == pytest.approx(53 * scale, abs=1) and len(man.decompose()) == 1
