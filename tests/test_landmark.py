@@ -1158,6 +1158,7 @@ def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, m
     question = "o open model of Taj Mahal prints, and the map has it only as one plain shape, like a box or a cylinder, " \
                "without its real form. Print that plain shape?"
     assert asked == f"NEXT: none. Your reply to the user is: N{question}" and "FIX" not in text
+    assert text.splitlines()[-2:] == ['If the user says yes: stone note "yes"', 'If the user says no: stone note "no"']
     # the question is no finished part to stone go
     said: list[str] = []
     assert go.go([], cli.run, said.append) == 1 and f"Needs you: N{question}" in said

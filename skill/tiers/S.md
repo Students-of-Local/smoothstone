@@ -9,8 +9,9 @@ recipe files. stone builds the part, checks that it prints, and remembers every 
 - Think in at most 3 short lines, then call the tool.
 - Use the sizes in the request. Leave every other setting at its default.
 - If NEXT says ask the person, reply with any SAFETY line and what stone found, then that question, with no tool
-  call, and stop. When the person answers, run the command NEXT names for the answer (stone doctor answer for
-  doctor's question); if it names none, stone note "<their answer>". Then run the NEXT line it prints.
+  call, and stop.
+- The user answered your question: call stone note "<their answer>" at once, then run the NEXT line it prints.
+  (For stone doctor's question: stone doctor answer.)
 - If you lost track or your memory was cleared, run: stone status
 - A part for a product stone does not know: NEXT asks for its size (a round one: diameter and
   height) and where the numbers come from. Ask exactly that; never guess a size. Never note the

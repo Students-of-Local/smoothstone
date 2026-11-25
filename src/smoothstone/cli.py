@@ -71,7 +71,9 @@ class Out:
         if nxt.startswith(LANDMARK_ASK):  # LFM3-1.7B loses the thread on who "the person" is and what is left to FIX
             body = [ln for ln in body if not ln.startswith(("Subject: ", "Searched: ", "FIX: no open model"))]
             body.append("stone can go no further until the user answers.")
-            after = after + ['After the person answers (not before): stone note "<their answer>", then run the NEXT line it prints.']
+            no = 'If the user says no: stone note "no"'  # a literal command: it thought in circles over "<their answer>"
+            after = after + (['If the user says yes: stone note "yes"', no] if nxt.endswith("Print that plain shape?") else
+                             [no, 'Else: stone note "<the name or file they give>"'])
             nxt = REPLY + nxt[len("ask the person: ")].upper() + nxt[len("ask the person: ") + 1:]
         room = MAX_LINES - 1
         passes = [ln for ln in body if ln.startswith("PASS ")]
@@ -1937,12 +1939,23 @@ def note_landmark(out: Out, job: Job, asked: str, plain: dict, text: str) -> Out
     return out
 
 
+NAMED = re.compile(r"^ask the person.* Then: (stone .+)$")  # a question that names the command its answer goes to
+
+
+def named_next(asked: str, text: str) -> str:
+    return NAMED.search(asked)[1].replace('"<their answer>"', shlex.quote(text))
+
+
 def cmd_note(args, job: Job) -> Out:
     """Keep a researched fact and its source in the job, so it survives a compaction."""
     out = Out(owns_next=False)
+    text = " ".join(args.text).strip()
+    case = doctor.status_hook(job) if text and not job.exists() else None
+    if case and NAMED.search(case[1]):  # an answer to stone doctor, which needs no job
+        out.next = named_next(case[1], text)
+        return out
     if not need_job(job, out):
         return out
-    text = " ".join(args.text).strip()
     if not text:
         out.add('Write the fact and where it came from: stone note "width = 71.9 mm, apple.com/iphone/compare"')
         out.code = 1
@@ -1986,6 +1999,10 @@ def cmd_note(args, job: Job) -> Out:
             out.next = fit._continue(job)
         else:  # calibrate reads the answer, and asks again with a way on when it cannot
             out.next = f"{st['ask_then']} {json.dumps(text)}"
+        return out
+    if NAMED.search(asked):
+        out.owns_next = True
+        out.next = named_next(asked, text)
         return out
     if st.get("ask_then") and not asked.startswith("ask the person"):
         job.update(ask_then=None, ask_then_q=None)  # the job moved on: a later answer is not the coupon's

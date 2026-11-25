@@ -362,7 +362,7 @@ def test_thin_features_name_a_needle_and_stay_quiet_on_a_block():
 def stone(*argv):
     text, code = cli.run(list(argv))
     lines = text.splitlines()
-    if lines[-1].startswith("After the person answers (not before): "):  # the one line allowed after a question
+    while lines[-1].startswith(("If the user says ", "Else: stone note")):  # what to run with the answer to a question
         lines = lines[:-1]
     assert len(lines) <= cli.MAX_LINES and lines[-1].startswith("NEXT: "), text
     assert "\u2014" not in text and "\u2013" not in text
