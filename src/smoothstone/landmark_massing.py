@@ -14,16 +14,14 @@ def _center(section):
 
 
 def _west_towers(parts, frame, center, spans, peak):
-    """Find the high, symmetric pair at the west end of a Gothic footprint. A plan whose long axis runs
-    nearer north and south has no west end, so there a pair at either end counts."""
+    """Find the high, symmetric pair at one end of a Gothic footprint, the west end when it has one. A plan
+    whose long axis runs nearer north and south has no west end, so there the taller pair counts."""
     east = frame[0][0]
     candidates = []
     for part, section in parts:
         h = part["height"]["metres"]
         width = math.sqrt(section.area()) / spans[1]
         position = (frame @ _center(section) - center) / spans
-        if abs(east) >= .5 and position[0] * east > 0:
-            continue
         if (not part["height"]["guessed"] and h >= peak * .77 and .04 <= width <= .26
                 and part["min_height"]["metres"] < h * .3 and abs(position[0]) > .28):
             candidates.append((part, position, width, h))
@@ -36,7 +34,8 @@ def _west_towers(parts, frame, center, spans, peak):
             pairs.append((a, b))
     if not pairs:
         return None
-    a, b = max(pairs, key=lambda pair: (min(p[3] for p in pair), min(p[2] for p in pair)))
+    west = [pair for pair in pairs if abs(east) >= .707 and pair[0][1][0] * east < 0]
+    a, b = max(west or pairs, key=lambda pair: (min(p[3] for p in pair), min(p[2] for p in pair)))
     for part, _, _, _ in (a, b):
         part["feature"] = "west_spire" if part["spire"] else "west_tower"
     peak_part, peak_section = max(parts, key=lambda pair: pair[0]["height"]["metres"])
@@ -176,15 +175,23 @@ def infer_massing(records, sections, outline, data, refs, target, styles):
             source = data["source"]
             # A part mapped lower than these walls keeps its height. Taller parts simply stand in them.
             # A gap too narrow to print beside a low part is map noise, not wall.
-            low = m3.CrossSection.batch_boolean([cs for p, cs in parts if p["height"]["metres"] < height], m3.OpType.Add)
-            # A low part mapped off the ground with nothing under it stands on wall up to its own base.
+            low = [cs for p, cs in parts if p["min_height"]["metres"] <= .1 and p["height"]["metres"] < height]
+            # So does one mapped off the ground, on wall up to its own base, unless another part stands over it.
             for part, section in list(parts):
-                base = part["min_height"]["metres"]
-                bare = (section ^ outline) - ground
-                if .1 < base and part["height"]["metres"] < height and bare.area() * size ** 2 > .64:
-                    parts.append((_new_part(f"wall-below-{part['id']}", bare, 0, base, 0, "flat", source, "lower_walls"), bare))
-            missing = outline - low
-            if not low.is_empty():
+                base, top = part["min_height"]["metres"], part["height"]["metres"]
+                if base <= .1 or top >= height or part["height"]["guessed"]:
+                    continue
+                over = m3.CrossSection.batch_boolean([cs for p, cs in parts if p is not part and p["min_height"]["metres"] > base
+                                                      and p["height"]["metres"] > top], m3.OpType.Add)
+                bare = (section ^ outline) - ground - over
+                if bare.area() * size ** 2 > .64:
+                    wall = _new_part(f"wall-below-{part['id']}", bare, 0, base, 0, "flat", part["source"], "lower_walls")
+                    wall["height"] = {**part["min_height"]}
+                    parts.append((wall, bare))
+                    low.append(bare)
+                    notes.append(f"Stood mapped part {part['id']} on wall up to its own base.")
+            missing = outline - m3.CrossSection.batch_boolean(low, m3.OpType.Add)
+            if low:
                 grain = .3 / size
                 missing = missing.offset(-grain).offset(grain + .05) ^ outline
             if not missing.is_empty():

@@ -155,6 +155,13 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
     height = float(size[2]) - refs.get("plinth_height_mm", 2)
 
     dimensions = refs.get("reference_dimensions_m", {})
+    # A linked tower prints with the building, so its plan counts only where the spec names the tower.
+    plan = refs.get("plan_dimensions_m") or {}
+    linked = plan.get("associated_outlines", [])
+    if plan and set(linked) <= set(references.get("linked_outlines", [])):
+        dimensions = {**dimensions, "length": plan["length"], "width": plan["width"]}
+    elif plan:
+        why.append("linked towers the spec does not name: " + ", ".join(linked))
     named = want.get("tallest") or {}
     standard = named.get("m") if named.get("source") else refs.get("height")
     if (_positive(standard) and _positive(dimensions.get("length")) and _positive(dimensions.get("width"))
@@ -211,7 +218,9 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
         stl = job / "model" / "generated.stl"
         named_parts = [p for p in refs.get("parts", []) if p.get("feature") == feature]
         mesh = printed_mesh(trimesh.load(stl, force="mesh", process=False), parts) if stl.is_file() else None
-        if mesh is None:
+        if not stl.is_file():
+            why.append("no generated model to find the print's frame from")
+        elif mesh is None:
             why.append("the print files do not line up with the generated model")
         stands = (standing_in_mesh(mesh, named_parts, scale, refs.get("plinth_height_mm", 2))
                   if mesh is not None and _positive(scale) else 0)

@@ -80,7 +80,15 @@ def test_landmark_grade_uses_printed_geometry_and_sourced_parts(tmp_path):
     assert wrong["why"] == ["built width is 50.0 m at scale, survey says 55 m (4% tolerance)"]
     cited["width_m"]["tolerance"] = .1
     assert landmarks_grade.grade(job, spec)["pass"]
-    del spec["expect"]["landmarks"]["references"]
+    tower = "https://www.openstreetmap.org/way/2"
+    refs["reference_dimensions_m"]["length"] = 80
+    refs["plan_dimensions_m"] = {"length": 100, "width": 50, "associated_outlines": [tower]}
+    ref_path.write_text(json.dumps(refs))
+    assert f"linked towers the spec does not name: {tower}" in landmarks_grade.grade(job, spec)["why"]
+    cited["linked_outlines"] = [tower]
+    assert landmarks_grade.grade(job, spec)["pass"]
+    del spec["expect"]["landmarks"]["references"], refs["plan_dimensions_m"]
+    refs["reference_dimensions_m"]["length"] = 100
 
     refs["parts"][2].pop("feature_of")
     refs["reference_dimensions_m"]["width"] = 55

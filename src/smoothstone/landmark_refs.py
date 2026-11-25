@@ -69,7 +69,7 @@ def _quantity(value):
 def resolve(name: str, job_root: Path) -> dict:
     """Return sourced facts for the closest structure found by name."""
     normalized = ' '.join(name.casefold().split())
-    key = hashlib.sha256(normalized.encode()).hexdigest()
+    key = hashlib.sha256(f'2 {normalized}'.encode()).hexdigest()  # 2: the ranking that chose the answer
     cache = Path.home() / '.cache' / 'smoothstone' / 'wikidata' / (key + '.json')
     ref_path = Path(job_root) / 'refs' / 'landmark.json'
     if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
@@ -93,9 +93,10 @@ def resolve(name: str, job_root: Path) -> dict:
         entities = _wiki({'action': 'wbgetentities', 'ids': ids,
                           'props': 'labels|descriptions|claims|sitelinks', 'languages': 'en'}).get('entities', {})
         forbidden = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
-        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel)\b', re.I)
+        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel|fort|fortification|house|ch[aâ]teau|hotel|fountain|dam|windmill|ruins?|archaeological)\b', re.I)
+        place = re.compile(r'\b(district|place|airport|state|kingdom|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|island|river|lake|street|road|square|station|stop|school|company|settlement|locality|community|area|territory|constituency|capital|mountain|hill|valley|park)$', re.I)
         # The words before the first place say what the thing is: a "human settlement in Tower Hamlets" is no tower.
-        kind = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named)\b', re.I)
+        kind = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named)\b|[,;(]', re.I)
         candidates = []
         for order, hit in enumerate(hits):
             entity = entities.get(hit['id'], {})
@@ -108,9 +109,12 @@ def resolve(name: str, job_root: Path) -> dict:
             # or it has an architectural style, an architect or a count of floors.
             named = any(' '.join(label.casefold().split()) == normalized for label in
                         (hit.get('label', ''), hit.get('match', {}).get('text', '')))
-            building = bool(structure.search(kind.split(description, maxsplit=1)[0])
-                            or any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101')))
-            candidates.append(((named and building, building, bool(structure.search(description)), named, -order), hit, entity))
+            what = kind.split(description, maxsplit=1)[0].strip()
+            placed = place.search(what)  # by its last word: a "cathedral city" is a city, a "parish church" is not a parish
+            building = not placed and bool(structure.search(what)
+                                           or any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101')))
+            rank = 2 * named + building if named and what and not placed else int(building)
+            candidates.append(((rank, bool(structure.search(description)), named, -order), hit, entity))
         if not candidates:
             raise LandmarkProblem(f'No building with coordinates found for {name}.')
         _, hit, entity = max(candidates, key=lambda x: x[0])

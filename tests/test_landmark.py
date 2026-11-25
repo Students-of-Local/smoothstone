@@ -99,8 +99,10 @@ def test_exact_landmark_outranks_a_nearby_structural_search_result(tmp_path, mon
 
 @pytest.mark.parametrize("description", [
     "district of a city", "human settlement in Tower Hamlets, England", "locality in a state", "mountain in the Alps",
-    "unincorporated community near Church Hill", "railway stop", ""])
-def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch, description):
+    "unincorporated community near Church Hill", "railway stop", "cathedral city in a county",
+    "census-designated place in a county", ""])
+@pytest.mark.parametrize("claims", [{}, {"P149": [{"mainsnak": {"datavalue": {"value": {"id": "Q9"}}}}]}])
+def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch, description, claims):
     place = {"id": "Q1", "label": "St Example's", "description": description}
     building = {"id": "Q2", "label": "St Example's Cathedral", "description": "cathedral in the city of Example"}
     coordinates = {"claims": {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]}}
@@ -108,12 +110,29 @@ def test_an_exact_place_name_does_not_outrank_the_building(tmp_path, monkeypatch
     def wiki(params):
         if params["action"] == "wbsearchentities":
             return {"search": [place, building]}
-        return {"entities": {item["id"]: coordinates for item in (place, building)}}
+        return {"entities": {"Q1": {"claims": {**coordinates["claims"], **claims}}, "Q2": coordinates, "Q9": {}}}
 
     monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
     monkeypatch.setattr(landmark_refs, "_wiki", wiki)
     assert landmark_refs.resolve(place["label"], tmp_path)["id"] == building["id"]
     assert landmark_refs.resolve(building["label"], tmp_path / "again")["id"] == building["id"]
+
+
+@pytest.mark.parametrize("kind", ["fort in Kent", "parish church in Kent", "windmill in Kent", "pumping works in Kent"])
+@pytest.mark.parametrize("other", [("Fort Example Museum", "museum in Kent"), ("Fort Example Road", "street near Tower Bridge")])
+def test_an_exact_building_of_any_kind_outranks_a_longer_name(tmp_path, monkeypatch, kind, other):
+    exact = {"id": "Q1", "label": "Fort Example", "description": kind}
+    longer = {"id": "Q2", "label": other[0], "description": other[1]}
+    coordinates = {"claims": {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]}}
+
+    def wiki(params):
+        if params["action"] == "wbsearchentities":
+            return {"search": [longer, exact]}
+        return {"entities": {"Q1": coordinates, "Q2": coordinates}}
+
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(landmark_refs, "_wiki", wiki)
+    assert landmark_refs.resolve("Fort Example", tmp_path)["id"] == "Q1"
 
 
 def test_an_exact_name_with_a_building_style_outranks_a_longer_name(tmp_path, monkeypatch):

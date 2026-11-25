@@ -14,7 +14,9 @@
         "dome_footprint": "https://www.openstreetmap.org/way/397848200",
         "architecture": "https://en.wikipedia.org/wiki/Florence_Cathedral#Plan_and_structure",
         "height_m": {"value": 114.5, "source": "https://www.wikidata.org/wiki/Q191739#P2048"},
-        "length_m": {"value": 153, "source": "https://www.wikidata.org/wiki/Q191739#P2043"}
+        "length_m": {"value": 153, "source": "https://www.wikidata.org/wiki/Q191739#P2043"},
+        "width_m": {"value": 97, "source": "https://www.openstreetmap.org/way/43768260"},
+        "linked_outlines": ["https://www.openstreetmap.org/way/251650632"]
       }
     }
   },
