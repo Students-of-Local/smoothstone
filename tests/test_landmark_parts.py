@@ -523,6 +523,11 @@ def test_each_opera_house_sail_stands_on_the_deck():
         return [solid.slice(z * 1.04) for z in heights]
     decks = sum((cut(r, 12.2)[0] for r in rows if r["id"] in ("upper-podium", "restaurant-southwest-wing")),
                 m3.CrossSection())
+    ground = sum((cut(r, .5)[0] for r in rows if r["id"] in ("lower-continuous-podium", "monumental-stair-01")),
+                 m3.CrossSection()).rotate(pack["parts"]["axis"])
+    west, south, east, north = ground.bounds()
+    # the mapped outline, relation 9596872; the published 183 x 118 m is the base's
+    assert np.allclose([(north - south) / 1.04, (east - west) / 1.04], [170.5, 114.2], rtol=.02)
     for r in sails:
         foot, wall = cut(r, 12.2, 14)
         assert (foot ^ wall).area() > .9 * wall.area() > 0, r["id"]
