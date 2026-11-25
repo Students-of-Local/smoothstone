@@ -20,10 +20,10 @@
         "why": "Street level to the top of the pinnacles"
       },
       "dimensions": {
-        "length": 258.5,
-        "width": 219.4,
+        "length": 258.4,
+        "width": 218.9,
         "source": "https://www.openstreetmap.org/way/23034336",
-        "why": "The mapped podium and the towers' bustles, as the pack measured them."
+        "why": "The smallest box round the mapped mall, towers and bustles (ways 23034336, 137331252, 137396348, 137331255 and 137396360), measured from the map."
       }
     }
   },

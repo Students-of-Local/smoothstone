@@ -1304,6 +1304,14 @@ stands on its columns, and a ring that crosses itself is refused. Judged once ea
 are on the shells' spacing and shape), Petronas 9 (the first try gave no verdict: the judge could not read the photo until
 PR 171), the Dome 9. LFM3 was not rerun. The Dome's porch roofs are 12 ledges before and after.
 
+The second review round found that the plan sizes checked the packs against themselves. Petronas is held to 258.4 x 218.9 m
+now, the box round the mapped mall, towers and bustles, and the Dome to the source's 49.7 m between faces, which its porches
+widen by 3.6%. Sydney's base carries the published 183 x 118 m; a test holds the building to the mapped 170.5 x 114.2 m. A
+first try made the base follow the map: judged 9, but failed Wikipedia's 183 m, which the spec already named, so it went
+back. The corner of one restaurant sail that ran past its deck, the lopsided apex of the tallest sail, a slot behind
+Petronas's entrance and thin piers beside the Dome's doors are fixed, and an opening's outline that crosses itself is
+refused as a ring's is. Judged once each: Sydney 9, Petronas 9, the Dome 9, every check passing.
+
 ### 2026-11-25: openings another part covers, and four packs fixed
 
 The second review of those packs found 14 windows of Himeji's (15 came out) and 2 pockets of Golden Gate's that were sealed inside
