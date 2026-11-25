@@ -947,6 +947,23 @@ def named_in(request: str) -> list[str]:
     return sorted(out, key=len, reverse=True)[:3]
 
 
+FIGURE_NAME = re.compile(r"\b(?:statue|sculpture|bust|figure|figurine)\b", re.I)
+
+
+def landmark_before_recipe(request: str, makes) -> str | None:
+    """The structure a request names when a recipe fits only through words of that name: "Empire State Building" has
+    "state", one letter from "statue", and "Hook Lighthouse" has "hook". `makes(text)` says whether a recipe makes the
+    text. A statue stays with the figure recipe. One lookup, and only when nothing else in the request asks for a part."""
+    from . import landmark_refs
+
+    for name in named_in(request):
+        rest = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", " ", request.replace("\u2019", "'"), flags=re.I)
+        if not FIGURE_NAME.search(name) and not re.search(rf"\b(?:an?|some|any)\s+{re.escape(name)}", request, re.I) \
+                and not makes(rest) and landmark_refs.is_structure(name):
+            return name
+    return None
+
+
 def asks_found_model(request: str) -> bool:
     """True when a request asks to find, download or get an existing or open model, not to build one."""
     return bool(FIND_MODEL.search(request))

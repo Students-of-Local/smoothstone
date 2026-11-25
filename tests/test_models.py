@@ -563,6 +563,25 @@ def test_the_lookup_waits_until_no_recipe_fits(jobenv, monkeypatch):
     assert _route(monkeypatch, request_)[0] != ["stone", "landmark"] and not asked
 
 
+@pytest.mark.parametrize("request_, routes", [
+    ("Print me the Empire State Building, about 18 cm tall.", True),  # "state" reads as a typo of "statue"
+    ("Print me the Sacre-Coeur, 15 cm tall", True),  # "coeur" of "cover"
+    ("Could I get a print of the Marina Bay Sands?", True),  # "sands" of "stand"
+    ("Print the Hook Lighthouse for my desk", True),
+    ("Print a hook for my Hook Lighthouse photo", False),
+    ("A phone stand with the Empire State Building on it", False),
+    ("Make me an Empire State Building bookend", False),
+    ("Print the Statue of Liberty, 15 cm", False),
+    ("Make me a Phone Stand", False),
+    ("Make a figure of the Empire State Building", False),
+    ('A mini figure of George R. R. Martin, 100 mm tall, with "GRRM" on the base', False),
+])
+def test_a_recipe_word_inside_a_landmarks_name_does_not_take_the_request(jobenv, monkeypatch, request_, routes):
+    """LFM3-1.7B built a figure: stone recipes listed the figure recipe for the Empire State Building."""
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: True)
+    assert (_route(monkeypatch, request_)[0] == ["stone", "landmark"]) is routes
+
+
 def test_the_eval_landmarks_still_route():
     for f in sorted((EVALS / "models").glob("m0*.json")):
         req = json.loads(f.read_text())["request"]

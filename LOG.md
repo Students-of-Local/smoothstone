@@ -1351,3 +1351,17 @@ types the same one command, and the packs' names did not change.
 More that is not from a source: l18's 95 m width is the pack's own base, l19's 22.27 m is built 22.58 m with the
 chimneys, and Tower Bridge's road sits at a guessed 11.3 m, which makes its top 74.3 m over the pack's water, not 71.99.
 The White House's windows are cut 1.3 m deep; views.png is lit from the camera, so a recess does not darken there.
+
+### 2026-11-25: Two skyscrapers from the map alone
+
+Specs l24 (Empire State Building) and l25 (Chrysler Building) have no pack: they hold what the map alone builds. One
+attempt each at a036be4, judged: l25 8, pass; l24 7, open, because the map draws its mooring mast as a plain needle.
+The judge could not answer for the Chrysler at first, since its article has no lead image; it now takes the article's
+first photo, and that second look is the 8.
+
+LFM3-1.7B, card S, one attempt each at 9fa3fdd, judged: Sydney 9, Windsor 9, Petronas 9, Dome 9 (the packs' final JSON)
+and Chrysler 9, all pass. Empire State: no landmark at all. `stone recipes` listed the figure recipe, because "state"
+reads as a typo of "statue", and the model set a figure's height. The same held for the Sacre-Coeur ("cover"), Marina
+Bay Sands ("stand") and the Hook Lighthouse. A recipe that fits only through words of a known structure's name no
+longer takes the request. Mount Rushmore and Mont Saint-Michel, which collide with "mount", are not known structures
+to the lookup and still go to a recipe.
