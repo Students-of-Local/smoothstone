@@ -573,6 +573,7 @@ class Inputs:
     bed: float | None = None  # C, default the K2 profile's
     clean: float = 1.0  # 1 a clean plate, fact("contamination") a dirty one
     fan: float = True  # its share of full speed
+    fan_over: float | None = None  # on lines over air, default fan
     enclosed: bool = True  # False: an open printer, air at fact("room_air")
     infill: float | None = None  # %, default the process's sparse infill; 100 prints solid
     supports: bool = False
@@ -587,6 +588,10 @@ class Inputs:
     @property
     def air(self) -> float:  # C
         return _mat(self.material).chamber if self.enclosed else fact("room_air")
+
+    @property
+    def over(self) -> float:
+        return self.fan if self.fan_over is None else self.fan_over
 
 
 @dataclass
@@ -717,11 +722,11 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
                         hit("bridge", i, at, {"span_mm": round(span, 1), "sag_mm": round(sag, 2),
                                               "usable_mm": fact("max_bridge_length")}, [note("bridge_rule")])
                 else:
-                    tip = -float(droop([big], m, lay, width, inp.fan, air)[0])
+                    tip = -float(droop([big], m, lay, width, inp.over, air)[0])
                     rule = fact("droop_rule")
                     nums = {"ledge_mm": round(big, 2), "reach_mm": round(reach(lay), 2), "droop_mm": round(tip, 3),
-                            "soft_s": round(cooling(m, lay, width, inp.fan, air)["soft_s"], 2)}
-                    why = [note("droop_rule"), note("fan_air_speed") if inp.fan else note("churchill_chu")]
+                            "soft_s": round(cooling(m, lay, width, inp.over, air)["soft_s"], 2)}
+                    why = [note("droop_rule"), note("fan_air_speed") if inp.over else note("churchill_chu")]
                     if tip >= rule["supports"] * lay:
                         hit("supports", i, at, nums, why)
                     elif tip >= rule["droop"] * lay:

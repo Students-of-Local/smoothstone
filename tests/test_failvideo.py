@@ -342,6 +342,10 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     tp.run[:, [0, 3]] = 0.4, 45
     inp = failvideo.inputs(tp, "PLA")
     assert (inp.fan, inp.air) == (0.4, 45) and failvideo.inputs(tp, "PLA", enclosed=False).air == failsim.fact("room_air")
+    assert inp.over == 0.4 and not any("bridges" in n for n in inp.notes)
+    tp.run[tp.feature == timelapse.gcode.FEATURES.index("bridge"), 0] = 0.9
+    inp = failvideo.inputs(tp, "PLA")
+    assert (inp.fan, inp.over) == (0.4, 0.9) and "fan 40 %" in inp.notes[0] and "fan on bridges 90 %" in inp.notes[0]
     tp.run[:] = np.nan
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan == 1 and inp.material.nozzle == failsim.material("PLA").nozzle
@@ -353,7 +357,18 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     assert not any("open frame" in n or "chamber" in n for n in ender.notes)
     assert mini.process["shells"]["wall_loops"] == 3 and failsim.run(replace(mini, width=None, speed=None)) == (0.4, 50)
     secs = float(np.median(np.diff(failvideo.layer_times(tp), prepend=0.0)))
-    assert mini.fan == printers.fan(printers.settings(printers.get("prusa_mini"), "ABS"), secs)
+    abs_ = printers.settings(printers.get("prusa_mini"), "ABS")
+    assert mini.fan == printers.fan(abs_, secs) and mini.over == max(mini.fan, abs_["fan_over"] / 100)
+
+
+def test_a_ledge_and_its_strands_are_in_the_fan_slicers_run_over_air():
+    tp, inp, fail, _ = _story(_t())
+    low, high = (replace(inp, fan=0.1, fan_over=o) for o in (0.1, 1.0))
+    soft = [failsim.predict(i)[0].numbers["soft_s"] for i in (low, high)]
+    assert soft == [pytest.approx(failsim.cooling(inp.material, inp.layer, inp.width, o, inp.air)["soft_s"], abs=0.01) for o in (0.1, 1.0)] and soft[0] > soft[1]
+    assert failvideo.Story(tp, high, fail, (1, 1, 1), (250, 250)).wind == 1.0
+    loose, _ = failvideo.choose(failsim.predict(high), "detach", high)
+    assert failvideo.Story(tp, high, loose, (1, 1, 1), (250, 250)).wind == 0.1  # it prints on as if on the part
 
 
 @pytest.mark.parametrize("file, used_mm, used_g, density", [("orca_cube", 398.94, 1.20, 1.25), ("prusa_screw", 1706.22, 5.09, 1.24)])
