@@ -1376,7 +1376,8 @@ still no known name: its item is called "Mount Saint-Michel" and the abbey is an
 Eighteen more landmarks without packs, built from the map alone on 2026-11-25. Fourteen built and nine of them hold up.
 Five were called ready and were wrong. Tokyo Tower was a 150 m stub of a 332.6 m tower; it is now refused, as is any map
 whose tallest part is under three quarters of the sourced height. The Porta Nigra was two end blocks joined by a strip; it
-is refused, as is any map whose separate pieces cover under 60% of the plan, or one piece under 40%. Cape Hatteras Lighthouse (a cylinder) and the
+is refused, as is any map whose separate pieces (a thin strip joins nothing, a shed is no piece) cover under 60% of the plan,
+or one piece under 40%. Cape Hatteras Lighthouse (a cylinder) and the
 Temple of Heaven (a drum and a cone) are one plain shape on the map: stone now looks for an open model first, and when
 there is none, `stone landmark --plain` builds the plain shape and says so. Rialto Bridge is a solid block with no arch; a bridge whose
 parts stand on over 90% of its plan is now refused (Tower Bridge's map: 3%). On 60 other

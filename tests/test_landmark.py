@@ -599,6 +599,7 @@ def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeyp
 
     recorded("Taj Mahal")
     monkeypatch.setattr(landmark, "SPLIT_SHARE", 0)
+    monkeypatch.setattr(landmark, "LEAST_SHARE", 0)
     monkeypatch.setattr(landmark, "LEAST_HEIGHT", 0)
 
     def way(i, ring, tags):
@@ -665,6 +666,7 @@ def test_bodies_that_meet_at_a_corner_get_a_real_join(recorded, monkeypatch, tmp
 
     recorded("Taj Mahal")
     monkeypatch.setattr(landmark, "LEAST_SHARE", 0)
+    monkeypatch.setattr(landmark, "SPLIT_SHARE", 0)
     monkeypatch.setattr(landmark, "LEAST_HEIGHT", 0)
     _map(monkeypatch, (-50, -50, 0, 0, 20), (0, 0, 50, 50, 20))
     result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
@@ -1099,6 +1101,29 @@ def test_a_map_of_two_ends_and_no_middle_is_refused(recorded, monkeypatch, tmp_p
         assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
 
 
+@pytest.mark.parametrize("joint, refused", [(.5, True), (3, False)])
+def test_a_thin_strip_does_not_make_two_ends_one_building(recorded, monkeypatch, tmp_path, joint, refused):
+    """A screen wall or walkway between the two ends took the middle's place."""
+    from smoothstone import landmark
+
+    _drawn(monkeypatch, recorded, OUTLINE, _way(2, -40, -10, -19, 10, building__part="yes", height="73"),
+           _way(3, 19, -10, 40, 10, building__part="yes", height="70"),
+           _way(4, -19, -joint, 19, joint, building__part="yes", height="20"))
+    if refused:
+        with pytest.raises(landmark_refs.LandmarkProblem, match="separate pieces covering 55% of its plan"):
+            landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
+    else:
+        assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
+
+
+def test_a_shed_beside_the_body_does_not_make_it_two_pieces(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    _drawn(monkeypatch, recorded, OUTLINE, _way(2, -40, -10, 4, 10, building__part="yes", height="73"),
+           _way(3, 30, -1, 33, 2, building__part="yes", height="5"))
+    assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
+
+
 def _no_models(monkeypatch):
     from smoothstone import models
 
@@ -1201,3 +1226,9 @@ def test_a_crowded_map_is_asked_again_for_a_smaller_area(monkeypatch, tmp_path):
         boxes = [[float(v) for v in urllib.parse.parse_qs(url.split("?")[1])["bbox"][0].split(",")] for url in asked]
         assert [round((b[3] - b[1]) * 111320 / 2) for b in boxes] == [1000, 500, 250]
         assert not list((home / ".cache/smoothstone/osm").glob("*.json"))
+
+    def crowded(url, data=None):
+        raise urllib.error.HTTPError(url, 400, "Bad Request", {}, None)
+    monkeypatch.setattr(landmark_refs, "_request", crowded)
+    with pytest.raises(landmark_refs.LandmarkProblem, match="too crowded"):  # the smallest area is still too large
+        landmark_refs.fetch(_site_refs(), tmp_path / "small")
