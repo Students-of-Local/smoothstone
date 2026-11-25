@@ -20,7 +20,7 @@ metadata removed. Nothing else was changed. Synthetic frames are renders, not ph
 - `bed_adhesion/gantrel-detached-22.jpg`: "Gantrel guard frame detached-22" by Gantrel, [MIT](https://github.com/Students-of-Local/smoothstone/blob/main/LICENSE), Gantrel guard frames (Blender render, render_frames.py) (Gantrel guard frames (Blender render, render_frames.py)), synthetic render.
 - `bed_adhesion/gantrel-detached-23.jpg`: "Gantrel guard frame detached-23" by Gantrel, [MIT](https://github.com/Students-of-Local/smoothstone/blob/main/LICENSE), Gantrel guard frames (Blender render, render_frames.py) (Gantrel guard frames (Blender render, render_frames.py)), synthetic render.
 - `bed_adhesion/gantrel-detached-24.jpg`: "Gantrel guard frame detached-24" by Gantrel, [MIT](https://github.com/Students-of-Local/smoothstone/blob/main/LICENSE), Gantrel guard frames (Blender render, render_frames.py) (Gantrel guard frames (Blender render, render_frames.py)), synthetic render.
-- `bed_adhesion/k2-detached-plate-blob.jpg`: "K2 detached part and nozzle blob" by Donovan Baney, [MIT](https://github.com/Students-of-Local/smoothstone/blob/main/LICENSE), owner's Creality K2 chamber camera (owner's Creality K2 chamber camera), resized.
+- `bed_adhesion/k2-detached-plate-blob.jpg`: "K2 detached part and nozzle blob" by Donovan Baney, [MIT](https://github.com/baney75/smoothstone/blob/main/LICENSE), owner's Creality K2 chamber camera (owner's Creality K2 chamber camera), resized.
 - `bed_adhesion/u1-honeycomb-panel-lifted.jpg`: "frame 411468eb8480445f" by Alex-Ultra, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [source](https://huggingface.co/datasets/Alex-Ultra/3d-cli-print-failure-frames/resolve/main/own/frames/411468eb8480445f.jpg) (Hugging Face Alex-Ultra/3d-cli-print-failure-frames), resized.
 
 ## blob_on_nozzle
@@ -71,7 +71,7 @@ metadata removed. Nothing else was changed. Synthetic frames are renders, not ph
 
 ## healthy
 
-- `healthy/k2-finished-vase.jpg`: "K2 finished twisted vase" by Donovan Baney, [MIT](https://github.com/Students-of-Local/smoothstone/blob/main/LICENSE), owner's Creality K2 chamber camera (owner's Creality K2 chamber camera), resized.
+- `healthy/k2-finished-vase.jpg`: "K2 finished twisted vase" by Donovan Baney, [MIT](https://github.com/baney75/smoothstone/blob/main/LICENSE), owner's Creality K2 chamber camera (owner's Creality K2 chamber camera), resized.
 - `healthy/u1-a-15a11a5f.jpg`: "frame 15a11a5fd7963278" by Alex-Ultra, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [source](https://huggingface.co/datasets/Alex-Ultra/3d-cli-print-failure-frames/resolve/main/own/frames/15a11a5fd7963278.jpg) (Hugging Face Alex-Ultra/3d-cli-print-failure-frames), resized.
 - `healthy/u1-a-1fce791e.jpg`: "frame 1fce791e1f59837b" by Alex-Ultra, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [source](https://huggingface.co/datasets/Alex-Ultra/3d-cli-print-failure-frames/resolve/main/own/frames/1fce791e1f59837b.jpg) (Hugging Face Alex-Ultra/3d-cli-print-failure-frames), resized.
 - `healthy/u1-a-25454ca1.jpg`: "frame 25454ca1100925ba" by Alex-Ultra, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [source](https://huggingface.co/datasets/Alex-Ultra/3d-cli-print-failure-frames/resolve/main/own/frames/25454ca1100925ba.jpg) (Hugging Face Alex-Ultra/3d-cli-print-failure-frames), resized.
