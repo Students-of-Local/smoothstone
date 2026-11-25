@@ -20,6 +20,7 @@ RIDGED = ("gabled", "hipped", "round", "half-hipped", "gambrel", "mansard")
 PLANS = ("rect", "circle", "ngon", "ring")
 ANY = ("kind", "id", "source", "guess", "copies")
 FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "ridge", "top_scale", "top_shift", "least"),
+          "loft": (*PLANS, "at", "turn", "sections", "least"),
           "lathe": ("at", "profile", "least"), "beam": ("path", "size", "round", "least"),
           "opening": ("at", "turn", "width", "depth", "from", "to", "arch", "arch_rise", "outline")}
 
@@ -133,6 +134,39 @@ def _wide(cs, floor):
     return m3.CrossSection.batch_boolean(out, m3.OpType.Add)
 
 
+def _loft(part):
+    cs, rows = _plan(part), part.get("sections")
+    _need(isinstance(rows, list) and 2 <= len(rows) <= 100 and all(isinstance(r, (list, tuple)) for r in rows),
+          "sections must list 2 to 100 rows")
+    _need({len(r) for r in rows} in ({2}, {3}, {5}, {6}),
+          "each row is [z, scale], [z, scale x, scale y], and may add x, y, and then a turn, all the same length")
+    rows = np.array([_vector(r, "sections", len(r)) for r in rows])
+    if rows.shape[1] == 2:
+        rows = rows[:, [0, 1, 1]]
+    rows = np.hstack([rows, np.zeros((len(rows), 6 - rows.shape[1]))])
+    z, size, shift, turn = rows[:, 0], rows[:, 1:3], rows[:, 3:5], np.radians(rows[:, 5])
+    _need((np.diff(z) > 0).all(), "sections must rise")
+    _need((size >= 0).all() and size.max(0).min() > 0, "a scale must be 0 or more, and not 0 all the way up")
+    steps = 8 if np.ptp(turn) else 1
+
+    def build(floor, notes):
+        body = _wide(cs, floor)
+        box = np.array(body.bounds()).reshape(2, 2)
+        mid, ext = box.mean(0), np.ptp(box, axis=0)
+        s = np.maximum(size, np.minimum(1, np.maximum(floor, 1e-3 * ext.min()) / ext))  # every section prints
+        n = len(z) - 1
+        levels = np.r_[min(z[0], z[-1] - floor), z[1:]]
+
+        def place(v):
+            at = v[:, 2]
+            sx, sy, dx, dy, a, up = (np.interp(at, range(n + 1), c) for c in (*s.T, *shift.T, turn, levels))
+            x, y = ((v[:, :2] - mid) * np.c_[sx, sy]).T
+            return np.c_[x * np.cos(a) + y * np.sin(a) + dx + mid[0], y * np.cos(a) - x * np.sin(a) + dy + mid[1], up]
+        return [body.extrude(n, n_divisions=n * steps - 1).warp_batch(place)]
+    build.slim = (size * np.ptp(np.array(cs.bounds()).reshape(2, 2), axis=0)).min()
+    return build, z[0], z[-1], 0, "flat"
+
+
 def _lathe(part):
     import manifold3d as m3
 
@@ -185,6 +219,7 @@ def _beam(part):
             if i:  # the elbow
                 solids.append(m3.Manifold.hull_points(np.array(end(frames[i - 1], i) + end(frame, i))))
         return [s for s in solids if not s.is_empty()]
+    build.slim = sizes.min()
     return build, 0, 0, 0, "flat"  # its heights are its solid's
 
 
@@ -249,7 +284,7 @@ def _narrowest(part):
     return 2 * lo
 
 
-KINDS = {"prism": _prism, "lathe": _lathe, "beam": _beam, "opening": _opening}
+KINDS = {"prism": _prism, "loft": _loft, "lathe": _lathe, "beam": _beam, "opening": _opening}
 
 
 def _copies(spec):
@@ -358,10 +393,10 @@ def read(pack, refs):
                 record = {}
 
                 def make(scale, notes, flat=flat, build=build, plain=outline, record=record, least=least,
-                         slim=np.min(part["size"]) if kind == "beam" else math.inf):
+                         slim=getattr(build, "slim", math.inf)):
                     solids = build(least / scale, notes)
                     grown = m3.Manifold.batch_boolean(solids, m3.OpType.Add)
-                    # a beam's thin end may widen inside the box of its thick one
+                    # a thin end may widen inside the box of a thick one
                     if (np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01
                             or slim * scale < least - .01):
                         record["print_modifications"] = [f"Widened to {least:g} mm."]

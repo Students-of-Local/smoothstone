@@ -33,6 +33,7 @@ with the same one command.
 | kind | fields |
 | --- | --- |
 | `prism` | a plan, `at`, `turn`, `from`, `to`, and any of `roof` + `roof_rise` (`to` is the roof's top), `ridge`, `top_scale`, `top_shift` [x, y] |
+| `loft` | a plan, `at`, `turn`, `sections` [[z, scale], ...] with z rising; a row may be [z, scale x, scale y], then add the shift x, y, then a turn |
 | `lathe` | `at`, `profile` [[z, radius], ...] with z rising |
 | `beam` | `path` [[x, y, z], ...], `size` [width, height] or one for each point of `path`, `round` (true: an oval section) |
 | `opening` | `at`, `turn` (the way you walk through), `width`, `depth`, `from`, `to`, and either `arch` + `arch_rise` or, in place of `width`, `from` and `to`, an `outline` [[x, z], ...] |
@@ -55,6 +56,8 @@ rise is sharper) or `triangle` (half the width). `arch_rise` is part of the heig
 | `top_scale` .5 | the top is half the plan |
 | `top_shift` [3, 0] | the top's centre is 3 m along x from the foot's |
 | `rect` [4, 6], `roof` gabled | the ridge runs along y; with `ridge` 90, along x, and its gables face left and right |
+| `loft` of `rect` [4, 6], `sections` [[0, 1], [8, 1.2], [10, .5]] | 4 x 6 m at the foot, 4.8 x 7.2 at 8 m, 2 x 3 at the top, straight between |
+| `loft` row [10, 1, 1, 3, 0, 45] | at 10 m the plan is full size, 3 m along x, turned 45 degrees clockwise |
 | `lathe` [[0, 5], [10, 1]] | a cone 10 m tall |
 | `beam` of two points | a bar between them, of `size`, never under its `least` (1.2 mm unless given) |
 | `beam` with `size` [[4, 4], [2, 2]] | 4 m square at the first point, 2 m at the last |

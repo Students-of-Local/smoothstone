@@ -49,6 +49,31 @@ def test_a_part_stands_where_the_spec_says(part, more, box):
     assert np.array(box, float) == _box(_solid(part, **more))
 
 
+def _frustum(h, a, b):
+    return h * (a + b + math.sqrt(a * b)) / 3
+
+
+def test_a_loft_goes_straight_from_section_to_section():
+    loft = {"kind": "loft", "rect": [4, 6], "at": [1, 0]}
+    solid = _solid({**loft, "sections": [[0, 1], [8, 1.2], [10, .5]]}, scale=100)
+    assert np.array([-1.4, -3.6, 0, 3.4, 3.6, 10]) == _box(solid)
+    assert solid.volume() == pytest.approx(_frustum(8, 24, 24 * 1.44) + _frustum(2, 24 * 1.44, 6), rel=.005)
+    moved = _solid({**loft, "sections": [[0, 1, 1, 0, 0, 0], [10, 1, .5, 3, 0, 90]]}, scale=100)
+    assert moved.trim_by_plane([0, 0, 1], 9.999).bounding_box()[:5] == pytest.approx((2.5, -2, 9.999, 5.5, 2), abs=.02)
+    west = _solid({"kind": "loft", "ring": [[-2, 0], [2, 0], [2, 1], [-2, 1]], "sections": [[0, 1, 1, 0, 0, 0], [9, 1, 1, 0, 0, 30]]},
+                  scale=100).trim_by_plane([0, 0, 1], 8.999)
+    right = west.trim_by_plane([1, 0, 0], 1).bounding_box()
+    assert right[1] < -.9 and right[4] < .6  # clockwise: its right end turned toward -y
+    assert west.status() == m3.Error.NoError
+
+
+def test_a_loft_keeps_a_print_minimum_at_every_section():
+    cone = landmark_parts.read(_pack({"kind": "loft", "rect": [4, 6], "sections": [[0, 1], [10, 0]]}), REFS)[0][0]
+    top = m3.Manifold.batch_boolean(cone["_build"](1., []), m3.OpType.Add).trim_by_plane([0, 0, 1], 9.999).bounding_box()
+    assert top[3] - top[0] == pytest.approx(1.2, abs=.01) and top[4] - top[1] == pytest.approx(1.2, abs=.01)
+    assert cone["print_modifications"] == ["Widened to 1.2 mm."]
+
+
 def test_a_taper_is_half_at_the_top_and_a_cone_has_a_cones_volume():
     assert _solid({**BLOCK, "top_scale": .5}).volume() == pytest.approx(10 * (24 + 6 + 12) / 3, rel=.01)
     cone = _solid({"kind": "lathe", "profile": [[0, 5], [10, 0]]}, scale=100)
@@ -161,6 +186,11 @@ def test_a_guess_is_marked_and_a_part_may_name_its_source():
     ({**BLOCK, "copies": {"around": [0, 0], "count": 401}}, "1 to 400"),
     ({**BLOCK, "copies": {"mirror": "z"}}, "mirror must be"),
     ({**BLOCK, "copies": 4}, "must be an object"),
+    ({"kind": "loft", "rect": [4, 6], "sections": [[0, 1]]}, "2 to 100 rows"),
+    ({"kind": "loft", "rect": [4, 6], "sections": [[0, 1], [9, 1, 1]]}, "same length"),
+    ({"kind": "loft", "rect": [4, 6], "sections": [[0, 1], [0, 1]]}, "must rise"),
+    ({"kind": "loft", "rect": [4, 6], "sections": [[0, 0], [9, 0]]}, "not 0 all"),
+    ({"kind": "loft", "rect": [4, 6], "to": 9, "sections": [[0, 1], [9, 1]]}, "no field to"),
     ({**BLOCK, "guess": ""}, "guess must say"),
     ({**BLOCK, "source": "a book"}, "must be a URL"),
     ({**BLOCK, "at": [1]}, "at must be"),
