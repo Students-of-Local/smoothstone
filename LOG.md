@@ -1134,3 +1134,21 @@ The round 2 mediums on PR 116, fixed.
 
 Westminster, St. Vitus and Florence rebuilt from saved references are byte-identical before and after. The nine
 saved builds pass the new measurements; no judge ran, because no mesh changed.
+
+## 2026-11-24 landmark names: the thing a person means
+
+100 famous names, looked up once and scored from the recorded answers. main gave 78 and the change before this one 79:
+"White House" was Moscow's, "Buckingham Palace" a cottage in Western Australia, "Rialto Bridge" one in Dublin and
+"Petra" a particle accelerator.
+
+- A lookup reads Wikidata's search, the article Wikipedia gives for that exact name, and Wikipedia's search. If
+  Wikipedia does not answer, Wikidata's search still does.
+- The score is how many Wikimedia sites write about a thing, times whether the name is its name (accents, "St." and
+  "Saint" and "The" aside), times whether it is a building. A town scores .02, so "Reims" and "Santiago de
+  Compostela" give their cathedrals.
+- The names were split in two. First score on the half kept back: 48 of 52. The misses showed "meeting place" and
+  "historic place" read as towns, an attack taken for a building, and an exact name weighed over fame; after those
+  fixes, 98 of 100. "Salisbury" still gives the city (no search returned the cathedral) and "Skellig Michael" the
+  island group. A third set of 50 names, scored once after that and not tuned on: 47. "Peterhof" gives an inn and
+  "Mezquita" a mosque in Huelva; the third, "Frauenkirche", gives Dresden's, which is fair.
+- The 98 are a recorded test, `tests/fixtures/landmark/names.json`. No sealed landmark's name is in any set.

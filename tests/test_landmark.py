@@ -18,6 +18,11 @@ CASES = {
 }
 
 
+@pytest.fixture(autouse=True)
+def no_wikipedia(monkeypatch):
+    monkeypatch.setattr(landmark_refs, "_wikipedia", lambda params: {})
+
+
 @pytest.fixture
 def recorded(monkeypatch, tmp_path):
     """Replay recorded Wikidata and OSM responses through the real parsers."""
@@ -155,6 +160,68 @@ def test_an_exact_name_with_a_building_style_outranks_a_longer_name(tmp_path, mo
     monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
     monkeypatch.setattr(landmark_refs, "_wiki", wiki)
     assert landmark_refs.resolve(ruin["label"], tmp_path)["id"] == "Q1"
+
+
+def test_the_better_known_of_two_buildings_with_one_name_comes_first(tmp_path, monkeypatch):
+    local = {"id": "Q1", "label": "Example Temple", "description": "building in a town"}
+    famous = {"id": "Q2", "label": "Example Temple", "description": "ancient temple in a capital"}
+    claims = {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]}
+
+    def wiki(params):
+        if params["action"] == "wbsearchentities":
+            return {"search": [local, famous]}
+        sites = {f"{code}wiki": {"title": ""} for code in ("de", "fr", "it")}
+        return {"entities": {"Q1": {"claims": claims}, "Q2": {"claims": claims, "sitelinks": sites}}}
+
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(landmark_refs, "_wiki", wiki)
+    assert landmark_refs.resolve("Example Temple", tmp_path)["id"] == "Q2"
+
+
+def _claims(words):
+    present = [{"mainsnak": {"datavalue": {"value": {"id": "Q839954"}}}}]
+    return {"P625": present, "P31": present if "dug" in words else [], **{w: present for w in words if w[0] == "P"}}
+
+
+@pytest.mark.parametrize("name, wanted, candidates", json.loads((FIXTURES / "names.json").read_text()),
+                         ids=lambda value: value if isinstance(value, str) else "")
+def test_a_famous_name_gives_the_landmark_a_person_means(name, wanted, candidates):
+    """Wikidata's and Wikipedia's answers of 2026-11-24, with each name's nearest rivals, worst first."""
+    hits, entities = [], {}
+    for identifier, label, description, aliases, links, words in reversed(candidates):
+        hits.append({"id": identifier, "label": label, "description": description, "article": "article" in words})
+        entities[identifier] = {"aliases": {"en": [{"value": alias} for alias in aliases]},
+                                "sitelinks": dict.fromkeys(range(links)), "claims": _claims(words.split())}
+    assert landmark_refs._choose(name, hits, entities)[0]["id"] == wanted
+
+
+def test_wikipedia_article_joins_the_search_and_its_failure_does_not_stop_it(tmp_path, monkeypatch):
+    house = {"id": "Q1", "label": "White Example", "description": "government building in Moscow"}
+    point = [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]
+    entities = {"Q1": {"claims": {"P625": point}}, "Q2": {"claims": {"P625": point},
+                "descriptions": {"en": {"value": "official residence of the president"}}}}
+
+    def wiki(params):
+        if params["action"] == "wbsearchentities":
+            return {"search": [house]}
+        return {"entities": {key: value for key, value in entities.items() if key in params["ids"]}}
+
+    def wikipedia(params):
+        if "titles" not in params:
+            raise OSError("rate limited")
+        return {"query": {"pages": {"7": {"title": "White Example", "pageprops": {"wikibase_item": "Q2"}}}}}
+
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(landmark_refs, "_wiki", wiki)
+    assert landmark_refs.resolve("White Example", tmp_path)["id"] == "Q1"
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "other")
+    monkeypatch.setattr(landmark_refs, "_wikipedia", wikipedia)
+    assert landmark_refs.resolve("white example", tmp_path)["id"] == "Q2"
+
+
+@pytest.mark.parametrize("a, b", [("Sacr\u00e9-C\u0153ur", "Sacre Coeur"), ("Saint Paul's", "St. Pauls"), ("The Alamo", "Alamo")])
+def test_one_name_written_two_ways(a, b):
+    assert landmark_refs._words(a) == landmark_refs._words(b)
 
 
 def test_separate_bell_tower_requires_a_wikidata_component_link():
