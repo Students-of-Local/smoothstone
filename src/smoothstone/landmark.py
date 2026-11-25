@@ -470,6 +470,7 @@ def _footing(man, notes):
 
 
 WELD = .08
+NECK = .4  # mm, a nozzle's line
 
 
 def _weld(man, mesh, notes):
@@ -478,13 +479,17 @@ def _weld(man, mesh, notes):
 
     points, index = np.unique(np.asarray(mesh.vertices, np.float32), axis=0, return_inverse=True)
     faces = index.reshape(-1)[mesh.faces]
+    a, b, c = faces.T
+    faces = faces[(a != b) & (b != c) & (c != a)]  # a sliver that collapses would count its long edge twice more
     edges = np.sort(np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
-    edges, count = np.unique(edges[edges[:, 0] != edges[:, 1]], axis=0, return_counts=True)
+    edges, count = np.unique(edges, axis=0, return_counts=True)
     touching = edges[count > 2]
+    if not len(touching):
+        return man
     cube = m3.Manifold.cube([WELD] * 3, True)
     bars = [(cube.translate(points[a].tolist()) + cube.translate(points[b].tolist())).hull() for a, b in touching]
     notes.append(f"Welded {len(bars)} edges where two bodies touched along a line.")
-    return _union([man, *bars])
+    return _union([man, _union(bars).trim_by_plane([0, 0, 1], man.bounding_box()[2])])  # none below the bed
 
 
 def _closed(man, raw, notes):
@@ -579,7 +584,7 @@ def _anchor(man, notes):
 def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack=None):
     """Build sourced geometry, preserving references and handing scale to modelprint."""
     import manifold3d as m3
-    from . import clean, landmark_architecture, landmark_parts, landmark_refs, modelprint
+    from . import landmark_architecture, landmark_parts, landmark_refs, modelprint
     from .landmark_style import style_keys
 
     root = Path(job_root)
@@ -802,11 +807,15 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         elif data.get("site"):  # the castle's ground carries its buildings
             base += _section(data["site"]).scale([scale, scale]) ^ footprint.hull()
         base = linked_plinth(base.offset(.02))
+        # bodies that meet only at a corner, or across a hairline gap, hold by a neck no print has
+        cores = [c for c in base.offset(-NECK / 2).decompose() if c.area() > 4]
+        if len(cores) > 1:
+            base += linked_plinth(m3.CrossSection.batch_boolean(cores, m3.OpType.Add))
         if towers:
             notes.append("Included measured bell towers explicitly listed as part of the landmark in Wikidata.")
     solids.append(base.extrude(2.02))
     man = _union(solids)
-    man = _footing(_anchor(man, notes), notes)
+    man = _anchor(man, notes)
     # A reference part is drawn as its sources show it, with no style's ornament over it.
     drawn = len(records) - len(extra)
     if chosen == "high" and drawn and not is_lattice:
@@ -816,7 +825,8 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         notes.extend(additions)
     man = landmark_parts.cut(man, openings, scale, notes)
     if "lean" in pack:
-        man = _footing(landmark_parts.lean(man, pack["lean"], notes), notes)
+        man = landmark_parts.lean(man, pack["lean"], notes)
+    man = _footing(man, notes)
     if man.status() != m3.Error.NoError:
         raise LandmarkProblem(f"mapped geometry could not form a closed solid ({man.status().name}).")
     raw_mesh = modelprint.to_trimesh(man)
