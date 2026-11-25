@@ -1166,6 +1166,15 @@ From 40 landmarks never built before (no model, no judge), looked at one by one.
   by measured ground parts is lower: 22 m there. With nothing measured on the ground, the old median stands.
 - `indoor`, `room` and underground elements are not parts. The White House's four toilets stood as 21 m blocks.
 
+### 2026-11-24: PR 141's review mediums
+
+- Several parts with no height at one spot share the missing levels, lowest first. They stood as full columns.
+- A twin's level counts only within the height of the stack it joins, so a pinnacle's plan repeated on another tower
+  gives none. An explicit `min_height=0` is kept.
+- A guessed height raised by a sourced amount stays marked guessed.
+
+The parts of 41 saved maps resolve the same before and after.
+
 ### 2026-11-24: the base follows the plan
 
 The 2 mm base was the convex hull of the plan, a boat-shaped plate around Speyer, Lincoln and Buckingham Palace, and the
