@@ -61,7 +61,7 @@ def reconcile_gothic(parts, refs: dict, facts: dict, notes: list[str]):
 def _reconcile_buttresses(parts, facts: dict, notes: list[str]):
     import manifold3d as m3
 
-    from .landmark import _frame
+    from .landmark import _frame, bearing
     from .landmark_architecture import _measurement
 
     survey = facts["flying_buttress_survey"]
@@ -71,13 +71,9 @@ def _reconcile_buttresses(parts, facts: dict, notes: list[str]):
     flying = []
     main_roofs = []
     for part, section in parts:
-        if part["roof_shape"] == "skillion" and part["tags"].get("roof:direction"):
-            try:
-                bearing = float(part["tags"]["roof:direction"])
-            except (ValueError, TypeError):
-                continue
+        if part["roof_shape"] == "skillion" and bearing(part["tags"]) is not None:
             _, _, (run, wide) = _frame(section, {})
-            if math.isfinite(bearing) and run >= 5 and run >= wide * 8 and part["roof_height"]["metres"] >= run * .65:
+            if run >= 5 and run >= wide * 8 and part["roof_height"]["metres"] >= run * .65:
                 flying.append((part, section))
         if part["roof_shape"] in {"gabled", "cone"} and nave_roof:
             top = part["height"]["metres"]
@@ -114,10 +110,10 @@ def _reconcile_buttresses(parts, facts: dict, notes: list[str]):
 def flying_buttress(section: CrossSection, part: dict, lo: float, eave: float,
                     top: float, notes: list[str]) -> list[Manifold]:
     """Replace a mapped narrow roof wedge with a rising arch and a pier."""
-    from .landmark import _frame, _section
+    from .landmark import _frame, _section, bearing
 
     frame, _, (run, width) = _frame(section, {})
-    outward_bearing = math.radians(float(part["tags"]["roof:direction"]))
+    outward_bearing = math.radians(bearing(part["tags"]))
     outward = np.array([math.sin(outward_bearing), math.cos(outward_bearing)])
     inward = -frame[0] if frame[0] @ outward > 0 else frame[0]
     across = np.array([-inward[1], inward[0]])

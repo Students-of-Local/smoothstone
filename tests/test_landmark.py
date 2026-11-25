@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 import trimesh
 
@@ -260,3 +261,79 @@ def test_supplied_facts_do_not_switch_off_the_inferred_massing(recorded, tmp_pat
     monkeypatch.setattr(landmark_massing, "infer_massing", infer)
     with pytest.raises(Reached):
         landmark.generate("Cologne Cathedral", tmp_path, (220, 220, 220), 200, "low", ref_pack="facts.json")
+
+
+@pytest.mark.parametrize("direction, down", [("90", (1, 0)), ("ENE", (.92, .38)), ("SSW", (-.38, -.92)), ("n", (0, 1))])
+def test_a_shed_roof_descends_the_way_the_map_says(direction, down):
+    # the 202 directed skillion parts in five landmarks' maps agree with OSM's sense; a roof built from one was
+    # high at the wrong side, and ENE and its kind were not read at all
+    import manifold3d as m3
+    from smoothstone import landmark
+
+    roof = landmark._roof(m3.CrossSection.circle(6, 32), {"roof_shape": "skillion", "tags": {"roof:direction": direction}},
+                          0, 8, [])
+    v = np.array(roof.to_mesh().vert_properties)[:, :3]
+    top = v[v[:, 2] > 7]
+    assert len(top) and (top[:, :2] @ np.array(down)).max() < 0, direction
+
+
+def _minaret(x, untagged=False):
+    def ring(half):
+        return [[[x - half, -half], [x + half, -half], [x + half, half], [x - half, half]]]
+    tags = [(2.0, "5", "32"), (2.4, "13", "14"), (2.8, "32", "32.3"), (2.2, "36", "41")]
+    out = []
+    for k, (half, lo, hi) in enumerate(tags):
+        t = {"building:part": "yes", "min_height": lo, "height": hi}
+        if untagged and k in (1, 2):
+            if k == 1:
+                out.append({"id": f"{x}-{k}", "footprint": ring(half), "tags": t})
+            t = {"building:part": "yes"}
+        out.append({"id": f"{x}-{k}{'u' if untagged else ''}", "footprint": ring(half), "tags": t})
+    return out
+
+
+def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
+    # the Taj Mahal's south-west minaret: three parts with no height stood as 40 m columns through its rings and kiosk
+    from smoothstone import landmark
+
+    parts = [*_minaret(0), *_minaret(50), *_minaret(100), *_minaret(150, untagged=True)]
+    records, _ = landmark.resolve_parts(parts, {"geometry_source": "https://www.openstreetmap.org/way/1"})
+    odd = {p["id"]: (p["min_height"]["metres"], p["height"]["metres"], p["height"]["guessed"])
+           for p in records if str(p["id"]).startswith("150")}
+    assert odd["150-2u"] == (32, 32.3, True)
+    assert "150-1u" not in odd  # its ring is already drawn with a height
+    assert odd["150-1"] == (13, 14, False)
+
+
+def test_a_part_with_no_height_and_no_twins_still_stands():
+    from smoothstone import landmark
+
+    square = [[[0, 0], [9, 0], [9, 9], [0, 9]]]
+    parts = [{"id": 1, "footprint": square, "tags": {"height": "20"}},
+             {"id": 2, "footprint": [[[30, 0], [39, 0], [39, 9], [30, 9]]], "tags": {}}]
+    records, _ = landmark.resolve_parts(parts, {"geometry_source": "x"})
+    assert [p["height"]["metres"] for p in records] == [20, 20]
+
+
+def test_matched_towers_get_the_same_mapped_detail():
+    # Cologne's map draws gables, pinnacles and spire bands on the south tower only
+    import manifold3d as m3
+    from smoothstone import landmark_architecture as la
+
+    fact = lambda v: {"metres": float(v), "source": "x", "guessed": False}
+    def part(i, at, size, lo, hi, feature=None):
+        cs = m3.CrossSection.square([size, size], True).translate(at)
+        return ({"id": i, "height": fact(hi), "min_height": fact(lo), "roof_height": fact(0), "roof_shape": "flat",
+                 "spire": False, "feature": feature, "tags": {"roof:direction": "NNE"}, "source": "x",
+                 "footprint": []}, cs)
+    parts = [part("s", (0, -17), 18, 70, 157, "west_spire"), part("n", (0, 17), 18, 70, 157, "west_spire"),
+             *[part(f"p{k}", (dx, -17 + dy), 1, 0, 110) for k, (dx, dy) in enumerate([(8, 8), (-8, 8), (8, -8), (-8, -8)])],
+             part("nave", (40, 0), 20, 0, 60)]
+    notes = []
+    added = la._twin_detail(parts, [np.array([0., -17]), np.array([0., 17])], 18, 70, notes)
+    got = sorted(tuple(np.round(la._dimensions(cs)[0], 1)) for _, cs in added)
+    assert got == [(-8.0, 9.0), (-8.0, 25.0), (8.0, 9.0), (8.0, 25.0)]
+    assert all(p["height"]["guessed"] and float(p["tags"]["roof:direction"]) == pytest.approx(157.5) for p, _ in added)
+    assert all(cs.area() == pytest.approx(1) for _, cs in added) and notes
+    both = parts + added
+    assert la._twin_detail(both, [np.array([0., -17]), np.array([0., 17])], 18, 70, []) == []

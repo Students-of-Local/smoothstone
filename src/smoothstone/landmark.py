@@ -81,6 +81,39 @@ def _levels(value):
     return v if v is not None and 0 < v < 300 else None
 
 
+def _same_plan(a, b):
+    """Whether two footprints have the same size, wherever they stand."""
+    ax, bx = np.subtract(a.bounds()[2:], a.bounds()[:2]), np.subtract(b.bounds()[2:], b.bounds()[:2])
+    return abs(a.area() / b.area() - 1) < .035 and bool((np.abs(ax / bx - 1) < .017).all())
+
+
+def _level_from_twin(i, prepared):
+    """A part drawn with no height inside a repeated element (one of four minarets) takes the level its
+    same-plan twins elsewhere share. Returns (min_height, height, id), "duplicate" when every such level
+    is already drawn here, or None when nothing repeats it."""
+    part, cs, _, lo = prepared[i]
+    if lo:
+        return None
+    levels, here = {}, []
+    for other, other_cs, h, other_lo in prepared:
+        if other is part or h is None or h <= other_lo or not _same_plan(cs, other_cs):
+            continue
+        if (cs ^ other_cs).area() > cs.area() * .8:
+            here.append((other_lo, h))
+        else:
+            levels.setdefault((round(other_lo, 1), round(h, 1)), []).append((other_lo, h, other.get("id")))
+    # One stray match is a coincidence. A set repeats at least twice and stands in for a stack here.
+    levels = [v[0] for v in levels.values() if len(v) >= 2]
+    stack = [1 for _, other_cs, h, other_lo in prepared
+             if h is not None and other_lo and (cs ^ other_cs).area() > cs.area() * .6]
+    if not levels or len(stack) < 2:
+        return None
+    missing = [v for v in levels if not any(abs(v[0] - a) < .3 and abs(v[1] - b) < .3 for a, b in here)]
+    if not missing:
+        return "duplicate"
+    return missing[0] if len(missing) == 1 else None
+
+
 def resolve_parts(parts, refs):
     """Resolve dimensions conservatively and return public records plus sections."""
     prepared = []
@@ -124,7 +157,7 @@ def resolve_parts(parts, refs):
         t = part.get("tags", {})
         source = part.get("source") or refs.get("geometry_source") or "https://www.openstreetmap.org/copyright"
         raw_h = length(t.get("height") or t.get("building:height"))
-        reason = None
+        reason = twin_reason = None
         hsource = source
         if raw_h is None:
             if _levels(t.get("building:levels")):
@@ -133,6 +166,11 @@ def resolve_parts(parts, refs):
                 h = real
                 hsource = refs.get("sources", {}).get("height", refs.get("source"))
                 reason = "landmark height assigned to the strongest mapped tower or roof candidate"
+            elif (twin := _level_from_twin(i, prepared)) == "duplicate":
+                continue
+            elif twin:
+                lo, h, twin_id = twin
+                reason = twin_reason = f"level shared by the same-plan parts of its twins, such as {twin_id}"
             else:
                 h = max(median, lo + 4)
                 reason = "median known part height, raised above min_height when necessary"
@@ -162,7 +200,7 @@ def resolve_parts(parts, refs):
             rh = h - lo
             rreason = "roof height limited to the mapped part's total vertical span"
         raw_lo = length(t.get("min_height"))
-        loreason = "building:min_level multiplied by 4 metres" if raw_lo is None and lo else None
+        loreason = twin_reason or ("building:min_level multiplied by 4 metres" if raw_lo is None and lo else None)
         rec = {"id": part.get("id"), "type": part.get("type", "way"),
                "height": _fact(h, hsource, reason is not None, reason),
                "min_height": _fact(lo, source, loreason is not None, loreason or ("ground datum" if raw_lo is None else None)),
@@ -174,19 +212,27 @@ def resolve_parts(parts, refs):
     return records, sections
 
 
+_COMPASS = {point: i * 22.5 for i, point in enumerate(
+    "n nne ne ene e ese se sse s ssw sw wsw w wnw nw nnw".split())}
+
+
+def bearing(tags):
+    """OSM's roof:direction in degrees: the way the roof face looks and a skillion roof descends. None if absent."""
+    value = str(tags.get("roof:direction", "")).strip().lower()
+    try:
+        degrees = _COMPASS[value] if value in _COMPASS else float(value)
+    except ValueError:
+        return None
+    return degrees if math.isfinite(degrees) else None
+
+
 def _frame(cs, tags):
     """Long roof ridge axis in east/north coordinates, then its projected extent."""
     import trimesh
     points = np.concatenate(cs.to_polygons())
     T, ext = trimesh.bounds.oriented_bounds_2D(points)
     u = T[:2, :2][int(ext[1] > ext[0])].copy()
-    direction = tags.get("roof:direction")
-    cardinal = {"n": 0, "ne": 45, "e": 90, "se": 135, "s": 180, "sw": 225, "w": 270, "nw": 315}
-    try:
-        a = cardinal.get(str(direction).lower())
-        a = float(direction) if a is None else a
-    except (ValueError, TypeError):
-        a = None
+    a = bearing(tags)
     if a is not None:
         slope = np.array([math.sin(math.radians(a)), math.cos(math.radians(a))])
         u = np.array([slope[1], -slope[0]])
@@ -296,7 +342,9 @@ def _roof(cs, record, z0, height, notes, mughal=False):
     w = width / 2 + .01
     tip = min(.8, w * .8)
     if shape == "skillion":
-        profile = [(-w, z0 - .01), (w, z0 - .01), (w, z0 + height), (-w, z0)]
+        # v points along roof:direction, so the roof is high behind it and descends toward it.
+        high, low = (-w, w) if bearing(record["tags"]) is not None else (w, -w)
+        profile = [(-w, z0 - .01), (w, z0 - .01), *sorted([(high, z0 + height), (low, z0)], reverse=True)]
     elif shape == "round":
         arc = [(float(w * math.cos(a)), z0 + height * math.sin(a)) for a in np.linspace(0, math.pi, 25)]
         profile = [(-w, z0 - .01), (w, z0 - .01), *arc]
