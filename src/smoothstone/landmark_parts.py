@@ -17,9 +17,9 @@ LEAST = .8  # mm, the narrowest a part held at both ends may ask for
 CUT = .6  # mm, the narrowest gap
 ROOFS = ("flat", "pyramidal", "gabled", "hipped", "dome", "onion", "round", "skillion")
 PLANS = ("rect", "circle", "ngon", "ring")
-ANY = ("kind", "id", "source", "guess", "copies", "least")
-FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "top_scale", "top_shift"),
-          "lathe": ("at", "profile"), "beam": ("path", "size", "round"),
+ANY = ("kind", "id", "source", "guess", "copies")
+FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "top_scale", "top_shift", "least"),
+          "lathe": ("at", "profile", "least"), "beam": ("path", "size", "round", "least"),
           "opening": ("at", "turn", "width", "depth", "from", "to", "arch")}
 
 
@@ -87,7 +87,7 @@ def _prism(part):
     _need((roof == "flat") == (rise == 0), "a roof needs roof_rise, and a flat roof has none")
     scale = _number(part.get("top_scale", 1), "top_scale", 0)
     shift = _vector(part.get("top_shift", [0, 0]), "top_shift")
-    least_mm = _number(part.get("least", THIN), "least")
+    _need(rise == 0 or part.get("least", THIN) == THIN, "a roof keeps its 1.6 mm tip, so a part with one takes no least")
 
     def build(floor, notes):
         from .landmark import _roof
@@ -106,7 +106,7 @@ def _prism(part):
             top = body.translate((-mid).tolist()).scale([s, s]).translate((mid + shift).tolist())
         if rise:
             over = min(.02, rise / 4)
-            mm = least_mm / floor if floor else 1.  # roofs are lofted in print millimetres
+            mm = THIN / floor if floor else 1.  # roofs are lofted in print millimetres
             loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {"roof:direction": "0"} if roof == "skillion" else {}},
                          (eave - over) * mm, (rise + over) * mm, notes)
             solids.append(loft.scale([1 / mm] * 3))
@@ -314,12 +314,13 @@ def read(pack, refs):
 
                 record = {}
 
-                def make(scale, notes, flat=flat, build=build, plain=outline, record=record, least=least, kind=kind):
+                def make(scale, notes, flat=flat, build=build, plain=outline, record=record, least=least,
+                         slim=np.min(part["size"]) if kind == "beam" else math.inf):
                     solids = build(least / scale, notes)
                     grown = m3.Manifold.batch_boolean(solids, m3.OpType.Add)
                     # a beam's thin end may widen inside the box of its thick one
                     if (np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01
-                            or kind == "beam" and grown.volume() > 1.01 * plain.volume()):
+                            or slim * scale < least - .01):
                         record["print_modifications"] = [f"Widened to {least:g} mm."]
                     return _place(solids, flat, scale)
                 def hole(scale, floor=0., flat=flat, build=build):
