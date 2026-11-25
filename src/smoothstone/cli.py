@@ -1883,46 +1883,56 @@ def cmd_measure(args, job: Job) -> Out:
 # done
 
 
-AGREE = set("yes yeah yep ok okay sure fine go please print want wants".split())
+AGREE = set("yes yeah yep ok okay sure fine go".split())
 AGREED = AGREE | set("ahead do the that it a one plain shape box cylinder thanks thank you is that's good great make build as "
-                     "to person user they said says i we just".split())
-REFUSE = set("no nope not never skip instead don't dont".split())
-FILE = re.compile(r"\S+\.(?:stl|3mf|obj|step|stp|glb|ply)\b", re.I)
+                     "to person user they said says i we just print please want wants tall high wide long across".split())
+SIZED = re.compile(r"\d+(?:\.\d+)?\s*(?:mm|cm|m|in|inch|inches)\b", re.I)
+FILE = re.compile(r"[^\s\"']+\.(?:stl|3mf|obj|step|stp|glb|ply)\b", re.I)
+MAKE = re.compile(r"^\W*(?:no\b\W*)?(?:(?:please|just|can you)\s+)?(?=(?:make|build|design|create)\b)", re.I)
+LEAD = re.compile(r"^\W*(?:(?:yes|try|use|maybe|it'?s|it is|called|the name is)\b\W*)+", re.I)
+WHERE = "ask the person: where is that file on this computer?"
+INSTEAD = "ask the person: what should I make instead?"
 
 
 def says(text: str) -> str:
-    """"yes" only when every word agrees ("OK, don't print it" is a no), "no" when a word refuses, else ""."""
-    words = set(re.findall(r"[a-z']+", text.lower().replace("\u2019", "'")))
+    """"yes" only when every word agrees, a size aside ("OK, don't print it" is neither), "no" when it opens with one, else ""."""
+    words = re.findall(r"[a-z']+", SIZED.sub("", text).lower().replace("\u2019", "'"))
     if "?" in text or not words:
         return ""
-    return "yes" if words & AGREE and words <= AGREED else "no" if words & REFUSE else ""
+    return "yes" if set(words) & AGREE and set(words) <= AGREED else "no" if words[0] in ("no", "nope") else ""
 
 
-def note_landmark(out: Out, job: Job, st: dict, text: str) -> Out:
-    """The person's answer to a landmark question: their yes or no, a file, another name, or another part."""
-    asked, plain, said = st["next"], st.get("landmark_plain") or {}, says(text)
+def note_landmark(out: Out, job: Job, asked: str, plain: dict, text: str) -> Out:
+    """The person's answer to a landmark question: yes or no, a file, another name, or another thing to make."""
+    from . import models as mdl
+
+    said, file, make = says(text), FILE.search(text), MAKE.match(text)
+    pick = plain and asked == _ask_plain(plain["subject"])
     out.owns_next = True
     out.next = asked
     if "?" in text:
-        return out  # their own question is no answer
-    job.update(landmark_said=asked)  # they have answered: the job may move to another part
-    file = FILE.search(text)
-    if plain and said == "yes" and (asked == _ask_plain(plain["subject"]) or {"print", "plain"} & set(text.lower().split())):
-        job.update(landmark_plain={**plain, "yes": True})
-        out.next = plain["command"]
-    elif plain and said == "no" and asked == _ask_plain(plain["subject"]):
+        out.add("That is a question to you: answer it, then ask again.")
+    elif file:
+        out.next = f"stone check {shlex.quote(file.group())}"
+    elif asked == INSTEAD and said:
+        pass  # a yes or a no names nothing to make
+    elif make or asked == INSTEAD:
+        out.next = f"stone new {shlex.quote(text[make.end():] if make else text)} --force"
+    elif pick and said == "yes":
+        size = {"size": mdl.target(text, config.bed(job.root))} if SIZED.search(text) else {}
+        job.update(landmark_plain={**plain, "yes": True, **size})
+        out.next = re.sub(r" --size \S+", "", plain["command"]) if size else plain["command"]
+    elif pick and said == "no":
         job.update(landmark_plain={**plain, "yes": False})
         out.next = _ask_file(plain["subject"])
-        if len(text.split()) > 3:  # "no, make me a panel instead"
-            job.update(landmark_said=out.next)
-    elif file:
-        out.next = f"stone check {shlex.quote(file.group().strip(chr(34) + chr(39)))}"
-    elif asked == _ask_plain(plain.get("subject", "")):
+    elif pick:
         out.add('If that was a yes or a no, note just that: stone note "yes" or stone note "no"')
+    elif said == "yes" or asked == WHERE:
+        out.next = WHERE
     elif said == "no":
-        out.next = "ask the person: what should I make instead?"
+        out.next = INSTEAD
     else:
-        out.add('If that was another name, run: stone landmark "<that name>"')
+        out.next = _landmark_command("stone landmark", LEAD.sub("", text).strip(" .!"))
     return out
 
 
@@ -1942,8 +1952,9 @@ def cmd_note(args, job: Job) -> Out:
     if st.get("ask_product") and asked.startswith("stone note"):
         # a set with sizes sent the model here: the job still waits on the person's answer to this question
         asked = f"ask the person: {match.product_size_question(st['ask_product'], bool(st.get('ask_round')))}"
-    agreed = asked.startswith(LANDMARK_ASK) and says(text) == "yes"  # "yes, print that plain shape" repeats its words
-    if asked.startswith("ask the person") and not agreed and is_the_question(text, asked):
+    # "yes, print that plain shape" repeats the question's words, and so does "no, don't print that plain shape"
+    mine = asked.startswith(LANDMARK_ASK) and says(text) and not text.lower().startswith("no open model")
+    if asked.startswith("ask the person") and not mine and is_the_question(text, asked):
         out.fix("that is your question, not the person's answer; write the question as your reply and stop")
         out.add("Note only what the person says back.")
         out.next = asked
@@ -1952,8 +1963,8 @@ def cmd_note(args, job: Job) -> Out:
         return out
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
-    if asked.startswith(LANDMARK_ASK):
-        return note_landmark(out, job, st, text)
+    if asked.startswith(LANDMARK_ASK) or asked in (WHERE, INSTEAD):
+        return note_landmark(out, job, asked, st.get("landmark_plain") or {}, text)
     if asked.startswith("ask the person") and st.get("ask_product"):
         # the answer is the product's size: it is kept as a note, never read into the request as a part size
         return note_product(out, job, st, text)
@@ -2381,6 +2392,8 @@ def cmd_landmark(args, job: Job) -> Out:
     chosen = [a for flag, value in (("--size", args.size), ("--detail", args.detail), ("--refs", args.refs))
               if value is not None for a in (flag, str(value))]
     mine = str(waits.get("subject") or "").casefold() == subject.casefold()
+    if args.size is None and mine and waits.get("size"):
+        size = waits["size"]  # the person said it with their yes
     if args.plain and not (mine and waits.get("yes")):
         out.fix('the person has not said yes to the plain shape; when they do: stone note "<their answer>"')
         out.next = (shlex.join(["stone", "landmark", subject, *chosen]) if not mine else _landmark_fallback(job, subject)
@@ -2407,6 +2420,8 @@ def cmd_landmark(args, job: Job) -> Out:
         if config.tier(job.root) == "L":  # only a large model can write what the map lacks
             out.add(f"Or write the shapes it lacks from cited sources (skill/landmarks.md) and build with "
                     f"{_landmark_command('stone landmark', subject)} --refs pack.json")
+        if args.plain:
+            job.update(landmark_plain=None)  # it cannot be built: no second yes to it
         out.fix(str(e))
         out.next = command or _landmark_command("stone models", subject)
         out.stage = "landmark_failed"
@@ -3738,7 +3753,7 @@ def run(argv: list[str]) -> tuple[str, int]:
         catalog.use_job(job.root)
         st = job.status() if job.exists() else {}
         asked = str(st.get("next", ""))
-        if cmd in MAKERS and asked.startswith(LANDMARK_ASK) and st.get("landmark_said") != asked:
+        if cmd in MAKERS and asked.startswith(LANDMARK_ASK):
             out = Out(owns_next=False)  # LFM3-1.7B made a faceplate instead of asking about a lighthouse
             out.fix('stone waits on the person, not another part; when they answer: stone note "<their answer>"')
             out.next = asked

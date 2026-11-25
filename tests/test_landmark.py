@@ -1170,30 +1170,88 @@ def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, m
     assert run("note", "how tall would it be?")[1] == asked
     # the question is no answer to itself, and a yes or no with more in it is asked back
     assert run("note", "No open model of Taj Mahal prints, and the map has it only as one plain shape")[1] == asked
-    assert 'stone note "yes"' in run("note", "12 cm tall")[0] and run(*plain)[1] == asked
-    assert "Do you have a model file" in run("note", "OK, don't print it")[1]
+    assert run("note", "Print that plain shape")[1] == asked and run(*plain)[1] == asked
+    for unclear in ("12 cm tall", "OK, don't print it", "I want to make a box", "Sure, why not"):
+        text, last = run("note", unclear)
+        assert 'stone note "yes"' in text and last == asked and run(*plain)[1] == asked
+    assert "Do you have a model file" in run("note", "No, don't print that plain shape")[1]
     assert "Do you have a model file" in run("models", "taj mahal")[1]  # the same question is not asked twice
     assert "Do you have a model file" in run(*plain)[1]
-    assert run("note", "yes, /tmp/taj.stl")[1] == "NEXT: stone check /tmp/taj.stl"
-    cli.Job(jobenv / "stone-job").update(next=cli._ask_file("Taj Mahal"))
-    assert 'stone landmark "<that name>"' in run("note", "try Crown of Palaces")[0]
-    assert run("note", "no")[1] == "NEXT: ask the person: what should I make instead?"
     cli.Job(jobenv / "stone-job").update(next=cli._ask_plain("Taj Mahal"))
     assert run("note", "Yes, print that plain shape")[1] == "NEXT: " + shlex.join(["stone", *plain])
-    command = "stone landmark 'Taj Mahal' --size 120.0 --plain"
-    text, last = run(*shlex.split(command)[1:])
+    text, last = run(*plain)
     assert "NOTE, tell the person: the map has Taj Mahal as one plain shape" in text and "Part ready" in text
     assert "Size: 120 mm" in text
     assert "Do you have a model file" in run("models", "Taj Mahal")[1]
-    run("note", "make a blank panel instead")
-    assert "waits on the person" not in run("show", "panel")[0]  # their own words may ask for another part
+
+
+def _asked(monkeypatch, recorded, ask="plain"):
+    """A job that waits on a landmark question, and the NEXT line of each stone command run in it."""
+    from smoothstone import cli
+
+    def run(*args):
+        text, _ = cli.run(list(args))
+        return next(ln for ln in text.splitlines() if ln.startswith("NEXT: "))[len("NEXT: "):]
+
+    _drawn(monkeypatch, recorded, PLAIN)
+    _no_models(monkeypatch)
+    for line in (["landmark", "Taj Mahal", "--size", "150"], ["models", "Taj Mahal"], *([["note", "no"]] * (ask == "file"))):
+        last = run(*line)
+    assert ("Print that plain shape?" if ask == "plain" else "Do you have a model file") in last
+    return run
+
+
+def test_a_size_said_with_the_yes_is_the_size_built(recorded, monkeypatch, jobenv):
+    from smoothstone import cli
+
+    command = _asked(monkeypatch, recorded)("note", "Yes, 12 cm tall")
+    assert command == "stone landmark 'Taj Mahal' --plain"
+    assert "Size: 120 mm" in cli.run(shlex.split(command)[1:])[0]
+
+
+def test_a_plain_shape_that_cannot_be_built_is_not_asked_about_again(recorded, monkeypatch, jobenv):
+    from smoothstone import landmark
+
+    def fails(*args, **kwargs):
+        raise landmark.LandmarkProblem("the map has no height")
+
+    run = _asked(monkeypatch, recorded)
+    command = run("note", "yes")
+    monkeypatch.setattr(landmark, "generate", fails)
+    assert run(*shlex.split(command)[1:]) == "stone models 'Taj Mahal'"
+    assert "Do you have a model file" in run("models", "Taj Mahal")
+
+
+@pytest.mark.parametrize("ask,text,then", [
+    ("plain", "no, use /tmp/taj.stl", "stone check /tmp/taj.stl"),
+    ("plain", "no, make a blank panel instead", "stone new 'make a blank panel instead' --force"),
+    ("file", "yes, /tmp/taj.stl", "stone check /tmp/taj.stl"),
+    ("file", "yes", "ask the person: where is that file on this computer?"),
+    ("file", "Crown of Palaces", "stone landmark 'Crown of Palaces'"),
+    ("file", "Yes, try Crown of Palaces.", "stone landmark 'Crown of Palaces'"),
+    ("file", "make a blank panel instead", "stone new 'make a blank panel instead' --force"),
+    ("file", "no", "ask the person: what should I make instead?")])
+def test_each_answer_to_a_landmark_question_names_the_next_command(recorded, monkeypatch, jobenv, ask, text, then):
+    assert _asked(monkeypatch, recorded, ask)("note", text) == then
+
+
+def test_a_no_to_both_questions_ends_in_another_part(recorded, monkeypatch, jobenv):
+    from smoothstone import cli
+
+    run = _asked(monkeypatch, recorded, "file")
+    question = run("note", "no")
+    assert run("note", "no") == question
+    command = run("note", "a blank panel")
+    assert command == "stone new 'a blank panel' --force"
+    run(*shlex.split(command)[1:])
+    assert "waits on the person" not in cli.run(["show", "panel"])[0]
 
 
 @pytest.mark.parametrize("text,meant", [
-    ("yes", "yes"), ("Yes, print that plain shape.", "yes"), ("User said yes", "yes"), ("print that plain shape", "yes"),
-    ("The person wants the plain shape", "yes"), ("Sure, go ahead", "yes"),
-    ("no thanks", "no"), ("OK, don't print it", "no"), ("Okay, no", "no"), ("Sure, skip it", "no"),
-    ("Yes I have a model file, not the plain shape", "no"), ("OK, how tall would it be?", ""),
+    ("yes", "yes"), ("Yes, print that plain shape.", "yes"), ("User said yes", "yes"), ("Sure, go ahead", "yes"),
+    ("yes, 12 cm tall", "yes"), ("no thanks", "no"), ("No, don't print that plain shape", "no"),
+    ("print that plain shape", ""), ("OK, don't print it", ""), ("Okay, no", ""), ("Sure, why not", ""),
+    ("Yes I have a model file, not the plain shape", ""), ("OK, how tall would it be?", ""), ("12 cm tall", ""),
     ("Fine detail matters to me", ""), ("yes, lighthouse.stl", ""), ("a box", ""), ("", "")])
 def test_only_a_plain_yes_agrees_to_the_plain_shape(text, meant):
     from smoothstone import cli
