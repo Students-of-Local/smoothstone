@@ -35,13 +35,16 @@ with the same one command.
 | `prism` | a plan, `at`, `turn`, `from`, `to`, and any of `roof` + `roof_rise` (`to` is the roof's top), `ridge`, `top_scale`, `top_shift` [x, y] |
 | `lathe` | `at`, `profile` [[z, radius], ...] with z rising |
 | `beam` | `path` [[x, y, z], ...], `size` [width, height] or one for each point of `path`, `round` (true: an oval section) |
-| `opening` | `at`, `turn` (the way you walk through), `width`, `depth`, `from`, `to`, `arch` (true: a round head) |
+| `opening` | `at`, `turn` (the way you walk through), `width`, `depth`, `from`, `to`, and either `arch` + `arch_rise` or, in place of `width`, `from` and `to`, an `outline` [[x, z], ...] |
 
 A plan is one of `rect` [x, y], `circle` radius, `ngon` [sides, radius], `ring` [[x, y], ...]. `turn` is degrees clockwise.
 Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, half-hipped, gambrel, mansard, skillion (high at -y, falling toward +y).
 `ridge` is the ridge's direction, in degrees clockwise from the part's y; without it the ridge follows the long side. Any part takes `id`, `source`, `guess` and `copies`, and any solid without a roof takes `least`:
 `{"around": [x, y], "count": n}` (n in all, evenly turned), `{"row": [x, y], "count": n}` (n in all, stepped by x, y) or
 `{"mirror": "x"}` (and its mirror image across the y axis) or `"y"` or `"xy"` (all four).
+
+`arch` is true or `round` (rising half the width; another `arch_rise` makes it an ellipse), `pointed` (equilateral; a higher
+rise is sharper) or `triangle` (half the width). `arch_rise` is part of the height from `from` to `to`.
 
 ## Cases
 
@@ -61,6 +64,8 @@ Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, half-hipped, gambrel
 | a part on the ground outside `plinth` | the base takes in its foot |
 | `least` .5, two sizes for three points, a plinth with no plan | refused |
 | `opening` 4 wide through a 10 m wall | light through the wall; volume falls by the opening's |
+| `opening` 4 wide, `arch` pointed | its head is the top 3.46 m; `arch_rise` 5 is sharper, 1 is refused |
+| `outline` [[0, 0], [1, 0], [9, 8], [8, 8]] | a diagonal slot; left out where its 0.7 m would print under 0.6 mm |
 | `copies` around, 4 | four parts at 90 degrees |
 | `mirror` xy of a part at [3, 4] | four parts at [±3, ±4] |
 | `replace` all | the map is never asked |

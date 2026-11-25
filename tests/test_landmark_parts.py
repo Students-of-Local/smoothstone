@@ -152,7 +152,12 @@ def test_a_guess_is_marked_and_a_part_may_name_its_source():
     ({"kind": "lathe"}, "profile must list"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 0]], "size": [1, 1]}, "repeats a point"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 1]], "size": [0, 1]}, "more than 0"),
-    ({"kind": "opening", "width": 4, "depth": 4, "from": 0, "to": 1, "arch": True}, "half its width"),
+    ({"kind": "opening", "width": 4, "depth": 4, "from": 0, "to": 1, "arch": True}, "rises 2 m, more than"),
+    ({"kind": "opening", "width": 4, "depth": 4, "to": 9, "arch": "ogee"}, "pointed or triangle"),
+    ({"kind": "opening", "width": 4, "depth": 4, "to": 9, "arch": "pointed", "arch_rise": 1}, "at least half"),
+    ({"kind": "opening", "width": 4, "depth": 4, "to": 9, "arch_rise": 1}, "needs an arch"),
+    ({"kind": "opening", "outline": [[0, 0], [4, 0], [0, 4]], "depth": 4, "to": 9}, "takes no to"),
+    ({"kind": "opening", "outline": [[0, 0], [4, 0], [8, 0]], "depth": 4}, "no area"),
     ({**BLOCK, "copies": {"around": [0, 0], "count": 401}}, "1 to 400"),
     ({**BLOCK, "copies": {"mirror": "z"}}, "mirror must be"),
     ({**BLOCK, "copies": 4}, "must be an object"),
@@ -267,6 +272,32 @@ def test_an_opening_lets_light_through_and_cuts_the_maps_walls(build):
     assert whole.volume() - man.volume() == pytest.approx(4 * 10 * 6 * scale ** 3, rel=.02)
     arched, _, _, _ = build(_pack(tower, {**hole, "arch": True}), [(1, 10)])
     assert whole.volume() - arched.volume() == pytest.approx((4 * 4 + math.pi * 2) * 10 * scale ** 3, rel=.03)
+
+
+@pytest.mark.parametrize("more, area", [
+    ({}, 4 * 8),
+    ({"arch": True}, 4 * 6 + math.pi * 2 ** 2 / 2),
+    ({"arch": "round", "arch_rise": 1}, 4 * 7 + math.pi * 2 * 1 / 2),
+    ({"arch": "pointed"}, 4 * (8 - 12 ** .5) + 16 * (math.pi / 3 - 3 ** .5 / 4)),
+    ({"arch": "pointed", "arch_rise": 5}, 4 * 3 + 7.25 ** 2 * math.atan2(5, 5.25) - 5.25 * 5),
+    ({"arch": "triangle", "arch_rise": 3}, 4 * 5 + 4 * 3 / 2),
+])
+def test_an_opening_has_the_head_it_asks_for(more, area):
+    hole, width, _, _ = landmark_parts.read(
+        _pack(BLOCK, {"kind": "opening", "width": 4, "depth": 1, "from": 1, "to": 9, **more}), REFS)[2][0]
+    solid = hole(1.)
+    assert width == 4 and solid.volume() == pytest.approx(area, rel=.01)
+    assert np.array(solid.bounding_box()) == pytest.approx(np.array([-2, -.5, 3, 2, .5, 11]), abs=.02)
+
+
+def test_an_outline_cuts_its_own_shape_and_is_omitted_when_too_narrow_to_print():
+    slot = {"kind": "opening", "outline": [[0, 0], [1, 0], [9, 8], [8, 8]], "depth": 1}
+    records, _, openings = landmark_parts.read(_pack(BLOCK, slot), REFS)
+    hole, width, _, _ = openings[0]
+    assert hole(1.).volume() == pytest.approx(8, rel=.01) and width == pytest.approx(.5 ** .5, rel=.02)
+    wall, notes = m3.Manifold.cube([40, 1, 40]).translate([-20, -.5, -5]), []
+    assert landmark_parts.cut(wall, openings, 1., notes).volume() == pytest.approx(1600 - 8, rel=1e-3) and not notes
+    assert landmark_parts.cut(wall, openings, .5, notes).volume() == pytest.approx(1600) and "Omitted" in notes[0]
 
 
 def test_an_opening_in_a_widened_wall_lets_light_through_and_a_recess_stays_shallow(build):
