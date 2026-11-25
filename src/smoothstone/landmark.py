@@ -648,7 +648,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                             "feature": "modeled architectural feature, when identified",
                             "tags": "all source tags", "footprint": "outer ring then holes, local east/north metres"}
     save()
-    refs["feature_sources"].extend(source for _, _, source, _ in openings)
+    refs["feature_sources"].extend(source for _, _, source, *_ in openings)
     measured = [cs for p, cs in zip(records, sections) if not p["height"]["guessed"] or "building:levels" in p["tags"]]
     mapped = m3.CrossSection.batch_boolean(sections, m3.OpType.Add)
     sourced = m3.CrossSection.batch_boolean(measured, m3.OpType.Add)
@@ -844,7 +844,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     save()
     urls = {refs["source"], refs["geometry_source"], *refs["sources"].values(),
             *refs["feature_sources"], *(p["source"] for p in records)}
-    drawn_from = [refs["geometry_source"], *(p["source"] for p in records), *(source for _, _, source, _ in openings)]
+    drawn_from = [refs["geometry_source"], *(p["source"] for p in records), *(source for _, _, source, *_ in openings)]
     if ground is not None:
         drawn_from.append(pack["parts"]["plinth"].get("source", pack["parts"]["source"]))
     osm = replace != "all" or any("openstreetmap.org/" in (url or "") for url in drawn_from)

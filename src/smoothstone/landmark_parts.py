@@ -403,10 +403,10 @@ def read(pack, refs):
                     return _place(solids, flat, scale)
                 def hole(scale, floor=0., flat=flat, build=build):
                     return _place(build(floor, []), flat, scale)[0].translate([0, 0, 2]).trim_by_plane([0, 0, 1], 2.02)
-                if kind == "opening":
-                    openings.append((hole, width, source, guess))
-                    continue
                 name = f"{part.get('id', f'part-{i}')}" + (f"-{k + 1}" if len(copies) > 1 else "")
+                if kind == "opening":
+                    openings.append((hole, width, source, guess, name))
+                    continue
                 _need(name not in seen, f"id {name} is used twice")
                 seen.add(name)
                 section = _place([outline], flat)[0].project()
@@ -428,7 +428,7 @@ def read(pack, refs):
 def cut(man, openings, scale, notes):
     """Cut the pack's openings, down to the base. One buried in solid would be a sealed cavity, so it is left out."""
     buried = []
-    for hole, width, _, guess in openings:
+    for hole, width, _, guess, name in openings:
         if guess:
             notes.append(f"Guessed an opening: {guess}.")
         if width * scale < CUT:
@@ -438,13 +438,14 @@ def cut(man, openings, scale, notes):
         if (solid - man).volume() < 1e-6 * solid.volume():  # the wall was widened past it, or a part covers it
             solid = hole(scale, 1.1 * THIN / scale)
             if (solid - man).volume() < 1e-6 * solid.volume():
-                buried.append((solid, width))
+                buried.append((solid, name))
                 continue
         man = man - solid
     while open_ := [b for b in buried if (b[0] - man).volume() >= 1e-6 * b[0].volume()]:  # another opening reached it
         for b in open_:
             man, buried = man - b[0], [c for c in buried if c is not b]
-    notes.extend(f"Left out an opening {width:g} m wide that another part covers." for _, width in buried)
+    if buried:
+        notes.append("Left out openings that another part covers: " + ", ".join(name for _, name in buried) + ".")
     return man
 
 
