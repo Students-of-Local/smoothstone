@@ -212,6 +212,8 @@ def resolve_parts(parts, refs):
                 for other, other_cs, other_h, other_lo in prepared
             ):
                 rh, rreason = 0, "mapped upper tier begins on this roof, kept a flat landing"
+            elif roof == "pyramidal" and "pyramid" in (t.get("building"), t.get("man_made"), t.get("tomb")):
+                rh, rreason = h - lo, "a mapped pyramid's roof is its whole height"
             elif roof != "flat":
                 x0, y0, x1, y1 = cs.bounds()
                 rh = min((h - lo) * .5, min(x1 - x0, y1 - y0) * .55)
