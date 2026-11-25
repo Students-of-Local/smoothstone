@@ -20,7 +20,7 @@ PLANS = ("rect", "circle", "ngon", "ring")
 ANY = ("kind", "id", "source", "guess", "copies")
 FIELDS = {"prism": (*PLANS, "at", "turn", "from", "to", "roof", "roof_rise", "top_scale", "top_shift", "least"),
           "lathe": ("at", "profile", "least"), "beam": ("path", "size", "round", "least"),
-          "opening": ("at", "turn", "width", "depth", "from", "to", "arch")}
+          "opening": ("at", "turn", "width", "depth", "from", "to", "arch", "arch_rise", "outline")}
 
 
 def _need(ok, what):
@@ -185,26 +185,65 @@ def _beam(part):
     return build, 0, 0, 0, "flat"  # its heights are its solid's
 
 
+def _head(arch, w, rise):
+    """The points of an arch's head over half its width, from the right springing to the left, and its rise."""
+    least, usual = {"round": (0, w), "pointed": (w, w * math.sqrt(3)), "triangle": (0, w)}[arch]
+    rise = usual if rise is None else rise
+    _need(rise >= least, "a pointed arch rises at least half its width")
+    if arch == "triangle":
+        return [[w, 0], [0, rise], [-w, 0]], rise
+    if arch == "round":
+        return [[w * math.cos(a), rise * math.sin(a)] for a in np.linspace(0, math.pi, 25)], rise
+    off = (rise ** 2 - w ** 2) / (2 * w)  # each side is an arc about a centre this far past the middle
+    arc = [[(w + off) * math.cos(a) - off, (w + off) * math.sin(a)] for a in np.linspace(0, math.atan2(rise, off), 13)]
+    return arc + [[-x, z] for x, z in arc[-2::-1]], rise
+
+
 def _opening(part):
     import manifold3d as m3
+    from .landmark import _section
 
-    width, depth = _number(part.get("width"), "width", 0), _number(part.get("depth"), "depth", 0)
-    lo, hi = _span(part)
-    arch = part.get("arch", False)
-    _need(isinstance(arch, bool), "arch must be true or false")
-    _need(not arch or hi - lo >= width / 2, "an arch needs to - from of at least half its width")
+    depth = _number(part.get("depth"), "depth", 0)
+    if "outline" in part:
+        extra = {"width", "from", "to", "arch", "arch_rise"} & set(part)
+        _need(not extra, f"an outline takes no {', '.join(sorted(extra))}")
+        ring = _points(part["outline"], "outline", 2, 3)
+        lo, hi = ring[:, 1].min(), ring[:, 1].max()
+    else:
+        half = _number(part.get("width"), "width", 0) / 2
+        lo, hi = _span(part)
+        arch = part.get("arch", False)
+        _need(isinstance(arch, bool) or arch in ("round", "pointed", "triangle"),
+              "arch must be true, false, round, pointed or triangle")
+        _need(arch or "arch_rise" not in part, "arch_rise needs an arch")
+        top, rise = [[half, 0], [-half, 0]], 0
+        if arch:
+            top, rise = _head("round" if arch is True else arch, half,
+                              _number(part["arch_rise"], "arch_rise", 0) if "arch_rise" in part else None)
+        _need(hi - lo >= rise - 1e-9, f"the arch rises {rise:g} m, more than to - from")
+        ring = np.array([[-half, lo], [half, lo]] + [[x, hi - rise + z] for x, z in top])
+    cs = _section([ring.tolist()])
+    _need(not cs.is_empty() and cs.area() > 1e-6, "an opening encloses no area")
 
     def build(floor, notes):
-        profile = [[-width / 2, lo], [width / 2, lo]]
-        if arch:
-            profile += [[width / 2 * math.cos(a), hi - width / 2 + width / 2 * math.sin(a)]
-                        for a in np.linspace(0, math.pi, 25)]
-        else:
-            profile += [[width / 2, hi], [-width / 2, hi]]
         deep = max(depth, floor)
-        solid = m3.CrossSection([profile]).extrude(deep)  # x stays x, the profile's y is up, its depth is y
-        return [solid.transform([[1, 0, 0, 0], [0, 0, -1, deep / 2], [0, 1, 0, 0]])]
+        # x stays x, the profile's y is up, its depth is y
+        return [cs.extrude(deep).transform([[1, 0, 0, 0], [0, 0, -1, deep / 2], [0, 1, 0, 0]])]
     return build, lo, hi, 0, "flat"
+
+
+def _narrowest(part):
+    """An opening's width: an outline's is that of the widest circle it holds."""
+    from .landmark import _section
+
+    if "outline" not in part:
+        return part["width"]
+    cs = _section([part["outline"]])
+    lo, hi = 0., math.sqrt(cs.area())
+    for _ in range(20):
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if cs.offset(-mid).is_empty() else (mid, hi)
+    return 2 * lo
 
 
 KINDS = {"prism": _prism, "lathe": _lathe, "beam": _beam, "opening": _opening}
@@ -326,7 +365,7 @@ def read(pack, refs):
                 def hole(scale, floor=0., flat=flat, build=build):
                     return _place(build(floor, []), flat, scale)[0].translate([0, 0, 2]).trim_by_plane([0, 0, 1], 2.02)
                 if kind == "opening":
-                    openings.append((hole, part["width"], source, guess))
+                    openings.append((hole, _narrowest(part), source, guess))
                     continue
                 name = f"{part.get('id', f'part-{i}')}" + (f"-{k + 1}" if len(copies) > 1 else "")
                 _need(name not in seen, f"id {name} is used twice")
