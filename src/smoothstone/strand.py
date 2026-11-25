@@ -194,8 +194,8 @@ class Strand:
         return d / ln[:, None], ln
 
     def diameters(self) -> np.ndarray:
-        """mm, of each edge."""
-        return np.sqrt(4 * self.vol / (math.pi * self.lengths()[1])) * 1e3
+        """mm, of each edge; one slumped shorter than it is thick is the drop its plastic makes, not a disc."""
+        return np.minimum(np.sqrt(4 * self.vol / (math.pi * self.lengths()[1])), np.cbrt(6 * self.vol / math.pi)) * 1e3
 
     def points(self) -> np.ndarray:
         return self.x * 1e3
@@ -475,7 +475,7 @@ class Strand:
     def snap(self) -> list:
         """Where it is drawn thinner than a hair it breaks: the pieces off the nozzle, without the hairs between them.
         What is left here has one point when it broke at the nozzle."""
-        thin = np.flatnonzero(self.diameters() < failsim.fact("thread_limit"))
+        thin = np.flatnonzero(4 * self.vol / (math.pi * self.lengths()[1]) < (failsim.fact("thread_limit") * 1e-3) ** 2)
         if not len(thin):
             return []
         cut, n, off = np.r_[-1, thin], len(self.x), []

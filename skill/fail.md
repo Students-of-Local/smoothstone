@@ -48,7 +48,7 @@ stone timelapse t.stl --supports off --fail ->
   Video: .../t.stl-timelapse/fail.mp4 (32 frames, 4.0 s; from layer 21 on: the model, closer in,
   only the nozzle drawn)
   Strand: 0.48 mm thick, it leaves the nozzle at 60.0 mm/s while the nozzle moves at 127.9. Pulling
-  it that fast takes 0.76 mN; 100 mm of it on the plate holds 0.11 mN, so the hotend drags it along
+  it that fast takes 5.13 mN; 100 mm of it on the plate holds 0.11 mN, so the hotend drags it along
   until something holds it.
   Air and heat: it falls at 2.3 m/s at most, and sets in 8.17 s (1.16 s in the fan's air). The
   nozzle's tip carries 8.0 mm3.

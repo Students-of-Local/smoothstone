@@ -611,6 +611,17 @@ def test_a_travel_drags_a_free_strand_and_breaks_a_held_one():
     assert not off
 
 
+def test_an_edge_slumped_to_nothing_is_a_drop():
+    s = rod(20, n=5)
+    was = s.diameters().copy()
+    s.x[2] = s.x[1] + (s.x[2] - s.x[1]) * 1e-3
+    assert s.diameters()[1] == pytest.approx((1.5 * was[1] ** 2 * 5) ** (1 / 3), rel=1e-6)  # 20 mm in four; the drop of its volume
+    assert s.diameters()[0] == was[0] and not s.snap()
+    s.vol[1] = 1e-16  # a hair is one by its own thickness, however short
+    s.x[2] = s.x[1] + [5e-3, 0, 0]
+    assert s.snap()
+
+
 def test_a_cold_strand_torn_back_and_forth_gives_instead_of_flying():
     """It froze with its stress, not its strain, so stiffening adds no energy, and it gives past its strength."""
     s = laid(True)

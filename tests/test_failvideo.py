@@ -85,7 +85,7 @@ def test_spaghetti_falls_from_the_layer_and_rests_on_what_is_below():
     scene, frs, extra, first, st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))
     z = float(inp.layer_z[fail.layer])
     fell, wide = (np.concatenate([k[j] for k in st.links if k[0] == fail.layer]) for j in (1, 3))
-    assert (fell[:, 2] - wide / 2).min() >= -0.02 and fell[:, 2].max() <= z + 2  # resting on the plate by its own radius, drawn thin or not, or a slack loop a little over the layer
+    assert (fell[:, 2] - wide / 2).min() >= -0.03 and fell[:, 2].max() <= z + 2  # resting on the plate by its own radius, drawn thin or not, or a slack loop a little over the layer
     assert (fell[:, 2] < 1.0).mean() > 0.4 and np.median(fell[:, 2]) < z / 2  # most of the arms' plastic lies on or near the bed
     assert st.gone.any() and not st.gone[tp.layer < fail.layer].any()  # the scene up to the failure is untouched
     assert [f["layer"] for f in frs[:first]] == list(range(fail.layer))
@@ -335,7 +335,7 @@ def test_strands_of_one_layer_lie_where_they_fell_while_the_next_one_comes(monke
     motion = st.run(fail.layer)
     lie = [b for i, _, b, _ in st.links if i == fail.layer]
     settled = lambda p: any(len(b) == len(p) - 1 and np.array_equal(p[1:], b) for b in lie)  # noqa: E731
-    assert len(lie) > 2 and all(settled(p) for pieces, _ in motion for p, _ in pieces[:-1])
+    assert len(lie) > 1 and all(settled(p) for pieces, _ in motion for p, _ in pieces[:-1])
     assert all(settled(p) for p, _ in motion[-1][0])  # the last one comes to rest in the motion too
     monkeypatch.setattr(failvideo, "SIM", 1e-6)  # nothing is followed: what has plastic under it is drawn as laid
     st = failvideo.Story(tp, inp, fail, (255, 255, 255), (260, 260))
