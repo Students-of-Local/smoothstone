@@ -590,7 +590,7 @@ def cmd(args, job, prof, out):
     data = {"model_not_recording": True, "mode": mode, "what_if": what_if, "kind": fail.kind, "taxonomy": fail.taxonomy,
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
-            "assumptions": list(dict.fromkeys([*fail.assumptions, *note, *st.notes])), "material": mat, "plate": args.plate,
+            "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
             "predicted": [x.kind for x in fails], "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
             "pre_failure_frame": str(files[first - 1].relative_to(dest)) if first else None,
             "first_failure_frame": str(files[first].relative_to(dest)),

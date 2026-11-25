@@ -299,6 +299,12 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
         other.write_text(gcode.read(file).replace("; filament_type = PLA", f"; filament_type = {said}" if said else ";"))
         text, code = cli.run(["timelapse", "--gcode", str(other), "--fail", "bridge", *more])
         assert line in text and ("bed 60 C" in text) is own and ("not the print's own: bed, nozzle" in text) is not own, text
+    unsaid = failsim.note("k2_air")  # PETG-CF's profile names no chamber
+    for enclosed, chamber, said in ((True, np.nan, True), (True, 45, False), (False, np.nan, False)):
+        tp.run[:, 3] = chamber
+        inp = failvideo.inputs(tp, "PETG-CF", enclosed=enclosed)
+        assert (unsaid in failsim.predict(inp)[0].assumptions) is (unsaid in inp.notes) is said
+        assert not any("not the print's own" in n and "chamber" in n for n in inp.notes)
     tp.run[:, [0, 3]] = 0.4, 45
     inp = failvideo.inputs(tp, "PLA")
     assert (inp.fan, inp.air) == (0.4, 45) and failvideo.inputs(tp, "PLA", enclosed=False).air == failsim.fact("room_air")
@@ -306,9 +312,3 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
     assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
-    unsaid = failsim.note("k2_air")  # PETG-CF's profile names no chamber
-    for enclosed, chamber, said in ((True, np.nan, True), (True, 45, False), (False, np.nan, False)):
-        tp.run[:, 3] = chamber
-        inp = failvideo.inputs(tp, "PETG-CF", enclosed=enclosed)
-        assert (unsaid in failsim.predict(inp)[0].assumptions) is (unsaid in inp.notes) is said
-        assert not any("not the print's own" in n and "chamber" in n for n in inp.notes)
