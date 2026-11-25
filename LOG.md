@@ -1402,4 +1402,7 @@ run per code state): 7 of 10 runs put it to the person, then 1 of 3 with a line 
 then 3 of 10 with other parts refused while it waits. The misses thought past 2,048 tokens about who "the person" is, how
 to ask and what was left to fix. Six wordings of that result were replayed over 16 landmark names, and the best two over 16
 fresh ones: "NEXT: none. Your reply to the user is: ..." with the search lines left out asked in 29 of 32, the first wording
-in 20 of 32. The ten runs with it: 10 of 10. At temperature 0.1 five seeds are close to one sample.
+in 20 of 32. The ten runs with it: 10 of 10. Adding
+"After the person answers (not before): stone note ..." below it, as stone's other questions have, asked in 29 of 32 again.
+It is there because larger models need it, not for a gain: noting the answer is still the gap. Given the person's yes or
+no, the 1.7B model noted it in 0 of 24 replays without that line and 2 of 24 with it. At temperature 0.1 five seeds are close to one sample.

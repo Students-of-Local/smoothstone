@@ -67,10 +67,11 @@ class Out:
         if self.raw is not None:
             return self.raw
         body = [ln for ln in self.lines if ln is not None]
-        nxt = self.next
+        nxt, after = self.next, self.after
         if nxt.startswith(LANDMARK_ASK):  # LFM3-1.7B loses the thread on who "the person" is and what is left to FIX
             body = [ln for ln in body if not ln.startswith(("Subject: ", "Searched: ", "FIX: no open model"))]
             body.append("stone can go no further until the user answers.")
+            after = after + ['After the person answers (not before): stone note "<their answer>", then run the NEXT line it prints.']
             nxt = REPLY + nxt[len("ask the person: ")].upper() + nxt[len("ask the person: ") + 1:]
         room = MAX_LINES - 1
         passes = [ln for ln in body if ln.startswith("PASS ")]
@@ -88,7 +89,7 @@ class Out:
             rest = [i for i in range(len(body)) if i not in set(must)]
             keep = sorted(must + rest[: room - 1 - len(must)])
             body = [body[i] for i in keep] + [f"({len(body) - len(keep)} more lines in log.txt)"]
-        return "\n".join(body + [f"NEXT: {nxt}"] + self.after)
+        return "\n".join(body + [f"NEXT: {nxt}"] + after)
 
 
 class UsageError(Exception):
@@ -1882,8 +1883,47 @@ def cmd_measure(args, job: Job) -> Out:
 # done
 
 
-YES = re.compile(r"\W*(?:the (?:person|user) (?:said|says)\W+)?(?:yes|yeah|yep|ok|okay|sure|please do|go ahead|print it|fine)\b", re.I)
-NO = re.compile(r"\W*(?:the (?:person|user) (?:said|says)\W+)?(?:no|nope|don't|do not|skip|never ?mind)\b", re.I)
+AGREE = set("yes yeah yep ok okay sure fine go please print want wants".split())
+AGREED = AGREE | set("ahead do the that it a one plain shape box cylinder thanks thank you is that's good great make build as "
+                     "to person user they said says i we just".split())
+REFUSE = set("no nope not never skip instead don't dont".split())
+FILE = re.compile(r"\S+\.(?:stl|3mf|obj|step|stp|glb|ply)\b", re.I)
+
+
+def says(text: str) -> str:
+    """"yes" only when every word agrees ("OK, don't print it" is a no), "no" when a word refuses, else ""."""
+    words = set(re.findall(r"[a-z']+", text.lower().replace("\u2019", "'")))
+    if "?" in text or not words:
+        return ""
+    return "yes" if words & AGREE and words <= AGREED else "no" if words & REFUSE else ""
+
+
+def note_landmark(out: Out, job: Job, st: dict, text: str) -> Out:
+    """The person's answer to a landmark question: their yes or no, a file, another name, or another part."""
+    asked, plain, said = st["next"], st.get("landmark_plain") or {}, says(text)
+    out.owns_next = True
+    out.next = asked
+    if "?" in text:
+        return out  # their own question is no answer
+    job.update(landmark_said=asked)  # they have answered: the job may move to another part
+    file = FILE.search(text)
+    if plain and said == "yes" and (asked == _ask_plain(plain["subject"]) or {"print", "plain"} & set(text.lower().split())):
+        job.update(landmark_plain={**plain, "yes": True})
+        out.next = plain["command"]
+    elif plain and said == "no" and asked == _ask_plain(plain["subject"]):
+        job.update(landmark_plain={**plain, "yes": False})
+        out.next = _ask_file(plain["subject"])
+        if len(text.split()) > 3:  # "no, make me a panel instead"
+            job.update(landmark_said=out.next)
+    elif file:
+        out.next = f"stone check {shlex.quote(file.group().strip(chr(34) + chr(39)))}"
+    elif asked == _ask_plain(plain.get("subject", "")):
+        out.add('If that was a yes or a no, note just that: stone note "yes" or stone note "no"')
+    elif said == "no":
+        out.next = "ask the person: what should I make instead?"
+    else:
+        out.add('If that was another name, run: stone landmark "<that name>"')
+    return out
 
 
 def cmd_note(args, job: Job) -> Out:
@@ -1902,15 +1942,8 @@ def cmd_note(args, job: Job) -> Out:
     if st.get("ask_product") and asked.startswith("stone note"):
         # a set with sizes sent the model here: the job still waits on the person's answer to this question
         asked = f"ask the person: {match.product_size_question(st['ask_product'], bool(st.get('ask_round')))}"
-    plain = st.get("landmark_plain") or {}
-    if plain and asked == _ask_plain(plain["subject"]) and (YES.match(text) or NO.match(text)):
-        yes = bool(YES.match(text))
-        out.add(f"Noted ({len(job.add_note(text))} notes): {text}")
-        job.update(landmark_plain={**plain, "yes": yes})
-        out.owns_next = True
-        out.next = plain["command"] if yes else _ask_file(plain["subject"])
-        return out
-    if asked.startswith("ask the person") and is_the_question(text, asked):
+    agreed = asked.startswith(LANDMARK_ASK) and says(text) == "yes"  # "yes, print that plain shape" repeats its words
+    if asked.startswith("ask the person") and not agreed and is_the_question(text, asked):
         out.fix("that is your question, not the person's answer; write the question as your reply and stop")
         out.add("Note only what the person says back.")
         out.next = asked
@@ -1920,7 +1953,7 @@ def cmd_note(args, job: Job) -> Out:
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
     if asked.startswith(LANDMARK_ASK):
-        job.update(landmark_said=asked)  # an answer in their own words: the job may move to another part
+        return note_landmark(out, job, st, text)
     if asked.startswith("ask the person") and st.get("ask_product"):
         # the answer is the product's size: it is kept as a note, never read into the request as a part size
         return note_product(out, job, st, text)
@@ -2299,7 +2332,7 @@ def _landmark_fallback(job: Job, subject: str) -> str:
     attempted = str(status.get("landmark_attempted") or "")
     plain = status.get("landmark_plain") or {}
     if str(plain.get("subject") or "").casefold() == subject.casefold():
-        return _ask_plain(subject)
+        return _ask_file(plain["subject"]) if plain.get("yes") is False else _ask_plain(plain["subject"])
     if attempted.casefold() == subject.casefold():
         return _ask_file(subject)
     return _landmark_command("stone landmark", subject)
@@ -2345,13 +2378,17 @@ def cmd_landmark(args, job: Job) -> Out:
         size = target if target["mode"] != "fit" or target.get("bed_said") else min(200.0, *bed)
     st = job.status()
     waits = st.get("landmark_plain") or {}
-    if args.plain and waits and not waits.get("yes") and waits["subject"].casefold() == subject.casefold():
+    chosen = [a for flag, value in (("--size", args.size), ("--detail", args.detail), ("--refs", args.refs))
+              if value is not None for a in (flag, str(value))]
+    mine = str(waits.get("subject") or "").casefold() == subject.casefold()
+    if args.plain and not (mine and waits.get("yes")):
         out.fix('the person has not said yes to the plain shape; when they do: stone note "<their answer>"')
-        out.next = (_ask_plain(subject) if str(st.get("models_out") or "").casefold() == subject.casefold()
+        out.next = (shlex.join(["stone", "landmark", subject, *chosen]) if not mine else _landmark_fallback(job, subject)
+                    if str(st.get("models_out") or "").casefold() == subject.casefold()
                     else _landmark_command("stone models", subject))
         out.result = "plain shape refused: not asked"
         return out
-    job.update(landmark_attempted=subject, landmark_plain=None)
+    job.update(landmark_attempted=subject, landmark_plain=waits if mine else None)
     progress(job, f"building {subject} from landmark references")
     try:
         options = {**({"ref_pack": args.refs} if args.refs else {}), **({"plain": True} if args.plain else {})}
@@ -2359,12 +2396,11 @@ def cmd_landmark(args, job: Job) -> Out:
     except Exception as e:
         command = None
         if isinstance(e, landmark_refs.PlainShape):
-            chosen = [a for flag, value in (("--size", args.size), ("--detail", args.detail), ("--refs", args.refs))
-                      if value is not None for a in (flag, str(value))]
             command = shlex.join(["stone", "landmark", subject, *chosen, "--plain"])
-            job.update(landmark_plain={"subject": subject, "command": command})
+            no = {"yes": False} if mine and waits.get("yes") is False else {}  # they said no: it is not asked again
+            job.update(landmark_plain={"subject": subject, "command": command, **no})
             out_of_models = str(job.status().get("models_out") or "").casefold() == subject.casefold()
-            command = _ask_plain(subject) if out_of_models else None  # the open models come first
+            command = _landmark_fallback(job, subject) if out_of_models else None  # the open models come first
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
@@ -2377,6 +2413,7 @@ def cmd_landmark(args, job: Job) -> Out:
         out.result = f"landmark failed: {str(e)}"[:120]
         return out
     out.add(*(info.get("lines") or []))
+    job.update(landmark_plain=None)
     write_json(mdl.model_file(job.root), info)
     job.plan_file.unlink(missing_ok=True)
     (job.root / "build" / "model" / "parts.json").unlink(missing_ok=True)
