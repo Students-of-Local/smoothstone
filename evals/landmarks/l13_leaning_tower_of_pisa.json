@@ -20,10 +20,10 @@
         "why": "Height above ground in the engineering study"
       },
       "dimensions": {
-        "length": 20.3,
-        "width": 16.4,
-        "source": "https://www.openstreetmap.org/relation/12982355",
-        "why": "The outline's 16.4 m, and the top's 3.9 m (56 m x tan 3.97 degrees) past it on the long axis."
+        "length": 19.9,
+        "width": 16.9,
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "why": "The surveyed gallery diameter, 16.9 m. Lengthwise the sixth gallery's cornice, 48 m up, leans out 3.3 m (3.97 degrees, https://www.cdmsmith.com/en-150/projects/leaning-tower-of-pisa) past its 8.45 m radius, and the foot stands 8.1 m the other way."
       }
     }
   },

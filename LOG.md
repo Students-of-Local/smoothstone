@@ -1219,5 +1219,5 @@ Two packs of reference parts, written by GPT-6.2 Sol from engineering and museum
 compared, built by the one command. One judge each on the builds they were written from: Space Needle 9, Pisa 9.
 Then built once each from the plain request, as a small model would (l12, l13): 9 and 9, every check passing.
 A grading spec may now cite a plan's dimensions (`dimensions`, with a source and why) where the map has no outline, or
-not the one that prints: Pisa's top stands 3.9 m past its foot. The bridge Sol wrote first scored 6 (hangers as fat as
+not the one that prints: Pisa's axis moves 3.9 m in its height, and its sixth gallery sets the length. The bridge Sol wrote first scored 6 (hangers as fat as
 the tower legs, a bar for a base), so it waits for a redo on the finer parts.
