@@ -595,6 +595,9 @@ def _write_atomic(path: Path, content: str):
             os.unlink(name)
 
 
+CROWDED = 'The map around this landmark is too crowded for the OSM map service, and Overpass gave no answer.'
+
+
 def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
     """Fetch and cache OSM responses in the job and shared cache, again when a site reaches past the search."""
     lat, lon = refs['latitude'], refs['longitude']
@@ -652,7 +655,12 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
                         small = True
                 raw_text = json.dumps(raw, ensure_ascii=False)
                 _write_atomic(ref_dir / 'osm-map.json', raw_text)
-                _write_atomic(raw_cache, raw_text)
+                if not small:
+                    _write_atomic(raw_cache, raw_text)
+                ways = {e['id'] for e in raw.get('elements', []) if e.get('type') == 'way'}
+                if small and any(m.get('type') == 'way' and m['ref'] not in ways for e in raw.get('elements', [])
+                                 if e.get('type') == 'relation' and _own(e, refs) for m in e.get('members', [])):
+                    raise LandmarkProblem(CROWDED)
                 data = _map_as_overpass(raw, refs)
                 data['_smoothstone_response_url'] = url
                 data['_smoothstone_query'] = query
@@ -662,10 +670,10 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
         parsed = parse_osm(data, refs)
         far = max((math.hypot(*point) for point in parsed.get('site', [[]])[0]), default=0)
         around = max([far, *(math.hypot(*point) for ring in parsed['outline'] for point in ring)])
-        if small and around > radius:
-            raise LandmarkProblem('OpenStreetMap is too busy to answer for all of this landmark. Try again in a few minutes.')
         if far > 1000:
             raise LandmarkProblem('The landmark reaches more than 1 km from its coordinates.')
+        if small and around > radius:
+            raise LandmarkProblem(CROWDED)
         if far > radius:
             return fetch(refs, job_root, far)
         if parsed.get('site') and parsed['tags'].get('man_made') == 'bridge' and _share(parsed['parts'], parsed['site']) < .5:

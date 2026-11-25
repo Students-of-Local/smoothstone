@@ -124,6 +124,8 @@ def _level_from_twin(i, prepared):
 
 
 OBELISK_TAPER = .63
+LEAST_HEIGHT = .75  # of the sourced height that a map must reach
+LEAST_SHARE, SPLIT_SHARE = .4, .6  # of its plan that a map must draw, and that one in separate pieces must
 
 
 def resolve_parts(parts, refs):
@@ -670,10 +672,13 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     if replace != "all" and (not (measured or extra)
                              or (len(measured) / max(1, len(records)) < .35 and coverage < .45)):
         raise LandmarkProblem("insufficient mapped 3D parts with heights across the landmark footprint. Use stone models " + json.dumps(name) + ".")
-    drawn_share = 1. if extra or outline.is_empty() else (mapped ^ outline).area() / outline.area()
-    if drawn_share < .6 and len(mapped.offset(.3).decompose()) > 1:
-        raise LandmarkProblem(f"the map draws {name} in separate pieces that cover {drawn_share:.0%} of its plan, "
-                              "and what joins them is missing.")
+    if replace != "all" and not outline.is_empty():
+        drawn = m3.CrossSection.batch_boolean([mapped, *extra_sections], m3.OpType.Add)
+        share = (drawn ^ outline).area() / outline.area()
+        split = len(drawn.offset(.3).decompose()) > 1
+        if share < (SPLIT_SHARE if split else LEAST_SHARE):
+            raise LandmarkProblem(f"the map draws {name} in {'separate pieces' if split else 'a piece'} covering {share:.0%} "
+                                  "of its plan, and the rest is missing.")
     towers, tower_sections = resolve_parts(data.get("linked_towers", []), refs)
     towers = [(p, cs) for p, cs in zip(towers, tower_sections) if not p["height"]["guessed"]]
     if towers:
@@ -719,10 +724,10 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         "deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m"))
     if replace != "all" and not is_lattice and refs.get("height"):
         tallest = max(p["height"]["metres"] for p in records)
-        if tallest < .75 * refs["height"]:
+        if tallest < LEAST_HEIGHT * refs["height"]:
             raise LandmarkProblem(f"the map's tallest part of {name} is {tallest:g} m, and the whole stands "
                                   f"{refs['height']:g} m.")
-    if replace != "all" and _plain(records) and not plain:
+    if not extra and replace != "all" and _plain(records) and not plain:
         raise PlainShape(f"the map draws {name} as one plain shape, with its outline and height and nothing else.")
     chosen = detail or ("high" if len(records) - len(extra) < 400 else "low")
     if chosen not in ("low", "high"):
@@ -875,9 +880,8 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     omitted = [note for note in notes if note.startswith("Omitted detail below the print floor")]
     lines = [f"Built {len(records)} modeled 3D parts with {chosen} detail.",
              "© OpenStreetMap contributors, ODbL 1.0." if osm else "Drawn from the reference pack's sources.", f"References and modeling notes: {refpath}"]
-    if replace != "all" and _plain(records):
-        lines.append(f"NOTE, tell the person: the map has {name} as one plain shape, so this print has its outline and "
-                     "height and no other detail.")
+    if not extra and replace != "all" and _plain(records):
+        lines.append(f"NOTE, tell the person: the map has {name} as one plain shape, and its real shape has more.")
     if omitted:
         lines.append("Omitted architectural detail below the print floor. See the modeling notes for each feature.")
     return {"stl": str(stl), "subject": refs.get("label", name), "name": refs.get("label", name),
