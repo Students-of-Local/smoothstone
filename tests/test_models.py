@@ -447,19 +447,41 @@ def test_names_landmark_still_names_buildings(request_, subject):
     ("A stand for my Kindle Paperwhite", None),
     ("A clip for the Arc de Triomphe", None),
     ("a wall thing", None),
+    ("make me stonehenge, 16 cm", "stonehenge"),
+    ("make me the alhambra in PLA", "alhambra"),
+    ("a wall hook with a small Parthenon on it", None),
+    ("a clip for St. Mark\u2019s", None),
+    ("a birdhouse that looks like the parthenon", None),
+    ("a model of a white house with a red roof", None),
+    ("a 3D print of a pentagon", None),
+    ("An Arc de Triomphe phone stand", None),
 ])
 def test_a_structure_without_a_building_word_routes_to_stone_landmark(jobenv, monkeypatch, request_, subject):
-    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: name in ("Kindle Paperwhite", subject, "Arc de Triomphe"))
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: name in (
+        "Kindle Paperwhite", subject, "Arc de Triomphe", "Parthenon", "parthenon", "white house", "pentagon", "Saint Mark's"))
     assert models.known_landmark(request_) == subject
     if subject:
         assert _route(monkeypatch, request_)[0] == ["stone", "landmark"]
 
 
+def test_a_named_statue_the_map_cannot_draw_goes_on_to_found_models(jobenv, monkeypatch):
+    def refused(*args, **kwargs):
+        raise landmark_refs.LandmarkProblem("A statue is a sculpture, and building maps do not have its shape.")
+
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: True)
+    monkeypatch.setattr(landmark_refs, "resolve", refused)
+    assert _route(monkeypatch, "A 3D print of Christ the Redeemer, 16 cm tall.")[0] == ["stone", "landmark"]
+    text, code, nxt = stone("landmark", "Christ the Redeemer")
+    assert shlex.split(nxt) == ["stone", "models", "Christ the Redeemer"]
+
+
 def test_the_lookup_waits_until_no_recipe_fits(jobenv, monkeypatch):
     asked = []
-    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: asked.append(name))
-    _route(monkeypatch, "A phone stand for the Arc de Triomphe gift shop")
-    assert not asked
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: asked.append(name) or True)
+    request_ = "Print the Arc de Triomphe as a phone stand"
+    assert models.known_landmark(request_) == "Arc de Triomphe" and asked
+    asked.clear()
+    assert _route(monkeypatch, request_)[0] != ["stone", "landmark"] and not asked
 
 
 def test_the_eval_landmarks_still_route():

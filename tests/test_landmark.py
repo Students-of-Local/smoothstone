@@ -329,12 +329,39 @@ def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_pat
     ("Exemple", "Exemple", "ancient city in Jordan",
      {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q839954"}}}}]}, 5, True),
 ])
-def test_a_name_that_is_a_known_structure(monkeypatch, name, label, description, claims, wikis, built):
+def test_a_name_that_is_a_known_structure(monkeypatch, tmp_path, name, label, description, claims, wikis, built):
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path)
     here = {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1, "longitude": 1}}}}]}
     hit = {"id": "Q1", "label": label, "description": description}
     entity = {"labels": {"en": {"value": label}}, "claims": here | claims, "sitelinks": {str(n): {} for n in range(wikis)}}
     monkeypatch.setattr(landmark_refs, "_matches", lambda wanted: ([hit], {"Q1": entity}, True))
     assert IS_STRUCTURE(name) is built
+
+
+def _entity(wikis, description="triumphal arch in Paris", place=True, **claims):
+    at = {"P625": [{"mainsnak": {"datavalue": {"value": {"latitude": 1, "longitude": 1}}}}]} if place else {}
+    return {"labels": {"en": {"value": "Exemple"}}, "descriptions": {"en": {"value": description}},
+            "claims": at | claims, "sitelinks": {str(n): {} for n in range(wikis)}}
+
+
+@pytest.mark.parametrize("found, answered, built", [
+    ([_entity(9)], True, True),
+    ([_entity(9)], False, False),  # Wikipedia did not answer
+    ([_entity(9), _entity(200, "god of examples", place=False)], True, False),  # the god is meant
+    ([_entity(9), _entity(3, "film", place=False)], True, True),
+    ([_entity(9, P576=[{}])], True, False),  # it no longer stands
+    ([_entity(9, P576=[{}], P1435=[{}])], True, True),  # a ruin that does
+    ([_entity(9, "natural limestone arch on a coast")], True, False),
+    ([_entity(9, "museum ship in London")], True, False),
+])
+def test_the_best_known_thing_of_the_name_must_stand(monkeypatch, tmp_path, found, answered, built):
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path)
+    asked = []
+    hits = [{"id": f"Q{i}", "label": "Exemple"} for i in range(len(found))]
+    monkeypatch.setattr(landmark_refs, "_matches", lambda name: asked.append(name) or (
+        hits, {h["id"]: e for h, e in zip(hits, found)}, answered))
+    assert IS_STRUCTURE("Exemple") is built and IS_STRUCTURE("exemple") is built
+    assert len(asked) == (1 if answered else 2)  # a definite answer is kept, a weak one is not
 
 
 def test_a_shipped_pack_is_a_known_structure_and_offline_nothing_else_is(monkeypatch):

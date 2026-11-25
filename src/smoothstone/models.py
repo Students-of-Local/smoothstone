@@ -874,20 +874,25 @@ def names_landmark(request: str) -> str | None:
     return s if BUILDING.search(s) or asks_found_model(request) else None
 
 
-THE_THING = re.compile(r"\b(?:make|print|model|build|want|need|like)\s+(?:me\s+|us\s+)?the\s+(.+)", re.I)
-HOLDS = r"\b(?:for|on|onto|with|from|to|fits?|my|our|your|his|her|their)\s+(?:(?:my|our|your|his|her|their|the|an?)\s+)?"
+ASKED = re.compile(r"""(?:.*\b(?:models?|replicas?|miniatures?|versions?|prints?|stls?|3mfs?|files?|mesh(?:es)?)\s+of
+    |.*\b(?:make|print|model|build|want|need|get|i'd\s+like|would\s+like)(?:\s+(?:me|us))?
+    |(?:an?\s+)?[\d.]+\s*(?:mm|cm|m|in|inch(?:es)?)\s*(?:tall|high|long|wide)?)?\s*(?:the\s+)?""", re.I | re.X | re.S)
+AFTER = re.compile(r"\s*(?:$|[,.;:!?(]|\d|(?:for|at|in|that|which|to|please|about|as|with|and|so)\b)", re.I)
 
 
 def known_landmark(request: str) -> str | None:
-    """The subject when a pack or Wikidata knows it as a structure: "a 3D print of the Arc de Triomphe" has no
-    building word in it. For a request no recipe fits, as it asks the network."""
+    """The thing a request asks for when a pack or Wikidata knows it as a structure: "a 3D print of the Arc de
+    Triomphe" has no building word in it. Only the thing itself: not "a clip for the Arc", "a small Parthenon on it"
+    or "a white house". For a request no recipe fits, as it asks the network."""
     from . import find, landmark_refs
 
-    the = THE_THING.search(request)
-    s = subject_of(request) or (find._phrase(the.group(1)) if the else None)
-    if not s or re.search(HOLDS + re.escape(s), request, re.I):  # a stand for my Kindle Paperwhite
-        return None
-    return s if landmark_refs.is_structure(s) else None
+    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'"))
+    verb = re.search(r"\b(?:make|print|model|build|want|need|get|like)\s+(?:me\s+|us\s+)?(?:the\s+)?(?!an?\b|my\b|our\b)(.+)", req, re.I)
+    for s in dict.fromkeys((subject_of(request), find._phrase(verb.group(1)) if verb else None)):
+        at = s and re.search(r"\b" + re.escape(s) + r"\b", req, re.I)
+        if at and ASKED.fullmatch(req[:at.start()]) and AFTER.match(req, at.end()) and landmark_refs.is_structure(s):
+            return s
+    return None
 
 
 def asks_found_model(request: str) -> bool:

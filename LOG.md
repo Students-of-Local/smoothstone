@@ -1174,10 +1174,12 @@ From 40 landmarks never built before (no model, no judge), looked at one by one.
 ### 2026-11-24: a landmark's name is enough
 
 - The 1.7B model's one attempt at l16, "A 3D print of the Arc de Triomphe", went to the figure recipe: the name has no
-  building word, so no request route saw a landmark. Where no recipe fits, a request whose thing is a shipped pack's name
-  or a structure Wikidata knows by that exact name (5 or more sitelinks) now goes to `stone landmark`. Stonehenge, the
-  Parthenon, Petra and the Alhambra route; Paris, Everest, Saturn V, a Kindle and "a case for my X" do not.
-- The lookup asks Wikidata once per such request, and a failed lookup leaves the request where it was.
+  building word, so no request route saw a landmark. Where no recipe fits, a request whose own subject is a shipped pack's
+  name, or a name Wikidata knows best as a structure that stands (5 or more sitelinks), now goes to `stone landmark`.
+- A name is looked up only as the thing asked for: not in "a clip for the Arc" or "a white house". A definite answer is
+  kept for 7 days; an offline or partial one counts as no.
+- Routing is not a promise to build. A statue, or a site with no mapped outline and no pack, is refused there, and the
+  next command is `stone models "<name>"`, where a real model of it may be found.
 
 ### 2026-11-24: PR 141's review mediums
 

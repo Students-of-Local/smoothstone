@@ -184,19 +184,44 @@ def _choose(name, hits, entities):
 
 
 KNOWN = 5  # the wikis that write about a structure someone asks for by its bare name
+NATURAL = re.compile(r'\b(natural|geological|rock formation|national monument|ship|submarine|aircraft)\b', re.I)
 
 
 def is_structure(name: str) -> bool:
-    """True when a shipped pack or Wikidata knows this exact name as a building, a monument or a ruin."""
+    """True when a shipped pack or Wikidata knows this exact name best as a building, a monument or a ruin that stands."""
+    cache = Path.home() / '.cache' / 'smoothstone' / 'structure' / (
+        hashlib.sha256(f'1 {" ".join(_words(name))}'.encode()).hexdigest() + '.json')
     try:
         if load_pack(name):
             return True
-        hit, entity = _choose(name, *_matches(name)[:2])
+        if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
+            return json.loads(cache.read_text()) is True
+        hits, entities, answered = _matches(name)
+        if not answered:  # the ranking needs Wikipedia's answer too
+            return False
+        known = _known_structure(name, hits, entities)
+        _write_atomic(cache, json.dumps(known))
+        return known
     except Exception:  # offline, a busy server, or no such thing: nobody can say it is one
         return False
+
+
+def _known_structure(name, hits, entities):
+    try:
+        hit, entity = _choose(name, hits, entities)
+    except LandmarkProblem:
+        return False
     what, _ = _what(hit, entity)
-    return (_words(name) in _names(hit, entity) and len(entity.get('sitelinks', {})) >= KNOWN
-            and _made(what, entity) is True)
+    wikis = len(entity.get('sitelinks', {}))
+    if _words(name) not in _names(hit, entity):
+        return False
+    # Another thing of this name, a god or a film, may be the one people mean: it has no place on a map.
+    best = max(len(entities.get(h['id'], {}).get('sitelinks', {})) for h in hits
+               if h['id'] == hit['id'] or _words(name) == _words(
+                   entities.get(h['id'], {}).get('labels', {}).get('en', {}).get('value', '')))
+    claims = entity.get('claims', {})
+    gone = claims.get('P576') and not claims.get('P1435')  # an ended place still listed as heritage is a ruin that stands
+    return wikis >= max(KNOWN, best) and not NATURAL.search(what) and not gone and _made(what, entity) is True
 
 
 def resolve(name: str, job_root: Path) -> dict:
