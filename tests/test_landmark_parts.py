@@ -169,14 +169,15 @@ def build(monkeypatch, tmp_path):
     """Build a pack as `stone landmark --refs` does, with the map answering these parts."""
     asked = []
 
-    def go(pack, parts=(), detail="low", outline=None):
+    def go(pack, parts=(), detail="low", outline=None, site=None):
         monkeypatch.setattr(landmark_refs, "resolve", lambda name, root: {
             **REFS, "label": "Example", "id": "Q1", "height": None, "style": [], "source": SOURCE, "sources": {}})
         ring = [[[-5, -5], [5, -5], [5, 5], [-5, 5]]]
 
         def fetch(refs, root):
             asked.append(1)
-            return {"outline": ring if outline is None else outline, "source": SOURCE, "tags": {}, "linked_towers": [], "parts": [
+            return {"outline": ring if outline is None else outline, "source": SOURCE, "tags": {}, "linked_towers": [],
+                **({"site": site} if site else {}), "parts": [
                 {"id": i, "type": "way", "footprint": ring if i == 1 else [[[6, -5], [16, -5], [16, 5], [6, 5]]],
                  "tags": {"height": str(h)}, "source": SOURCE} for i, h in parts]}
         monkeypatch.setattr(landmark_refs, "fetch", fetch)
@@ -299,16 +300,11 @@ def test_a_beam_tapers_along_its_path_and_may_be_round():
 
 def test_a_beam_whose_thin_end_is_widened_says_so():
     beam = {"kind": "beam", "path": [[0, 0, 0], [0, 0, 10]], "size": [[4, 4], [.2, .2]]}
-    for part, widened in ((beam, True), ({**beam, "size": [[4, 4], [2, 2]]}, False)):
+    short = {"kind": "beam", "path": [[0, 0, 0], [0, 0, 100], [0, 0, 102]], "size": [[10, 10], [10, 10], [.5, .5]]}
+    for part, widened in ((beam, True), (short, True), ({**beam, "size": [[4, 4], [2, 2]]}, False)):
         record = landmark_parts.read(_pack(part), REFS)[0][0]
         record["_build"](1., [])
         assert ("print_modifications" in record) is widened
-
-
-def test_a_finer_minimum_keeps_a_roof_in_print_millimetres():
-    roof = {"kind": "prism", "rect": [9, 9], "to": 9, "roof": "pyramidal", "roof_rise": 6}
-    fine = _solid({**roof, "least": .8}, scale=2.)
-    assert fine.volume() == pytest.approx(_solid(roof, scale=2.).volume(), rel=1e-6)
 
 
 def test_a_slender_part_may_ask_for_a_finer_minimum():
@@ -319,6 +315,8 @@ def test_a_slender_part_may_ask_for_a_finer_minimum():
 
 @pytest.mark.parametrize("part, says", [
     ({**BLOCK, "least": .5}, "least must be 0.8 to 1.2 mm"),
+    ({"kind": "prism", "rect": [9, 9], "to": 9, "roof": "dome", "roof_rise": 3, "least": .8}, "a roof keeps"),
+    ({"kind": "opening", "width": 4, "depth": 9, "from": 0, "to": 5, "least": .8}, "has no field least"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5], [0, 0, 9]], "size": [[1, 1], [2, 2]]}, "one for each point"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5]], "size": [1, 1], "round": 1}, "round must be"),
 ])
@@ -342,6 +340,19 @@ def test_a_build_stands_on_the_packs_plinth_and_keeps_a_foot_past_it(build):
     assert (x1 - x0, y1 - y0) == pytest.approx((40 * scale, 60 * scale), abs=.05) and scale == pytest.approx(100 / 60, rel=.01)
     man, _, scale, _ = build(_pack(BLOCK, {**BLOCK, "at": [0, 50]}, replace="all", plinth={"rect": [40, 60]}))
     assert man.slice(1.).bounds()[3] == pytest.approx(53 * scale, abs=1) and len(man.decompose()) == 1
+
+
+def test_a_low_part_past_the_plinth_joins_the_base(build):
+    quay = {"kind": "prism", "rect": [10, 6], "at": [0, 40], "from": -3, "to": 0}
+    man, *_ = build(_pack({**BLOCK, "to": 30}, quay, replace="all", plinth={"rect": [40, 60]}))
+    assert len(man.decompose()) == 1
+
+
+def test_the_plinth_replaces_a_sites_ground(build):
+    man, _, scale, _ = build(_pack(BLOCK, plinth={"rect": [40, 60]}), parts=[(1, 20)],
+                             site=[[[-90, -90], [90, -90], [90, 90], [-90, 90]]])
+    x0, y0, x1, y1 = man.slice(1.).bounds()
+    assert (x1 - x0, y1 - y0) == pytest.approx((40 * scale, 60 * scale), abs=.1)
 
 
 def test_a_plinths_guess_is_noted_and_its_source_kept(build):

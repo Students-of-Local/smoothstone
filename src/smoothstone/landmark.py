@@ -709,12 +709,13 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     ground = landmark_parts.plinth(pack, refs)
     if ground is not None and is_lattice:
         raise LandmarkProblem("Reference plinth: a lattice tower has its own base. Leave plinth out.")
-    scale = _scale([outline] if is_lattice and not outline.is_empty() else [*sections, *([ground] if ground is not None else [])],
-                   records, target, reach)
+    scale = _scale([outline] if is_lattice and not outline.is_empty() else sections, records, target, reach)
+    if ground is not None:  # the fixed-size piers stand on it, not past it
+        scale = min(scale, _scale([*sections, ground], records, target))
     notes = ["Dimensions use local east/north metres, uniformly scaled to millimetres.",
              "Added a 2 mm plinth following the mapped plan, with short joiners where needed.",
              "Mapped faces overlap by 0.01 metre at wall and roof joins; coordinates are otherwise unsnapped.",
-             "Roof tips retain at least 1.6 mm across their loft centre; narrow walls are widened to 1.2 mm."]
+             "Roof tips retain at least 1.6 mm across their loft centre; narrow walls are widened to 1.2 mm, or to the least a part asks for."]
     notes.extend(changes)
     solids, mm_sections = [], []
     mughal = "mughal" in keys
@@ -793,7 +794,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
 
         base = footprint
         if ground is not None:  # the pack's base, and whatever stands on the ground past it
-            base = ground.scale([scale, scale]) + _union(solids).slice(2.02)
+            base = ground.scale([scale, scale]) + _union(solids).trim_by_plane([0, 0, -1], -2.02).project()
             notes[1] = "Added a 2 mm base of the outline the reference pack gives."
             asked = pack["parts"]["plinth"]
             refs["feature_sources"].append(asked.get("source", pack["parts"]["source"]))
