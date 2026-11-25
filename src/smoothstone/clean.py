@@ -14,6 +14,7 @@ ZERO_AREA = 1e-9  # mm2: a face this small is dropped by a slicer's repair, open
 # mm3: a shell this small is a sliver the union split off a fold (two of 0.01 mm on Inde Navarrette's
 # hair read as three bodies); it cannot print, and a real loose piece is thousands of times larger
 SLIVER = 1e-3
+KEPT = .005  # of the volume: the most a repair may add or take
 
 
 def slicer_view(vertices, faces) -> dict:
@@ -58,6 +59,7 @@ def for_slicer(mesh, tolerance: float = 0.01):
         return np.asarray(o.vert_properties[:, :3], dtype=np.float64), np.asarray(o.tri_verts, dtype=np.int64)
 
     v, f = rebuild(mesh.vertices, mesh.faces)
+    whole = trimesh.Trimesh(v, f, process=False).volume
     # manifold3d keeps a sliver it cannot collapse now and then; a light quadric pass removes it
     for reduction in (0.02, 0.05, 0.1):
         if not problems(slicer_view(v, f)):
@@ -67,7 +69,10 @@ def for_slicer(mesh, tolerance: float = 0.01):
     left = problems(slicer_view(v, f))
     if left:  # never hand a slicer a part it will complain about
         raise ValueError("still " + " and ".join(left) + " after three repair passes")
-    return trimesh.Trimesh(v, f, process=False)
+    out = trimesh.Trimesh(v, f, process=False)
+    if abs(out.volume - whole) > KEPT * abs(whole):  # on a mesh of few faces the pass takes off a corner
+        raise ValueError(f"the repair would change its volume by {out.volume / whole - 1:.1%}")
+    return out
 
 
 def problems(view: dict) -> list[str]:
