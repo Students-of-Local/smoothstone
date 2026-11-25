@@ -22,18 +22,19 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 
-from . import config
+from . import config, printers
 
 REFS = config.REPO_ROOT / "recipes" / "lib" / "refs"
 KINDS = ("supports", "droop", "bridge", "detach", "topple", "none")
 TAXONOMY = {"supports": "spaghetti", "droop": "overhang_droop", "bridge": "poor_bridging", "topple": "toppled"}
-MATERIALS = ("PLA", "PETG", "ABS")
+MATERIALS = ("PLA", "PETG", "ABS", "ASA", "PLA-CF", "PETG-CF")
 
 
 @lru_cache(maxsize=1)
@@ -91,29 +92,59 @@ def _props(m: str) -> tuple[dict, str]:
     return found, src
 
 
+PLASTICS = (("PLA", r"(HT|E)?PLA"), ("PETG", r"PETG|PCTG"), ("ABS", r"ABS"), ("ASA", r"ASA"), ("PC", r"PC|POLYCARBONATE"),
+            ("PA", r"PA(6|11|12|66|612)?|COPA|NYLON"), ("TPU", r"TPU(\d\dA)?"))
+OTHER = re.compile(r"[GK]F\d*|\w*GLASS\w*|KEVLAR|ARAMID|AERO|LW|\w*FOAM\w*|WOOD\w*|METAL\w*|IRON|MAGNETIC|\w*FILL(ED)?|SUPPORT|PET|PHA|PBAT|PBT|PP|PVA|"
+                   r"PVB|PTFE|PMMA|TPE|HIPS")
+
+
+def named(text: str) -> str | None:
+    """The plastic of MATERIALS a file or a person names (PLA Silk, PETG-CF), or None: no numbers for it."""
+    words = re.findall(r"[A-Z0-9]+", (text or "").upper().replace("CARBON BLACK", "BLACK"))
+    got = {m for w in words for m, names in PLASTICS if re.fullmatch(names, w)}
+    if len(got) != 1 or any(map(OTHER.fullmatch, words)):
+        return None  # a blend (PC-ABS), a foam or a filling stone has no numbers for
+    m = got.pop() + ("-CF" if any(re.fullmatch(r"R?CF\d*|CARBON(FIB(ER|RE))?", w) for w in words) else "")
+    return m if m in MATERIALS else None
+
+
+def like(m: str) -> str:
+    """The plastic it borrows from where nothing is known of its own."""
+    return fact("like").get(m, m)
+
+
+def _own(m: str, key: str):
+    """Its own fact, or the one of the plastic it is like, or None."""
+    return next((fact(f"{n.lower()}.{key}") for n in (m, like(m)) if f"failsim.{n.lower()}.{key}" in facts()), None)
+
+
 @lru_cache(maxsize=None)
 def material(name: str = "PLA") -> Material:
     m = name.upper()
     if m not in MATERIALS:
-        raise ValueError(f"failsim models PLA, PETG and ABS (the K2 profile's three), not {name}")
+        raise ValueError(f"failsim models {', '.join(MATERIALS)}, not {name}")
     p, src = _props(m)
     curve = np.asarray(p["modulus_vs_temp"]["value"], float)
     curve[:, 1] = np.minimum.accumulate(curve[:, 1])  # Track S's rule: no credit for a rise on heating
-    k2 = fact(f"k2.{m.lower()}")
-    stand = [note("mfi_rig"), note("petg.melt" if m == "PETG" else f"{m.lower()}.cross_wlf")]
-    if m == "ABS":  # average cp from Tg to the nozzle on Bhandari's table
+    base, tg = like(m), p["tg"]["value"]
+    k2 = f"k2.{m.lower()}"
+    heat = fact(k2) if "failsim." + k2 in facts() else printers.settings(printers.get("creality_k2"), m)
+    cp, k = fact("pla.cp"), _own(m, "k")
+    if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg
         tab = np.asarray(fact("abs.cp_k"), float)
-        ts = np.linspace(p["tg"]["value"], k2["nozzle"], 50)
-        cp = float(np.interp(ts, tab[:, 0], tab[:, 2]).mean())
-        k = float(np.interp(np.linspace(fact("room_air"), p["tg"]["value"], 50), tab[:, 0], tab[:, 1]).mean())
-    else:
-        cp, k = fact("pla.cp"), fact(f"{m.lower()}.k")
-        if m == "PETG":
-            stand += ["PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity"]
-    return Material(m, p["density"]["value"], p["tg"]["value"], p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
-                    tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k,
-                    fact(f"peel.{m.lower()}"), fact("peel_bed")[m], k2["bed"], k2["chamber"],
-                    k2["nozzle"], tuple(stand), src)
+        cp = float(np.interp(np.linspace(tg, heat["nozzle"], 50), tab[:, 0], tab[:, 2]).mean())
+        k = k or float(np.interp(np.linspace(fact("room_air"), tg, 50), tab[:, 0], tab[:, 1]).mean())
+    stand = [note("mfi_rig"), *([note("like")] if base != m else [])]
+    stand += [note(i[8:]) for i, e in facts().items() if "assumption" in e and i.startswith((f"failsim.{base.lower()}.", f"failsim.{m.lower()}."))]
+    if "chamber" not in heat:
+        stand.append(note("k2_air"))
+    if base == "PETG":
+        stand.append("PETG uses PLA's specific heat (no sourced value for the melt) and ABS's and PLA's emissivity")
+    stand += [f"{p[key]['assumption']} (materials.json {p[key]['id']})" for key in ("cte", "modulus_vs_temp")
+              if "assumption" in p[key]]
+    return Material(m, p["density"]["value"], tg, p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
+                    tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()),
+                    fact("peel_bed")[base], heat["bed"], heat.get("chamber", fact("k2_air")), heat["nozzle"], tuple(dict.fromkeys(stand)), src)
 
 
 def _mat(m) -> Material:
@@ -133,10 +164,11 @@ def flow_index(name: str) -> tuple[float, float, float]:
 
 @lru_cache(maxsize=None)
 def _melt(name: str) -> dict:
-    """Its Cross-WLF's shape, set to its filament's melt flow index."""
-    p, u = fact("pla.cross_wlf" if name == "PETG" else f"{name.lower()}.cross_wlf"), fact("wlf")
-    if name == "PETG":
-        p = {**p, "A1": u["C1"] * math.log(10), "A2_K": u["C2_K"], "T_star_K": _props(name)[0]["tg"]["value"] + 273.15}
+    """Its melt's shape (its own, or the one it borrows), set to its filament's melt flow index."""
+    base, u = like(name), fact("wlf")
+    p = _own(name, "cross_wlf") or fact("pla.cross_wlf")
+    if base == "PETG":
+        p = {**p, "A1": u["C1"] * math.log(10), "A2_K": u["C2_K"], "T_star_K": _props(base)[0]["tg"]["value"] + 273.15}
     t_c, rate, eta = flow_index(name)
     lo, hi = math.log(eta), math.log(eta) + 20  # of the melt at rest: what thins to eta at the test's rate
     for _ in range(80):
@@ -497,13 +529,13 @@ def nozzle_drag(mat="PLA", speed_mm_s: float | None = None, layer: float = 0.2) 
 
 def tension(t_c, mat="PLA") -> float:
     """N/m, the melt's surface tension: the 20 C value falling with temperature (Wu)."""
-    q = fact(_mat(mat).name.lower() + ".surface_tension")
+    q = _own(_mat(mat).name, "surface_tension")
     return (q["at_20C"] + q["per_K"] * (t_c - 20)) * 1e-3
 
 
 def wetting(t_c, mat="PLA") -> float:
     """Degrees, the angle a drop of the melt rests at on metal: under 90 it spreads over the nozzle's tip."""
-    tab = np.asarray(fact(_mat(mat).name.lower() + ".contact_angle"), float)
+    tab = np.asarray(_own(_mat(mat).name, "contact_angle"), float)
     return float(np.interp(t_c, tab[:, 0], tab[:, 1]))
 
 
@@ -638,7 +670,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     air = inp.air
     where_air = f"{air:g} C chamber" if inp.enclosed else f"open printer, {air:g} C room air"
     base = [f"this is a model, not a recording; {m.name} ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})",
-            *m.stand_ins, *inp.notes]
+            *(x for x in m.stand_ins if inp.enclosed or x != note("k2_air")), *inp.notes]
     if inp.clean < 1:
         base.append(note("contamination"))
     if not inp.enclosed:

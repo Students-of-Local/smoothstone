@@ -63,18 +63,23 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True) -> dict:  # h
     speed, width = (float(np.median(q[s])) if (s := on & (tp.feature == F.index(k))).any() else None
                     for q, k in ((tp.feed, "inner wall"), (tp.width, "outer wall")))
     m = failsim.material(material)
-    m = replace(m, nozzle=nozzle or m.nozzle, chamber=chamber if chamber and enclosed else m.chamber)
+    unsaid = failsim.note("k2_air") if failsim.note("k2_air") in m.stand_ins else None  # its profile names no chamber
+    if chamber and enclosed:
+        m = replace(m, chamber=chamber, stand_ins=tuple(x for x in m.stand_ins if x != unsaid))
+    m = replace(m, nozzle=nozzle or m.nozzle)
     got = {"bed": bed, "infill": tp.infill, "speed": speed, "width": width}
     said = [f"{k} {v:.3g} {u}" for k, v, u in (("bed", bed, "C"), ("nozzle", nozzle, "C"), ("chamber", chamber if enclosed else None, "C"),
             ("fan", None if fan is None else 100 * fan, "%"), ("infill", tp.infill, "%"), ("inner wall", speed, "mm/s"),
             ("line", width, "mm")) if v is not None]
     missing = [k for k, v in (("bed", bed), ("nozzle", nozzle), ("fan", fan), ("infill", tp.infill),
                                 ("inner wall speed", speed), ("line width", width)) if v is None]
-    if enclosed and chamber is None:
+    if enclosed and chamber is None and not unsaid:
         missing.append("chamber")
     notes = [f"this print's own settings: {', '.join(said)}"] if said else []
     if missing:
         notes.append(f"the K2 profile's, not the print's own: {', '.join(missing)}" + (" (fan full on)" if fan is None else ""))
+    if enclosed and chamber is None and unsaid:
+        notes.append(unsaid)
     return {**got, "material": m, "fan": True if fan is None else fan, "notes": notes}
 
 
@@ -495,8 +500,8 @@ def cmd(args, job, prof, out):
         out.fix("--fail draws one frame a layer; drop --mode")
         out.next = timelapse.again(args, **{"--mode": None})
         return out
-    if args.material and args.material.upper() not in failsim.MATERIALS:
-        out.fix(f"--material {args.material}: the model has {', '.join(failsim.MATERIALS)}")
+    if args.material and not failsim.named(args.material):
+        out.fix(f"--material {args.material}: the model has no numbers for it; it has {', '.join(failsim.MATERIALS)}")
         out.next = "ask the person: which of these is closest? Then: " + timelapse.again(args, **{"--material": "<" + "|".join(failsim.MATERIALS) + ">"})
         return out
     asked, without = args.supports, mode not in ("auto", "detach") and not args.gcode
@@ -512,11 +517,14 @@ def cmd(args, job, prof, out):
         without = asked == "on" or supports.analyze(supports.load(f), columns=True)["needed"]
     asked_for = refs.material_for(job.request()).material.upper() if job.exists() else ""
     said = (args.material or tp.material or asked_for).upper()
-    mat = next((k for k in (said, asked_for) if k in failsim.MATERIALS), "PLA")
-    note = ["material: PLA is assumed; say --material PETG or ABS" if not said else
-            f"material: the model has no {said}, so this is {mat}'s" if mat != said else
-            f"material: {mat}" + ("" if args.material or not tp.material else ", the G-code says")]
-    heat = tp.material == mat or mat == said and tp.material not in failsim.MATERIALS  # the file's is for this plastic
+    own, file = failsim.named(said), failsim.named(tp.material)
+    mat = own or failsim.named(asked_for) or "PLA"
+    note = [f"material: PLA is assumed; say --material {', '.join(failsim.MATERIALS[1:-1])} or {failsim.MATERIALS[-1]}" if not said else
+            f"material: the model has no numbers for {said}, so this is {mat}'s; it has {', '.join(failsim.MATERIALS)}" if not own else
+            f"material: {mat}" + ("" if mat == said else f", for {said}") + ("" if args.material or not tp.material else ", the G-code says")]
+    if failsim.like(mat) != mat:
+        note.append(failsim.note("like"))
+    heat = file == mat or bool(own) and not file  # the file's is for this plastic
     clean = failsim.fact("contamination") if args.plate == "dirty" else 1.0
     inp = inputs(tp, mat, clean, prof.get("enclosed", True), heat)
     fails = failsim.predict(inp)

@@ -315,7 +315,7 @@
    "cite": "arXiv 2311.05158 Table 2",
    "url": "https://arxiv.org/abs/2311.05158",
    "checked": "2026-11-24",
-   "assumption": "PETG's melt moves with heat by the universal WLF constants and thins with speed as PLA does; its thickness is its melt flow index, 1730 Pa s at 240 C and no speed, where a fit to shear and stretch tests of another PETG sums to 600 to 1800, so it may sag up to 2.9 times as much"
+   "assumption": "PETG's melt moves with heat by the universal WLF constants and thins with speed as PLA does; its flow index makes the plain one 1730 Pa s at 240 C and no speed, where a fit to shear and stretch tests of another PETG sums to 600 to 1800, so it may sag up to 2.9 times as much"
   },
   {
    "id": "failsim.mfi_rig",
@@ -329,18 +329,18 @@
    "cite": "US 12055470 B2; ISO 1133:1997",
    "url": "https://patents.google.com/patent/US12055470B2/en",
    "checked": "2026-11-24",
-   "assumption": "Each melt is as thick as its filament maker's melt flow index says (the middle of a range), read without corrections that would make it up to a third thinner at that test's speed, two fifths at rest"
+   "assumption": "Each melt is as thick as its filament maker's melt flow index says (the middle of a range), read without corrections that would make it up to a third thinner at that test's speed, two fifths at rest (ASA, tested under 10 kg: three fifths)"
   },
   {
    "id": "failsim.mfi_test",
    "topic": "failsim",
    "key": "mfi_test",
-   "value": {"PLA": [210, 2.16], "PETG": [240, 2.16], "ABS": [220, 2.16]},
+   "value": {"PLA": [210, 2.16], "PETG": [240, 2.16], "ABS": [220, 2.16], "ASA": [220, 10], "PLA-CF": [210, 2.16], "PETG-CF": [230, 2.16]},
    "unit": "C, kg",
    "note": "The heat and weight of each plastic's melt flow index in materials.json, from the same datasheet line (each sheet's address is there).",
-   "quote": "Melt index 210\u00b0C, 2.16kg 7-11 g/10min ... Melt index 240\u00b0C, 2.16kg 10.8 g/10min ... Melt index 220\u00b0C, 2.16kg 9-14 g/10min",
-   "source": "Polymaker PolyLite PLA, PETG and ABS technical data sheets V5.4",
-   "cite": "Polymaker PolyLite datasheets",
+   "quote": "Melt index 210\u00b0C, 2.16kg 7-11 g/10min ... Melt index 240\u00b0C, 2.16kg 10.8 g/10min ... Melt index 220\u00b0C, 2.16kg 9-14 g/10min ... Melt index 220\u00b0C, 10kg 25g /10min ... Melt index 210\u00b0C, 2.16 kg 9.2 g/10min ... Melt index 230\u00b0C, 2.16 kg 11.5 g/10min",
+   "source": "Polymaker technical data sheets of each, V5.4 and V1.0",
+   "cite": "Polymaker datasheets",
    "url": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyLite_PLA_TDS_EN_V5.4.pdf",
    "checked": "2026-11-24"
   },
@@ -704,6 +704,45 @@
    "cite": "Mueller et al. 2007 Position Based Dynamics",
    "url": "https://doi.org/10.1016/j.jvcir.2007.01.005",
    "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.like",
+   "topic": "failsim",
+   "key": "like",
+   "value": {"ASA": "ABS", "PLA-CF": "PLA", "PETG-CF": "PETG"},
+   "unit": "",
+   "note": "The plastic each borrows its melt's shape, its hold on the plate and the nozzle and its heat from, where nothing is known of its own. ASA is ABS with acrylate rubber; a CF's resin is the plain plastic's. Its own: density, stiffness, strength, melt flow index, where it softens.",
+   "source": "stone assumption",
+   "cite": "assumption",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "ASA melts, sticks and holds heat as ABS does, and a carbon-filled plastic as the plain one, but for its own melt flow index, stiffness, strength and softening"
+  },
+  {
+   "id": "failsim.asa.k",
+   "topic": "failsim",
+   "key": "asa.k",
+   "value": 0.1642,
+   "unit": "W/(m K)",
+   "note": "Stratasys ASA at 30 C.",
+   "quote": "Thermal Conductivity ... 0.1642 W/m·K at 30 °C",
+   "source": "Stratasys FDM ASA material data sheet 0824a, Table 4",
+   "cite": "Stratasys ASA datasheet",
+   "url": "https://prod.stratasys.com/contentassets/6da978b5d061469987285d6d62171061/mds_fdm_asa_0824a.pdf",
+   "checked": "2026-11-24"
+  },
+  {
+   "id": "failsim.k2_air",
+   "topic": "failsim",
+   "key": "k2_air",
+   "value": 35,
+   "unit": "C",
+   "note": "The chamber of the K2's PLA, PETG and TPU profiles, for a plastic whose profile names none. A 100 C plate warms a closed chamber further, which lowers the pull on the edge.",
+   "source": "stone assumption, from failsim.k2.pla",
+   "cite": "OrcaSlicer K2 PLA profile",
+   "url": "",
+   "checked": "2026-11-24",
+   "assumption": "The slicer's profile names no chamber heat for this plastic: 35 C, the K2's PLA chamber, is used"
   },
   {
    "id": "failsim.k2.pla",
