@@ -568,6 +568,8 @@ def test_the_lookup_waits_until_no_recipe_fits(jobenv, monkeypatch):
     ("Print me the Sacre-Coeur, 15 cm tall", True),  # "coeur" of "cover"
     ("Could I get a print of the Marina Bay Sands?", True),  # "sands" of "stand"
     ("Print the Hook Lighthouse for my desk", True),
+    ("Print me Mount Rushmore, 18 cm wide", True),  # "mount" of the under desk mount
+    ("A wall mount for my Mount Rushmore photo", False),
     ("Can I get an Empire State Building print, 18 cm tall?", True),
     ("Make me a Hook Lighthouse, 15 cm tall", True),
     ("Print the Mt. Hook Lighthouse", True),
