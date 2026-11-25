@@ -1877,6 +1877,10 @@ def cmd_measure(args, job: Job) -> Out:
 # done
 
 
+YES = re.compile(r"\W*(?:the (?:person|user) (?:said|says)\W+)?(?:yes|yeah|yep|ok|okay|sure|please do|go ahead|print it|fine)\b", re.I)
+NO = re.compile(r"\W*(?:the (?:person|user) (?:said|says)\W+)?(?:no|nope|don't|do not|skip|never ?mind)\b", re.I)
+
+
 def cmd_note(args, job: Job) -> Out:
     """Keep a researched fact and its source in the job, so it survives a compaction."""
     out = Out(owns_next=False)
@@ -1911,6 +1915,11 @@ def cmd_note(args, job: Job) -> Out:
             f.write(f"\nAnswer: {text}\n")
         out.owns_next = True
         out.next = f"stone show {st['ask_recipe']}"
+        return out
+    plain = st.get("landmark_plain") or {}
+    if plain and asked == _ask_plain(plain["subject"], plain["command"]) :
+        out.owns_next = True
+        out.next = plain["command"] if YES.match(text) else ASK_FILE if NO.match(text) else asked
         return out
     if st.get("ask_then") and asked == st.get("ask_then_q"):
         # only the coupon question's answer calibrates; "later, carry on" drops the question instead
@@ -2259,16 +2268,24 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
     return out
 
 
+def _ask_plain(subject: str, command: str) -> str:
+    return (f"ask the person: no open model of {subject} prints, and the map has it only as one plain shape, like a "
+            f"box or a cylinder, without its real form. Print that plain shape? When they say yes: {command}")
+
+
+ASK_FILE = ("ask the person: neither the landmark references nor an open model produced a printable part. "
+            'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
+
+
 def _landmark_fallback(job: Job, subject: str) -> str:
     status = job.status()
     job.update(models_out=subject)
     attempted = str(status.get("landmark_attempted") or "")
     plain = status.get("landmark_plain") or {}
     if str(plain.get("subject") or "").casefold() == subject.casefold():
-        return plain["command"]  # its one plain shape is better than nothing
+        return _ask_plain(subject, plain["command"])
     if attempted.casefold() == subject.casefold():
-        return ("ask the person: neither the landmark references nor an open model produced a printable part. "
-                'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
+        return ASK_FILE
     return _landmark_command("stone landmark", subject)
 
 
@@ -2322,8 +2339,8 @@ def cmd_landmark(args, job: Job) -> Out:
                       if value is not None for a in (flag, str(value))]
             command = shlex.join(["stone", "landmark", subject, *chosen, "--plain"])
             job.update(landmark_plain={"subject": subject, "command": command})
-            if str(job.status().get("models_out") or "").casefold() != subject.casefold():
-                command = None  # the open models come first
+            out_of_models = str(job.status().get("models_out") or "").casefold() == subject.casefold()
+            command = _ask_plain(subject, command) if out_of_models else None  # the open models come first
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
