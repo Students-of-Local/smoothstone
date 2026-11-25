@@ -889,18 +889,23 @@ NAME_ENDS = re.compile(r"""\s*(?:[,.;:!?()]|$)|\s+(?:[-\u2013\u2014]\s|\d|(?:for
     |as\s+(?:an?\s+)?(?:3d\s+)?(?:model|replica|miniature|print)\b|to\s+(?:be\s+)?(?:3-?d[\s-]?)?(?:print|fit|display)\w*\b|i\s+(?:can|could|want)\b)""", re.I | re.X)
 
 
+def _leading_name(request: str) -> str:
+    """What a request asks for by its first words: "print me the arc de triomphe, 15 cm" gives "arc de triomphe"."""
+    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'")).strip()
+    for lead in (LEAD, SIZED, MODEL_OF, SIZED):
+        m = lead.match(req)
+        req = req[m.end():] if m else req
+    req = re.sub(r"^the\s+", "", req, flags=re.I)
+    return re.sub(r"\s+(?:3d\s+)?(?:models?|replicas?|miniatures?|prints?|stls?)$", "", req[:NAME_ENDS.search(req).start()], flags=re.I)
+
+
 def known_landmark(request: str) -> str | None:
     """The thing a request asks for when a pack or Wikidata knows it as a structure: "a 3D print of the Arc de
     Triomphe" has no building word in it. Only the thing itself, by name: not "a clip for the Arc", "a small Parthenon
     on it" or "a white house". One lookup, and only for a request no recipe fits."""
     from . import landmark_refs
 
-    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'")).strip()
-    for lead in (LEAD, SIZED, MODEL_OF, SIZED):
-        m = lead.match(req)
-        req = req[m.end():] if m else req
-    req = re.sub(r"^the\s+", "", req, flags=re.I)
-    name = re.sub(r"\s+(?:3d\s+)?(?:models?|replicas?|miniatures?|prints?|stls?)$", "", req[:NAME_ENDS.search(req).start()], flags=re.I)
+    name = _leading_name(request)
     words = name.casefold().split()
     plain = 1 <= len(words) <= 7 and words[0] not in ("a", "an", "some", "any") and not {"my", "our", "your", "his", "her", "their"} & {*words}
     if plain and landmark_refs.is_structure(name):
@@ -945,6 +950,31 @@ def named_in(request: str) -> list[str]:
                     and not OTHER_BEFORE.search(clause[:m.end() - len(name)].rstrip()):
                 out.append(name)
     return sorted(out, key=len, reverse=True)[:3]
+
+
+OPENING = re.compile(rf"^\s*(?:at|in)\s+(?:{SIZE}|(?:\w+\s+)?(?:PLA|PETG|ABS|ASA|TPU|resin)\b)[\s,]*", re.I)  # "At 18 cm tall, print"
+FIGURE_NAME = re.compile(r"\b(?:statue|sculpture|bust|figure|figurine)\b", re.I)
+
+
+def landmark_before_recipe(request: str, makes) -> str | None:
+    """The structure a request names when a recipe fits only through words of that name: "Empire State Building" has
+    "state", one letter from "statue", and "Hook Lighthouse" has "hook". `makes(text)` says whether a recipe makes the
+    text. A statue stays with the figure recipe, and one word alone ("Hook, 40 mm") is the part. A name is looked up
+    only when nothing else in the request asks for a part."""
+    from . import landmark_refs
+
+    whole = " ".join(_clauses(request))
+    req = OPENING.sub("", whole)
+    first = re.sub(r"^an?\s+", "", _leading_name(req), flags=re.I)
+    # in lower case only a name that ends in a building word, and no part before it ("a stand shaped like the arch")
+    plain = NAME.fullmatch(first) or BUILDING.fullmatch(first.split(" ")[-1]) and not OTHER_BEFORE.search(first)
+    for found in dict.fromkeys([*([first] if plain else []), *(n for n in named_in(req) if not for_another_thing(req, n))]):
+        for name in dict.fromkeys([found, found.split(" in ")[0]]):
+            rest = re.sub(rf"(?<!\w){re.escape(found)}(?!\w)", " ", whole, flags=re.I)
+            if len(re.findall(r"\w+", name)) > 1 and not FIGURE_NAME.search(name) and not makes(rest) \
+                    and landmark_refs.is_structure(name):
+                return name
+    return None
 
 
 def asks_found_model(request: str) -> bool:

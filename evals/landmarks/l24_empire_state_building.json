@@ -1,0 +1,24 @@
+{
+  "id": "l24_empire_state_building",
+  "request": "Print me the Empire State Building, about 18 cm tall.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Empire State Building",
+      "size": {
+        "mode": "z",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "references": {
+        "identity": "https://www.wikidata.org/wiki/Q9188",
+        "footprint": "https://www.openstreetmap.org/way/34633854"
+      }
+    }
+  },
+  "why": "No pack: the map's stepped parts alone have to carry the setbacks, the crown and the antenna."
+}

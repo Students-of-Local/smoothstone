@@ -1,0 +1,24 @@
+{
+  "id": "l25_chrysler_building",
+  "request": "Can I get a Chrysler Building print, 18 cm tall?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Chrysler Building",
+      "size": {
+        "mode": "z",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "references": {
+        "identity": "https://www.wikidata.org/wiki/Q11274",
+        "footprint": "https://www.openstreetmap.org/way/42500770"
+      }
+    }
+  },
+  "why": "No pack: the map's 79 parts alone have to carry the setbacks, the terraced crown and the needle."
+}

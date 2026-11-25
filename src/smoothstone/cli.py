@@ -338,7 +338,11 @@ def cmd_recipes(args, job: Job) -> Out:
         fits = {r.name: rc.fit(r, query) for _, r in ranked}
         ranked.sort(key=lambda sr: -fits[sr[1].name])  # stable: keeps the word score within a fit
         top = ranked[0][1]
-        if fits[top.name] == 0 and (landmark := request_landmark(query)):
+        from . import models as mdl
+
+        landmark = request_landmark(query) if fits[top.name] == 0 else mdl.landmark_before_recipe(
+            query, lambda text: any(rc.fit(r, text) for r in vis))
+        if landmark:
             return models_route(out, landmark, query)
         if fits[top.name] == 0:
             # no recipe makes this: handing over the nearest one ready would be a wrong part
