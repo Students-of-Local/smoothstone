@@ -24,6 +24,10 @@ class LandmarkProblem(Exception):
     """A reference could not be resolved or contains insufficient geometry."""
 
 
+class PlainShape(LandmarkProblem):
+    """The map has one plain shape and no more: an open model is better, and this is better than nothing."""
+
+
 def _request(url, data=None):
     agent = 'smoothstone' if url.startswith(OVERPASS) else 'smoothstone (https://github.com/baney75/smoothstone)'
     request = urllib.request.Request(url, data=data, headers={'User-Agent': agent})
@@ -596,7 +600,7 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
     lat, lon = refs['latitude'], refs['longitude']
     # The radius includes half the known span and is capped to bound public requests.
     span = max(refs.get('length') or 0, refs.get('width') or 0)
-    radius = min(1000, max(220, math.ceil(span * 0.6), math.ceil(reach)))
+    radius, small = min(1000, max(220, math.ceil(span * 0.6), math.ceil(reach))), False
     nearby = ''.join(f'{kind}["{tag}"](around:{radius},{lat},{lon});'
                      for tag in ('building', 'building:part') for kind in ('way', 'relation'))
     explicit = ''
@@ -633,21 +637,33 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
                     raise LandmarkProblem('Overpass returned no elements')
             except (OSError, ValueError, LandmarkProblem):
                 # OSM's map API supplies the same primitives when Overpass is unavailable.
-                dx = radius / (111320 * math.cos(math.radians(lat)))
-                dy = radius / 111320
-                bbox = ','.join(str(v) for v in (lon-dx, lat-dy, lon+dx, lat+dy))
-                url = 'https://api.openstreetmap.org/api/0.6/map.json?' + urllib.parse.urlencode({'bbox': bbox})
-                raw = _request(url)
+                while True:
+                    dx = radius / (111320 * math.cos(math.radians(lat)))
+                    dy = radius / 111320
+                    bbox = ','.join(str(v) for v in (lon-dx, lat-dy, lon+dx, lat+dy))
+                    url = 'https://api.openstreetmap.org/api/0.6/map.json?' + urllib.parse.urlencode({'bbox': bbox})
+                    try:
+                        raw = _request(url)
+                        break
+                    except urllib.error.HTTPError as exc:  # it answers 400 for an area with over 50,000 nodes
+                        if exc.code != 400 or radius <= 220:
+                            raise
+                        radius = max(220, radius // 2)
+                        small = True
                 raw_text = json.dumps(raw, ensure_ascii=False)
                 _write_atomic(ref_dir / 'osm-map.json', raw_text)
                 _write_atomic(raw_cache, raw_text)
                 data = _map_as_overpass(raw, refs)
                 data['_smoothstone_response_url'] = url
                 data['_smoothstone_query'] = query
-            _write_atomic(cache, json.dumps(data, ensure_ascii=False))
+            if not small:
+                _write_atomic(cache, json.dumps(data, ensure_ascii=False))
         _write_atomic(job_cache, json.dumps(data, ensure_ascii=False))
         parsed = parse_osm(data, refs)
         far = max((math.hypot(*point) for point in parsed.get('site', [[]])[0]), default=0)
+        around = max([far, *(math.hypot(*point) for ring in parsed['outline'] for point in ring)])
+        if small and around > radius:
+            raise LandmarkProblem('OpenStreetMap is too busy to answer for all of this landmark. Try again in a few minutes.')
         if far > 1000:
             raise LandmarkProblem('The landmark reaches more than 1 km from its coordinates.')
         if far > radius:

@@ -2256,7 +2256,10 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
 
 
 def _landmark_fallback(job: Job, subject: str) -> str:
-    attempted = str(job.status().get("landmark_attempted") or "")
+    status = job.status()
+    attempted = str(status.get("landmark_attempted") or "")
+    if str(status.get("landmark_plain") or "").casefold() == subject.casefold():
+        return _landmark_command("stone landmark", subject)  # its one plain shape is better than nothing
     if attempted.casefold() == subject.casefold():
         return ("ask the person: neither the landmark references nor an open model produced a printable part. "
                 'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
@@ -2301,12 +2304,15 @@ def cmd_landmark(args, job: Job) -> Out:
     size = args.size
     if size is None:
         size = target if target["mode"] != "fit" or target.get("bed_said") else min(200.0, *bed)
-    job.update(landmark_attempted=subject)
+    plain = str(job.status().get("landmark_plain") or "").casefold() == subject.casefold()
+    job.update(landmark_attempted=subject, landmark_plain=None)
     progress(job, f"building {subject} from landmark references")
     try:
-        options = {"ref_pack": args.refs} if args.refs else {}
+        options = {**({"ref_pack": args.refs} if args.refs else {}), **({"plain": True} if plain else {})}
         info = landmark.generate(subject, job.root, bed, size, args.detail, **options)
     except Exception as e:
+        if isinstance(e, landmark.PlainShape):
+            job.update(landmark_plain=subject)
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
