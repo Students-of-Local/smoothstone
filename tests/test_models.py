@@ -439,29 +439,59 @@ def test_names_landmark_still_names_buildings(request_, subject):
     assert models.names_landmark(request_) == subject
 
 
+NAMES = ("Arc de Triomphe", "Stonehenge", "alhambra", "Parthenon", "pantheon", "Colosseum", "white house", "pentagon", "lid",
+         "Saint Mark's", "Alhambra", "Kindle Paperwhite", "petra", "stonehenge", "parthenon")
+
+
 @pytest.mark.parametrize("request_, subject", [
     ("A 3D print of the Arc de Triomphe, 16 cm tall please.", "Arc de Triomphe"),
     ("Model Stonehenge for my 3D printer, 16 cm across.", "Stonehenge"),
     ("make me the alhambra, 15 cm", "alhambra"),
     ("a 3d model of petra, 12 cm", "petra"),
+    ("make me stonehenge, 16 cm", "stonehenge"),
+    ("make me the alhambra in PLA", "alhambra"),
+    ("Print a 150 mm tall Stonehenge", "Stonehenge"),
+    ("Make me a 16 cm Arc de Triomphe", "Arc de Triomphe"),
+    ("I want a 15 cm Parthenon", "Parthenon"),
+    ("Create the Arc de Triomphe, 16 cm tall", "Arc de Triomphe"),
+    ("Design Stonehenge for my printer", "Stonehenge"),
+    ("Give me the Colosseum, 12 cm", "Colosseum"),
+    ("Can I have the Alhambra?", "Alhambra"),
+    ("i want to print stonehenge, 16 cm", "stonehenge"),
+    ("i'd like to make the alhambra", "alhambra"),
+    ("stonehenge, 16 cm tall", "stonehenge"),
+    ("a 16 cm stonehenge", "stonehenge"),
+    ("Could you 3D print the Arc de Triomphe at 1:500 scale?", "Arc de Triomphe"),
+    ("A small detailed 12 cm replica of the Parthenon in white", "Parthenon"),
+    ("Stonehenge model, 16 cm", "Stonehenge"),
     ("A stand for my Kindle Paperwhite", None),
     ("A clip for the Arc de Triomphe", None),
     ("a wall thing", None),
-    ("make me stonehenge, 16 cm", "stonehenge"),
-    ("make me the alhambra in PLA", "alhambra"),
     ("a wall hook with a small Parthenon on it", None),
     ("a clip for St. Mark\u2019s", None),
     ("a birdhouse that looks like the parthenon", None),
     ("a model of a white house with a red roof", None),
     ("a 3D print of a pentagon", None),
     ("An Arc de Triomphe phone stand", None),
+    ("A display case for my model of Stonehenge", None),
+    ("a frame for a print of the Alhambra", None),
+    ("a keychain with a miniature of the Colosseum", None),
+    ("Print the Colosseum as a lampshade", None),
+    ("Print the Parthenon to hold my pens", None),
+    ("make me the pantheon in paris, 15 cm", None),
+    ("make me a lid", None),
 ])
 def test_a_structure_without_a_building_word_routes_to_stone_landmark(jobenv, monkeypatch, request_, subject):
-    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: name in (
-        "Kindle Paperwhite", subject, "Arc de Triomphe", "Parthenon", "parthenon", "white house", "pentagon", "Saint Mark's"))
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: name in NAMES)
     assert models.known_landmark(request_) == subject
     if subject:
         assert _route(monkeypatch, request_)[0] == ["stone", "landmark"]
+
+
+@pytest.mark.parametrize("request_", ["make me a lid", "print me a name plate for Anna", "make me my nan's urn"])
+def test_a_thing_with_no_name_is_not_looked_up(monkeypatch, request_):
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: pytest.fail(name))
+    assert models.known_landmark(request_) is None
 
 
 def test_a_named_statue_the_map_cannot_draw_goes_on_to_found_models(jobenv, monkeypatch):
@@ -478,8 +508,8 @@ def test_a_named_statue_the_map_cannot_draw_goes_on_to_found_models(jobenv, monk
 def test_the_lookup_waits_until_no_recipe_fits(jobenv, monkeypatch):
     asked = []
     monkeypatch.setattr(landmark_refs, "is_structure", lambda name: asked.append(name) or True)
-    request_ = "Print the Arc de Triomphe as a phone stand"
-    assert models.known_landmark(request_) == "Arc de Triomphe" and asked
+    request_ = "Print the Arc de Triomphe phone stand"
+    assert models.known_landmark(request_) and asked
     asked.clear()
     assert _route(monkeypatch, request_)[0] != ["stone", "landmark"] and not asked
 

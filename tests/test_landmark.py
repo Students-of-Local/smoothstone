@@ -3,6 +3,8 @@
 import copy
 import http.client
 import json
+import time
+import os
 import urllib.parse
 from pathlib import Path
 
@@ -344,14 +346,22 @@ def _entity(wikis, description="triumphal arch in Paris", place=True, **claims):
             "claims": at | claims, "sitelinks": {str(n): {} for n in range(wikis)}}
 
 
+ENDED = {"mainsnak": {"datavalue": {"value": {"time": "+1790-00-00T00:00:00Z"}}}}
+
+
 @pytest.mark.parametrize("found, answered, built", [
     ([_entity(9)], True, True),
     ([_entity(9)], False, False),  # Wikipedia did not answer
     ([_entity(9), _entity(200, "god of examples", place=False)], True, False),  # the god is meant
     ([_entity(9), _entity(3, "film", place=False)], True, True),
-    ([_entity(9, P576=[{}])], True, False),  # it no longer stands
-    ([_entity(9, P576=[{}], P1435=[{}])], True, True),  # a ruin that does
+    ([_entity(9, P576=[ENDED])], True, False),  # it no longer stands
+    ([_entity(9, P576=[ENDED], P1435=[{}])], True, True),  # a ruin that does
+    ([_entity(9, P576=[ENDED], P1435=[{"qualifiers": {"P582": []}}])], True, False),  # and was taken off the list
+    ([_entity(9, P576=[ENDED | {"rank": "deprecated"}])], True, True),
+    ([_entity(9), _entity(99, "Wikimedia disambiguation page", place=False,
+                          P31=[{"mainsnak": {"datavalue": {"value": {"id": "Q4167410"}}}}])], True, True),
     ([_entity(9, "natural limestone arch on a coast")], True, False),
+    ([_entity(9, "natural history museum in Chicago")], True, True),
     ([_entity(9, "museum ship in London")], True, False),
 ])
 def test_the_best_known_thing_of_the_name_must_stand(monkeypatch, tmp_path, found, answered, built):
@@ -361,7 +371,29 @@ def test_the_best_known_thing_of_the_name_must_stand(monkeypatch, tmp_path, foun
     monkeypatch.setattr(landmark_refs, "_matches", lambda name: asked.append(name) or (
         hits, {h["id"]: e for h, e in zip(hits, found)}, answered))
     assert IS_STRUCTURE("Exemple") is built and IS_STRUCTURE("exemple") is built
-    assert len(asked) == (1 if answered else 2)  # a definite answer is kept, a weak one is not
+    assert len(asked) == 1  # a definite answer is kept a week
+    old = time.time() - 700
+    for path in (tmp_path / ".cache/smoothstone/structure").iterdir():
+        os.utime(path, (old, old))
+    IS_STRUCTURE("Exemple")
+    assert len(asked) == (1 if answered else 2)  # and a weak one ten minutes
+
+
+def test_a_busy_wikidata_is_not_a_no(monkeypatch, tmp_path):
+    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(landmark_refs, "_wikipedia", lambda params: {})
+    monkeypatch.setattr(landmark_refs, "_wiki", lambda params: (
+        {"search": [{"id": "Q1", "label": "Exemple"}]} if "search" in params else {"error": {"code": "maxlag"}}))
+    with pytest.raises(ValueError, match="maxlag"):
+        landmark_refs._matches("Exemple")
+    assert not IS_STRUCTURE("Exemple")
+    assert [p.read_text() for p in (tmp_path / ".cache/smoothstone/structure").iterdir()] == ["null"]
+
+
+def test_a_statue_on_a_building_is_refused_for_what_wikidata_calls_it():
+    refs = {"latitude": 0, "longitude": 0, "wikidata_raw": _entity(9, "colossal sculpture on an island")}
+    with pytest.raises(landmark_refs.LandmarkProblem, match="A statue is a sculpture"):
+        landmark_refs.parse_osm({"elements": []}, refs)
 
 
 def test_a_shipped_pack_is_a_known_structure_and_offline_nothing_else_is(monkeypatch):

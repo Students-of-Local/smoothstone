@@ -82,15 +82,16 @@ def _words(text):
 
 def _matches(name):
     """What Wikidata and Wikipedia find for a name: hits, their entities, and whether Wikipedia answered."""
-    hits = {hit['id']: hit for hit in _wiki({'action': 'wbsearchentities', 'search': name, 'language': 'en',
-                                             'limit': 15}).get('search', [])}
+    def told(reply):
+        if 'error' in reply:  # a busy server says so in a page that loads
+            raise ValueError(reply['error'])
+        return reply
+    hits = {hit['id']: hit for hit in told(_wiki({'action': 'wbsearchentities', 'search': name, 'language': 'en',
+                                                  'limit': 15})).get('search', [])}
     answered = True
     for params in ({'titles': name, 'redirects': 1}, {'generator': 'search', 'gsrsearch': name, 'gsrlimit': 6}):
         try:
-            reply = _wikipedia(params)
-            if 'error' in reply:  # a busy server says so in a page that loads
-                raise ValueError(reply['error'])
-            pages = reply.get('query', {}).get('pages', {}).values()
+            pages = told(_wikipedia(params)).get('query', {}).get('pages', {}).values()
         except (OSError, ValueError, http.client.HTTPException):
             answered = False  # Wikidata's own search still answers
             continue
@@ -101,8 +102,8 @@ def _matches(name):
                 hit['article'] = hit.get('article') or 'titles' in params
     if not hits:
         raise LandmarkProblem(f'No Wikidata entity found for {name}.')
-    entities = _wiki({'action': 'wbgetentities', 'ids': '|'.join(hits), 'languages': 'en',
-                      'props': 'labels|descriptions|aliases|claims|sitelinks'}).get('entities', {})
+    entities = told(_wiki({'action': 'wbgetentities', 'ids': '|'.join(hits), 'languages': 'en',
+                           'props': 'labels|descriptions|aliases|claims|sitelinks'})).get('entities', {})
     return list(hits.values()), entities, answered
 
 
@@ -184,7 +185,9 @@ def _choose(name, hits, entities):
 
 
 KNOWN = 5  # the wikis that write about a structure someone asks for by its bare name
-NATURAL = re.compile(r'\b(natural|geological|rock formation|national monument|ship|submarine|aircraft)\b', re.I)
+NATURAL = re.compile(r'\bnatural (?!history)|\bgeological (?:feature|formation|structure|site)|\brock formation'
+                     r'|\bnational monument|\b(?:ship|submarine|aircraft)$', re.I)
+SCULPTURE = re.compile(r'\b(?:statue|sculpture|bust)$', re.I)
 
 
 def is_structure(name: str) -> bool:
@@ -194,16 +197,31 @@ def is_structure(name: str) -> bool:
     try:
         if load_pack(name):
             return True
-        if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
-            return json.loads(cache.read_text()) is True
-        hits, entities, answered = _matches(name)
-        if not answered:  # the ranking needs Wikipedia's answer too
-            return False
-        known = _known_structure(name, hits, entities)
-        _write_atomic(cache, json.dumps(known))
-        return known
-    except Exception:  # offline, a busy server, or no such thing: nobody can say it is one
+        try:
+            kept = json.loads(cache.read_text())  # null: the lookup failed, and is not repeated for ten minutes
+            if time.time() - cache.stat().st_mtime < (600 if kept is None else 7 * 86400):
+                return kept is True
+        except (OSError, ValueError):
+            pass
+        try:
+            hits, entities, answered = _matches(name)
+            known = _known_structure(name, hits, entities) if answered else None  # the ranking needs Wikipedia too
+        except LandmarkProblem:  # nothing has this name
+            known = False
+        except (OSError, ValueError, http.client.HTTPException):  # offline or busy
+            known = None
+        try:
+            _write_atomic(cache, json.dumps(known))
+        except OSError:
+            pass
+        return known is True
+    except Exception:  # nobody can say it is one
         return False
+
+
+def _is_sculpture(refs):
+    what, _ = _what({}, refs.get('wikidata_raw') or {})
+    return bool(SCULPTURE.search(what))
 
 
 def _known_structure(name, hits, entities):
@@ -218,9 +236,11 @@ def _known_structure(name, hits, entities):
     # Another thing of this name, a god or a film, may be the one people mean: it has no place on a map.
     best = max(len(entities.get(h['id'], {}).get('sitelinks', {})) for h in hits
                if h['id'] == hit['id'] or _words(name) == _words(
-                   entities.get(h['id'], {}).get('labels', {}).get('en', {}).get('value', '')))
-    claims = entity.get('claims', {})
-    gone = claims.get('P576') and not claims.get('P1435')  # an ended place still listed as heritage is a ruin that stands
+                   entities.get(h['id'], {}).get('labels', {}).get('en', {}).get('value', ''))
+               and 'Q4167410' not in _item_ids(entities.get(h['id'], {}), 'P31'))  # a disambiguation page
+    listed = any(c.get('rank') != 'deprecated' and 'P582' not in c.get('qualifiers', {})
+                 for c in entity.get('claims', {}).get('P1435', []))
+    gone = _value(entity, 'P576') and not listed  # an ended place still listed as heritage is a ruin that stands
     return wikis >= max(KNOWN, best) and not NATURAL.search(what) and not gone and _made(what, entity) is True
 
 
@@ -434,6 +454,8 @@ def parse_osm(data: dict, refs: dict) -> dict:
         outer = _join([[project(p) for p in m.get('geometry', [])] for m in members if m.get('role') in ('outer', '')])
         inner = _join([[project(p) for p in m.get('geometry', [])] for m in members if m.get('role') == 'inner'])
         return [[ring] + [hole for hole in inner if _inside(_centroid(hole), ring)] for ring in outer]
+    if _is_sculpture(refs):  # and never the pedestal or the building it stands on
+        raise LandmarkProblem('A statue is a sculpture, and building maps do not have its shape.')
     candidates, pieces, sites = [], [], []
     for el in data.get('elements', []):
         if el.get('type') not in ('way', 'relation'):

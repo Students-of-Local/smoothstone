@@ -874,25 +874,35 @@ def names_landmark(request: str) -> str | None:
     return s if BUILDING.search(s) or asks_found_model(request) else None
 
 
-ASKED = re.compile(r"""(?:.*\b(?:models?|replicas?|miniatures?|versions?|prints?|stls?|3mfs?|files?|mesh(?:es)?)\s+of
-    |.*\b(?:make|print|model|build|want|need|get|i'd\s+like|would\s+like)(?:\s+(?:me|us))?
-    |(?:an?\s+)?[\d.]+\s*(?:mm|cm|m|in|inch(?:es)?)\s*(?:tall|high|long|wide)?)?\s*(?:the\s+)?""", re.I | re.X | re.S)
-AFTER = re.compile(r"\s*(?:$|[,.;:!?(]|\d|(?:for|at|in|that|which|to|please|about|as|with|and|so)\b)", re.I)
+# What may come before the name of the thing asked for, a size and a "model of" last, and what may come after it.
+LEAD = re.compile(r"""(?:(?:please|hi|hello|hey|can|could|would|will|you|i|i'd|we|we'd|let's|want|need|like|love|to|me|us|give|get|have
+    |make|print|model|build|create|recreate|design|generate|produce|render|sculpt|do|3d[ -]?print|3d[ -]?model)\b[\s,]+)*""", re.I | re.X)
+SIZE = r"[\d.]+[\s-]*(?:mm|cm|m|in|inch(?:es)?)\b[\s-]*(?:tall|high|long|wide|across)?"
+SIZED = re.compile(rf"(?:(?:an?\s+)?{SIZE}\s+)?", re.I)
+MODEL_OF = re.compile(r"""(?:(?:an?|the)\s+)?(?:(?!(?:for|with|of|on|to|under|hold\w*|that)\b)[\w.:/'-]+\s+){0,5}?
+    (?:models?|replicas?|miniatures?|versions?|prints?|copy|copies|stls?|3mfs?|files?|mesh(?:es)?)\s+of\s+""", re.I | re.X)
+NAME_ENDS = re.compile(r"""\s*(?:[,.;:!?()]|$)|\s+(?:[-\u2013\u2014]\s|\d|(?:for|that|which|please|about|with|so|using|from|scaled?|sized)\b
+    |(?:in|at)\s+(?:\d|an?\b|one\b|two\b|pla|petg|abs|asa|tpu|resin|plastic|wood|stone|colou?r|white|black|gr[ae]y|red|green|blue
+    |gold|silver|bronze|full|true|high|low|small|large|scale|about|around)
+    |as\s+(?:an?\s+)?(?:3d\s+)?(?:model|replica|miniature|print)\b|to\s+(?:print|fit|display)\b)""", re.I | re.X)
 
 
 def known_landmark(request: str) -> str | None:
     """The thing a request asks for when a pack or Wikidata knows it as a structure: "a 3D print of the Arc de
-    Triomphe" has no building word in it. Only the thing itself: not "a clip for the Arc", "a small Parthenon on it"
-    or "a white house". For a request no recipe fits, as it asks the network."""
-    from . import find, landmark_refs
+    Triomphe" has no building word in it. Only the thing itself, by name: not "a clip for the Arc", "a small Parthenon
+    on it" or "a white house". One lookup, and only for a request no recipe fits."""
+    from . import landmark_refs
 
-    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'"))
-    verb = re.search(r"\b(?:make|print|model|build|want|need|get|like)\s+(?:me\s+|us\s+)?(?:the\s+)?(?!an?\b|my\b|our\b)(.+)", req, re.I)
-    for s in dict.fromkeys((subject_of(request), find._phrase(verb.group(1)) if verb else None)):
-        at = s and re.search(r"\b" + re.escape(s) + r"\b", req, re.I)
-        if at and ASKED.fullmatch(req[:at.start()]) and AFTER.match(req, at.end()) and landmark_refs.is_structure(s):
-            return s
-    return None
+    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'")).strip()
+    for lead in (LEAD, SIZED, MODEL_OF, SIZED):
+        m = lead.match(req)
+        req = req[m.end():] if m else req
+    req = re.sub(r"^the\s+", "", req, flags=re.I)
+    name = re.sub(r"\s+(?:3d\s+)?(?:models?|replicas?|miniatures?|prints?|stls?)$", "", req[:NAME_ENDS.search(req).start()], flags=re.I)
+    words = name.casefold().split()
+    if not 1 <= len(words) <= 7 or words[0] in ("a", "an", "some", "any") or {"my", "our", "your", "his", "her", "their"} & {*words}:
+        return None
+    return name if landmark_refs.is_structure(name) else None
 
 
 def asks_found_model(request: str) -> bool:

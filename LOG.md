@@ -1177,7 +1177,8 @@ From 40 landmarks never built before (no model, no judge), looked at one by one.
   building word, so no request route saw a landmark. Where no recipe fits, a request whose own subject is a shipped pack's
   name, or a name Wikidata knows best as a structure that stands (5 or more sitelinks), now goes to `stone landmark`.
 - A name is looked up only as the thing asked for: not in "a clip for the Arc" or "a white house". A definite answer is
-  kept for 7 days; an offline or partial one counts as no.
+  kept for 7 days; an offline or partial one counts as no, for 10 minutes.
+- A statue is refused by what Wikidata calls it, before any map: its pedestal or the building under it was built.
 - Routing is not a promise to build. A statue, or a site with no mapped outline and no pack, is refused there, and the
   next command is `stone models "<name>"`, where a real model of it may be found.
 
