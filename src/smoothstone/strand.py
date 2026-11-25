@@ -64,7 +64,7 @@ def draw_force(mat, flow_mm3_s: float, speed_mm_s: float, nozzle_c: float | None
     if ratio <= 1:
         return 0.0
     rate = (speed_mm_s - out) / neck_mm
-    eta = float(failsim.viscosity(m.nozzle if nozzle_c is None else nozzle_c, math.sqrt(3) * rate, m))
+    eta = float(failsim.viscosity(m.out if nozzle_c is None else nozzle_c, math.sqrt(3) * rate, m))
     return failsim.fact("trouton") * eta * flow_mm3_s * 1e-9 * math.log(ratio) / (neck_mm * 1e-3)
 
 
@@ -83,7 +83,7 @@ def set_time(mat="PLA", d_mm: float | None = None, air_c: float | None = None, w
     air_c = m.chamber if air_c is None else air_c
     if air_c >= m.set:
         return math.inf
-    t = np.linspace(m.set, m.nozzle if nozzle_c is None else nozzle_c, 400)
+    t = np.linspace(m.set, m.out if nozzle_c is None else nozzle_c, 400)
     q = m.density * 1000 * m.cp * d * 1e-3 / 4 / (failsim.h_strand(d, t, air_c, wind) * (t - air_c))
     return float(((q[1:] + q[:-1]) / 2 * np.diff(t)).sum())
 
@@ -167,8 +167,8 @@ class Strand:
         n = len(self.x)
         self.v = np.zeros_like(self.x)
         self.vol = math.pi / 4 * (np.full(n - 1, float(diameter)) * 1e-3) ** 2 * np.linalg.norm(np.diff(self.x, axis=0), axis=1)
-        self.t = np.full(n, float(m.nozzle if temp is None else temp))
-        self.hot = float(m.nozzle if temp is None else temp)  # what comes out of the nozzle
+        self.t = np.full(n, float(m.out if temp is None else temp))
+        self.hot = float(m.out if temp is None else temp)  # what comes out of the nozzle
         self.air = m.chamber if air is None else float(air)
         self.es, self.eb = np.zeros(n - 1), np.zeros((n, 4))  # elastic stretch of edges, elastic curvature and twist of nodes (1/m)
         self.rate, self.tens, self.press = np.zeros(n - 1), np.zeros(n - 1), np.zeros(n)

@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -73,6 +73,13 @@ class Material:
     nozzle: float
     stand_ins: tuple = ()  # data borrowed from another plastic, said out loud
     source: str = ""
+    max_flow: float = math.inf  # mm3/s its slicer profile lets the hotend melt
+    hotend: float = math.inf  # mm3/s of PLA that hotend melts
+    leaves: float | None = None  # C it leaves the nozzle at, default the nozzle's heat
+
+    @property
+    def out(self) -> float:
+        return self.nozzle if self.leaves is None else self.leaves
 
     def ratio(self, t) -> np.ndarray:
         c = np.asarray(self.curve, float)
@@ -133,6 +140,7 @@ def material(name: str = "PLA", printer: str = "creality_k2") -> Material:
     ours = fact(k2) if "failsim." + k2 in facts() else {}
     heat = ours if ours and printer == "creality_k2" else printers.settings(printers.get(printer), m) or ours
     air = heat.get("chamber", fact("k2_air"))
+    most, hotend = (printers.settings(printers.get(printer), x)["max_flow"] for x in (m, "PLA"))
     solid, cp = _own(m, "set") or tg, fact("pla.cp")
     k = _own(m, "k")
     if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg
@@ -160,7 +168,7 @@ def material(name: str = "PLA", printer: str = "creality_k2") -> Material:
               if "assumption" in p[key]]
     return Material(m, p["density"]["value"], tg, p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
                     tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()) if base in fact("peel_bed") else None,
-                    fact("peel_bed").get(base), solid, heat["bed"], air, heat["nozzle"], tuple(dict.fromkeys(stand)), src)
+                    fact("peel_bed").get(base), solid, heat["bed"], air, heat["nozzle"], tuple(dict.fromkeys(stand)), src, most, hotend)
 
 
 def _mat(m) -> Material:
@@ -263,7 +271,7 @@ def _cool(m: Material, layer: float, width: float, fan: bool, n: int = 2001, air
     """(C from where it sets to the nozzle, seconds the bead takes to cool by each degree there). air_c: default the chamber's."""
     air_c = m.chamber if air_c is None else air_c
     a, per = _bead(width, layer)
-    ts = np.linspace(m.set, m.nozzle, n)
+    ts = np.linspace(m.set, m.out, n)
     h = h_strand(4 * a / per, ts, air_c, _wind(fan))
     with np.errstate(divide="ignore"):
         return ts, np.where(ts > air_c, m.density * 1000 * m.cp * (a / per * 1e-3) / (h * (ts - air_c)), math.inf)
@@ -278,7 +286,7 @@ def cooling(mat="PLA", layer: float = 0.2, width: float = 0.42, fan: bool = True
     ts, dt = _cool(m, layer, width, fan, air_c=air_c)
     soft = float(np.sum((dt[1:] + dt[:-1]) * np.diff(ts)) / 2)
     rho_cp = m.density * 1000 * m.cp * (a / per * 1e-3)
-    span = math.log((m.nozzle - air_c) / (m.set - air_c)) if m.set > air_c else math.inf
+    span = math.log((m.out - air_c) / (m.set - air_c)) if m.set > air_c else math.inf
     h = rho_cp * span / soft if math.isfinite(soft) else float(h_strand(4 * a / per, m.set, air_c, _wind(fan)))
     return {"h": h, "tau_s": rho_cp / h, "biot": h * (a / per * 1e-3) / m.k, "soft_s": soft}
 
@@ -464,12 +472,22 @@ def edge_stress(mat, temps, layer: float = 0.2, band: float = math.inf, bed: flo
     return {"edge": min(het, zone), "hetenyi": het, "zone": zone, "moment": mom}
 
 
+def melt_c(mat, flow: float) -> float:
+    """C the plastic leaves the nozzle at, flow mm3/s: less than the nozzle is set to, and less the faster it goes through. Never
+    colder than 5 C over where it sets: colder is no print, and the model says so."""
+    m, q, room = _mat(mat), fact("melt_exit"), fact("room_air")
+    c = q[like(m.name) if like(m.name) in q else "PETG"]
+    set_, f = np.clip(m.nozzle, *c["set_c"]), np.clip(flow / m.hotend * q["flow"][1], *q["flow"])
+    out = c["1"] + c["T"] * set_ + c["Q"] * f + c["QQ"] * f * f + c["TQ"] * set_ * f
+    return max(float(room + (out - room) / (set_ - room) * (m.nozzle - room)), m.set + 5)
+
+
 def nozzle_drag(mat="PLA", speed_mm_s: float | None = None, layer: float = 0.2) -> float:
     """N the nozzle's flat tip drags the top layer with: melt shear stress x tip area."""
     m = _mat(mat)
     v = fact("k2_speeds")["inner_wall"] if speed_mm_s is None else speed_mm_s
     rate = v / layer
-    tau = float(viscosity(m.nozzle, rate, m)) * rate * 1e-6  # MPa
+    tau = float(viscosity(m.out, rate, m)) * rate * 1e-6  # MPa
     return tau * math.pi * (fact("nozzle_tip") / 2) ** 2
 
 
@@ -489,7 +507,7 @@ def nozzle_hold(mat="PLA", nozzle_c: float | None = None, bore: float = 0.4) -> 
     """What the hotend's tip carries before it falls: surface tension around the edge of the melt, 2 pi r gamma (Tate).
     Melt that wets the tip spreads to the edge of its flat and hangs from there; melt that does not hangs from the bore."""
     m = _mat(mat)
-    t = m.nozzle if nozzle_c is None else nozzle_c
+    t = m.out if nozzle_c is None else nozzle_c
     wets = wetting(t, m) < 90
     newtons = math.pi * (fact("nozzle_tip") if wets else bore) * 1e-3 * tension(t, m)
     return {"hold_n": newtons, "wets": wets, "blob_mm3": newtons / (m.density * 1000 * fact("gravity")) * 1e9}
@@ -561,6 +579,7 @@ class Inputs:
     brim: np.ndarray | None = None  # what is printed round the first layer and holds it, as a mask
     speed: float | None = None  # mm/s, default the process's inner wall
     width: float | None = None  # mm, default the process's outer wall
+    flow: float | None = None  # mm3/s, the mean over the part's lines, default its walls
     process: dict | None = None  # the printer's (printers.process), default the K2 profile's
     drag: float | None = None  # N, a push to use instead of the nozzle's drag
     notes: list = field(default_factory=list)
@@ -589,9 +608,18 @@ DIRS = [(math.cos(a), math.sin(a)) for a in np.radians(np.arange(0, 360, 45))]
 
 
 def run(inp: Inputs) -> tuple[float, float]:
-    """(mm, mm/s) its walls are printed at: the print's own, else the printer's process's, else the K2 profile's."""
+    """(mm, mm/s) its walls are printed at: the print's own, else the printer's process's, else the K2 profile's, no faster
+    than the hotend melts."""
     got = inp.process or {"widths": fact("k2_widths"), "speeds": fact("k2_speeds")}
-    return inp.width or got["widths"]["outer_wall"], inp.speed or got["speeds"]["inner_wall"]
+    width = inp.width or got["widths"]["outer_wall"]
+    return width, inp.speed or min(got["speeds"]["inner_wall"], _mat(inp.material).max_flow / _bead(width, inp.layer)[0])
+
+
+def leaving(inp: Inputs) -> Material:
+    """Its plastic, at the heat it leaves the nozzle with at the print's own flow, else as its walls are printed."""
+    width, speed = run(inp)
+    m = _mat(inp.material)
+    return replace(m, leaves=melt_c(m, inp.flow or _bead(width, inp.layer)[0] * speed))
 
 
 def _times(inp: Inputs, width: float, speed: float) -> np.ndarray:
@@ -608,7 +636,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     from scipy import ndimage
 
     inp = job_or_inputs if isinstance(job_or_inputs, Inputs) else inputs_from_mesh(job_or_inputs, **kw)
-    m = _mat(inp.material)
+    m = leaving(inp)
     cell, lay = inp.cell, inp.layer
     width, speed = run(inp)
     zs = np.asarray(inp.layer_z, float) if inp.layer_z is not None else (np.arange(len(inp.masks)) + 1) * lay
@@ -616,7 +644,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
     bed = m.bed if inp.bed is None else inp.bed
     air = inp.air
     where_air = f"{air:g} C chamber" if inp.enclosed else f"open printer, {air:g} C room air"
-    base = [f"this is a model, not a recording; {m.name} ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})",
+    base = [f"this is a model, not a recording; {m.name} ({bed:g} C bed, {m.nozzle:g} C nozzle, {where_air})", note("melt_exit"),
             *(x for x in m.stand_ins if inp.enclosed or x != note("k2_air")), *inp.notes]
     if inp.clean < 1:
         base.append(note("contamination"))

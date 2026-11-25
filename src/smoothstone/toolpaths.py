@@ -33,16 +33,19 @@ def spacing(width: float, height: float) -> float:
     return width - height * (1.0 - math.pi / 4.0)
 
 
-def profile(prof: dict | None = None) -> dict:
+def profile(prof: dict | None = None, material: str | None = None) -> dict:
     """Widths, speeds, accelerations and shells for generated toolpaths: the printer's own slicer process
     (printers.process). A printer without one gets OrcaSlicer's K2 profile: speeds, travel too, scale down and
-    accelerations are capped for a slower printer (assumption: same proportions)."""
+    accelerations are capped for a slower printer (assumption: same proportions). max_flow: mm3/s of the plastic the
+    printer's hotend melts, None where its profile does not say."""
     prof = prof or {}
+    melts = ((printers.settings(prof, material) if material and "id" in prof else None) or {}).get("max_flow")
     v = lambda k: refs.get(k)["value"]  # noqa: E731
     if own := printers.process(prof) if "id" in prof else None:
         ac = {**own["accels"], **{k: own["accels"]["default"] for k in ("sparse_infill", "solid_infill")}}
         return {**{k: own[k] for k in ("layer", "widths", "speeds", "shells")}, "accels": ac, "support": v("slicer.support_spacing"),
-                "jerk": v("slicer.k2_accels")["jerk_walls"], "whose": f"OrcaSlicer's {printers.short_name(prof)} speeds"}
+                "jerk": v("slicer.k2_accels")["jerk_walls"], "max_flow": melts,
+                "whose": f"OrcaSlicer's {printers.short_name(prof)} speeds" + (f", no faster than {melts:g} mm3/s of {material}" if melts else "")}
     sp, ac = dict(v("slicer.k2_speeds")), dict(v("slicer.k2_accels"))
     typical = float((prof.get("speeds") or {}).get("typical_print_mm_s") or sp["inner_wall"])
     cap = float((prof.get("speeds") or {}).get("max_accel_mm_s2") or v("slicer.k2_machine")["max_accel"])
@@ -51,7 +54,8 @@ def profile(prof: dict | None = None) -> dict:
     accels = {k: min(x, cap) for k, x in ac.items() if not k.startswith("jerk")}
     accels.update({"sparse_infill": accels["default"], "solid_infill": accels["default"]})
     return {"layer": 0.2, "widths": v("slicer.k2_widths"), "speeds": speeds, "accels": accels, "shells": v("slicer.k2_shells"),
-            "support": v("slicer.support_spacing"), "jerk": ac["jerk_walls"], "whose": "OrcaSlicer's K2 speeds" + (" scaled to this printer" if f < 1 else "")}
+            "support": v("slicer.support_spacing"), "jerk": ac["jerk_walls"], "max_flow": melts, "whose": "OrcaSlicer's K2 speeds" + (" scaled to this printer" if f < 1 else "")
+            + (f", no faster than {melts:g} mm3/s of {material}" if melts else "")}
 
 
 def _scan(region: np.ndarray, deg: float, spacing_px: float, offset_px: float = 0.0):
@@ -122,7 +126,7 @@ def _paint(shape, polys, width_px: float) -> np.ndarray:
 
 def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, place=(0.0, 0.0)) -> gcode.Toolpath:
     """The part's toolpaths. prof: widths, speeds, accels (mm, mm/s, mm/s2 by feature), shells, jerk,
-    max_feed. sup: supports.analyze(..., columns=True) on the same mesh and layer height, for support lines.
+    max_feed, max_flow (mm3/s). sup: supports.analyze(..., columns=True) on the same mesh and layer height, for support lines.
     place: mm added to x and y (the part's spot on the bed). Walls under two lines thick (about 0.8 mm, below
     any stone recipe's) come out as short infill dashes or a doubled line, not a slicer's one thin line."""
     import cv2
@@ -136,6 +140,7 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
     grid, it = supports.cut(mesh, layer, sup["_grid"].px if sup else None)
     px = grid.px
     W, S, A, sh = prof["widths"], prof["speeds"], prof["accels"], prof["shells"]
+    melts = prof.get("max_flow") or math.inf
     dens = sh["sparse_infill_density"] / 100.0
     n_walls = max(1, int(sh.get("wall_loops", 2)))
     sp = prof["support"]
@@ -157,6 +162,7 @@ def generate(mesh, prof: dict, layer: float = 0.2, sup: dict | None = None, plac
             rows.append((pos[0], pos[1], z, x[0], y[0], z, 0.0, S["travel"], A["travel"], F("other"), 0.0, layer, i))
         seg = np.hypot(np.diff(x), np.diff(y))
         e = seg * spacing(width, layer) * layer / FIL_AREA
+        speed = min(speed, melts / (spacing(width, layer) * layer))  # no faster than the hotend melts, as a slicer does
         for k in range(len(seg)):
             if seg[k] > 1e-6:
                 rows.append((x[k], y[k], z, x[k + 1], y[k + 1], z, e[k], speed, accel, feat, width, layer, i))
