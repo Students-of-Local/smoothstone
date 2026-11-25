@@ -1,0 +1,31 @@
+{
+  "id": "l12_space_needle",
+  "request": "Print me the Space Needle, about 20 cm tall.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Space Needle",
+      "size": {
+        "mode": "z",
+        "mm": 200
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 184.404,
+        "source": "https://www.spaceneedle.com/about/",
+        "why": "605 ft to the top of the spire"
+      },
+      "dimensions": {
+        "length": 42.06,
+        "width": 42.06,
+        "source": "https://www.spaceneedle.com/about/",
+        "why": "The saucer's 138 ft diameter is the widest thing on it."
+      }
+    }
+  },
+  "why": "Splayed legs with a waist and a saucer are curves no building map records; the reference pack gives them."
+}

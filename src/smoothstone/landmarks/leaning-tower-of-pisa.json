@@ -1,0 +1,651 @@
+{
+  "styles": {
+    "value": ["Pisan Romanesque"],
+    "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa"
+  },
+  "expected_height_m": {
+    "value": 56,
+    "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+    "reason": "Above-ground height of the tower from the engineering study."
+  },
+  "lean": {
+    "value": [3.97, 180],
+    "source": "https://www.cdmsmith.com/en-150/projects/leaning-tower-of-pisa",
+    "reason": "The restoration engineering team reports a lean of 3.97 degrees toward the south."
+  },
+  "parts": {
+    "source": "https://api.openstreetmap.org/api/0.6/map.json?bbox=10.393889375749819%2C43.721033715415025%2C10.39935862425018%2C43.72498628458498",
+    "origin": [43.72300658, 10.3966324],
+    "axis": 0,
+    "replace": [
+      35667218, 252151271, 3381971, 3381972, 3381973, 3381974, 3381975, 3381976,
+      3381977, 3381978, 3381979, 3381980, 3381981, 3381982, 3381983, 3381984,
+      3381985, 3381986, 3381987, 3381988, 3381989, 3381991, 3381994, 3381996,
+      3381999, 3382000, 3382002, 3382005
+    ],
+    "value": [
+      {
+        "kind": "lathe",
+        "id": "core",
+        "profile": [[0, 6], [48.05, 6]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "The paper gives about 12 m across the shaft without its galleries. The solid printable core continues from the foot to the belfry deck with a small join overlap."
+      },
+      {
+        "kind": "lathe",
+        "id": "ground-storey-drum",
+        "profile": [[0, 8.12], [0.24, 8.12], [0.47, 7.93], [0.72, 7.93], [0.97, 7.74], [8.85, 7.74], [9.08, 8.04], [11.84, 8.04], [12.09, 8.25], [12.24, 8.38], [12.32, 8.17]],
+        "source": "https://www.opapisa.it/wp-content/uploads/2025/06/Storia-della-Torre-in-CAA.pdf",
+        "guess": "The wall radius is half the published 15.48 m base diameter. The stepped footing, arcade band, profile and molding levels follow the photographed shadow lines."
+      },
+      {
+        "kind": "prism",
+        "id": "engaged-ground-columns",
+        "ring": [
+          [0.93, 7.679], [1.997, 7.473], [2.147, 7.554], [2.333, 7.648],
+          [2.52, 7.636], [2.678, 7.534], [2.771, 7.348], [2.843, 7.194],
+          [3.985, 6.63], [5.019, 5.886], [5.213, 5.922], [5.423, 5.928],
+          [5.588, 5.836], [5.687, 5.676], [5.69, 5.465], [5.662, 5.27],
+          [6.305, 4.481], [6.839, 3.614], [6.969, 3.544], [7.162, 3.471],
+          [7.28, 3.326], [7.312, 3.143], [7.241, 2.949], [7.209, 2.805],
+          [7.583, 1.524], [7.732, 0.198], [7.854, 0.077], [7.998, -0.075],
+          [8.039, -0.258], [7.986, -0.438], [7.833, -0.58], [7.704, -0.692],
+          [7.522, -1.804], [7.18, -2.876], [7.189, -3.012], [7.258, -3.206],
+          [7.223, -3.388], [7.105, -3.532], [6.912, -3.603], [6.802, -3.683],
+          [6.225, -4.591], [5.528, -5.41], [5.526, -5.581], [5.517, -5.789],
+          [5.414, -5.946], [5.249, -6.034], [5.04, -6.023], [4.87, -6.009],
+          [4.036, -6.598], [3.132, -7.072], [3.038, -7.161], [2.952, -7.346],
+          [2.8, -7.453], [2.615, -7.473], [2.428, -7.39], [2.299, -7.386],
+          [1.308, -7.624], [0.295, -7.729], [0.175, -7.831], [0.025, -7.975],
+          [-0.156, -8.018], [-0.336, -7.968], [-0.481, -7.818], [-0.596, -7.712],
+          [-1.493, -7.59], [-2.369, -7.363], [-2.507, -7.392], [-2.696, -7.474],
+          [-2.881, -7.453], [-3.033, -7.344], [-3.117, -7.156], [-3.2, -7.042],
+          [-4.219, -6.483], [-5.144, -5.777], [-5.314, -5.782], [-5.522, -5.783],
+          [-5.684, -5.688], [-5.779, -5.526], [-5.779, -5.317], [-5.774, -5.147],
+          [-6.368, -4.39], [-6.864, -3.565], [-6.965, -3.48], [-7.157, -3.405],
+          [-7.272, -3.26], [-7.304, -3.077], [-7.232, -2.885], [-7.229, -2.753],
+          [-7.557, -1.652], [-7.718, -0.514], [-7.863, -0.4], [-8.014, -0.254],
+          [-8.062, -0.072], [-8.017, 0.11], [-7.869, 0.259], [-7.726, 0.376],
+          [-7.454, 2.065], [-6.818, 3.652], [-6.899, 3.836], [-6.95, 4.041],
+          [-6.895, 4.221], [-6.76, 4.352], [-6.554, 4.4], [-6.353, 4.412],
+          [-5.508, 5.431], [-4.501, 6.29], [-4.449, 6.428], [-4.402, 6.629],
+          [-4.275, 6.765], [-4.097, 6.822], [-3.895, 6.778], [-3.748, 6.766],
+          [-2.437, 7.341], [-1.043, 7.664], [-0.942, 7.84], [-0.806, 8.002],
+          [-0.627, 8.064], [-0.442, 8.03], [-0.282, 7.892], [-0.155, 7.733]
+        ],
+        "from": 0.82,
+        "to": 9.31,
+        "source": "https://api.openstreetmap.org/api/0.6/relation/3381985/full.json",
+        "guess": "The OpenStreetMap pier footprints locate the 15 engaged shafts. The circular shaft profile and its vertical span follow the photograph."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-01",
+        "at": [4.008, 6.668],
+        "turn": 31.01,
+        "width": 2.64,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-02",
+        "at": [6.342, 4.507],
+        "turn": 54.6,
+        "width": 2.13,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-03",
+        "at": [7.628, 1.533],
+        "turn": 78.64,
+        "width": 2.76,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-04",
+        "at": [7.566, -1.814],
+        "turn": 103.48,
+        "width": 2.35,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-05",
+        "at": [6.262, -4.617],
+        "turn": 126.41,
+        "width": 2.25,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-06",
+        "at": [4.06, -6.637],
+        "turn": 148.55,
+        "width": 2.14,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-07",
+        "at": [1.316, -7.668],
+        "turn": 170.26,
+        "width": 2.14,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-08",
+        "at": [-1.501, -7.634],
+        "turn": 191.13,
+        "width": 1.91,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-09",
+        "at": [-4.244, -6.52],
+        "turn": 213.06,
+        "width": 2.42,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-10",
+        "at": [-6.405, -4.416],
+        "turn": 235.42,
+        "width": 2.03,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-11",
+        "at": [-7.601, -1.661],
+        "turn": 257.67,
+        "width": 2.39,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-12",
+        "at": [-7.498, 2.077],
+        "turn": 285.48,
+        "width": 3.5,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-13",
+        "at": [-5.54, 5.462],
+        "turn": 314.59,
+        "width": 2.74,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-14",
+        "at": [-2.452, 7.384],
+        "turn": 341.63,
+        "width": 2.95,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "ground-blind-bay-15",
+        "at": [0.936, 7.724],
+        "turn": 6.91,
+        "width": 2.27,
+        "depth": 1.27,
+        "from": 1.18,
+        "to": 11.83,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leaning_Tower_of_Pisa_%281%29.jpg",
+        "guess": "Bay center and spacing derived from the mapped ground piers. The narrower clear width, relief depth, foot and round head follow the photographed blind arcade. The recess keeps the ground wall behind it."
+      },
+      {
+        "kind": "opening",
+        "id": "entrance-recess",
+        "at": [-6.91, 1.914],
+        "turn": 285.48,
+        "width": 1.66,
+        "depth": 2.36,
+        "from": 0.67,
+        "to": 4.17,
+        "arch": true,
+        "source": "https://www.opapisa.it/wp-content/uploads/2024/07/Scheda_informativa_Campanile_V01.pdf",
+        "guess": "The owner gives a 1.66 m by approximately 3.50 m doorway. The recess is centered in the widest west-northwest bay identified from mapped piers. The doorway depth and foot elevation are estimated from the photo."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-1-arch-band-and-cornice",
+        "profile": [[16.87, 8.04], [17.4, 8.13], [17.97, 8.13], [18.18, 8.32], [18.22, 8.45], [18.35, 8.45], [18.44, 8.38], [18.51, 8.16]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "Floor levels are sampled from the north-south elevation in Figure 3 and rounded. The maximum radius is half the 16.9 m surveyed gallery diameter. The molded ledge and arcade section are estimated from the photograph."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-1-columns",
+        "profile": [[12.2, 0.33], [12.49, 0.33], [12.62, 0.235], [16.43, 0.222], [16.69, 0.33], [16.97, 0.33]],
+        "at": [0, 7.82],
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa",
+        "guess": "The national tourism site counts 30 columns per gallery. Shaft radii, capitals, bases, centerline radius and end overlaps are estimated from the photos and made to retain at least 1.4 mm of shaft at a 180 mm print height."
+      },
+      {
+        "kind": "opening",
+        "id": "gallery-1-round-heads",
+        "at": [0.841, 8.006],
+        "turn": 6,
+        "width": 1.24,
+        "depth": 1.7,
+        "from": 16.78,
+        "to": 17.96,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Round-headed cuts midway between the 30 shafts follow the photographed arcade. The widths, crowns and radial cut depth retain the vault supports toward the core."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-2-arch-band-and-cornice",
+        "profile": [[22.72, 8.04], [23.25, 8.13], [23.82, 8.13], [24.03, 8.32], [24.07, 8.45], [24.2, 8.45], [24.29, 8.38], [24.36, 8.16]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "Floor levels are sampled from the north-south elevation in Figure 3 and rounded. The maximum radius is half the 16.9 m surveyed gallery diameter. The molded ledge and arcade section are estimated from the photograph."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-2-columns",
+        "profile": [[18.43, 0.33], [18.59, 0.33], [18.72, 0.235], [22.28, 0.222], [22.54, 0.33], [22.82, 0.33]],
+        "at": [0, 7.82],
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa",
+        "guess": "The national tourism site counts 30 columns per gallery. Shaft radii, capitals, bases, centerline radius and end overlaps are estimated from the photos and made to retain at least 1.4 mm of shaft at a 180 mm print height."
+      },
+      {
+        "kind": "opening",
+        "id": "gallery-2-round-heads",
+        "at": [0.841, 8.006],
+        "turn": 6,
+        "width": 1.24,
+        "depth": 1.7,
+        "from": 22.63,
+        "to": 23.81,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Round-headed cuts midway between the 30 shafts follow the photographed arcade. The widths, crowns and radial cut depth retain the vault supports toward the core."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-3-arch-band-and-cornice",
+        "profile": [[28.62, 8.04], [29.15, 8.13], [29.72, 8.13], [29.93, 8.32], [29.97, 8.45], [30.1, 8.45], [30.19, 8.38], [30.26, 8.16]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "Floor levels are sampled from the north-south elevation in Figure 3 and rounded. The maximum radius is half the 16.9 m surveyed gallery diameter. The molded ledge and arcade section are estimated from the photograph."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-3-columns",
+        "profile": [[24.28, 0.33], [24.44, 0.33], [24.57, 0.235], [28.18, 0.222], [28.44, 0.33], [28.72, 0.33]],
+        "at": [0, 7.82],
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa",
+        "guess": "The national tourism site counts 30 columns per gallery. Shaft radii, capitals, bases, centerline radius and end overlaps are estimated from the photos and made to retain at least 1.4 mm of shaft at a 180 mm print height."
+      },
+      {
+        "kind": "opening",
+        "id": "gallery-3-round-heads",
+        "at": [0.841, 8.006],
+        "turn": 6,
+        "width": 1.24,
+        "depth": 1.7,
+        "from": 28.53,
+        "to": 29.71,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Round-headed cuts midway between the 30 shafts follow the photographed arcade. The widths, crowns and radial cut depth retain the vault supports toward the core."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-4-arch-band-and-cornice",
+        "profile": [[34.52, 8.04], [35.05, 8.13], [35.62, 8.13], [35.83, 8.32], [35.87, 8.45], [36, 8.45], [36.09, 8.38], [36.16, 8.16]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "Floor levels are sampled from the north-south elevation in Figure 3 and rounded. The maximum radius is half the 16.9 m surveyed gallery diameter. The molded ledge and arcade section are estimated from the photograph."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-4-columns",
+        "profile": [[30.18, 0.33], [30.34, 0.33], [30.47, 0.235], [34.08, 0.222], [34.34, 0.33], [34.62, 0.33]],
+        "at": [0, 7.82],
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa",
+        "guess": "The national tourism site counts 30 columns per gallery. Shaft radii, capitals, bases, centerline radius and end overlaps are estimated from the photos and made to retain at least 1.4 mm of shaft at a 180 mm print height."
+      },
+      {
+        "kind": "opening",
+        "id": "gallery-4-round-heads",
+        "at": [0.841, 8.006],
+        "turn": 6,
+        "width": 1.24,
+        "depth": 1.7,
+        "from": 34.43,
+        "to": 35.61,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Round-headed cuts midway between the 30 shafts follow the photographed arcade. The widths, crowns and radial cut depth retain the vault supports toward the core."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-5-arch-band-and-cornice",
+        "profile": [[40.52, 8.04], [41.05, 8.13], [41.62, 8.13], [41.83, 8.32], [41.87, 8.45], [42, 8.45], [42.09, 8.38], [42.16, 8.16]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "Floor levels are sampled from the north-south elevation in Figure 3 and rounded. The maximum radius is half the 16.9 m surveyed gallery diameter. The molded ledge and arcade section are estimated from the photograph."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-5-columns",
+        "profile": [[36.08, 0.33], [36.24, 0.33], [36.37, 0.235], [40.08, 0.222], [40.34, 0.33], [40.62, 0.33]],
+        "at": [0, 7.82],
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa",
+        "guess": "The national tourism site counts 30 columns per gallery. Shaft radii, capitals, bases, centerline radius and end overlaps are estimated from the photos and made to retain at least 1.4 mm of shaft at a 180 mm print height."
+      },
+      {
+        "kind": "opening",
+        "id": "gallery-5-round-heads",
+        "at": [0.841, 8.006],
+        "turn": 6,
+        "width": 1.24,
+        "depth": 1.7,
+        "from": 40.43,
+        "to": 41.61,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Round-headed cuts midway between the 30 shafts follow the photographed arcade. The widths, crowns and radial cut depth retain the vault supports toward the core."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-6-arch-band-and-cornice",
+        "profile": [[46.52, 8.04], [47.05, 8.13], [47.62, 8.13], [47.83, 8.32], [47.87, 8.45], [48, 8.45], [48.09, 8.38], [48.16, 8.25]],
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "Floor levels are sampled from the north-south elevation in Figure 3 and rounded. The maximum radius is half the 16.9 m surveyed gallery diameter. The molded ledge and arcade section are estimated from the photograph."
+      },
+      {
+        "kind": "lathe",
+        "id": "gallery-6-columns",
+        "profile": [[42.08, 0.33], [42.24, 0.33], [42.37, 0.235], [46.08, 0.222], [46.34, 0.33], [46.62, 0.33]],
+        "at": [0, 7.82],
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://www.italia.it/it/toscana/pisa/torre-di-pisa",
+        "guess": "The national tourism site counts 30 columns per gallery. Shaft radii, capitals, bases, centerline radius and end overlaps are estimated from the photos and made to retain at least 1.4 mm of shaft at a 180 mm print height."
+      },
+      {
+        "kind": "opening",
+        "id": "gallery-6-round-heads",
+        "at": [0.841, 8.006],
+        "turn": 6,
+        "width": 1.24,
+        "depth": 1.7,
+        "from": 46.43,
+        "to": 47.61,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 30
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Round-headed cuts midway between the 30 shafts follow the photographed arcade. The widths, crowns and radial cut depth retain the vault supports toward the core."
+      },
+      {
+        "kind": "prism",
+        "id": "belfry-wall",
+        "ring": [
+          [-5.779, -0.101], [-5.78, 0.0], [-5.748, 0.604], [-5.654, 1.202],
+          [-5.497, 1.786], [-5.28, 2.351], [-5.006, 2.89], [-4.676, 3.397],
+          [-4.295, 3.868], [-3.868, 4.295], [-3.397, 4.676], [-2.89, 5.006],
+          [-2.351, 5.28], [-1.786, 5.497], [-1.202, 5.654], [-0.604, 5.748],
+          [0.0, 5.78], [0.604, 5.748], [1.202, 5.654], [1.786, 5.497],
+          [2.351, 5.28], [2.89, 5.006], [3.397, 4.676], [3.868, 4.295],
+          [4.295, 3.868], [4.676, 3.397], [5.006, 2.89], [5.28, 2.351],
+          [5.497, 1.786], [5.654, 1.202], [5.748, 0.604], [5.78, 0.0],
+          [5.779, -0.101], [3.909, -0.068], [3.91, 0.0], [3.889, 0.409],
+          [3.825, 0.813], [3.719, 1.208], [3.572, 1.59], [3.386, 1.955],
+          [3.163, 2.298], [2.906, 2.616], [2.616, 2.906], [2.298, 3.163],
+          [1.955, 3.386], [1.59, 3.572], [1.208, 3.719], [0.813, 3.825],
+          [0.409, 3.889], [0.0, 3.91], [-0.409, 3.889], [-0.813, 3.825],
+          [-1.208, 3.719], [-1.59, 3.572], [-1.955, 3.386], [-2.298, 3.163],
+          [-2.616, 2.906], [-2.906, 2.616], [-3.163, 2.298], [-3.386, 1.955],
+          [-3.572, 1.59], [-3.719, 1.208], [-3.825, 0.813], [-3.889, 0.409],
+          [-3.91, 0.0], [-3.909, -0.068]
+        ],
+        "from": 47.98,
+        "to": 55.58,
+        "copies": {
+          "around": [0, 0],
+          "count": 2
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "The smaller wall and open center follow the aerial photograph. Its outer and inner radii and height are estimated. Two overlapping half rings keep a continuous wall."
+      },
+      {
+        "kind": "prism",
+        "id": "belfry-cornice",
+        "ring": [
+          [-6.169, -0.108], [-6.17, 0.0], [-6.136, 0.645], [-6.035, 1.283],
+          [-5.868, 1.907], [-5.637, 2.51], [-5.343, 3.085], [-4.992, 3.627],
+          [-4.585, 4.129], [-4.129, 4.585], [-3.627, 4.992], [-3.085, 5.343],
+          [-2.51, 5.637], [-1.907, 5.868], [-1.283, 6.035], [-0.645, 6.136],
+          [0.0, 6.17], [0.645, 6.136], [1.283, 6.035], [1.907, 5.868],
+          [2.51, 5.637], [3.085, 5.343], [3.627, 4.992], [4.129, 4.585],
+          [4.585, 4.129], [4.992, 3.627], [5.343, 3.085], [5.637, 2.51],
+          [5.868, 1.907], [6.035, 1.283], [6.136, 0.645], [6.17, 0.0],
+          [6.169, -0.108], [4.049, -0.071], [4.05, 0.0], [4.028, 0.423],
+          [3.961, 0.842], [3.852, 1.252], [3.7, 1.647], [3.507, 2.025],
+          [3.277, 2.381], [3.01, 2.71], [2.71, 3.01], [2.381, 3.277],
+          [2.025, 3.507], [1.647, 3.7], [1.252, 3.852], [0.842, 3.961],
+          [0.423, 4.028], [0.0, 4.05], [-0.423, 4.028], [-0.842, 3.961],
+          [-1.252, 3.852], [-1.647, 3.7], [-2.025, 3.507], [-2.381, 3.277],
+          [-2.71, 3.01], [-3.01, 2.71], [-3.277, 2.381], [-3.507, 2.025],
+          [-3.7, 1.647], [-3.852, 1.252], [-3.961, 0.842], [-4.028, 0.423],
+          [-4.05, 0.0], [-4.049, -0.071]
+        ],
+        "from": 55.33,
+        "to": 56,
+        "copies": {
+          "around": [0, 0],
+          "count": 2
+        },
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "guess": "The engineering study gives about 56 m above ground. The open crown radius and cornice thickness are estimated from the elevation and photographs."
+      },
+      {
+        "kind": "opening",
+        "id": "belfry-high-arches",
+        "at": [0, 4.92],
+        "turn": 0,
+        "width": 1.81,
+        "depth": 2.66,
+        "from": 49.72,
+        "to": 54.72,
+        "arch": true,
+        "copies": {
+          "around": [0, 0],
+          "count": 6
+        },
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Six tall arched windows carry the photographed openings through the chamber wall. Their count, evenly spaced orientation, width, crown and floor heights are estimated."
+      },
+      {
+        "kind": "opening",
+        "id": "belfry-low-arch-1",
+        "at": [2.46, 4.261],
+        "turn": 30,
+        "width": 1.75,
+        "depth": 2.66,
+        "from": 49.02,
+        "to": 52.93,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Five low arched windows alternate with the taller openings where they fit around the chamber. Count, simplified spacing, width and elevations are estimated from the aerial photograph for the print."
+      },
+      {
+        "kind": "opening",
+        "id": "belfry-low-arch-2",
+        "at": [4.92, 0.0],
+        "turn": 90,
+        "width": 1.75,
+        "depth": 2.66,
+        "from": 49.02,
+        "to": 52.93,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Five low arched windows alternate with the taller openings where they fit around the chamber. Count, simplified spacing, width and elevations are estimated from the aerial photograph for the print."
+      },
+      {
+        "kind": "opening",
+        "id": "belfry-low-arch-3",
+        "at": [2.46, -4.261],
+        "turn": 150,
+        "width": 1.75,
+        "depth": 2.66,
+        "from": 49.02,
+        "to": 52.93,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Five low arched windows alternate with the taller openings where they fit around the chamber. Count, simplified spacing, width and elevations are estimated from the aerial photograph for the print."
+      },
+      {
+        "kind": "opening",
+        "id": "belfry-low-arch-4",
+        "at": [-2.46, -4.261],
+        "turn": 210,
+        "width": 1.75,
+        "depth": 2.66,
+        "from": 49.02,
+        "to": 52.93,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Five low arched windows alternate with the taller openings where they fit around the chamber. Count, simplified spacing, width and elevations are estimated from the aerial photograph for the print."
+      },
+      {
+        "kind": "opening",
+        "id": "belfry-low-arch-5",
+        "at": [-2.46, 4.261],
+        "turn": 330,
+        "width": 1.75,
+        "depth": 2.66,
+        "from": 49.02,
+        "to": 52.93,
+        "arch": true,
+        "source": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Italy_-_Pisa_-_Leaning_Tower.jpg",
+        "guess": "Five low arched windows alternate with the taller openings where they fit around the chamber. Count, simplified spacing, width and elevations are estimated from the aerial photograph for the print."
+      }
+    ]
+  }
+}

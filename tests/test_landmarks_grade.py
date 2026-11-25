@@ -90,6 +90,17 @@ def test_landmark_grade_uses_printed_geometry_and_sourced_parts(tmp_path):
     del spec["expect"]["landmarks"]["references"], refs["plan_dimensions_m"]
     refs["reference_dimensions_m"]["length"] = 100
 
+    drawn = {"length": 120, "width": 50, "source": "https://example.org/survey"}
+    spec["expect"]["landmarks"]["dimensions"] = drawn
+    ref_path.write_text(json.dumps(refs))
+    assert landmarks_grade.grade(job, spec)["pass"]  # without a reason the map's own outline counts
+    drawn["why"] = "redrawn from a survey"
+    assert any("height/length" in why for why in landmarks_grade.grade(job, spec)["why"])
+    drawn["length"], refs["reference_dimensions_m"]["length"] = 100, 120
+    ref_path.write_text(json.dumps(refs))
+    assert landmarks_grade.grade(job, spec)["pass"]
+    refs["reference_dimensions_m"]["length"] = 100
+    del spec["expect"]["landmarks"]["dimensions"]
     refs["parts"][2].pop("feature_of")
     refs["reference_dimensions_m"]["width"] = 55
     ref_path.write_text(json.dumps(refs))

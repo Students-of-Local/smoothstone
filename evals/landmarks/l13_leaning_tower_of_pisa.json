@@ -1,0 +1,31 @@
+{
+  "id": "l13_leaning_tower_of_pisa",
+  "request": "I want a print of the Leaning Tower of Pisa, 18 cm tall.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Leaning Tower of Pisa",
+      "size": {
+        "mode": "z",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 56,
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "why": "Height above ground in the engineering study"
+      },
+      "dimensions": {
+        "length": 19.9,
+        "width": 16.9,
+        "source": "https://research-information.bris.ac.uk/ws/portalfiles/portal/183971374/181008_Pisa_manuscript_R1_GM.pdf",
+        "why": "The surveyed gallery diameter, 16.9 m. Lengthwise the sixth gallery's cornice, 48 m up, leans out 3.3 m (3.97 degrees, https://www.cdmsmith.com/en-150/projects/leaning-tower-of-pisa) past its 8.45 m radius, and the foot stands 8.1 m the other way."
+      }
+    }
+  },
+  "why": "Six open galleries of columns and a surveyed lean: the mapped walls alone are a plain leaning drum."
+}

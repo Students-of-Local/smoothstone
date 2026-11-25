@@ -162,10 +162,14 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
         dimensions = {**dimensions, "length": plan["length"], "width": plan["width"]}
     elif plan:
         why.append("linked towers the spec does not name: " + ", ".join(linked))
+    # A landmark redrawn from engineering figures has no mapped outline, or not the one it prints (a lean).
+    drawn = want.get("dimensions") or {}
+    if drawn.get("source") and drawn.get("why"):
+        dimensions = drawn
     named = want.get("tallest") or {}
     standard = named.get("m") if named.get("source") else refs.get("height")
     if (_positive(standard) and _positive(dimensions.get("length")) and _positive(dimensions.get("width"))
-            and _domain(dimensions.get("source"), "openstreetmap.org")):
+            and (dimensions is drawn or _domain(dimensions.get("source"), "openstreetmap.org"))):
         out["ratios"] = {}
         for axis, span in (("length", length), ("width", width)):
             actual, reference = height / span, standard / dimensions[axis]

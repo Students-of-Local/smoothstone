@@ -1223,3 +1223,12 @@ the judge no longer mentions St. Vitus's base. The other four graded bases are u
 - Where the parts that stand on the ground cover under half of a building and rise above the outline's own height, the
   outline is a part too. The Dome of the Rock was its dome with no octagon, and Angkor Wat's galleries stood in the air.
   Of 50 saved maps this changes those two and the Flatiron Building, and none that is graded.
+
+### 2026-11-24: the Space Needle and the Leaning Tower of Pisa
+
+Two packs of reference parts, written by GPT-6.2 Sol from engineering and museum sources it opened and photographs it
+compared, built by the one command. One judge each on the builds they were written from: Space Needle 9, Pisa 9.
+Then built once each from the plain request, as a small model would (l12, l13): 9 and 9, every check passing.
+A grading spec may now cite a plan's dimensions (`dimensions`, with a source and why) where the map has no outline, or
+not the one that prints: Pisa's axis moves 3.9 m in its height, and its sixth gallery sets the length. The bridge Sol wrote first scored 6 (hangers as fat as
+the tower legs, a bar for a base), so it waits for a redo on the finer parts.
