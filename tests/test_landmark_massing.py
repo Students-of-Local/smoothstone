@@ -112,6 +112,21 @@ def test_walls_stay_under_a_low_part_that_carries_a_tower_or_has_no_mapped_heigh
     assert (8. in walls) == (extra is None)
 
 
+@pytest.mark.parametrize("top, guessed", [(14., False), (40., True)])
+def test_a_small_detail_on_a_low_part_puts_no_wall_through_it(top, guessed):
+    """A 0.38 m turret below the walls, or a finial of guessed height, stands on the apse's own roof."""
+    apse, turret = _box(60, 5, 80, 35), _mapped(3, top, 12.)
+    turret["height"]["guessed"] = guessed
+    walls = _walls([_mapped(1, 60.), _mapped(2, 12., 8.), turret], [_box(0, 0, 60, 40), apse, _box(70, 20, 70.38, 20.38)])
+    assert (walls[30.] ^ _box(65, 15, 75, 25)).area() < .01
+
+
+def test_a_sliver_beyond_the_mapped_ground_gets_no_wall_of_its_own():
+    walls = _walls([_mapped(1, 60.), _mapped(3, 60.), _mapped(2, 12., 8.)],
+                   [_box(0, 0, 60, 40), _box(60, 0, 80, 5), _box(0, 5, 60.1, 35)])
+    assert 8. not in walls
+
+
 def _tower_pair(x, top, first):
     return [(_mapped(first + i, top), _box(x - 4, y - 4, x + 4, y + 4)) for i, y in enumerate((-12, 12))]
 

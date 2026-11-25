@@ -176,15 +176,16 @@ def infer_massing(records, sections, outline, data, refs, target, styles):
             # A part mapped lower than these walls keeps its height. Taller parts simply stand in them.
             # A gap too narrow to print beside a low part is map noise, not wall.
             low = [cs for p, cs in parts if p["min_height"]["metres"] <= .1 and p["height"]["metres"] < height]
-            # So does one mapped off the ground, on wall up to its own base, unless another part stands over it.
+            grain = .3 / size
+            # So does one mapped off the ground, on wall up to its own base, unless a part as tall as the walls stands over it.
             for part, section in list(parts):
                 base, top = part["min_height"]["metres"], part["height"]["metres"]
                 if base <= .1 or top >= height or part["height"]["guessed"]:
                     continue
                 over = m3.CrossSection.batch_boolean([cs for p, cs in parts if p is not part and p["min_height"]["metres"] > base
-                                                      and p["height"]["metres"] > top], m3.OpType.Add)
+                                                      and p["height"]["metres"] >= height and not p["height"]["guessed"]], m3.OpType.Add)
                 bare = (section ^ outline) - ground - over
-                if bare.area() * size ** 2 > .64:
+                if bare.area() * size ** 2 > .64 and not bare.offset(-grain).is_empty():
                     wall = _new_part(f"wall-below-{part['id']}", bare, 0, base, 0, "flat", part["source"], "lower_walls")
                     wall["height"] = {**part["min_height"]}
                     parts.append((wall, bare))
@@ -192,7 +193,6 @@ def infer_massing(records, sections, outline, data, refs, target, styles):
                     notes.append(f"Stood mapped part {part['id']} on wall up to its own base.")
             missing = outline - m3.CrossSection.batch_boolean(low, m3.OpType.Add)
             if low:
-                grain = .3 / size
                 missing = missing.offset(-grain).offset(grain + .05) ^ outline
             if not missing.is_empty():
                 parts.append((_new_part("outline-lower-walls", missing, 0, height, 0, "flat", source, "lower_walls"), missing))
