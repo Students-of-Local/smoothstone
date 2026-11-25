@@ -1190,3 +1190,6 @@ the judge no longer mentions St. Vitus's base. The other four graded bases are u
 - A site past the map search is searched again, up to 1 km.
 - A tower, obelisk or shaped roof with its own height and no parts is its own part. An obelisk tapers to 63%, guessed.
 - A statue is refused as one.
+- A bridge whose mapped parts cover under half of its area is refused. The Golden Gate Bridge (2%) was its two towers.
+- Where the parts cover under half of a building and rise above the outline's own height, the outline is a part too.
+  The Dome of the Rock was its dome with no octagon. Of 46 saved maps this changes that one and the Flatiron Building.

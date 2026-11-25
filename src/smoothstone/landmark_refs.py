@@ -324,6 +324,25 @@ def _named(tags, refs):
     return bool(words) and words <= set(re.findall(r'\w+', tags.get('name', '').casefold()))
 
 
+def _share(parts, boundary):
+    """The share of an outline's ground that has a part over it."""
+    import manifold3d as m3
+    from .landmark import _section
+    ground = _section(boundary)
+    if ground.is_empty() or not parts:
+        return 0
+    over = m3.CrossSection.batch_boolean([_section(p['footprint']) for p in parts], m3.OpType.Add)
+    return (over ^ ground).area() / ground.area()
+
+
+def _body(selected, parts, boundary):
+    """The outline, where its own height is the walls around a mapped dome or tower."""
+    from .landmark import length
+    walls = length(selected['tags'].get('height'))
+    tops = [length(p['tags'].get('height')) or 0 for p in parts]
+    return [selected] if walls and max(tops, default=0) > walls and _share(parts, boundary) < .5 else []
+
+
 def _site(site, candidates, pieces, data):
     """Every part on a site, and each building there that is not mapped in parts."""
     def on(item, boundary):
@@ -398,6 +417,7 @@ def parse_osm(data: dict, refs: dict) -> dict:
     boundary = selected['footprint']
     parts = [p for p in pieces if _inside(_centroid(p['footprint'][0]), boundary[0]) and
              not any(_inside(_centroid(p['footprint'][0]), h) for h in boundary[1:])]
+    parts += _body(selected, parts, boundary)
     form = selected['tags']
     if not parts and form.get('height') and (
             form.get('roof:shape', 'flat') != 'flat' or form.get('man_made') in UPRIGHT or form.get('building') == 'tower'):
@@ -537,7 +557,11 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
         far = max((math.hypot(*point) for point in parsed.get('site', [[]])[0]), default=0)
         if far > 1000:
             raise LandmarkProblem('The landmark reaches more than 1 km from its coordinates.')
-        return fetch(refs, job_root, far) if far > radius else parsed
+        if far > radius:
+            return fetch(refs, job_root, far)
+        if parsed.get('site') and parsed['tags'].get('man_made') == 'bridge' and _share(parsed['parts'], parsed['site']) < .5:
+            raise LandmarkProblem('The map has the place of this bridge, and not the shape of its deck.')
+        return parsed
     except LandmarkProblem:
         raise
     except (OSError, ValueError, KeyError, TypeError) as exc:

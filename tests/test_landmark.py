@@ -648,11 +648,11 @@ def test_a_castle_is_every_building_on_its_site(change, parts, source):
     assert bool(parsed.get("site")) == (source == "way/1")
 
 
-def test_the_map_answer_keeps_a_site_and_a_far_site_is_searched_again(monkeypatch, tmp_path):
+def _map_answer(monkeypatch, tmp_path, drawn):
+    """Overpass is down and the OSM map answers with these ways. Returns its nodes and what was asked."""
     monkeypatch.setenv("HOME", str(tmp_path))
     nodes, ways, asked = [], [], []
-    for way in [_way(1, -700, -60, 400, 60, man_made="bridge", wikidata="Q1"), *CASTLE[1:3],
-                _way(9, 0, 0, 5, 5, man_made="bridge", wikidata="Q8")]:
+    for way in drawn:
         ids = [way["id"] * 100 + k for k in range(4)]
         nodes += [{"type": "node", "id": n, **g} for n, g in zip(ids, way["geometry"])]
         ways.append({"type": "way", "id": way["id"], "tags": way["tags"], "nodes": [*ids, ids[0]]})
@@ -663,12 +663,43 @@ def test_the_map_answer_keeps_a_site_and_a_far_site_is_searched_again(monkeypatc
         asked.append(url)
         return {"elements": nodes + ways}
     monkeypatch.setattr(landmark_refs, "_request", request)
+    return nodes, asked
+
+
+BRIDGE = _way(1, -700, -60, 400, 60, man_made="bridge", wikidata="Q1")
+DECK = _way(7, -700, -40, 400, 40, building__part="yes", min_height="8", height="10")
+
+
+def test_the_map_answer_keeps_a_site_and_a_far_site_is_searched_again(monkeypatch, tmp_path):
+    nodes, asked = _map_answer(monkeypatch, tmp_path, [
+        BRIDGE, DECK, CASTLE[1], _way(9, 0, 0, 5, 5, man_made="bridge", wikidata="Q8")])
     parsed = landmark_refs.fetch(_site_refs(label="Example Bridge"), tmp_path)
-    assert parsed["site"] and [p["id"] for p in parsed["parts"]] == [2, 3]
+    assert parsed["site"] and [p["id"] for p in parsed["parts"]] == [7, 2]
     assert len(asked) == 2  # 220 m, then the 703 m the bridge reaches
     nodes[0]["lon"] *= 2
     with pytest.raises(landmark_refs.LandmarkProblem, match="1 km"):
         landmark_refs.fetch(_site_refs(label="Example Bridge", osm_way="1"), tmp_path)
+
+
+def test_a_bridge_with_no_mapped_deck_is_refused_after_the_far_search(monkeypatch, tmp_path):
+    """The Golden Gate Bridge was built as two towers and no bridge."""
+    _, asked = _map_answer(monkeypatch, tmp_path, [BRIDGE, *CASTLE[1:3]])
+    with pytest.raises(landmark_refs.LandmarkProblem, match="deck"):
+        landmark_refs.fetch(_site_refs(label="Example Bridge"), tmp_path)
+    assert len(asked) == 2
+
+
+@pytest.mark.parametrize("walls, dome, drum, parts", [
+    ("17", "34", 20, [2, 1]),  # the Dome of the Rock was built as its dome, with no octagon
+    ("34", "34", 20, [2]),  # the height of the whole, not of the walls
+    (None, "34", 20, [2]),
+    ("17", "34", 44, [2]),  # the parts are the building
+])
+def test_the_walls_around_a_mapped_dome_are_a_part(walls, dome, drum, parts):
+    r = drum / 2
+    whole = _way(1, -25, -25, 25, 25, building="mosque", wikidata="Q1", **({"height": walls} if walls else {}))
+    elements = [whole, _way(2, -r, -r, r, r, building__part="yes", height=dome, roof__shape="dome")]
+    assert [p["id"] for p in landmark_refs.parse_osm({"elements": elements}, _site_refs())["parts"]] == parts
 
 
 @pytest.mark.parametrize("tags, parts", [
