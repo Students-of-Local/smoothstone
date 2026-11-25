@@ -903,6 +903,19 @@ def test_a_statue_the_map_answer_has_is_refused_and_a_dome_on_a_site_keeps_its_w
     assert [p["id"] for p in landmark_refs.parse_osm({"elements": domed}, _site_refs())["parts"]] == [3, 2]
 
 
+@pytest.mark.parametrize("foot, refused", [("0", True), ("8", False)])
+def test_a_bridge_mapped_solid_to_the_ground_is_refused(monkeypatch, tmp_path, foot, refused):
+    """The Rialto Bridge came out as a solid block with no arch, and was called ready."""
+    deck = _way(7, -700, -40, 400, 40, building__part="yes", min_height=foot, height="10")
+    step = _way(8, -60, -40, 40, 40, building__part="yes", min_height="2", height="14")  # stands over the deck
+    _map_answer(monkeypatch, tmp_path, [BRIDGE, deck, step])
+    if refused:
+        with pytest.raises(landmark_refs.LandmarkProblem, match="solid to the ground"):
+            landmark_refs.fetch(_site_refs(label="Example Bridge"), tmp_path)
+    else:
+        assert landmark_refs.fetch(_site_refs(label="Example Bridge"), tmp_path)["parts"]
+
+
 def test_a_bridge_with_no_mapped_deck_is_refused_after_the_far_search(monkeypatch, tmp_path):
     """The Golden Gate Bridge was built as two towers and no bridge."""
     _, asked = _map_answer(monkeypatch, tmp_path, [BRIDGE, *CASTLE[1:3]])

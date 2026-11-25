@@ -421,6 +421,16 @@ def _share(parts, boundary):
     return (over ^ ground).area() / ground.area()
 
 
+def _ground(parts, every=False):
+    """The plan area of the parts that stand on the ground, or of every part, each place counted once."""
+    import manifold3d as m3
+    from .landmark import _section, length
+
+    raised = ('min_height', 'building:min_level')
+    stand = [_section(p['footprint']) for p in parts if every or not any(length(p['tags'].get(k)) for k in raised)]
+    return m3.CrossSection.batch_boolean(stand, m3.OpType.Add).area() if stand else 0
+
+
 def _body(selected, parts, boundary):
     """The outline, where its own height is the walls around a mapped dome or tower."""
     from .landmark import length
@@ -679,6 +689,9 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
             return fetch(refs, job_root, far)
         if parsed.get('site') and parsed['tags'].get('man_made') == 'bridge' and _share(parsed['parts'], parsed['site']) < .5:
             raise LandmarkProblem('The map has the place of this bridge, and not the shape of its deck.')
+        if parsed.get('site') and parsed['tags'].get('man_made') == 'bridge' \
+                and _ground(parsed['parts']) > .9 * _ground(parsed['parts'], every=True):
+            raise LandmarkProblem('The map draws this bridge solid to the ground, with no opening under it.')
         return parsed
     except LandmarkProblem:
         raise
