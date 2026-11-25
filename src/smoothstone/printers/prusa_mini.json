@@ -22,6 +22,10 @@
   "clean_by": "maker",
   "type_source": "https://www.prusa3d.com/product/original-prusa-mini-3/"
  },
+ "bowden_mm": {
+  "value": 275,
+  "source": "https://www.prusa3d.com/en/product/extruder-print-head-ptfe-tube-mini/"
+ },
  "auto_level": "SuperPINDA probe, mesh leveling",
  "multi_material": "none",
  "camera": {
