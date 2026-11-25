@@ -126,6 +126,7 @@ def _level_from_twin(i, prepared):
 OBELISK_TAPER = .63
 LEAST_HEIGHT = .75  # of the sourced height that a map must reach
 LEAST_SHARE, SPLIT_SHARE = .4, .6  # of its plan that a map must draw, and that one in separate pieces must
+THIN = .025  # half the width, against the side of a square as large as the plan, of a strip that joins nothing
 
 
 def resolve_parts(parts, refs):
@@ -583,6 +584,12 @@ def _anchor(man, notes):
     return base
 
 
+def _split(drawn, outline) -> bool:
+    """The plan is in pieces once its thin strips are cut away. A piece under a twentieth of it does not count."""
+    sizes = [piece.area() for piece in drawn.offset(.3).offset(-.3 - THIN * outline.area() ** .5).decompose()]
+    return sum(size >= .05 * sum(sizes) for size in sizes) > 1
+
+
 def _plain(records) -> bool:
     """The whole landmark drawn as one extruded outline: no lighthouse is a cylinder. A pyramid's roof is its shape."""
     if len(records) != 1 or records[0]["tags"].get("man_made") == "obelisk":
@@ -675,7 +682,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     if replace != "all" and not outline.is_empty():
         drawn = m3.CrossSection.batch_boolean([mapped, *extra_sections], m3.OpType.Add)
         share = (drawn ^ outline).area() / outline.area()
-        split = len(drawn.offset(.3).decompose()) > 1
+        split = _split(drawn, outline)
         if share < (SPLIT_SHARE if split else LEAST_SHARE):
             raise LandmarkProblem(f"the map draws {name} in {'separate pieces' if split else 'a piece'} covering {share:.0%} "
                                   "of its plan, and the rest is missing.")

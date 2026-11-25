@@ -649,8 +649,10 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
                         raw = _request(url)
                         break
                     except urllib.error.HTTPError as exc:  # it answers 400 for an area with over 50,000 nodes
-                        if exc.code != 400 or radius <= 220:
+                        if exc.code != 400:
                             raise
+                        if radius <= 220:
+                            raise LandmarkProblem(CROWDED) from exc
                         radius = max(220, radius // 2)
                         small = True
                 raw_text = json.dumps(raw, ensure_ascii=False)
