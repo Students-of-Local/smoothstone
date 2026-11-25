@@ -1165,3 +1165,17 @@ From 40 landmarks never built before (no model, no judge), looked at one by one.
   pinnacles at 54 to 63 m made six small chapels 54 m blocks. It now takes the height at which half the ground covered
   by measured ground parts is lower: 22 m there. With nothing measured on the ground, the old median stands.
 - `indoor`, `room` and underground elements are not parts. The White House's four toilets stood as 21 m blocks.
+
+### 2026-11-24: the base follows the plan
+
+The 2 mm base was the convex hull of the plan, a boat-shaped plate around Speyer, Lincoln and Buckingham Palace, and the
+judge's complaint on St. Vitus. It now follows the mapped plan, with short joiners between bodies, as Notre-Dame's
+already did (its `plinth_follows_plan` fact is gone). The Eiffel Tower's four feet keep one plate.
+
+- A model too slender to lean the 10 degrees the print check asks for gets a wider base (the Washington Monument leaned 7).
+- Two walls that meet along a line are welded with a thin bar where that line stops the mesh from closing. Westminster
+  needed it, 262 short edges 10 to 34 mm up; its old base happened to close.
+- Where that still leaves a sliver, edges under 0.03 mm are collapsed (0.01 before). The Lotus Temple failed on one.
+
+One judged build each on the new base: Cologne 9, Taj 9, St Paul's 9 (was 8), Westminster 9, St. Vitus 8, all passing, and
+the judge no longer mentions St. Vitus's base. The other four graded bases are unchanged.

@@ -501,6 +501,96 @@ def _minaret(x, untagged=False):
     return out
 
 
+def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeypatch, tmp_path):
+    # Speyer, Lincoln and Buckingham Palace stood on boat-shaped plates, the convex hull of their plans
+    from smoothstone import landmark
+
+    recorded("Taj Mahal")
+
+    def way(i, ring, tags):
+        ring = [*ring, ring[0]]
+        return {"type": "way", "id": i, "tags": tags, "geometry": [
+            {"lat": 27.175 + y / 111320, "lon": 78.042 + x / 99000} for x, y in ring]}
+
+    def box(x0, y0, x1, y1):
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+    part = {"building:part": "yes", "height": "20"}
+
+    def fetch(refs, root):
+        here = {**refs, "latitude": 27.175, "longitude": 78.042, "osm_way": 1, "osm_relation": None}
+        return landmark_refs.parse_osm({"elements": [
+            way(1, box(-60, -60, 60, 60), {"building": "yes"}),
+            way(2, box(-50, -10, 50, 10), part), way(3, box(-10, 10, 10, 50), part),  # a T
+            way(4, box(40, 40, 50, 50), part)]}, here)  # a pavilion that stands apart
+    monkeypatch.setattr(landmark_refs, "fetch", fetch)
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
+    mesh = trimesh.load(result["stl"])
+    k = result["scale"]
+    plan = (100 * 20 + 20 * 40 + 10 * 10) * k * k
+    base = modelprint.to_manifold(mesh).slice(1.).area()
+    assert plan <= base < plan * 1.05
+    assert len(mesh.split()) == 1
+    notes = json.loads(Path(result["refs"]).read_text())["modeling_additions"]
+    assert any("following the mapped plan" in n for n in notes) and not any("convex" in n for n in notes)
+
+
+@pytest.mark.parametrize("width, height, widened", [(18, 180, True), (60, 180, False), (40, 60, False)])
+def test_a_slender_tower_gets_a_wider_base(width, height, widened):
+    # the Washington Monument, 18 by 180 mm, leaned 7 degrees before it tipped and was refused
+    import manifold3d as m3
+    from smoothstone import landmark, printable
+
+    tower, notes = m3.Manifold.cube([width, width, height]).translate([5, 9, 0]), []
+    out = landmark._footing(tower, notes)
+    assert bool(notes) == widened
+    if not widened:
+        assert out.volume() == tower.volume()
+    mesh = modelprint.to_trimesh(out)
+    assert printable.tip_angle(mesh, printable.occupancy(mesh)) >= printable.TIP_MIN
+    assert out.slice(3).area() == pytest.approx(width * width)
+
+
+def test_two_walls_that_meet_along_a_line_are_welded():
+    # Westminster Abbey: two buttress corners meet along a 24 mm line, "still 1 non-manifold edges"
+    import manifold3d as m3
+    from smoothstone import clean, landmark
+
+    base = m3.Manifold.cube([40, 40, 2])
+    man = base + m3.Manifold.cube([10, 10, 20]).translate([10, 10, 0]) + m3.Manifold.cube([10, 10, 30]).translate([20, 20, 0])
+    raw, notes = modelprint.to_trimesh(man), []
+    view = clean.slicer_view(np.asarray(raw.vertices), np.asarray(raw.faces))
+    assert view["bad_edges"]
+    welded = modelprint.to_trimesh(landmark._weld(man, raw, notes))
+    out = clean.for_slicer(welded)
+    assert not clean.problems(clean.slicer_view(out.vertices, out.faces)) and len(out.split()) == 1
+    assert out.volume == pytest.approx(man.volume(), rel=1e-4) and "Welded 1 edge" in notes[0]
+
+
+@pytest.mark.parametrize("fails, note", [(0, None), (1, "Snapped"), (2, "Welded"), (3, "Collapsed"), (4, None)])
+def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeypatch):
+    import manifold3d as m3
+    from smoothstone import clean, landmark
+
+    calls, real = [], clean.for_slicer
+
+    def stubborn(mesh, tolerance=.01):
+        calls.append(tolerance)
+        if len(calls) <= fails:
+            raise ValueError("still 1 zero-area faces after three repair passes")
+        return real(mesh, tolerance)
+    monkeypatch.setattr(clean, "for_slicer", stubborn)
+    man, notes = m3.Manifold.cube([10, 10, 10]), []
+    raw = modelprint.to_trimesh(man)
+    if fails == 4:
+        with pytest.raises(ValueError, match="zero-area"):
+            landmark._closed(man, raw, notes)
+        return
+    assert landmark._closed(man, raw, notes).volume == pytest.approx(1000)
+    assert calls == [.01, .01, .01, .03][:fails + 1]
+    assert (notes[-1].startswith(note) if note else notes == [])
+
+
 def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     # the Taj Mahal's south-west minaret: three parts with no height stood as 40 m columns through its rings and kiosk
     from smoothstone import landmark
