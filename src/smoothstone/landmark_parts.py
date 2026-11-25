@@ -52,9 +52,20 @@ def _turned(degrees):
     return np.array([[math.cos(a), math.sin(a)], [-math.sin(a), math.cos(a)]])
 
 
+def _loop(points, name):
+    """A cross section from one loop that does not cross itself."""
+    from .landmark import _section
+
+    cs = _section([points.tolist()])
+    _need(not cs.is_empty() and cs.area() > 1e-6, f"{name} encloses no area")
+    x, y = points.T
+    wound = abs(x @ np.roll(y, -1) - y @ np.roll(x, -1)) / 2  # a loop wound the other way takes area off this one
+    _need(abs(cs.area() - wound) <= 1e-5 * cs.area(), f"{name} crosses itself")
+    return cs
+
+
 def _plan(part):
     import manifold3d as m3
-    from .landmark import _section
 
     given = [k for k in PLANS if k in part]
     _need(len(given) == 1, "give one plan: rect, circle, ngon or ring")
@@ -70,12 +81,8 @@ def _plan(part):
         _need(sides == int(sides) and 3 <= sides <= 64 and radius > 0, "ngon must be [3 to 64 sides, radius]")
         cs = m3.CrossSection.circle(float(radius), int(sides)).rotate(90 + 180 / sides)  # a flat side to the front
     else:
-        ring = _points(value, "ring", 2, 3)
-        cs = _section([ring.tolist()])
-        x, y = ring.T
-        wound = abs(x @ np.roll(y, -1) - y @ np.roll(x, -1)) / 2  # a loop wound the other way takes area off this one
+        return _loop(_points(value, "ring", 2, 3), "ring")
     _need(not cs.is_empty() and cs.area() > 1e-6, f"{kind} encloses no area")
-    _need(kind != "ring" or abs(cs.area() - wound) <= 1e-5 * cs.area(), "ring crosses itself")
     return cs
 
 
@@ -242,9 +249,6 @@ def _head(arch, w, rise):
 
 
 def _opening(part):
-    import manifold3d as m3
-    from .landmark import _section
-
     depth = _number(part.get("depth"), "depth", 0)
     if "outline" in part:
         extra = {"width", "from", "to", "arch", "arch_rise"} & set(part)
@@ -264,8 +268,7 @@ def _opening(part):
                               _number(part["arch_rise"], "arch_rise", 0) if "arch_rise" in part else None)
         _need(hi - lo >= rise - 1e-9, f"the arch rises {rise:g} m, more than to - from")
         ring = np.array([[-half, lo], [half, lo]] + [[x, hi - rise + z] for x, z in top])
-    cs = _section([ring.tolist()])
-    _need(not cs.is_empty() and cs.area() > 1e-6, "an opening encloses no area")
+    cs = _loop(ring, "an opening")
 
     def build(floor, notes):
         deep = max(depth, floor)
