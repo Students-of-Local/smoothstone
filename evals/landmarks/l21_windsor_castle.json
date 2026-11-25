@@ -1,0 +1,31 @@
+{
+  "id": "l21_windsor_castle",
+  "request": "Can I get Windsor Castle as a 3D print, 18 cm long?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Windsor Castle",
+      "size": {
+        "mode": "long",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 39.3,
+        "source": "https://westernciv.com/wp-content/uploads/2017/06/8.mod-eng.geoIV_.11.27.18X.key.pdf",
+        "why": "The Round Tower's flag turret at 85.3 m above the sea, over ground taken as 46 m. The 46 m is the pack's, so this holds the print to the pack."
+      },
+      "dimensions": {
+        "length": 582,
+        "width": 198.2,
+        "source": "https://www.openstreetmap.org/way/23580556",
+        "why": "The smallest rectangle round the mapped castle."
+      }
+    }
+  },
+  "why": "The map has no heights: the Round Tower on its mound, the ranges, the chapel and the walls come from the pack."
+}

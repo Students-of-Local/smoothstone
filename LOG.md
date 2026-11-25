@@ -1256,6 +1256,13 @@ One rerun each on the final code (514914b): l11 7, fail; l16 9, pass.
 Of 40 landmarks never built before, 35 now build (30 before). Not built: the Statue of Liberty and Windsor Castle, and
 the Golden Gate, Himeji and Stonehenge, which these packs cover.
 
+### 2026-11-25: Windsor Castle
+
+A pack of reference parts by GPT-6.2 Sol, with grading spec l21. Sol's weekly quota ended before it compared its build with
+the photographs. One attempt each at 398a5b3: judged 8, pass; LFM3-1.7B, card S, 8, pass. Not from a source: the ground is
+taken as 46 m above the sea, so the 39.3 m height holds the print to the pack. The judge's notes stay open: the Round Tower
+reads low, and the George IV Gateway's two towers do not stand out.
+
 ### 2026-11-24: a card for landmarks
 
 `skill/landmarks.md` says how a large model writes the shapes a map lacks, and what makes a landmark read as itself at
