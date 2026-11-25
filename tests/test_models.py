@@ -491,6 +491,34 @@ def test_a_structure_without_a_building_word_routes_to_stone_landmark(jobenv, mo
         assert _route(monkeypatch, request_)[0] == ["stone", "landmark"]
 
 
+@pytest.mark.parametrize("request_, name", [
+    ("I want a Stonehenge for my desk, 15 cm", "Stonehenge"),
+    ("Could I get a 3D printable Arc de Triomphe?", "Arc de Triomphe"),
+    ("Any chance you could print the Parthenon?", "Parthenon"),
+    ("Turn the Arc de Triomphe into a 3D print", "Arc de Triomphe"),
+    ("My kid loves Stonehenge, can you make one?", "Stonehenge"),
+    ("I'd like the Parthenon as a gift for my mom", "Parthenon"),
+    ("Please model the Arc de Triomphe completely accurately so I can print it", "Arc de Triomphe"),
+    ("For my class I need an STL file for the Petronas Towers in PLA", "Petronas Towers"),
+    ("I was in Paris last year. Now I want the Arc de Triomphe in 3D!", "Arc de Triomphe"),
+    ("make a tiny white house", None),
+    ("make a small pentagon", None),
+    ("A phone case with the Arc de Triomphe on it", None),
+    ("a Stonehenge phone stand", None),
+    ("Make a keychain shaped like the Parthenon", None),
+    ("I need a hook for my Alhambra photo", None),
+    ("Print a box to hold my Colosseum tickets", None),
+    ("A lamp inspired by the Alhambra", None),
+    ("a puzzle of the Parthenon", None),
+    ("a vase like the Parthenon", None),
+    ("I saw this near the Alhambra, a wall hook", None),
+    ("Print me the Pantheon in Paris", None),
+])
+def test_a_name_in_capitals_is_read_anywhere_in_a_sentence(monkeypatch, request_, name):
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda n: n in NAMES + ("Pantheon",))
+    assert models.known_landmark(request_) == name
+
+
 @pytest.mark.parametrize("request_", ["make me a lid", "print me a name plate for Anna", "make me my nan's urn"])
 def test_a_thing_with_no_name_is_not_looked_up(monkeypatch, request_):
     monkeypatch.setattr(landmark_refs, "is_structure", lambda name: pytest.fail(name))
