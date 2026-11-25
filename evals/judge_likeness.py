@@ -115,14 +115,16 @@ def reference(title: str) -> dict:
     if not pages or "missing" in pages[0] or not (pages[0].get("original") or {}).get("source"):
         raise JudgeProblem(f"no lead image for the Wikipedia article {title!r}")
     p = pages[0]
-    url = p["original"]["source"]
-    if ".svg" in url.lower():  # a logo or a plan is no photo of it: the first photo in the article is
-        media = json.loads(_get(MEDIA + urllib.parse.quote(p["title"].replace(" ", "_"), safe=""))).get("items", [])
-        photos = [i for i in media if re.search(r"\.jpe?g$", i.get("title", ""), re.I) and i.get("srcset")]
-        if not photos:
-            raise JudgeProblem(f"the Wikipedia article {title!r} leads with a drawing and has no photo")
-        url = urllib.parse.urljoin(WIKI, photos[0]["srcset"][-1]["src"])
-    return {"title": p["title"], "url": url, "caption": p.get("description", "")}
+    return {"title": p["title"], "url": p["original"]["source"], "caption": p.get("description", "")}
+
+
+def first_photo(title: str) -> str:
+    """The first photo in an article, for one that leads with a logo or a plan."""
+    media = json.loads(_get(MEDIA + urllib.parse.quote(title.replace(" ", "_"), safe=""))).get("items", [])
+    photos = [i for i in media if re.search(r"\.jpe?g$", i.get("title", ""), re.I) and i.get("srcset")]
+    if not photos:
+        raise JudgeProblem(f"the Wikipedia article {title!r} leads with a drawing and has no photo")
+    return urllib.parse.urljoin(WIKI, photos[0]["srcset"][-1]["src"])
 
 
 def _file_key(name: str) -> str:
