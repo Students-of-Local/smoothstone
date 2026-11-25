@@ -952,6 +952,7 @@ def named_in(request: str) -> list[str]:
     return sorted(out, key=len, reverse=True)[:3]
 
 
+OPENING = re.compile(rf"^\s*(?:at|in)\s+(?:{SIZE}|(?:\w+\s+)?(?:PLA|PETG|ABS|ASA|TPU|resin)\b)[\s,]*", re.I)  # "At 18 cm tall, print"
 FIGURE_NAME = re.compile(r"\b(?:statue|sculpture|bust|figure|figurine)\b", re.I)
 
 
@@ -962,13 +963,17 @@ def landmark_before_recipe(request: str, makes) -> str | None:
     only when nothing else in the request asks for a part."""
     from . import landmark_refs
 
-    req = re.sub(r"^\s*(?:at|in|on)\b[^,]*,\s*", "", " ".join(_clauses(request)), flags=re.I)  # "At 18 cm tall, print"
-    first = re.sub(r"^an?\s+", "", _leading_name(req), flags=re.I)  # in lower case only a name that ends in a building word
-    for name in dict.fromkeys([*named_in(req), *([first] if BUILDING.fullmatch(first.split(" ")[-1]) else [])]):
-        rest = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", " ", req, flags=re.I)
-        if len(re.findall(r"\w+", name)) > 1 and not FIGURE_NAME.search(name) and not for_another_thing(req, name) \
-                and not makes(rest) and landmark_refs.is_structure(name):
-            return name
+    whole = " ".join(_clauses(request))
+    req = OPENING.sub("", whole)
+    first = re.sub(r"^an?\s+", "", _leading_name(req), flags=re.I)
+    # in lower case only a name that ends in a building word, and no part before it ("a stand shaped like the arch")
+    plain = NAME.fullmatch(first) or BUILDING.fullmatch(first.split(" ")[-1]) and not OTHER_BEFORE.search(first)
+    for found in dict.fromkeys([*([first] if plain else []), *(n for n in named_in(req) if not for_another_thing(req, n))]):
+        for name in dict.fromkeys([found, found.split(" in ")[0]]):
+            rest = re.sub(rf"(?<!\w){re.escape(found)}(?!\w)", " ", whole, flags=re.I)
+            if len(re.findall(r"\w+", name)) > 1 and not FIGURE_NAME.search(name) and not makes(rest) \
+                    and landmark_refs.is_structure(name):
+                return name
     return None
 
 

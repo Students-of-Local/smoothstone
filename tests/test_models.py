@@ -575,6 +575,11 @@ def test_the_lookup_waits_until_no_recipe_fits(jobenv, monkeypatch):
     ("make an empire state building", True),
     ("At 18 cm tall, print me the Empire State Building.", True),
     ("In white PLA, print me the Empire State Building", True),
+    ("Print me the Empire State Building - 18 cm tall", True),
+    ("Print me the Empire State Building I can put on my desk", True),
+    ("In white PLA print me the Empire State Building, 18 cm tall", True),
+    ("On a phone stand, put the Empire State Building.", False),
+    ("make a phone stand shaped like the empire state building", False),
     ("Hook, 40 mm", False),
     ("Hook for my coat", False),
     ("Print a hook for my Hook Lighthouse photo", False),
@@ -589,6 +594,17 @@ def test_a_recipe_word_inside_a_landmarks_name_does_not_take_the_request(jobenv,
     """LFM3-1.7B built a figure: stone recipes listed the figure recipe for the Empire State Building."""
     monkeypatch.setattr(landmark_refs, "is_structure", lambda name: True)
     assert (_route(monkeypatch, request_)[0] == ["stone", "landmark"]) is routes
+
+
+@pytest.mark.parametrize("request_, name", [
+    ("Print me the Empire State Building in New York, 18 cm tall", "Empire State Building"),
+    ("Generate the Sacre-Coeur, 15 cm tall", "Sacre-Coeur"),
+    ("Recreate the Marina Bay Sands", "Marina Bay Sands"),
+    ("make a dice tower", None),
+])
+def test_the_name_routed_is_the_landmarks_alone(monkeypatch, request_, name):
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda n: n == name)
+    assert models.landmark_before_recipe(request_, lambda text: False) == name
 
 
 @pytest.mark.parametrize("request_", ["Print the Phone Stand", "Make me a Phone Stand", "Print the Wall Hook"])
