@@ -718,7 +718,7 @@ def test_the_cap_on_lines_never_hides_why_a_build_failed():
     lines = out.render().splitlines()
     assert len(lines) == cli.MAX_LINES and lines[0] == "Part 0: all 15 checks pass"
     assert lines[-3] == "FIX: a part does not pass the print checks at this size"
-    assert lines[-2] == "(9 more lines in log.txt)" and lines[-1].startswith("NEXT:")
+    assert lines[-2] == "(8 more lines in log.txt)" and lines[-1].startswith("NEXT:")
     assert [int(ln.split(":")[0][5:]) for ln in lines[:-3]] == list(range(22))
     out = cli.Out()
     out.add(*(f"FIX: {i}" for i in range(40)))
