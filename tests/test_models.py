@@ -440,7 +440,7 @@ def test_names_landmark_still_names_buildings(request_, subject):
 
 
 NAMES = ("Arc de Triomphe", "Stonehenge", "alhambra", "Parthenon", "pantheon", "Colosseum", "white house", "pentagon", "lid",
-         "Saint Mark's", "Alhambra", "Kindle Paperwhite", "petra", "stonehenge", "parthenon")
+         "Saint Mark's", "Alhambra", "Kindle Paperwhite", "Petronas Towers", "petra", "stonehenge", "parthenon")
 
 
 @pytest.mark.parametrize("request_, subject", [
@@ -464,6 +464,9 @@ NAMES = ("Arc de Triomphe", "Stonehenge", "alhambra", "Parthenon", "pantheon", "
     ("Could you 3D print the Arc de Triomphe at 1:500 scale?", "Arc de Triomphe"),
     ("A small detailed 12 cm replica of the Parthenon in white", "Parthenon"),
     ("Stonehenge model, 16 cm", "Stonehenge"),
+    ("I need a model of the Petronas Towers to 3D print, 18 cm tall.", "Petronas Towers"),
+    ("a model of the Alhambra to be 3D-printed in PLA", "Alhambra"),
+    ("make the Parthenon I can print on my Ender", "Parthenon"),
     ("A stand for my Kindle Paperwhite", None),
     ("A clip for the Arc de Triomphe", None),
     ("a wall thing", None),
@@ -486,6 +489,34 @@ def test_a_structure_without_a_building_word_routes_to_stone_landmark(jobenv, mo
     assert models.known_landmark(request_) == subject
     if subject:
         assert _route(monkeypatch, request_)[0] == ["stone", "landmark"]
+
+
+@pytest.mark.parametrize("request_, name", [
+    ("I want a Stonehenge for my desk, 15 cm", "Stonehenge"),
+    ("Could I get a 3D printable Arc de Triomphe?", "Arc de Triomphe"),
+    ("Any chance you could print the Parthenon?", "Parthenon"),
+    ("Turn the Arc de Triomphe into a 3D print", "Arc de Triomphe"),
+    ("My kid loves Stonehenge, can you make one?", "Stonehenge"),
+    ("I'd like the Parthenon as a gift for my mom", "Parthenon"),
+    ("Please model the Arc de Triomphe completely accurately so I can print it", "Arc de Triomphe"),
+    ("For my class I need an STL file for the Petronas Towers in PLA", "Petronas Towers"),
+    ("I was in Paris last year. Now I want the Arc de Triomphe in 3D!", "Arc de Triomphe"),
+    ("make a tiny white house", None),
+    ("make a small pentagon", None),
+    ("A phone case with the Arc de Triomphe on it", None),
+    ("a Stonehenge phone stand", None),
+    ("Make a keychain shaped like the Parthenon", None),
+    ("I need a hook for my Alhambra photo", None),
+    ("Print a box to hold my Colosseum tickets", None),
+    ("A lamp inspired by the Alhambra", None),
+    ("a puzzle of the Parthenon", None),
+    ("a vase like the Parthenon", None),
+    ("I saw this near the Alhambra, a wall hook", None),
+    ("Print me the Pantheon in Paris", None),
+])
+def test_a_name_in_capitals_is_read_anywhere_in_a_sentence(monkeypatch, request_, name):
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda n: n in NAMES + ("Pantheon",))
+    assert models.known_landmark(request_) == name
 
 
 @pytest.mark.parametrize("request_", ["make me a lid", "print me a name plate for Anna", "make me my nan's urn"])

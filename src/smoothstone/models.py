@@ -830,7 +830,7 @@ FIND_MODEL = re.compile(r"\b(?:find|download|get|grab)(?:\s+me)?\s+(?:an?\s+|the
                         r"\b(?:existing|open|someone['’]s)\s+" + FILE_WORD + r"\b|"
                         r"\b(?:on|from)\s+(?:printables|thingiverse|myminifactory|cults3?d?)\b", re.I)
 PRINT_WORDS = {"A", "An", "The", "Make", "Print", "Build", "I", "My", "Please", "Model", "Replica",
-               "Find", "Download", "Get", "Grab", "STL", "Printables", "Thingiverse"}
+               "Find", "Download", "Get", "Grab", "STL", "Printables", "Thingiverse", "Turn", "Try", "Help", "Start", "Create", "Design"}
 
 
 # "St. Basil's Cathedral": the period is an abbreviation's, not the end of the subject
@@ -884,7 +884,7 @@ MODEL_OF = re.compile(r"""(?:(?:an?|the)\s+)?(?:(?!(?:for|with|of|on|to|under|ho
 NAME_ENDS = re.compile(r"""\s*(?:[,.;:!?()]|$)|\s+(?:[-\u2013\u2014]\s|\d|(?:for|that|which|please|about|with|so|using|from|scaled?|sized)\b
     |(?:in|at)\s+(?:\d|an?\b|one\b|two\b|pla|petg|abs|asa|tpu|resin|plastic|wood|stone|colou?r|white|black|gr[ae]y|red|green|blue
     |gold|silver|bronze|full|true|high|low|small|large|scale|about|around)
-    |as\s+(?:an?\s+)?(?:3d\s+)?(?:model|replica|miniature|print)\b|to\s+(?:print|fit|display)\b)""", re.I | re.X)
+    |as\s+(?:an?\s+)?(?:3d\s+)?(?:model|replica|miniature|print)\b|to\s+(?:be\s+)?(?:3-?d[\s-]?)?(?:print|fit|display)\w*\b|i\s+(?:can|could|want)\b)""", re.I | re.X)
 
 
 def known_landmark(request: str) -> str | None:
@@ -900,9 +900,38 @@ def known_landmark(request: str) -> str | None:
     req = re.sub(r"^the\s+", "", req, flags=re.I)
     name = re.sub(r"\s+(?:3d\s+)?(?:models?|replicas?|miniatures?|prints?|stls?)$", "", req[:NAME_ENDS.search(req).start()], flags=re.I)
     words = name.casefold().split()
-    if not 1 <= len(words) <= 7 or words[0] in ("a", "an", "some", "any") or {"my", "our", "your", "his", "her", "their"} & {*words}:
-        return None
-    return name if landmark_refs.is_structure(name) else None
+    plain = 1 <= len(words) <= 7 and words[0] not in ("a", "an", "some", "any") and not {"my", "our", "your", "his", "her", "their"} & {*words}
+    if plain and landmark_refs.is_structure(name):
+        return name
+    return next((n for n in named_in(request) if n != name and landmark_refs.is_structure(n)), None)
+
+
+# A name in capitals anywhere in a sentence, and the words beside it that make the request about another thing.
+CAP = r"[A-Z][\w'&-]*"
+NAME = re.compile(rf"(?<![\w'-]){CAP}(?:(?:\s+(?:of|de|the|la|le|les|du|des|and|di|da|del|von|in)){{0,3}}\s+(?!(?:PLA|PETG|ABS|ASA|TPU|STL)\b){CAP})*")
+OPENERS = re.compile(rf"(?:(?:{'|'.join(sorted(PRINT_WORDS))}|Could|Can|Do)\s+(?:of\s+)?(?:the\s+)?)+")
+THING = r"(?:models?|replicas?|miniatures?|versions?|prints?|copy|copies|stls?|3mfs?|files?|mesh(?:es)?)"
+OTHER_BEFORE = re.compile(rf"""(?<!looking\s)(?<!hoping\s)(?<!asking\s)(?<!asked\s)(?<!model\s)(?<!file\s)(?<!stl\s)(?<!^)\bfor\b|(?<!'d\s)(?<!would\s)\blike\b|\b(?:with|on|under|inside|around|by|from|in|at|into|onto|over|than|near
+    |shaped|styled?|themed)\b|(?<!\w)(?:that|which)\b|\b(?<!\bmodel\s)(?<!models\s)(?<!replica\s)(?<!miniature\s)(?<!version\s)(?<!print\s)(?<!copy\s)
+    (?<!copies\s)(?<!stl\s)(?<!file\s)of\b|\b(?:to|my|our|your|his|her|their)(?:\s+(?:an?|the))?\s*$""", re.I | re.X)
+AFTER = re.compile(rf"""\s*(?:$|[,.;:!?()])|\s+(?:\d|(?:3-?d\s+)?{THING}\b|(?:look|looks|but|please|pls|about|around|roughly|tall|high|long|wide|printed|built|made|and|which
+    |that|is|so|using|next|now|today|soon|\w+ly|display|souvenir|with|from|scaled?|sized)\b|(?:in|at)\b|on\s+(?:my|our|the)\b
+    |for\s+(?!\w+ing\b)|to\s+(?!(?:hold|keep|store|carry|hang|put|cover)\b)
+    |into\s+(?:an?\s+)?(?:3-?d\s+)?{THING}\b|as\s+(?:\w+\s+as\b|(?:an?\s+)?(?:3-?d\s+)?(?:{THING}|gift|present|souvenir|decoration)\b))""", re.I | re.X)
+
+
+def named_in(request: str) -> list[str]:
+    """Names in capitals that a request may ask for, the longest first: "Turn the Arc de Triomphe into a 3D print". Not
+    one that another thing is made for, with or like ("a clip for the Arc"), nor one that names it ("an Arc lamp")."""
+    out = []
+    for clause in re.split(r"(?<=[.!?;])\s+(?=[A-Za-z])", ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'"))):
+        for m in NAME.finditer(clause):
+            opener = OPENERS.match(m.group())
+            name = m.group()[opener.end():] if opener else m.group()
+            if name and name not in PRINT_WORDS and AFTER.match(clause, m.end()) \
+                    and not OTHER_BEFORE.search(clause[:m.end() - len(name)].rstrip()):
+                out.append(name)
+    return sorted(out, key=len, reverse=True)[:3]
 
 
 def asks_found_model(request: str) -> bool:
