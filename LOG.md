@@ -1285,6 +1285,13 @@ name in capitals is now read anywhere in a sentence (the figures are in PR 172).
 l10's height (67 m, Wikidata) and plan (183 x 118 m, New South Wales) are cited now. Not from a source: the
 Dome's porches reach 28.7 m from the centre along the door axes by the pack's choice, 51.5 m across in the smallest box, at 45 degrees. Petronas's plan is the pack's measure of the map's podium and bustles.
 
+The review found that the opera house's sails fanned from one point under their lowest row, in mid air. Each foot now runs
+straight down into the deck: `stone slice` at 0.2 mm finds 2 unsupported ledges, 24 before. Its stair starts at the
+pavement, the concert hall's portico at Petronas shows, the Dome's windows clear its porch hoods, the south hood
+stands on its columns, and a ring that crosses itself is refused. Judged once each after that: Sydney 8 (9 before; the new notes
+are on the shells' spacing and shape), Petronas 9 (the first try gave no verdict: the judge could not read the photo until
+PR 171), the Dome 9. LFM3 was not rerun. The Dome's porch roofs are 12 ledges before and after.
+
 ### 2026-11-25: openings another part covers, and four packs fixed
 
 The second review of those packs found 14 windows of Himeji's (15 came out) and 2 pockets of Golden Gate's that were sealed inside
