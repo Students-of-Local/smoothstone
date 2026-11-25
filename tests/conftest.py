@@ -33,6 +33,14 @@ def no_user_config(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_structure_lookup(monkeypatch):
+    """A request no recipe fits asks Wikidata what its subject is: no test reaches the network for it."""
+    from smoothstone import landmark_refs
+
+    monkeypatch.setattr(landmark_refs, "is_structure", lambda name: False)
+
+
+@pytest.fixture(autouse=True)
 def shipped_catalog_after():
     """stone makes each command's job the current one, with its own products in the catalog
     (catalog.use_job): the next test starts from the shipped catalog."""

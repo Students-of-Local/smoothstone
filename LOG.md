@@ -1175,6 +1175,17 @@ From 40 landmarks never built before (no model, no judge), looked at one by one.
   by measured ground parts is lower: 22 m there. With nothing measured on the ground, the old median stands.
 - `indoor`, `room` and underground elements are not parts. The White House's four toilets stood as 21 m blocks.
 
+### 2026-11-24: a landmark's name is enough
+
+- The 1.7B model's one attempt at l16, "A 3D print of the Arc de Triomphe", went to the figure recipe: the name has no
+  building word, so no request route saw a landmark. Where no recipe fits, a request whose own subject is a shipped pack's
+  name, or a name Wikidata knows best as a structure that stands (5 or more sitelinks), now goes to `stone landmark`.
+- A name is looked up only as the thing asked for: not in "a clip for the Arc" or "a white house". A definite answer is
+  kept for 7 days; an offline or partial one counts as no, for 10 minutes.
+- A statue is refused by what Wikidata calls it, before any map: its pedestal or the building under it was built.
+- Routing is not a promise to build. A statue, or a site with no mapped outline and no pack, is refused there, and the
+  next command is `stone models "<name>"`, where a real model of it may be found.
+
 ### 2026-11-24: PR 141's review mediums
 
 - Several parts with no height at one spot share the missing levels, lowest first. They stood as full columns.

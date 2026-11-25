@@ -82,15 +82,16 @@ def _words(text):
 
 def _matches(name):
     """What Wikidata and Wikipedia find for a name: hits, their entities, and whether Wikipedia answered."""
-    hits = {hit['id']: hit for hit in _wiki({'action': 'wbsearchentities', 'search': name, 'language': 'en',
-                                             'limit': 15}).get('search', [])}
+    def told(reply):
+        if 'error' in reply:  # a busy server says so in a page that loads
+            raise ValueError(reply['error'])
+        return reply
+    hits = {hit['id']: hit for hit in told(_wiki({'action': 'wbsearchentities', 'search': name, 'language': 'en',
+                                                  'limit': 15})).get('search', [])}
     answered = True
     for params in ({'titles': name, 'redirects': 1}, {'generator': 'search', 'gsrsearch': name, 'gsrlimit': 6}):
         try:
-            reply = _wikipedia(params)
-            if 'error' in reply:  # a busy server says so in a page that loads
-                raise ValueError(reply['error'])
-            pages = reply.get('query', {}).get('pages', {}).values()
+            pages = told(_wikipedia(params)).get('query', {}).get('pages', {}).values()
         except (OSError, ValueError, http.client.HTTPException):
             answered = False  # Wikidata's own search still answers
             continue
@@ -101,8 +102,8 @@ def _matches(name):
                 hit['article'] = hit.get('article') or 'titles' in params
     if not hits:
         raise LandmarkProblem(f'No Wikidata entity found for {name}.')
-    entities = _wiki({'action': 'wbgetentities', 'ids': '|'.join(hits), 'languages': 'en',
-                      'props': 'labels|descriptions|aliases|claims|sitelinks'}).get('entities', {})
+    entities = told(_wiki({'action': 'wbgetentities', 'ids': '|'.join(hits), 'languages': 'en',
+                           'props': 'labels|descriptions|aliases|claims|sitelinks'})).get('entities', {})
     return list(hits.values()), entities, answered
 
 
@@ -124,47 +125,123 @@ def _lived_in(entity):
     return False
 
 
+def _what(hit, entity):
+    """What a hit is, from the first words of its description."""
+    description = hit.get('description') or entity.get('descriptions', {}).get('en', {}).get('value', '')
+    return KIND.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip(), description
+
+
+def _names(hit, entity):
+    return [_words(text) for text in (hit.get('label', ''), hit.get('match', {}).get('text', ''),
+                                      entity.get('labels', {}).get('en', {}).get('value', ''),
+                                      *(a['value'] for a in entity.get('aliases', {}).get('en', [])))]
+
+
+def _made(what, entity):
+    """True for something built, False for a place people live in or go through, None when nothing says."""
+    # A "siege castle" or a "fire station" ends in its kind, as a "parish church" does.
+    ends = any(m.end() == len(what) for m in STRUCTURE.finditer(what))
+    # An archaeological site, whatever it once was, unless people still live there.
+    if 'Q839954' in _item_ids(entity, 'P31') and not _lived_in(entity):
+        return True
+    designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
+    places = {word.group().casefold() for word in PLACE.finditer(what)}
+    # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
+    # A station or a school is a building when it has an architect; a town of one style is still a town.
+    if places and not ends and not (designed and places <= {'station', 'school', 'airport'}):
+        return False
+    return True if designed or STRUCTURE.search(what) else None
+
+
 def _choose(name, hits, entities):
     """The hit a person most likely means: its name, what kind of thing it is, and how widely it is written about."""
     wanted, best = _words(name), None
     for hit in hits:
         entity = entities.get(hit['id'], {})
-        description = hit.get('description') or entity.get('descriptions', {}).get('en', {}).get('value', '')
+        what, description = _what(hit, entity)
         if not _value(entity, 'P625') or FORBIDDEN.search(description):
             continue
-        names = [_words(text) for text in (hit.get('label', ''), hit.get('match', {}).get('text', ''),
-                                           entity.get('labels', {}).get('en', {}).get('value', ''),
-                                           *(a['value'] for a in entity.get('aliases', {}).get('en', [])))]
-        what = KIND.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip()
+        names = _names(hit, entity)
         named = wanted in names
         # A page Wikipedia only thinks related is no answer. Wikidata's own hits match the start of a name.
         near = hit.get('article') or any(set(wanted) <= set(n) for n in names)
         # "Example Tower Paris" is the Example Tower whose description says Paris.
         told = set(_words(description))
         near = near or any(n and set(n) < set(wanted) and set(wanted) - set(n) <= told for n in names)
-        # A "siege castle" or a "fire station" ends in its kind, as a "parish church" does.
         ends = any(m.end() == len(what) for m in STRUCTURE.finditer(what))
         if (EVENT.search(what) and not ends and not what.casefold().endswith('station')) \
                 or not (named or near or 'match' in hit):
             continue
-        designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
-        places = {word.group().casefold() for word in PLACE.finditer(what)}
-        # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
-        placed = bool(places) and not ends
-        # A station or a school is a building when it has an architect; a town of one style is still a town.
-        if placed and designed and places <= {'station', 'school', 'airport'}:
-            placed = False
-        # An archaeological site, whatever it once was, unless people still live there.
-        dug = 'Q839954' in _item_ids(entity, 'P31') and not _lived_in(entity)
+        made = _made(what, entity)
         score = 1 + len(entity.get('sitelinks', {}))
         score *= 8 if named else 1 if near else .05
         score *= 2 if hit.get('article') else 1
-        score *= (4 if dug else .02 if placed else 4 if designed or STRUCTURE.search(what) else 1 if what else .5)
+        score *= 4 if made else .02 if made is False else 1 if what else .5
         if best is None or score > best[0]:
             best = score, {**hit, 'description': description}, entity
     if best is None:
         raise LandmarkProblem(f'No building with coordinates found for {name}.')
     return best[1:]
+
+
+KNOWN = 5  # the wikis that write about a structure someone asks for by its bare name
+NATURAL = re.compile(r'\bnatural (?!history)|\bgeological (?:feature|formation|structure|site)|\brock formation'
+                     r'|\bnational monument|\b(?:ship|submarine|aircraft)$', re.I)
+SCULPTURE = re.compile(r'\b(?:statue|sculpture|bust)$', re.I)
+
+
+def is_structure(name: str) -> bool:
+    """True when a shipped pack or Wikidata knows this exact name best as a building, a monument or a ruin that stands."""
+    cache = Path.home() / '.cache' / 'smoothstone' / 'structure' / (
+        hashlib.sha256(f'1 {" ".join(_words(name))}'.encode()).hexdigest() + '.json')
+    try:
+        if load_pack(name):
+            return True
+        try:
+            kept = json.loads(cache.read_text())  # null: the lookup failed, and is not repeated for ten minutes
+            if time.time() - cache.stat().st_mtime < (600 if kept is None else 7 * 86400):
+                return kept is True
+        except (OSError, ValueError):
+            pass
+        try:
+            hits, entities, answered = _matches(name)
+            known = _known_structure(name, hits, entities) if answered else None  # the ranking needs Wikipedia too
+        except LandmarkProblem:  # nothing has this name
+            known = False
+        except (OSError, ValueError, http.client.HTTPException):  # offline or busy
+            known = None
+        try:
+            _write_atomic(cache, json.dumps(known))
+        except OSError:
+            pass
+        return known is True
+    except Exception:  # nobody can say it is one
+        return False
+
+
+def _is_sculpture(refs):
+    what, _ = _what({}, refs.get('wikidata_raw') or {})
+    return bool(SCULPTURE.search(what))
+
+
+def _known_structure(name, hits, entities):
+    try:
+        hit, entity = _choose(name, hits, entities)
+    except LandmarkProblem:
+        return False
+    what, _ = _what(hit, entity)
+    wikis = len(entity.get('sitelinks', {}))
+    if _words(name) not in _names(hit, entity):
+        return False
+    # Another thing of this name, a god or a film, may be the one people mean: it has no place on a map.
+    best = max(len(entities.get(h['id'], {}).get('sitelinks', {})) for h in hits
+               if h['id'] == hit['id'] or _words(name) == _words(
+                   entities.get(h['id'], {}).get('labels', {}).get('en', {}).get('value', ''))
+               and 'Q4167410' not in _item_ids(entities.get(h['id'], {}), 'P31'))  # a disambiguation page
+    listed = any(c.get('rank') != 'deprecated' and 'P582' not in c.get('qualifiers', {})
+                 for c in entity.get('claims', {}).get('P1435', []))
+    gone = _value(entity, 'P576') and not listed  # an ended place still listed as heritage is a ruin that stands
+    return wikis >= max(KNOWN, best) and not NATURAL.search(what) and not gone and _made(what, entity) is True
 
 
 def resolve(name: str, job_root: Path) -> dict:
@@ -377,6 +454,8 @@ def parse_osm(data: dict, refs: dict) -> dict:
         outer = _join([[project(p) for p in m.get('geometry', [])] for m in members if m.get('role') in ('outer', '')])
         inner = _join([[project(p) for p in m.get('geometry', [])] for m in members if m.get('role') == 'inner'])
         return [[ring] + [hole for hole in inner if _inside(_centroid(hole), ring)] for ring in outer]
+    if _is_sculpture(refs):  # and never the pedestal or the building it stands on
+        raise LandmarkProblem('A statue is a sculpture, and building maps do not have its shape.')
     candidates, pieces, sites = [], [], []
     for el in data.get('elements', []):
         if el.get('type') not in ('way', 'relation'):
