@@ -21,7 +21,7 @@
     "source": "https://online.bunka.go.jp/suisensyo/himeji/REFERENCE-3/reference3-1.html",
     "origin": [34.8393314, 134.6940198],
     "axis": 5.4,
-    "replace": [23707900],
+    "replace": "all",
     "value": [
       {
         "kind": "prism",
