@@ -1365,3 +1365,6 @@ reads as a typo of "statue", and the model set a figure's height. The same held 
 Bay Sands ("stand") and the Hook Lighthouse. A recipe that fits only through words of a known structure's name no
 longer takes the request. Mount Rushmore and Mont Saint-Michel, which collide with "mount", are not known structures
 to the lookup and still go to a recipe.
+
+After that change LFM3-1.7B, one attempt at f6d4ce3, builds the Empire State Building: every check passes and the judge
+gives 7, the same open mast.
