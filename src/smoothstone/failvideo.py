@@ -156,10 +156,16 @@ def _width(inp) -> float:
     return inp.width or failsim.fact("k2_widths")["outer_wall"]
 
 
+def _below(inp: failsim.Inputs, i: int) -> np.ndarray:
+    """What layer i is printed on: the layer under it, and the brim round the first."""
+    mk = np.asarray(inp.masks[i - 1], bool)
+    return mk if i > 1 or inp.brim is None else mk | inp.brim
+
+
 def _first(inp: failsim.Inputs, mode: str):
     """The first layer with a piece that fails the asked way: (layer, piece mask, mm past)."""
     for i in range(1, len(inp.masks)):
-        for comp, big, kind in pieces(np.asarray(inp.masks[i], bool), _dist(np.asarray(inp.masks[i - 1], bool), inp.cell), inp):
+        for comp, big, kind in pieces(np.asarray(inp.masks[i], bool), _dist(_below(inp, i), inp.cell), inp):
             if kind == mode:
                 return i, comp, big
     return None
@@ -330,7 +336,7 @@ class Story:
             out = float(np.diff(np.interp([t - dt, t], np.r_[t0[0], t1], came))[0]) / dt
             at = self.px(head[None])
             solid = not loose[at][0]
-            if self.kind == "detach" and (self.blob < self.hold or self.field[at][0] > head[2] - self.inp.layer / 2):
+            if self.kind == "detach" and (self.blob < self.hold or self.field[at][0] > head[2] - (z - float(self.inp.layer_z[i - 1])) / 2):
                 self.blob, out = self.blob + out * dt, 0.0  # the tip carries it, or it has nowhere to go
             if self.rod is None:
                 if out <= 0:
@@ -387,8 +393,10 @@ class Story:
         """Steps the physics layer by layer from the failure to last. Returns the failure's own motion."""
         tp, inp, L = self.tp, self.inp, self.L
         for j in range(L):
-            self.field[np.asarray(inp.masks[j], bool)] = inp.layer_z[j]
-        solid = np.asarray(inp.masks[L - 1], bool) if L > 0 else np.zeros(self.field.shape, bool)
+            self.field[_below(inp, j + 1)] = inp.layer_z[j]
+        other = self.prints & ~self.ext  # a skirt, a prime tower
+        self.lay(np.flatnonzero(other & (tp.layer < L)))
+        solid = _below(inp, L) if L > 0 else np.zeros(self.field.shape, bool)
         motion = []
         if self.kind == "detach":
             motion = self.loose(fps)
@@ -398,9 +406,10 @@ class Story:
         layers = range(L + (self.kind == "detach"), last + 1)
         for i in layers:
             secs = (SIM - self.told) / (last + 1 - i)
-            moves = np.flatnonzero(self.ext & (tp.layer == i))
+            moves, was = np.flatnonzero(self.ext & (tp.layer == i)), self.field.copy()
+            self.lay(np.flatnonzero(other & (tp.layer == i)))  # the tower grows on
+            tower = self.field > was
             if self.kind == "detach":
-                self.lay(np.flatnonzero(self.prints & ~self.ext & (tp.layer == i)))  # the tower grows on
                 self.gone[moves] = True
                 if len(moves):
                     run = np.flatnonzero(tp.layer == i)
@@ -426,7 +435,7 @@ class Story:
             solid = mk & ~falls  # what fell supports nothing above it
             self.since[falls] = -1
             self.field[solid] = np.maximum(self.field[solid], inp.layer_z[i])
-            loose = (d > self.rch) & ~held
+            loose = (d > self.rch) & ~held & ~tower
             air = [j for j in moves if loose[self.px(self.line(j))].any()]
             self.gone[air] = self.flew[air] = True
             over = np.zeros(tp.n, bool)

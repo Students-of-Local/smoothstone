@@ -442,3 +442,36 @@ def test_strands_fall_on_the_part_where_it_slid_to():
     rim = st.field[st.px(np.c_[mid[0] + move[0] + np.linspace(-9.8, 9.8, 99), np.full(99, mid[1] + move[1] - 9.4), np.zeros(99)])]
     assert (rim > 0).all()  # its walls are as wide as their lines, not a row of threads
     assert near(mid).max() == 0  # it left that spot bare
+
+
+def test_what_is_over_a_brim_is_not_in_the_air():
+    tp = _toolpath(_box((20, 20, 2), (0, 0, 0)))
+    bare, mid = failvideo.inputs(tp, "PLA"), float(tp.p1[tp.part(), 0].mean())
+    tp.feature[tp.extruding() & (tp.layer == 0) & (np.maximum(tp.p0, tp.p1)[:, 0] > mid)] = timelapse.gcode.FEATURES.index("skirt")
+    inp = failvideo.inputs(tp, "PLA")
+    assert inp.masks[0].sum() < 0.7 * bare.masks[0].sum() and inp.brim.any()
+    assert [f.kind for f in failsim.predict(replace(inp, brim=None))][0] == "supports"  # half of it hangs over nothing
+    assert [f.kind for f in failsim.predict(inp)] == [f.kind for f in failsim.predict(bare)] == ["none"]
+    assert failvideo._first(replace(inp, brim=None), "supports") and not failvideo._first(inp, "supports")
+    st = failvideo.Story(tp, inp, failsim.Failure("supports", 1, 0.4, 1.0, "spaghetti", None, {}, []), (1, 1, 1), (250, 250))
+    st.run(2)
+    assert not st.flew.any() and not st.gone.any()
+
+
+def test_a_prime_tower_is_there_for_strands_to_end_on():
+    tp = _toolpath(_union(_t(), _box((8, 8, 8), (45, 0, 0))))
+    bar = failvideo.inputs(_toolpath(_t()), "PLA")
+    left = float(tp.p0[tp.part(), 0].min())
+    at = tp.extruding() & (tp.p0[:, 0] > left + 40) & (tp.p1[:, 0] > left + 40)
+    tp.feature[at] = timelapse.gcode.FEATURES.index("prime tower")
+    inp = failvideo.inputs(tp, "PLA")
+    fail, _ = failvideo.choose(failsim.predict(inp), "auto", inp)
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    assert at.any() and not (st.ext & at).any() and fail.kind == "supports"
+    assert [int(m.sum()) for m in inp.masks[:3]] == pytest.approx([int(m.sum()) for m in bar.masks[:3]], rel=0.05)
+    strand, air = st.strand, []
+    st.strand = lambda i, run, loose, *a, **k: (air.append(loose), strand(i, run, loose, *a, **k))[1]
+    st.run(st.L)
+    top = tp.p1[at & (tp.layer == st.L), :3]
+    assert len(top) and (st.field[st.px(top)] >= inp.layer_z[st.L] - 1e-6).all()
+    assert air and not air[0][st.px(top)].any()  # a strand the nozzle takes there is pressed onto it

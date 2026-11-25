@@ -752,7 +752,7 @@ def predict(job_or_inputs, **kw) -> list[Failure]:
                         hit("supports", i, at, nums, why)
                     elif tip >= rule["droop"] * lay:
                         hit("droop", i, at, nums, why)
-        prev = mk
+        prev = mk if i or inp.brim is None else mk | inp.brim  # what the second layer is printed on
         # the part so far against the plate
         n = i + 1
         temps = column_temps(m, sec["area"][:n], sec["perimeter"][:n], sec["share"][:n], lay, bed, air, inp.fan)
