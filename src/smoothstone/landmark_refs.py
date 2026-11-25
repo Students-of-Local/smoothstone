@@ -340,7 +340,8 @@ def _body(selected, parts, boundary):
     from .landmark import length
     walls = length(selected['tags'].get('height'))
     tops = [length(p['tags'].get('height')) or 0 for p in parts]
-    return [selected] if walls and max(tops, default=0) > walls and _share(parts, boundary) < .5 else []
+    standing = [p for p in parts if not length(p['tags'].get('min_height')) and not length(p['tags'].get('building:min_level'))]
+    return [selected] if walls and max(tops, default=0) > walls and _share(standing, boundary) < .5 else []
 
 
 def _site(site, candidates, pieces, data):

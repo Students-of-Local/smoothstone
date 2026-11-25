@@ -694,11 +694,13 @@ def test_a_bridge_with_no_mapped_deck_is_refused_after_the_far_search(monkeypatc
     ("34", "34", 20, [2]),  # the height of the whole, not of the walls
     (None, "34", 20, [2]),
     ("17", "34", 44, [2]),  # the parts are the building
+    ("17", "34", -44, [2, 1]),  # Angkor Wat's galleries stood in the air over its 23 m platform
 ])
 def test_the_walls_around_a_mapped_dome_are_a_part(walls, dome, drum, parts):
-    r = drum / 2
+    r = abs(drum) / 2
+    raised = {"min_height": "17"} if drum < 0 else {}
     whole = _way(1, -25, -25, 25, 25, building="mosque", wikidata="Q1", **({"height": walls} if walls else {}))
-    elements = [whole, _way(2, -r, -r, r, r, building__part="yes", height=dome, roof__shape="dome")]
+    elements = [whole, _way(2, -r, -r, r, r, building__part="yes", height=dome, roof__shape="dome", **raised)]
     assert [p["id"] for p in landmark_refs.parse_osm({"elements": elements}, _site_refs())["parts"]] == parts
 
 
