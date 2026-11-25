@@ -19,7 +19,8 @@ with the same one command.
 5. Openings are cut after every solid is joined, and cut the map's parts too.
 6. After `copies`, at most 400 parts. A bad part stops the build, named by its place in the list.
 7. `plinth` is the base's outline, where the plan under the parts makes a poor one: water under a bridge, or a lawn. Whatever
-   stands on the ground past it keeps its own base. It counts in the print's length.
+   stands on the ground past it keeps its own base. It counts in the print's length. It takes `at`, `turn`, `source` and
+   `guess` as a part does, and replaces the mapped grounds of a site. A lattice tower has its own base and refuses it.
 8. `lean` tips everything above the base, map parts too, about the ground at the origin.
 
 ## Format
@@ -31,7 +32,7 @@ with the same one command.
 | kind | fields |
 | --- | --- |
 | `prism` | a plan, `at`, `turn`, `from`, `to`, and any of `roof` + `roof_rise` (`to` is the roof's top), `top_scale`, `top_shift` [x, y] |
-| `lathe` | `at`, `profile` [[z, radius], ...] with z rising, or [[z, radius, inner radius], ...] for a hollow one |
+| `lathe` | `at`, `profile` [[z, radius], ...] with z rising |
 | `beam` | `path` [[x, y, z], ...], `size` [width, height] or one for each point of `path`, `round` (true: an oval section) |
 | `opening` | `at`, `turn` (the way you walk through), `width`, `depth`, `from`, `to`, `arch` (true: a round head) |
 
@@ -52,11 +53,10 @@ Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, skillion (high at -y
 | `beam` of two points | a bar between them, of `size`, never under 1.2 mm |
 | `beam` with `size` [[4, 4], [2, 2]] | 4 m square at the first point, 2 m at the last |
 | `beam` with `round` | an oval section of `size`; a vertical one 2 x 2 is a round post |
-| `lathe` [[0, 5, 4], [10, 5, 4]] | a tube 10 m tall, open at both ends, its wall never under 1.2 mm |
 | `least` .8 on a thin beam | 0.8 mm wide at print scale |
 | `plinth` `rect` [40, 60] under a 4 x 6 block | the base is 40 x 60 m at scale, and 60 m is the print's length |
 | a part on the ground outside `plinth` | the base takes in its foot |
-| `least` .5, an inner radius as wide as the radius, two sizes for three points, a plinth with no plan | refused |
+| `least` .5, two sizes for three points, a plinth with no plan | refused |
 | `opening` 4 wide through a 10 m wall | light through the wall; volume falls by the opening's |
 | `copies` around, 4 | four parts at 90 degrees |
 | `mirror` xy of a part at [3, 4] | four parts at [±3, ±4] |

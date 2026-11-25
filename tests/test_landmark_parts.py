@@ -297,14 +297,18 @@ def test_a_beam_tapers_along_its_path_and_may_be_round():
     assert post.volume() == pytest.approx(math.pi * 10, rel=.03)
 
 
-def test_a_hollow_lathe_is_an_open_tube_with_a_printable_wall():
-    tube = _solid({"kind": "lathe", "profile": [[0, 5, 4], [10, 5, 4]]}, scale=100)
-    assert tube.volume() == pytest.approx(math.pi * 9 * 10, rel=.02) and tube.genus() == 1
-    record = landmark_parts.read(_pack({"kind": "lathe", "profile": [[0, 5, 4.9], [10, 5, 4.9]]}), REFS)[0][0]
-    wall = m3.Manifold.batch_boolean(record["_build"](1., []), m3.OpType.Add)
-    assert wall.volume() == pytest.approx(math.pi * (25 - 3.8 ** 2) * 10, rel=.02)
-    bowl = _solid({"kind": "lathe", "profile": [[0, 5, 0], [10, 5, 4]]}, scale=100)
-    assert bowl.genus() == 0 and bowl.volume() < math.pi * 25 * 10
+def test_a_beam_whose_thin_end_is_widened_says_so():
+    beam = {"kind": "beam", "path": [[0, 0, 0], [0, 0, 10]], "size": [[4, 4], [.2, .2]]}
+    for part, widened in ((beam, True), ({**beam, "size": [[4, 4], [2, 2]]}, False)):
+        record = landmark_parts.read(_pack(part), REFS)[0][0]
+        record["_build"](1., [])
+        assert ("print_modifications" in record) is widened
+
+
+def test_a_finer_minimum_keeps_a_roof_in_print_millimetres():
+    roof = {"kind": "prism", "rect": [9, 9], "to": 9, "roof": "pyramidal", "roof_rise": 6}
+    fine = _solid({**roof, "least": .8}, scale=2.)
+    assert fine.volume() == pytest.approx(_solid(roof, scale=2.).volume(), rel=1e-6)
 
 
 def test_a_slender_part_may_ask_for_a_finer_minimum():
@@ -315,8 +319,6 @@ def test_a_slender_part_may_ask_for_a_finer_minimum():
 
 @pytest.mark.parametrize("part, says", [
     ({**BLOCK, "least": .5}, "least must be 0.8 to 1.2 mm"),
-    ({"kind": "lathe", "profile": [[0, 5, 5], [10, 5, 4]]}, "inner radius"),
-    ({"kind": "lathe", "profile": [[0, 5, 4], [10, 5]]}, "3 numbers"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5], [0, 0, 9]], "size": [[1, 1], [2, 2]]}, "one for each point"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 5]], "size": [1, 1], "round": 1}, "round must be"),
 ])
@@ -340,3 +342,20 @@ def test_a_build_stands_on_the_packs_plinth_and_keeps_a_foot_past_it(build):
     assert (x1 - x0, y1 - y0) == pytest.approx((40 * scale, 60 * scale), abs=.05) and scale == pytest.approx(100 / 60, rel=.01)
     man, _, scale, _ = build(_pack(BLOCK, {**BLOCK, "at": [0, 50]}, replace="all", plinth={"rect": [40, 60]}))
     assert man.slice(1.).bounds()[3] == pytest.approx(53 * scale, abs=1) and len(man.decompose()) == 1
+
+
+def test_a_plinths_guess_is_noted_and_its_source_kept(build):
+    asked = {"rect": [40, 60], "guess": "wide enough for the lawn", "source": "https://example.org/lawn"}
+    _, refs, *_ = build(_pack(BLOCK, replace="all", plinth=asked))
+    assert "Guessed the base's outline: wide enough for the lawn." in refs["modeling_additions"]
+    assert "https://example.org/lawn" in json.dumps(refs)
+    with pytest.raises(landmark_refs.LandmarkProblem, match="Reference plinth: guess"):
+        landmark_parts.plinth(_pack(BLOCK, plinth={"rect": [4, 4], "guess": ""}), REFS)
+
+
+def test_a_lattice_tower_refuses_a_plinth(build, monkeypatch):
+    facts = ("deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m")
+    monkeypatch.setattr("smoothstone.landmark_style.style_keys", lambda styles: {"steel"})
+    pack = {**_pack(BLOCK, plinth={"rect": [40, 60]}), **{f: {"source": SOURCE, "value": 5} for f in facts}}
+    with pytest.raises(landmark_refs.LandmarkProblem, match="Leave plinth out"):
+        build(pack, parts=[(1, 20)])

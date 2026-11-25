@@ -87,6 +87,7 @@ def _prism(part):
     _need((roof == "flat") == (rise == 0), "a roof needs roof_rise, and a flat roof has none")
     scale = _number(part.get("top_scale", 1), "top_scale", 0)
     shift = _vector(part.get("top_shift", [0, 0]), "top_shift")
+    least_mm = _number(part.get("least", THIN), "least")
 
     def build(floor, notes):
         from .landmark import _roof
@@ -105,7 +106,7 @@ def _prism(part):
             top = body.translate((-mid).tolist()).scale([s, s]).translate((mid + shift).tolist())
         if rise:
             over = min(.02, rise / 4)
-            mm = THIN / floor if floor else 1.  # roofs are lofted in print millimetres
+            mm = least_mm / floor if floor else 1.  # roofs are lofted in print millimetres
             loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {"roof:direction": "0"} if roof == "skillion" else {}},
                          (eave - over) * mm, (rise + over) * mm, notes)
             solids.append(loft.scale([1 / mm] * 3))
@@ -132,28 +133,16 @@ def _wide(cs, floor):
 def _lathe(part):
     import manifold3d as m3
 
-    given = part.get("profile")
-    hollow = isinstance(given, list) and bool(given) and isinstance(given[0], list) and len(given[0]) == 3
-    profile = _points(given, "profile", 3 if hollow else 2, 2)
-    z, r = profile[:, 0], profile[:, 1]
-    bore = profile[:, 2] if hollow else np.zeros(len(z))
+    profile = _points(part.get("profile"), "profile", 2, 2)
+    z, r = profile.T
     _need((np.diff(z) > 0).all(), "profile must rise")
     _need((r >= 0).all() and r.max() > 0, "profile needs a radius above 0, and none below")
-    _need((bore >= 0).all() and (bore[r > 0] < r[r > 0]).all() and (bore[r == 0] == 0).all(),
-          "profile's inner radius must be 0 or more and less than its radius")
 
     def build(floor, notes):
         wide = np.maximum(r, floor / 2)
         foot = min(z[0], z[-1] - floor)
-        hole = np.maximum(np.minimum(bore, wide - floor), 0)  # the wall prints too
-        outer = [[0, foot], [wide[0], foot], *np.c_[wide, z][int(foot == z[0]):].tolist(), [0, z[-1]]]
-        solid = m3.CrossSection([outer]).revolve(64)
-        if hole.max() > 0:
-            # the bore runs on past an open end, so no film is left over it
-            low, high = ([[hole[0], foot - 1]] if hole[0] else []), ([[hole[-1], z[-1] + 1]] if hole[-1] else [])
-            edge = [*low, *np.c_[hole, z].tolist(), *high]
-            solid = solid - m3.CrossSection([[[0, edge[0][1]], *edge, [0, edge[-1][1]]]]).revolve(64)
-        return [solid]
+        ring = [[0, foot], [wide[0], foot], *np.c_[wide, z][int(foot == z[0]):].tolist(), [0, z[-1]]]
+        return [m3.CrossSection([ring]).revolve(64)]
     return build, z[0], z[-1], 0, "flat"
 
 
@@ -263,8 +252,11 @@ def plinth(pack, refs):
     try:
         spec = fact["plinth"]
         _need(isinstance(spec, dict), "it must be an object")
-        unknown = set(spec) - {*PLANS, "at", "turn"}
+        unknown = set(spec) - {*PLANS, "at", "turn", "source", "guess"}
         _need(not unknown, f"it has no field {', '.join(sorted(unknown))}")
+        guess, source = spec.get("guess"), spec.get("source", fact["source"])
+        _need(guess is None or isinstance(guess, str) and guess.strip(), "guess must say how it was chosen")
+        _need(isinstance(source, str) and source.startswith(("http://", "https://")), "source must be a URL")
         cs = _plan(spec)
         here = np.c_[_turned(_number(spec.get("turn", 0), "turn")), _vector(spec.get("at", [0, 0]), "at")]
         lat, lon = _vector(fact["origin"], "origin")
@@ -322,10 +314,12 @@ def read(pack, refs):
 
                 record = {}
 
-                def make(scale, notes, flat=flat, build=build, plain=outline, record=record, least=least):
+                def make(scale, notes, flat=flat, build=build, plain=outline, record=record, least=least, kind=kind):
                     solids = build(least / scale, notes)
                     grown = m3.Manifold.batch_boolean(solids, m3.OpType.Add)
-                    if np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01:
+                    # a beam's thin end may widen inside the box of its thick one
+                    if (np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01
+                            or kind == "beam" and grown.volume() > 1.01 * plain.volume()):
                         record["print_modifications"] = [f"Widened to {least:g} mm."]
                     return _place(solids, flat, scale)
                 def hole(scale, floor=0., flat=flat, build=build):
