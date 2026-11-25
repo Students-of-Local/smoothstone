@@ -1156,10 +1156,13 @@ def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, m
     text, asked = run("models", "Taj Mahal")
     question = "o open model of Taj Mahal prints, and the map has it only as one plain shape, like a box or a cylinder, " \
                "without its real form. Print that plain shape?"
-    assert asked == f'NEXT: ask the person: n{question} When they answer: stone note "<their answer>"'
+    assert asked == f'NEXT: ask the person: n{question}'
     assert f'Reply with just this and no tool call: "N{question}"' in text
     text, last = run(*plain)
     assert "has not said yes" in text and last == asked  # LFM3-1.7B built it unasked, and called it the real form
+    for other in (["show", "panel"], ["show", "panel"], ["build"], ["recipes"]):  # it made a faceplate of the lighthouse
+        text, last = run(*other)
+        assert "waits on the person" in text and last == asked and "twice" not in text
     assert run("note", "how tall would it be?")[1] == asked
     assert "Do you have a model file" in run("note", "no thanks")[1]
     assert run("models", "Taj Mahal")[1] == asked
@@ -1169,6 +1172,8 @@ def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, m
     assert "NOTE, tell the person: the map has Taj Mahal as one plain shape" in text and "Part ready" in text
     assert "Size: 120 mm" in text
     assert run("models", "Taj Mahal")[1].startswith("NEXT: ask the person")
+    run("note", "make a blank panel instead")
+    assert "waits on the person" not in run("show", "panel")[0]  # their own words may ask for another part
 
 
 def test_a_plain_shape_after_the_models_is_not_sent_back_to_them(recorded, monkeypatch, jobenv):

@@ -69,7 +69,7 @@ class Out:
         body = [ln for ln in self.lines if ln is not None]
         reply = []
         if self.next.startswith(LANDMARK_ASK):  # a small model loses the thread working out how to ask
-            said = self.next.removeprefix("ask the person: ").removesuffix(THEN_NOTE)
+            said = self.next.removeprefix("ask the person: ")
             reply = [f'Reply with just this and no tool call: "{said[0].upper()}{said[1:]}"']
         room = MAX_LINES - 1 - len(reply)
         passes = [ln for ln in body if ln.startswith("PASS ")]
@@ -1918,6 +1918,8 @@ def cmd_note(args, job: Job) -> Out:
         return out
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
+    if asked.startswith(LANDMARK_ASK):
+        job.update(landmark_said=asked)  # an answer in their own words: the job may move to another part
     if asked.startswith("ask the person") and st.get("ask_product"):
         # the answer is the product's size: it is kept as a note, never read into the request as a part size
         return note_product(out, job, st, text)
@@ -2276,17 +2278,17 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
 
 
 LANDMARK_ASK = "ask the person: no open model of "
-THEN_NOTE = ' When they answer: stone note "<their answer>"'
+MAKERS = ("recipes", "show", "set", "build", "product", "image")  # commands that make some other part
 
 
 def _ask_plain(subject: str) -> str:
     return (f"{LANDMARK_ASK}{subject} prints, and the map has it only as one plain shape, like a box or a cylinder, "
-            f"without its real form. Print that plain shape?{THEN_NOTE}")
+            f"without its real form. Print that plain shape?")
 
 
 def _ask_file(subject: str) -> str:
     return (f"{LANDMARK_ASK}{subject} prints, and the map gives no printable shape of it. "
-            f"Do you have a model file, or another name?{THEN_NOTE}")
+            f"Do you have a model file, or another name?")
 
 
 def _landmark_fallback(job: Job, subject: str) -> str:
@@ -2342,7 +2344,7 @@ def cmd_landmark(args, job: Job) -> Out:
     st = job.status()
     waits = st.get("landmark_plain") or {}
     if args.plain and waits and not waits.get("yes") and waits["subject"].casefold() == subject.casefold():
-        out.fix("the person has not said yes to the plain shape")
+        out.fix('the person has not said yes to the plain shape; when they do: stone note "<their answer>"')
         out.next = (_ask_plain(subject) if str(st.get("models_out") or "").casefold() == subject.casefold()
                     else _landmark_command("stone models", subject))
         out.result = "plain shape refused: not asked"
@@ -3695,7 +3697,14 @@ def run(argv: list[str]) -> tuple[str, int]:
         cmd = args.cmd
         job = Job(config.job_dir(getattr(args, "job", None) or args.job_top))
         catalog.use_job(job.root)
-        out = COMMANDS[cmd](args, job)
+        st = job.status() if job.exists() else {}
+        asked = str(st.get("next", ""))
+        if cmd in MAKERS and asked.startswith(LANDMARK_ASK) and st.get("landmark_said") != asked:
+            out = Out(owns_next=False)  # LFM3-1.7B made a faceplate instead of asking about a lighthouse
+            out.fix('stone waits on the person, not another part; when they answer: stone note "<their answer>"')
+            out.next = asked
+        else:
+            out = COMMANDS[cmd](args, job)
     except UsageError as e:
         out = Out()
         out.fix(f"{e}; commands: status new recipes show set build check image measure colors done")
