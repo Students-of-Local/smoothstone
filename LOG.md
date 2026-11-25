@@ -1405,4 +1405,5 @@ fresh ones: "NEXT: none. Your reply to the user is: ..." with the search lines l
 in 20 of 32. The ten runs with it: 10 of 10. Adding
 "After the person answers (not before): stone note ..." below it, as stone's other questions have, asked in 29 of 32 again.
 It is there because larger models need it, not for a gain: noting the answer is still the gap. Given the person's yes or
-no, the 1.7B model noted it in 0 of 24 replays without that line and 2 of 24 with it. At temperature 0.1 five seeds are close to one sample.
+no, the 1.7B model noted it in 0 of 24 replays without that line and 2 of 24 with it. The ten runs on the code with that
+line and every review fix: 8 of 10 (the 10 of 10 was before them); both misses thought past the cut. At temperature 0.1 five seeds are close to one sample.
