@@ -1188,3 +1188,18 @@ already did (its `plinth_follows_plan` fact is gone). The Eiffel Tower's four fe
 
 One judged build each on the new base: Cologne 9, Taj 9, St Paul's 9 (was 8), Westminster 9, St. Vitus 8, all passing, and
 the judge no longer mentions St. Vitus's base. The other four graded bases are unchanged.
+
+### 2026-11-24: which mapped thing is the landmark
+
+- A castle, fort or bridge that Wikidata ties to a map area, not a building, is every part and building on it. Windsor
+  Castle was its Round Tower; Edinburgh Castle, Tower Bridge and the Alhambra were refused. Windsor, with 13% of its
+  ground measured, is now refused too. A building that bears the landmark's whole name is still the landmark.
+- A site past the map search is searched again, up to 1 km.
+- Overpass is asked for the landmark's own area; it answered with buildings alone. A dome on a castle keeps its walls.
+- A tower, obelisk, dome, cone or pyramid with its own height and no parts is its own part; a gabled box is not. An
+  obelisk tapers to 63%, guessed.
+- A statue is refused as one.
+- A bridge whose mapped parts cover under half of its area is refused. The Golden Gate Bridge (2%) was its two towers.
+- Where the parts that stand on the ground cover under half of a building and rise above the outline's own height, the
+  outline is a part too. The Dome of the Rock was its dome with no octagon, and Angkor Wat's galleries stood in the air.
+  Of 50 saved maps this changes those two and the Flatiron Building, and none that is graded.

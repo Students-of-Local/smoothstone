@@ -303,6 +303,66 @@ def _join(segments):
     return rings
 
 
+WHOLE = ('pyramidal', 'cone', 'dome', 'onion')  # a roof that can be the shape of the whole; a gable is not a cathedral
+UPRIGHT = ('obelisk', 'tower', 'chimney', 'lighthouse', 'column', 'water_tower')
+
+
+def _own(el, refs):
+    """Wikidata names this map object, or it names the Wikidata item."""
+    wanted = refs.get('osm_way' if el['type'] == 'way' else 'osm_relation')
+    return str(el['id']) == str(wanted) or bool(refs.get('id')) and el.get('tags', {}).get('wikidata') == refs['id']
+
+
+def _is_site(tags):
+    """A castle, fort or bridge mapped as an area and not as one building."""
+    return not ('building' in tags or 'building:part' in tags) and (
+        tags.get('historic') in ('castle', 'fort', 'citadel') or tags.get('man_made') == 'bridge')
+
+
+def _named(tags, refs):
+    """A building that carries the landmark's whole name is the landmark."""
+    words = set(re.findall(r'\w+', (refs.get('label') or '').casefold()))
+    return bool(words) and words <= set(re.findall(r'\w+', tags.get('name', '').casefold()))
+
+
+def _share(parts, boundary):
+    """The share of an outline's ground that has a part over it."""
+    import manifold3d as m3
+    from .landmark import _section
+    ground = _section(boundary)
+    if ground.is_empty() or not parts:
+        return 0
+    over = m3.CrossSection.batch_boolean([_section(p['footprint']) for p in parts], m3.OpType.Add)
+    return (over ^ ground).area() / ground.area()
+
+
+def _body(selected, parts, boundary):
+    """The outline, where its own height is the walls around a mapped dome or tower."""
+    from .landmark import length
+    walls = length(selected['tags'].get('height'))
+    tops = [length(p['tags'].get('height')) or 0 for p in parts]
+    standing = [p for p in parts if not length(p['tags'].get('min_height')) and not length(p['tags'].get('building:min_level'))]
+    return [selected] if walls and max(tops, default=0) > walls and _share(standing, boundary) < .5 else []
+
+
+def _site(site, candidates, pieces, data):
+    """Every part on a site, and each building there that is not mapped in parts."""
+    def on(item, boundary):
+        point = _centroid(item['footprint'][0])
+        return _inside(point, boundary[0]) and not any(_inside(point, h) for h in boundary[1:])
+
+    boundary = site['footprint']
+    buildings = [c for c in candidates if on(c, boundary)]
+    areas = [boundary, *(b['footprint'] for b in buildings)]
+    parts = [p for p in pieces if any(on(p, a) for a in areas)]
+    mapped = list(parts)
+    for b in buildings:
+        own = [p for p in mapped if on(p, b['footprint'])]
+        parts += _body(b, own, b['footprint']) if own else [b]
+    return {'outline': [], 'site': boundary, 'parts': parts, 'source': site['source'], 'tags': site['tags'],
+            'linked_towers': [], 'response_url': data.get('_smoothstone_response_url', OVERPASS)}
+
+
 def parse_osm(data: dict, refs: dict) -> dict:
     """Project ways and multipolygon relations; keep parts within the chosen outline."""
     lat0, lon0 = refs['latitude'], refs['longitude']
@@ -317,12 +377,16 @@ def parse_osm(data: dict, refs: dict) -> dict:
         outer = _join([[project(p) for p in m.get('geometry', [])] for m in members if m.get('role') in ('outer', '')])
         inner = _join([[project(p) for p in m.get('geometry', [])] for m in members if m.get('role') == 'inner'])
         return [[ring] + [hole for hole in inner if _inside(_centroid(hole), ring)] for ring in outer]
-    candidates, pieces = [], []
+    candidates, pieces, sites = [], [], []
     for el in data.get('elements', []):
         if el.get('type') not in ('way', 'relation'):
             continue
         tags = el.get('tags', {})
-        if not ('building' in tags or 'building:part' in tags):
+        own = _own(el, refs)
+        if own and (tags.get('artwork_type') in ('statue', 'sculpture', 'bust') or tags.get('monument') == 'statue'):
+            raise LandmarkProblem('A statue is a sculpture, and building maps do not have its shape.')
+        site = own and _is_site(tags)
+        if not (site or 'building' in tags or 'building:part' in tags):
             continue
         # A room, or anything under the ground, has no outside to model.
         if tags.get('indoor', 'no') != 'no' or 'room' in tags or tags.get('location') == 'underground':
@@ -331,6 +395,8 @@ def parse_osm(data: dict, refs: dict) -> dict:
             item = {'id': el['id'], 'type': el['type'], 'footprint': poly, 'tags': tags,
                     'source': f"https://www.openstreetmap.org/{el['type']}/{el['id']}"}
             is_part = tags.get('building:part', 'no') != 'no'
+            if site:
+                sites.append(item)
             if is_part:
                 pieces.append(item)
             if tags.get('building', 'no') != 'no' and not is_part:
@@ -348,11 +414,19 @@ def parse_osm(data: dict, refs: dict) -> dict:
                       not any(_inside((0, 0), h) for h in c['footprint'][1:])]
         if containing:
             selected = min(containing, key=lambda c: _area(c['footprint'][0]))
+        # A castle is all of its buildings, not the tower that happens to stand at its coordinates.
+        if sites and not (selected and _named(selected['tags'], refs)):
+            return _site(max(sites, key=lambda c: _area(c['footprint'][0])), candidates, pieces, data)
     if selected is None:
         raise LandmarkProblem('OpenStreetMap has no building outline containing the coordinates.')
     boundary = selected['footprint']
     parts = [p for p in pieces if _inside(_centroid(p['footprint'][0]), boundary[0]) and
              not any(_inside(_centroid(p['footprint'][0]), h) for h in boundary[1:])]
+    parts += _body(selected, parts, boundary)
+    form = selected['tags']
+    if not parts and form.get('height') and (
+            form.get('roof:shape') in WHOLE or form.get('man_made') in UPRIGHT or form.get('building') == 'tower'):
+        parts = [selected]  # an obelisk or a tower is its own one part
     components = set(_item_ids(refs.get('wikidata_raw', {}), 'P527'))
     linked_towers = [c for c in candidates if c is not selected
                      and c['tags'].get('wikidata') in components
@@ -389,7 +463,7 @@ def load_pack(name, path=None, *, label=None):
     return facts
 
 
-def _map_as_overpass(data):
+def _map_as_overpass(data, refs):
     """Convert the OSM map API's node references into Overpass out geom."""
     elements = data.get('elements', [])
     nodes = {e['id']: e for e in elements if e.get('type') == 'node'}
@@ -405,7 +479,8 @@ def _map_as_overpass(data):
     for e in elements:
         if e.get('type') not in ('way', 'relation'):
             continue
-        if not any(k in e.get('tags', {}) for k in ('building', 'building:part')):
+        if not any(k in e.get('tags', {}) for k in ('building', 'building:part')) \
+                and not _own(e, refs):
             continue
         result = {k: v for k, v in e.items() if k in ('type', 'id', 'tags')}
         if e['type'] == 'way':
@@ -431,21 +506,24 @@ def _write_atomic(path: Path, content: str):
             os.unlink(name)
 
 
-def fetch(refs: dict, job_root: Path) -> dict:
-    """Fetch and cache OSM responses in the job and shared cache."""
+def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
+    """Fetch and cache OSM responses in the job and shared cache, again when a site reaches past the search."""
     lat, lon = refs['latitude'], refs['longitude']
     # The radius includes half the known span and is capped to bound public requests.
     span = max(refs.get('length') or 0, refs.get('width') or 0)
-    radius = min(1000, max(220, math.ceil(span * 0.6)))
+    radius = min(1000, max(220, math.ceil(span * 0.6), math.ceil(reach)))
     nearby = ''.join(f'{kind}["{tag}"](around:{radius},{lat},{lon});'
                      for tag in ('building', 'building:part') for kind in ('way', 'relation'))
     explicit = ''
+    if re.fullmatch(r'Q\d+', refs.get('id') or ''):
+        # `around` measures to the line of an area, and a castle's line can be far from its middle.
+        explicit += ''.join(f'{kind}["wikidata"="{refs["id"]}"](around:1000,{lat},{lon});' for kind in ('way', 'relation'))
     for kind, key_name in (('way', 'osm_way'), ('relation', 'osm_relation')):
         identifier = str(refs.get(key_name) or '')
         if identifier.isdecimal():
             explicit += f'{kind}({identifier});'
     query = f'[out:json][timeout:40];({nearby}{explicit});out geom;'
-    key = hashlib.sha256(query.encode()).hexdigest()
+    key = hashlib.sha256(('2 ' + query).encode()).hexdigest()  # 2: the map answer keeps sites
     cache = Path.home() / '.cache' / 'smoothstone' / 'osm' / (key + '.json')
     raw_cache = cache.parent / (key + '-map.json')
     overpass_cache = cache.parent / (key + '-overpass.json')
@@ -478,12 +556,20 @@ def fetch(refs: dict, job_root: Path) -> dict:
                 raw_text = json.dumps(raw, ensure_ascii=False)
                 _write_atomic(ref_dir / 'osm-map.json', raw_text)
                 _write_atomic(raw_cache, raw_text)
-                data = _map_as_overpass(raw)
+                data = _map_as_overpass(raw, refs)
                 data['_smoothstone_response_url'] = url
                 data['_smoothstone_query'] = query
             _write_atomic(cache, json.dumps(data, ensure_ascii=False))
         _write_atomic(job_cache, json.dumps(data, ensure_ascii=False))
-        return parse_osm(data, refs)
+        parsed = parse_osm(data, refs)
+        far = max((math.hypot(*point) for point in parsed.get('site', [[]])[0]), default=0)
+        if far > 1000:
+            raise LandmarkProblem('The landmark reaches more than 1 km from its coordinates.')
+        if far > radius:
+            return fetch(refs, job_root, far)
+        if parsed.get('site') and parsed['tags'].get('man_made') == 'bridge' and _share(parsed['parts'], parsed['site']) < .5:
+            raise LandmarkProblem('The map has the place of this bridge, and not the shape of its deck.')
+        return parsed
     except LandmarkProblem:
         raise
     except (OSError, ValueError, KeyError, TypeError) as exc:
