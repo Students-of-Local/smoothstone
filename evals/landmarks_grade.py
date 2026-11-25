@@ -41,7 +41,9 @@ def credits_why(job: Path, refs: dict) -> list[str]:
     except OSError:
         return ["no landmark credits.txt"]
     why = []
-    if "openstreetmap contributors" not in text.casefold() or "odbl" not in text.casefold():
+    drawn_from = {refs.get("geometry_source"), *(p.get("source") for p in refs.get("parts", []))}
+    mapped = not refs.get("parts") or any(_domain(u, "openstreetmap.org") for u in drawn_from)
+    if mapped and ("openstreetmap contributors" not in text.casefold() or "odbl" not in text.casefold()):
         why.append("credits must name OpenStreetMap contributors and ODbL")
     urls = {refs.get("source"), refs.get("wikipedia_url"), *refs.get("sources", {}).values(),
             *refs.get("feature_sources", [])}

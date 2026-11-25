@@ -240,6 +240,8 @@ def test_an_openings_source_and_guess_are_kept_and_the_map_is_not_credited(build
     _, refs, _, _ = build(_pack(BLOCK, hole, replace="all"))
     credits = (tmp_path / "job/model/credits.txt").read_text()
     assert "OpenStreetMap" not in credits and SOURCE + "/door" in credits
+    build(_pack({**BLOCK, "source": "https://www.openstreetmap.org/way/7"}, replace="all"))
+    assert "OpenStreetMap" in (tmp_path / "job/model/credits.txt").read_text()  # one part is traced from the map
     assert any("a door" in note for note in refs["modeling_additions"])
 
 
@@ -380,11 +382,13 @@ SHIPPED = sorted(p for p in Path(landmark_refs.__file__).with_name("landmarks").
 def test_a_shipped_pack_s_parts_make_one_body_at_a_small_print(path):
     pack = json.loads(path.read_text())
     lat, lon = pack["parts"]["origin"]
-    records, _, _ = landmark_parts.read(pack, {"latitude": lat, "longitude": lon})
+    refs = {"latitude": lat, "longitude": lon}
+    records, _, _ = landmark_parts.read(pack, refs)
+    ground = landmark_parts.plinth(pack, refs)
     tall = max(r["height"]["metres"] for r in records)
     wide = max(abs(v) for r in records for ring in r["footprint"] for point in ring for v in point)
     scale = 150 / max(tall, 2 * wide)
     solid = m3.Manifold.batch_boolean([s for r in records for s in r["_build"](scale, [])], m3.OpType.Add)
-    base = solid.project().extrude(2).translate([0, 0, -1.98])
-    assert len((solid + base).decompose()) == 1
+    base = (solid.project() if ground is None else ground.scale([scale, scale])).extrude(2).translate([0, 0, -1.98])
+    assert sum(d.volume() > 1e-3 for d in (solid + base).decompose()) == 1  # less is a sliver of the join
     assert all(r["source"].startswith("http") for r in records)

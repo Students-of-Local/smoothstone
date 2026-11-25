@@ -842,11 +842,11 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     refs.update(parts=records, target=target, scale_mm_per_metre=scale, detail=chosen,
                 modeling_additions=list(dict.fromkeys(notes)), size_mm=mesh.extents.tolist(), plinth_height_mm=2)
     save()
-    osm = replace != "all"
-    credits = ("© OpenStreetMap contributors. Building geometry: ODbL 1.0, https://www.openstreetmap.org/copyright\n" if osm
-               else "Geometry drawn from the sources below.\n")
     urls = {refs["source"], refs["geometry_source"], *refs["sources"].values(),
             *refs["feature_sources"], *(p["source"] for p in records)}
+    osm = replace != "all" or any("openstreetmap.org/" in (url or "") for url in urls)
+    credits = ("© OpenStreetMap contributors. Building geometry: ODbL 1.0, https://www.openstreetmap.org/copyright\n" if osm
+               else "Geometry drawn from the sources below.\n")
     credits += "\n".join(sorted(url for url in urls if url)) + "\n"
     credits_path = md / "credits.txt"
     credits_path.write_text(credits)
