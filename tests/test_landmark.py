@@ -1170,6 +1170,7 @@ def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, m
     assert run("note", "how tall would it be?")[1] == asked
     # the question is no answer to itself, and a yes or no with more in it is asked back
     assert run("note", "No open model of Taj Mahal prints, and the map has it only as one plain shape")[1] == asked
+    assert run("note", "No model of Taj Mahal prints and the map has it only as one plain shape")[1] == asked
     assert run("note", "Print that plain shape")[1] == asked and run(*plain)[1] == asked
     for unclear in ("12 cm tall", "OK, don't print it", "I want to make a box", "Sure, why not"):
         text, last = run("note", unclear)
@@ -1249,7 +1250,7 @@ def test_a_no_to_both_questions_ends_in_another_part(recorded, monkeypatch, jobe
 
 @pytest.mark.parametrize("text,meant", [
     ("yes", "yes"), ("Yes, print that plain shape.", "yes"), ("User said yes", "yes"), ("Sure, go ahead", "yes"),
-    ("yes, 12 cm tall", "yes"), ("no thanks", "no"), ("No, don't print that plain shape", "no"),
+    ("yes, 12 cm tall", "yes"), ("no thanks", "no"), ("No.", "no"), ("No model of it prints", ""), ("No, don't print that plain shape", "no"),
     ("print that plain shape", ""), ("OK, don't print it", ""), ("Okay, no", ""), ("Sure, why not", ""),
     ("Yes I have a model file, not the plain shape", ""), ("OK, how tall would it be?", ""), ("12 cm tall", ""),
     ("Fine detail matters to me", ""), ("yes, lighthouse.stl", ""), ("a box", ""), ("", "")])

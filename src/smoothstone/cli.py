@@ -1890,6 +1890,7 @@ SIZED = re.compile(r"\d+(?:\.\d+)?\s*(?:mm|cm|m|in|inch|inches)\b", re.I)
 FILE = re.compile(r"[^\s\"']+\.(?:stl|3mf|obj|step|stp|glb|ply)\b", re.I)
 MAKE = re.compile(r"^\W*(?:no\b\W*)?(?:(?:please|just|can you)\s+)?(?=(?:make|build|design|create)\b)", re.I)
 LEAD = re.compile(r"^\W*(?:(?:yes|try|use|maybe|it'?s|it is|called|the name is)\b\W*)+", re.I)
+NO = re.compile(r"\W*(?:no|nope)\s*(?:$|[,.!;:]|(?:thanks|thank you|please|don['\u2019]?t|do not)\b)", re.I)  # not "No model of it"
 WHERE = "ask the person: where is that file on this computer?"
 INSTEAD = "ask the person: what should I make instead?"
 
@@ -1899,7 +1900,7 @@ def says(text: str) -> str:
     words = re.findall(r"[a-z']+", SIZED.sub("", text).lower().replace("\u2019", "'"))
     if "?" in text or not words:
         return ""
-    return "yes" if set(words) & AGREE and set(words) <= AGREED else "no" if words[0] in ("no", "nope") else ""
+    return "yes" if set(words) & AGREE and set(words) <= AGREED else "no" if NO.match(text) else ""
 
 
 def note_landmark(out: Out, job: Job, asked: str, plain: dict, text: str) -> Out:
@@ -1953,7 +1954,7 @@ def cmd_note(args, job: Job) -> Out:
         # a set with sizes sent the model here: the job still waits on the person's answer to this question
         asked = f"ask the person: {match.product_size_question(st['ask_product'], bool(st.get('ask_round')))}"
     # "yes, print that plain shape" repeats the question's words, and so does "no, don't print that plain shape"
-    mine = asked.startswith(LANDMARK_ASK) and says(text) and not text.lower().startswith("no open model")
+    mine = asked.startswith(LANDMARK_ASK) and says(text)
     if asked.startswith("ask the person") and not mine and is_the_question(text, asked):
         out.fix("that is your question, not the person's answer; write the question as your reply and stop")
         out.add("Note only what the person says back.")
