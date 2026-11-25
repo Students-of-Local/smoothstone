@@ -573,7 +573,7 @@ def test_landmark_without_parts_routes_to_models_and_does_not_loop(jobenv, monke
     monkeypatch.setitem(sys.modules, "smoothstone.landmark", module)
     text, code, nxt = stone("landmark", "Cologne Cathedral")
     assert code == 1 and "FIX: no 3D building parts found" in text
-    assert nxt == "stone models 'Cologne Cathedral'"
+    assert nxt == "stone models 'Cologne Cathedral'" and "landmarks.md" not in text
     found = {
         "subject": "Cologne Cathedral", "names": {"kind": "building", "label": "Cologne Cathedral"},
         "terms": [], "kept": [], "left_out": [],
@@ -583,6 +583,17 @@ def test_landmark_without_parts_routes_to_models_and_does_not_loop(jobenv, monke
     monkeypatch.setattr(models, "search", lambda *args: found)
     text, code, nxt = stone("models", "Cologne Cathedral")
     assert code == 1 and nxt.startswith("ask the person:"), text
+
+
+def test_a_refused_landmark_tells_a_large_model_it_may_write_the_shapes(jobenv, monkeypatch):
+    from smoothstone import landmark
+
+    def generate(*args):
+        raise landmark.LandmarkProblem("no 3D building parts found")
+    monkeypatch.setattr(landmark, "generate", generate)
+    monkeypatch.setenv("STONE_TIER", "L")
+    text, code, nxt = stone("landmark", "Cologne Cathedral")
+    assert "stone landmark 'Cologne Cathedral' --refs pack.json" in text and nxt == "stone models 'Cologne Cathedral'"
 
 
 def test_landmark_done_reports_model_credits(jobenv):

@@ -58,10 +58,13 @@ left out. With your own photo, run `stone image <photo>` instead.
 Then stone build runs three local models (describe, style, lift) and the print checks. Run
 tools/figure/setup.sh once first.
 
-## Landmarks: found models
+## Landmarks
 
-No recipe makes a cathedral, so `stone recipes` sends a landmark request to
-`stone models "<landmark>"`. It looks the landmark up on Wikidata for its names, searches
+`stone landmark "<name>"` builds a landmark from the map and cited facts, with every number's source kept, and landmarks.md
+says what to do when the map does not hold it: a large model writes its missing shapes once from real sources
+(docs/REFERENCE_PARTS.md), and then the one command builds it for any model.
+
+To print a model someone made instead, run `stone models "<landmark>"`. It looks the landmark up on Wikidata for its names, searches
 Printables and Wikimedia Commons (and Sketchfab when STONE_SKETCHFAB_TOKEN holds your own key),
 leaves out what is not a model of it (keychains, lamps, maps, paid models, closed licenses) and
 lists the best five with author, license and popularity. `stone models --take <n>` downloads one,

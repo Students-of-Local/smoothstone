@@ -2306,6 +2306,9 @@ def cmd_landmark(args, job: Job) -> Out:
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
+        if config.tier(job.root) == "L":  # only a large model can write what the map lacks
+            out.add(f"Or write the shapes it lacks from cited sources (skill/landmarks.md) and build with "
+                    f"{_landmark_command('stone landmark', subject)} --refs pack.json")
         out.fix(str(e))
         out.next = _landmark_command("stone models", subject)
         out.stage = "landmark_failed"
