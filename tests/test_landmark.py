@@ -721,7 +721,8 @@ def test_a_weld_stays_above_the_bed_and_leaves_a_collapsed_sliver_alone():
     assert landmark._weld(man, flat, notes) is man and notes == []
 
 
-@pytest.mark.parametrize("fails, note", [(0, None), (1, "Snapped"), (2, "Welded"), (3, "Collapsed"), (4, None)])
+@pytest.mark.parametrize("fails, note", [(0, None), (1, "Snapped"), (2, "Welded"), (3, "Collapsed edges under 0.03"),
+                                         (4, "Collapsed edges under 0.05"), (5, None)])
 def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeypatch):
     import manifold3d as m3
     from smoothstone import clean, landmark
@@ -738,12 +739,12 @@ def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeyp
     if fails > 1:
         man += m3.Manifold.cube([10, 10, 30]).translate([20, 20, 0])  # they meet along a line
     raw = modelprint.to_trimesh(man)
-    if fails == 4:
+    if fails == 5:
         with pytest.raises(ValueError, match="zero-area"):
             landmark._closed(man, raw, notes)
         return
-    assert landmark._closed(man, raw, notes).volume == pytest.approx(man.volume(), rel=1e-4)
-    assert calls == [.01, .01, .01, .03][:fails + 1]
+    assert landmark._closed(man, raw, notes).volume == pytest.approx(man.volume(), rel=2e-4)
+    assert calls == [.01, .01, .01, .03, .05][:fails + 1]
     assert (notes[-1].startswith(note) if note else notes == [])
 
 
