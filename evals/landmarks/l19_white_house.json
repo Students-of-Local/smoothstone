@@ -1,0 +1,31 @@
+{
+  "id": "l19_white_house",
+  "request": "Print the White House for me, 16 cm wide.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "White House",
+      "size": {
+        "mode": "long",
+        "mm": 160
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 22.27,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "why": "Chimney heads, scaled from the west elevation's own level marks: 73 ft above the ground floor"
+      },
+      "dimensions": {
+        "length": 51.2,
+        "width": 51.7,
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "why": "168 ft long. The width runs from the north portico to the foot of the south stairs, scaled from the same HABS elevation; the published 152 ft leaves the stairs out."
+      }
+    }
+  },
+  "why": "Two porticoes that stand clear of the house, the bowed one with its stairs, balustrades and windows: the map had a block with steps in it."
+}

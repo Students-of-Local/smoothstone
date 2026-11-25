@@ -1,0 +1,31 @@
+{
+  "id": "l17_tower_bridge",
+  "request": "Make me a 3D print of Tower Bridge in London, 20 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Tower Bridge",
+      "size": {
+        "mode": "long",
+        "mm": 200
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 71.99,
+        "source": "https://www.towerbridge.org.uk/stories/top-facts-of-tower-bridge",
+        "why": "63 m above the road, which stands over the 29 ft 6 in of headway at high water (archiseek.com/building-the-tower-bridge-london). The road's own depth is not published."
+      },
+      "dimensions": {
+        "length": 286.512,
+        "width": 56.388,
+        "source": "https://en.wikipedia.org/wiki/Tower_Bridge",
+        "why": "940 ft with the abutments; the 185 ft piers are the widest thing on it."
+      }
+    }
+  },
+  "why": "The map's towers are blocks and its side spans are flat decks: the turrets, the walkways, the trussed chains and the piers come from the pack."
+}

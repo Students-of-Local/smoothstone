@@ -1,0 +1,3299 @@
+{
+  "expected_height_m": {
+    "value": 21.336,
+    "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+    "reason": "Roof measured from the south lawn. Chimney tops project above it."
+  },
+  "overall_plan_m": {
+    "value": [51.2, 26.1, 46.3296],
+    "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+    "reason": "Residence length, bare depth, and depth with both porticoes."
+  },
+  "parapet_height_m": {
+    "value": 18.288,
+    "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+    "reason": "Parapet height from the south lawn."
+  },
+  "south_portico_dimensions_m": {
+    "value": [18.5928, 3.9624],
+    "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+    "reason": "Width and approximate rise of the stairs above the south lawn."
+  },
+  "reference_alignment": {
+    "value": [38.89766, -77.036546, 0],
+    "source": "https://www.loc.gov/resource/hhh.dc0402.sheet/?fo=json&sp=1",
+    "guess": "Uses the coordinates in the HABS catalog. Approximates the nearly cardinal alignment shown on the site and floor plans with a zero-degree bearing."
+  },
+  "parts": {
+    "source": "https://www.loc.gov/pictures/item/dc0402/",
+    "origin": [38.89766, -77.036546],
+    "axis": 0,
+    "replace": "all",
+    "value": [
+      {
+        "kind": "prism",
+        "id": "ground-floor",
+        "from": 0,
+        "to": 4.17,
+        "rect": [51.2, 26.1],
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Uses the published 51.2 m by 26.1 m Residence body. The 4 m storey height follows the south elevation and the stair rise reported by the White House Historical Association."
+      },
+      {
+        "kind": "prism",
+        "id": "state-and-second-floors",
+        "from": 3.96,
+        "to": 15.48,
+        "rect": [51.2, 26.1],
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Uses the published Residence width and depth. The wall top is scaled against the south elevation below the cornice and published parapet height."
+      },
+      {
+        "kind": "prism",
+        "id": "south-oval-room-bow",
+        "from": 0,
+        "to": 15.48,
+        "ring": [
+          [-6.35, -11.9],
+          [6.35, -11.9],
+          [6.35, -12.95],
+          [6.228, -13.559],
+          [5.867, -14.144],
+          [5.28, -14.683],
+          [4.49, -15.156],
+          [3.528, -15.544],
+          [2.43, -15.833],
+          [1.239, -16.01],
+          [0.0, -16.07],
+          [-1.239, -16.01],
+          [-2.43, -15.833],
+          [-3.528, -15.544],
+          [-4.49, -15.156],
+          [-5.28, -14.683],
+          [-5.867, -14.144],
+          [-6.228, -13.559],
+          [-6.35, -12.95]
+        ],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the projecting oval rooms from the first-floor plan. Rounded the profile to an elliptical segment and buried its back in the main body."
+      },
+      {
+        "kind": "prism",
+        "id": "south-state-floor-stringcourse",
+        "from": 3.82,
+        "to": 4.23,
+        "rect": [51.35, 0.34],
+        "at": [0, -13.07],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Raised the top course of the rusticated south ground floor. The heights and projection are exaggerated just enough to read in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "west-and-east-stringcourse",
+        "from": 3.82,
+        "to": 4.23,
+        "rect": [0.34, 26.15],
+        "at": [25.55, 0],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Continued the ground-floor course around the two short sides at the apparent survey height."
+      },
+      {
+        "kind": "prism",
+        "id": "main-entablature-course-1",
+        "from": 14.88,
+        "to": 15.22,
+        "rect": [51.38, 26.32],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the stacked fascia bands from the north and south elevations. Thickened the shallow projections to survive at model scale."
+      },
+      {
+        "kind": "prism",
+        "id": "main-entablature-course-2",
+        "from": 15.15,
+        "to": 16.15,
+        "rect": [51.58, 26.46],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the stacked fascia bands from the north and south elevations. Thickened the shallow projections to survive at model scale."
+      },
+      {
+        "kind": "prism",
+        "id": "main-entablature-course-3",
+        "from": 16.06,
+        "to": 16.49,
+        "rect": [52.03, 26.81],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the stacked fascia bands from the north and south elevations. Thickened the shallow projections to survive at model scale."
+      },
+      {
+        "kind": "prism",
+        "id": "main-entablature-course-4",
+        "from": 16.38,
+        "to": 16.77,
+        "rect": [52.28, 27.12],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the stacked fascia bands from the north and south elevations. Thickened the shallow projections to survive at model scale."
+      },
+      {
+        "kind": "prism",
+        "id": "main-entablature-course-5",
+        "from": 16.68,
+        "to": 17.13,
+        "rect": [51.55, 26.39],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the stacked fascia bands from the north and south elevations. Thickened the shallow projections to survive at model scale."
+      },
+      {
+        "kind": "prism",
+        "id": "main-attic",
+        "from": 16.95,
+        "to": 21.336,
+        "rect": [44.4, 19.25],
+        "roof": "hipped",
+        "roof_rise": 1.46,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Set the attic behind the parapet using the upper setbacks in the elevations. The roof top uses the published 70 ft height from the south lawn."
+      },
+      {
+        "kind": "prism",
+        "id": "south-attic-bay",
+        "from": 17.07,
+        "to": 19.49,
+        "ring": [
+          [-4.7, -8.8],
+          [4.7, -8.8],
+          [4.7, -13.2],
+          [4.61, -13.795],
+          [4.342, -14.367],
+          [3.908, -14.894],
+          [3.323, -15.357],
+          [2.611, -15.736],
+          [1.799, -16.018],
+          [0.917, -16.191],
+          [0.0, -16.25],
+          [-0.917, -16.191],
+          [-1.799, -16.018],
+          [-2.611, -15.736],
+          [-3.323, -15.357],
+          [-3.908, -14.894],
+          [-4.342, -14.367],
+          [-4.61, -13.795],
+          [-4.7, -13.2]
+        ],
+        "roof": "hipped",
+        "roof_rise": 0.24,
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the low rounded attic projection above the curved roof balustrade in the south photograph. Lowered its cap after inspecting the first build against the photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-1",
+        "from": 18.48,
+        "to": 21.979999999999997,
+        "rect": [1.45, 1.71],
+        "at": [-12.7, 8.2],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-1",
+        "from": 21.81,
+        "to": 22.32,
+        "rect": [1.78, 2.02],
+        "at": [-12.7, 8.2],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-2",
+        "from": 18.48,
+        "to": 21.83,
+        "rect": [1.45, 1.71],
+        "at": [12.45, 8.15],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-2",
+        "from": 21.66,
+        "to": 22.17,
+        "rect": [1.78, 2.02],
+        "at": [12.45, 8.15],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-3",
+        "from": 18.48,
+        "to": 21.959999999999997,
+        "rect": [1.45, 1.71],
+        "at": [-6.6, 8.18],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-3",
+        "from": 21.79,
+        "to": 22.3,
+        "rect": [1.78, 2.02],
+        "at": [-6.6, 8.18],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-4",
+        "from": 18.48,
+        "to": 22.24,
+        "rect": [1.45, 1.71],
+        "at": [6.8, 8.1],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-4",
+        "from": 22.07,
+        "to": 22.580000000000002,
+        "rect": [1.78, 2.02],
+        "at": [6.8, 8.1],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-5",
+        "from": 18.48,
+        "to": 21.83,
+        "rect": [1.45, 1.71],
+        "at": [-12.65, -6.58],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-5",
+        "from": 21.66,
+        "to": 22.17,
+        "rect": [1.78, 2.02],
+        "at": [-12.65, -6.58],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-6",
+        "from": 18.48,
+        "to": 22.209999999999997,
+        "rect": [1.45, 1.71],
+        "at": [12.21, -6.65],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-6",
+        "from": 22.04,
+        "to": 22.55,
+        "rect": [1.78, 2.02],
+        "at": [12.21, -6.65],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-7",
+        "from": 18.48,
+        "to": 21.72,
+        "rect": [1.45, 1.71],
+        "at": [-4.76, -6.63],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-7",
+        "from": 21.55,
+        "to": 22.060000000000002,
+        "rect": [1.78, 2.02],
+        "at": [-4.76, -6.63],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-8",
+        "from": 18.48,
+        "to": 22.009999999999998,
+        "rect": [1.45, 1.71],
+        "at": [4.41, -6.65],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Located the roof stacks against the north and south elevations. Approximated the height and shoulder width of each stack."
+      },
+      {
+        "kind": "prism",
+        "id": "chimney-cap-8",
+        "from": 21.84,
+        "to": 22.35,
+        "rect": [1.78, 2.02],
+        "at": [4.41, -6.65],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the shallow projecting cap from the visible stack heads, with printable thickness."
+      },
+      {
+        "kind": "prism",
+        "id": "north-portico-landing",
+        "from": 0,
+        "to": 3.84,
+        "rect": [17.08, 11.96],
+        "at": [0.22, 18.65],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the porch from the first-floor survey. Retained the covered paving on the high north side and used solid fill up to the column bases."
+      },
+      {
+        "kind": "prism",
+        "id": "north-entry-step-1",
+        "from": 0,
+        "to": 2.52,
+        "rect": [16.45, 3.45],
+        "at": [0.22, 24.66],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the porch approach in elevation and consolidated the shallower steps for a clear printed edge."
+      },
+      {
+        "kind": "prism",
+        "id": "north-entry-step-2",
+        "from": 0,
+        "to": 2.851,
+        "rect": [15.99, 2.99],
+        "at": [0.22, 24.45],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the porch approach in elevation and consolidated the shallower steps for a clear printed edge."
+      },
+      {
+        "kind": "prism",
+        "id": "north-entry-step-3",
+        "from": 0,
+        "to": 3.182,
+        "rect": [15.53, 2.53],
+        "at": [0.22, 24.24],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the porch approach in elevation and consolidated the shallower steps for a clear printed edge."
+      },
+      {
+        "kind": "prism",
+        "id": "north-entry-step-4",
+        "from": 0,
+        "to": 3.513,
+        "rect": [15.07, 2.07],
+        "at": [0.22, 24.03],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the porch approach in elevation and consolidated the shallower steps for a clear printed edge."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-portico-west-column-1",
+        "at": [-6.68, 24.55],
+        "profile": [
+          [3.71, 0.66],
+          [3.99, 0.66],
+          [4.24, 0.53],
+          [4.45, 0.55],
+          [4.71, 0.47],
+          [12.7, 0.415],
+          [14.51, 0.37],
+          [14.68, 0.57],
+          [14.93, 0.57],
+          [15.13, 0.62]
+        ],
+        "copies": {
+          "row": [4.6, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the four front columns and the two return columns per side from the state-floor plan. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-portico-west-column-2",
+        "at": [-6.68, 20.17],
+        "profile": [
+          [3.71, 0.66],
+          [3.99, 0.66],
+          [4.24, 0.53],
+          [4.45, 0.55],
+          [4.71, 0.47],
+          [12.7, 0.415],
+          [14.51, 0.37],
+          [14.68, 0.57],
+          [14.93, 0.57],
+          [15.13, 0.62]
+        ],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the four front columns and the two return columns per side from the state-floor plan. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-portico-west-column-3",
+        "at": [-6.68, 17.2],
+        "profile": [
+          [3.71, 0.66],
+          [3.99, 0.66],
+          [4.24, 0.53],
+          [4.45, 0.55],
+          [4.71, 0.47],
+          [12.7, 0.415],
+          [14.51, 0.37],
+          [14.68, 0.57],
+          [14.93, 0.57],
+          [15.13, 0.62]
+        ],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the four front columns and the two return columns per side from the state-floor plan. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-portico-east-column-2",
+        "at": [7.12, 20.17],
+        "profile": [
+          [3.71, 0.66],
+          [3.99, 0.66],
+          [4.24, 0.53],
+          [4.45, 0.55],
+          [4.71, 0.47],
+          [12.7, 0.415],
+          [14.51, 0.37],
+          [14.68, 0.57],
+          [14.93, 0.57],
+          [15.13, 0.62]
+        ],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the four front columns and the two return columns per side from the state-floor plan. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-portico-east-column-3",
+        "at": [7.12, 17.2],
+        "profile": [
+          [3.71, 0.66],
+          [3.99, 0.66],
+          [4.24, 0.53],
+          [4.45, 0.55],
+          [4.71, 0.47],
+          [12.7, 0.415],
+          [14.51, 0.37],
+          [14.68, 0.57],
+          [14.93, 0.57],
+          [15.13, 0.62]
+        ],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the four front columns and the two return columns per side from the state-floor plan. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "prism",
+        "id": "north-portico-architrave",
+        "from": 14.96,
+        "to": 15.66,
+        "rect": [16.58, 13.07],
+        "at": [0.22, 19.54],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Sized the compact entablature band from the north elevation. Extended it into the wall and the tops of the colonnade."
+      },
+      {
+        "kind": "prism",
+        "id": "north-portico-frieze",
+        "from": 15.55,
+        "to": 16.35,
+        "rect": [16.38, 13.09],
+        "at": [0.22, 19.5],
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Estimated the height of the plain frieze between the column heads and pediment."
+      },
+      {
+        "kind": "prism",
+        "id": "north-portico-cornice",
+        "from": 16.16,
+        "to": 16.78,
+        "rect": [17.43, 13.38],
+        "at": [0.22, 19.53],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Estimated the horizontal sill and increased the projection after inspecting the first build, to frame the bottom of the north pediment."
+      },
+      {
+        "kind": "prism",
+        "id": "north-portico-pediment",
+        "from": 16.51,
+        "to": 19.49,
+        "rect": [16.47, 24.36],
+        "at": [0.22, 13.7],
+        "roof": "gabled",
+        "roof_rise": 2.91,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the low triangle against the north elevation and lowered the pitch after the first build. The long roof runs back into the attic to hold the north-facing gable."
+      },
+      {
+        "kind": "beam",
+        "id": "north-pediment-raking-cornice",
+        "path": [
+          [-8.11, 26.03, 16.68],
+          [0.22, 26.03, 19.47],
+          [8.55, 26.03, 16.68]
+        ],
+        "size": [0.72, 0.46],
+        "source": "https://commons.wikimedia.org/wiki/File:North_Fa%C3%A7ade_White_House.JPG",
+        "guess": "Used three survey triangle stations and strengthened the thin sloping molding so it reads above the horizontal cornice."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-podium-1",
+        "from": 0,
+        "to": 3.71,
+        "ring": [
+          [-9.18, -12.4],
+          [9.18, -12.4],
+          [9.18, -13.05],
+          [9.004, -14.451],
+          [8.481, -15.798],
+          [7.633, -17.039],
+          [6.491, -18.127],
+          [5.1, -19.02],
+          [3.513, -19.683],
+          [1.791, -20.092],
+          [0.0, -20.23],
+          [-1.791, -20.092],
+          [-3.513, -19.683],
+          [-5.1, -19.02],
+          [-6.491, -18.127],
+          [-7.633, -17.039],
+          [-8.481, -15.798],
+          [-9.004, -14.451],
+          [-9.18, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-podium-2",
+        "from": 3.59,
+        "to": 4.17,
+        "ring": [
+          [-9.2964, -12.4],
+          [9.2964, -12.4],
+          [9.296, -13.05],
+          [9.118, -14.476],
+          [8.589, -15.847],
+          [7.73, -17.111],
+          [6.574, -18.219],
+          [5.165, -19.128],
+          [3.558, -19.804],
+          [1.814, -20.22],
+          [0.0, -20.36],
+          [-1.814, -20.22],
+          [-3.558, -19.804],
+          [-5.165, -19.128],
+          [-6.574, -18.219],
+          [-7.73, -17.111],
+          [-8.589, -15.847],
+          [-9.118, -14.476],
+          [-9.296, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-entablature-3",
+        "from": 14.93,
+        "to": 15.47,
+        "ring": [
+          [-8.99, -12.4],
+          [8.99, -12.4],
+          [8.99, -13.05],
+          [8.817, -14.423],
+          [8.306, -15.744],
+          [7.475, -16.961],
+          [6.357, -18.028],
+          [4.995, -18.904],
+          [3.44, -19.554],
+          [1.754, -19.955],
+          [0.0, -20.09],
+          [-1.754, -19.955],
+          [-3.44, -19.554],
+          [-4.995, -18.904],
+          [-6.357, -18.028],
+          [-7.475, -16.961],
+          [-8.306, -15.744],
+          [-8.817, -14.423],
+          [-8.99, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-entablature-4",
+        "from": 15.38,
+        "to": 16.17,
+        "ring": [
+          [-9.08, -12.4],
+          [9.08, -12.4],
+          [9.08, -13.05],
+          [8.906, -14.449],
+          [8.389, -15.794],
+          [7.55, -17.033],
+          [6.421, -18.12],
+          [5.045, -19.012],
+          [3.475, -19.674],
+          [1.771, -20.082],
+          [0.0, -20.22],
+          [-1.771, -20.082],
+          [-3.475, -19.674],
+          [-5.045, -19.012],
+          [-6.421, -18.12],
+          [-7.55, -17.033],
+          [-8.389, -15.794],
+          [-8.906, -14.449],
+          [-9.08, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-entablature-5",
+        "from": 16.07,
+        "to": 16.52,
+        "ring": [
+          [-9.29, -12.4],
+          [9.29, -12.4],
+          [9.29, -13.05],
+          [9.111, -14.498],
+          [8.583, -15.89],
+          [7.724, -17.172],
+          [6.569, -18.297],
+          [5.161, -19.22],
+          [3.555, -19.905],
+          [1.812, -20.327],
+          [0.0, -20.47],
+          [-1.812, -20.327],
+          [-3.555, -19.905],
+          [-5.161, -19.22],
+          [-6.569, -18.297],
+          [-7.724, -17.172],
+          [-8.583, -15.89],
+          [-9.111, -14.498],
+          [-9.29, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-entablature-6",
+        "from": 16.4,
+        "to": 16.9,
+        "ring": [
+          [-9.2964, -12.4],
+          [9.2964, -12.4],
+          [9.296, -13.05],
+          [9.118, -14.511],
+          [8.589, -15.916],
+          [7.73, -17.211],
+          [6.574, -18.346],
+          [5.165, -19.278],
+          [3.558, -19.97],
+          [1.814, -20.396],
+          [0.0, -20.54],
+          [-1.814, -20.396],
+          [-3.558, -19.97],
+          [-5.165, -19.278],
+          [-6.574, -18.346],
+          [-7.73, -17.211],
+          [-8.589, -15.916],
+          [-9.118, -14.511],
+          [-9.296, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-entablature-7",
+        "from": 16.82,
+        "to": 17.18,
+        "ring": [
+          [-9.04, -12.4],
+          [9.04, -12.4],
+          [9.04, -13.05],
+          [8.866, -14.464],
+          [8.352, -15.824],
+          [7.516, -17.078],
+          [6.392, -18.177],
+          [5.022, -19.078],
+          [3.459, -19.748],
+          [1.764, -20.161],
+          [0.0, -20.3],
+          [-1.764, -20.161],
+          [-3.459, -19.748],
+          [-5.022, -19.078],
+          [-6.392, -18.177],
+          [-7.516, -17.078],
+          [-8.352, -15.824],
+          [-8.866, -14.464],
+          [-9.04, -13.05]
+        ],
+        "source": "https://www.whitehousehistory.org/in-a-white-house-passageway",
+        "guess": "Uses the published 61 ft width for the widest courses and about 13 ft above the south lawn for the deck. The curve and narrower tiers follow the survey plan and photograph."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-pedestal-1",
+        "from": 3.99,
+        "to": 4.86,
+        "rect": [1.54, 1.45],
+        "at": [7.4, -15.0],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Raised square plinths are visible in the elevation. Sizes are proportioned to the column shafts and simplified for printing."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-portico-column-1",
+        "at": [7.4, -15.0],
+        "profile": [
+          [4.74, 0.69],
+          [4.94, 0.69],
+          [5.18, 0.565],
+          [5.39, 0.59],
+          [5.58, 0.48],
+          [12.5, 0.44],
+          [14.44, 0.38],
+          [14.61, 0.54],
+          [14.84, 0.58],
+          [15.11, 0.66]
+        ],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the six freestanding column centers from the plan and checked their size against the south photograph. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-pedestal-2",
+        "from": 3.99,
+        "to": 4.86,
+        "rect": [1.54, 1.45],
+        "at": [4.99, -17.4],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Raised square plinths are visible in the elevation. Sizes are proportioned to the column shafts and simplified for printing."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-portico-column-2",
+        "at": [4.99, -17.4],
+        "profile": [
+          [4.74, 0.69],
+          [4.94, 0.69],
+          [5.18, 0.565],
+          [5.39, 0.59],
+          [5.58, 0.48],
+          [12.5, 0.44],
+          [14.44, 0.38],
+          [14.61, 0.54],
+          [14.84, 0.58],
+          [15.11, 0.66]
+        ],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the six freestanding column centers from the plan and checked their size against the south photograph. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "prism",
+        "id": "south-portico-pedestal-3",
+        "from": 3.99,
+        "to": 4.86,
+        "rect": [1.54, 1.45],
+        "at": [1.69, -19.05],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Raised square plinths are visible in the elevation. Sizes are proportioned to the column shafts and simplified for printing."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-portico-column-3",
+        "at": [1.69, -19.05],
+        "profile": [
+          [4.74, 0.69],
+          [4.94, 0.69],
+          [5.18, 0.565],
+          [5.39, 0.59],
+          [5.58, 0.48],
+          [12.5, 0.44],
+          [14.44, 0.38],
+          [14.61, 0.54],
+          [14.84, 0.58],
+          [15.11, 0.66]
+        ],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Traced the six freestanding column centers from the plan and checked their size against the south photograph. Simplified the Ionic capital to a printable profile."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-1",
+        "from": 0,
+        "to": 0.51,
+        "rect": [3.88, 1.72],
+        "at": [4.5, -23.6],
+        "turn": 29.0,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-2",
+        "from": 0,
+        "to": 0.952,
+        "rect": [3.88, 1.72],
+        "at": [5.07, -22.64],
+        "turn": 32.6,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-3",
+        "from": 0,
+        "to": 1.394,
+        "rect": [3.88, 1.72],
+        "at": [5.64, -21.68],
+        "turn": 36.2,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-4",
+        "from": 0,
+        "to": 1.836,
+        "rect": [3.88, 1.72],
+        "at": [6.21, -20.72],
+        "turn": 39.8,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-5",
+        "from": 0,
+        "to": 2.278,
+        "rect": [3.88, 1.72],
+        "at": [6.78, -19.75],
+        "turn": 43.4,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-6",
+        "from": 0,
+        "to": 2.72,
+        "rect": [3.88, 1.72],
+        "at": [7.35, -18.79],
+        "turn": 47.0,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-7",
+        "from": 0,
+        "to": 3.162,
+        "rect": [3.88, 1.72],
+        "at": [7.92, -17.83],
+        "turn": 50.6,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "south-double-stair-course-8",
+        "from": 0,
+        "to": 3.604,
+        "rect": [3.88, 1.72],
+        "at": [8.49, -16.87],
+        "turn": 54.2,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00005v.jpg",
+        "guess": "Followed the two curved flights beside the podium. Eight overlapping solid courses simplify the individual treads and preserve the two descending silhouettes. Their reach is scaled from the west elevation, HABS sheet 8."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-deck",
+        "from": 9.97,
+        "to": 10.43,
+        "ring": [
+          [-8.46, -12.4],
+          [8.46, -12.4],
+          [8.46, -12.91],
+          [8.297, -13.985],
+          [7.816, -15.019],
+          [7.034, -15.971],
+          [5.982, -16.806],
+          [4.7, -17.491],
+          [3.238, -18.001],
+          [1.65, -18.314],
+          [0.0, -18.42],
+          [-1.65, -18.314],
+          [-3.238, -18.001],
+          [-4.7, -17.491],
+          [-5.982, -16.806],
+          [-7.034, -15.971],
+          [-7.816, -15.019],
+          [-8.297, -13.985],
+          [-8.46, -12.91]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the narrower bowed balcony at second-floor level. Its solid slab is thicker than the photo suggests so its projecting edge survives."
+      },
+      {
+        "kind": "beam",
+        "id": "truman-balcony-top-rail",
+        "path": [
+          [8.16, -13.26, 11.15],
+          [7.882, -14.627, 11.15],
+          [7.067, -15.9, 11.15],
+          [5.77, -16.994, 11.15],
+          [4.08, -17.833, 11.15],
+          [2.112, -18.36, 11.15],
+          [0.0, -18.54, 11.15],
+          [-2.112, -18.36, 11.15],
+          [-4.08, -17.833, 11.15],
+          [-5.77, -16.994, 11.15],
+          [-7.067, -15.9, 11.15],
+          [-7.882, -14.627, 11.15],
+          [-8.16, -13.26, 11.15]
+        ],
+        "size": [0.39, 0.27],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balcony railing over the bow, increasing its cross section to join the simplified metal uprights."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-1",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [8.16, -13.26],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-2",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [7.882, -14.627],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-3",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [7.067, -15.9],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-4",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [5.77, -16.994],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-5",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [4.08, -17.833],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-6",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [2.112, -18.36],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-7",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [0.0, -18.54],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-8",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [-2.112, -18.36],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-9",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [-4.08, -17.833],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-10",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [-5.77, -16.994],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-11",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [-7.067, -15.9],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-12",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [-7.882, -14.627],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "prism",
+        "id": "truman-balcony-upright-13",
+        "from": 10.23,
+        "to": 11.21,
+        "rect": [0.29, 0.32],
+        "at": [-8.16, -13.26],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Reduced the railing to thicker evenly spaced upright bars between the slab and the curved top rail."
+      },
+      {
+        "kind": "opening",
+        "id": "north-state-window-1",
+        "at": [10.52, 13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-second-window-1",
+        "at": [10.52, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "north-second-window-frame-1",
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the measured elevation for the raised rectangular surround. Enlarged the trim enough to stay visible around the deep window pocket.",
+        "path": [
+          [9.47, 13.1, 10.4],
+          [9.47, 13.1, 13.73],
+          [11.57, 13.1, 13.73],
+          [11.57, 13.1, 10.4],
+          [9.47, 13.1, 10.4]
+        ],
+        "size": [0.38, 0.38]
+      },
+      {
+        "kind": "beam",
+        "id": "north-window-triangular-hood-1",
+        "path": [
+          [9.33, 13.15, 8.82],
+          [10.52, 13.15, 9.27],
+          [11.709999999999999, 13.15, 8.82]
+        ],
+        "size": [0.56, 0.36],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Followed the alternating triangular hood shown in the elevation. Enlarged the stone trim for a legible relief."
+      },
+      {
+        "kind": "opening",
+        "id": "north-state-window-2",
+        "at": [14.56, 13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-second-window-2",
+        "at": [14.56, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "north-second-window-frame-2",
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the measured elevation for the raised rectangular surround. Enlarged the trim enough to stay visible around the deep window pocket.",
+        "path": [
+          [13.51, 13.1, 10.4],
+          [13.51, 13.1, 13.73],
+          [15.61, 13.1, 13.73],
+          [15.61, 13.1, 10.4],
+          [13.51, 13.1, 10.4]
+        ],
+        "size": [0.38, 0.38]
+      },
+      {
+        "kind": "beam",
+        "id": "north-window-segmental-hood-2",
+        "path": [
+          [13.39, 13.15, 8.82],
+          [13.94, 13.15, 9.1],
+          [14.56, 13.15, 9.2],
+          [15.18, 13.15, 9.1],
+          [15.73, 13.15, 8.82]
+        ],
+        "size": [0.55, 0.32],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used four short curve segments to form the alternating arched stone hood shown in the elevation."
+      },
+      {
+        "kind": "opening",
+        "id": "north-state-window-3",
+        "at": [18.65, 13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-second-window-3",
+        "at": [18.65, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "north-second-window-frame-3",
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the measured elevation for the raised rectangular surround. Enlarged the trim enough to stay visible around the deep window pocket.",
+        "path": [
+          [17.6, 13.1, 10.4],
+          [17.6, 13.1, 13.73],
+          [19.7, 13.1, 13.73],
+          [19.7, 13.1, 10.4],
+          [17.6, 13.1, 10.4]
+        ],
+        "size": [0.38, 0.38]
+      },
+      {
+        "kind": "beam",
+        "id": "north-window-triangular-hood-3",
+        "path": [
+          [17.459999999999997, 13.15, 8.82],
+          [18.65, 13.15, 9.27],
+          [19.84, 13.15, 8.82]
+        ],
+        "size": [0.56, 0.36],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Followed the alternating triangular hood shown in the elevation. Enlarged the stone trim for a legible relief."
+      },
+      {
+        "kind": "opening",
+        "id": "north-state-window-4",
+        "at": [22.7, 13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-second-window-4",
+        "at": [22.7, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "north-second-window-frame-4",
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the measured elevation for the raised rectangular surround. Enlarged the trim enough to stay visible around the deep window pocket.",
+        "path": [
+          [21.65, 13.1, 10.4],
+          [21.65, 13.1, 13.73],
+          [23.75, 13.1, 13.73],
+          [23.75, 13.1, 10.4],
+          [21.65, 13.1, 10.4]
+        ],
+        "size": [0.38, 0.38]
+      },
+      {
+        "kind": "beam",
+        "id": "north-window-segmental-hood-4",
+        "path": [
+          [21.53, 13.15, 8.82],
+          [22.08, 13.15, 9.1],
+          [22.7, 13.15, 9.2],
+          [23.32, 13.15, 9.1],
+          [23.87, 13.15, 8.82]
+        ],
+        "size": [0.55, 0.32],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used four short curve segments to form the alternating arched stone hood shown in the elevation."
+      },
+      {
+        "kind": "opening",
+        "id": "north-ground-window-1",
+        "at": [14.45, 13.05],
+        "width": 1.49,
+        "depth": 2.65,
+        "from": 0.75,
+        "to": 2.74,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the three exposed lower bays on either side in the elevation through the area wells, with stronger recesses for the model. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-ground-window-2",
+        "at": [18.64, 13.05],
+        "width": 1.49,
+        "depth": 2.65,
+        "from": 0.75,
+        "to": 2.74,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the three exposed lower bays on either side in the elevation through the area wells, with stronger recesses for the model. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-ground-window-3",
+        "at": [22.68, 13.05],
+        "width": 1.49,
+        "depth": 2.65,
+        "from": 0.75,
+        "to": 2.74,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Read the three exposed lower bays on either side in the elevation through the area wells, with stronger recesses for the model. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-state-window-1",
+        "at": [10.52, -13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-second-window-1",
+        "at": [10.52, -13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "south-window-triangular-hood-1",
+        "path": [
+          [9.33, -13.15, 8.82],
+          [10.52, -13.15, 9.27],
+          [11.709999999999999, -13.15, 8.82]
+        ],
+        "size": [0.56, 0.36],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Followed the alternating triangular hood shown in the elevation. Enlarged the stone trim for a legible relief."
+      },
+      {
+        "kind": "opening",
+        "id": "south-state-window-2",
+        "at": [14.56, -13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-second-window-2",
+        "at": [14.56, -13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "south-window-segmental-hood-2",
+        "path": [
+          [13.39, -13.15, 8.82],
+          [13.94, -13.15, 9.1],
+          [14.56, -13.15, 9.2],
+          [15.18, -13.15, 9.1],
+          [15.73, -13.15, 8.82]
+        ],
+        "size": [0.55, 0.32],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Used four short curve segments to form the alternating arched stone hood shown in the elevation."
+      },
+      {
+        "kind": "opening",
+        "id": "south-state-window-3",
+        "at": [18.65, -13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-second-window-3",
+        "at": [18.65, -13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "south-window-triangular-hood-3",
+        "path": [
+          [17.459999999999997, -13.15, 8.82],
+          [18.65, -13.15, 9.27],
+          [19.84, -13.15, 8.82]
+        ],
+        "size": [0.56, 0.36],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Followed the alternating triangular hood shown in the elevation. Enlarged the stone trim for a legible relief."
+      },
+      {
+        "kind": "opening",
+        "id": "south-state-window-4",
+        "at": [22.7, -13.05],
+        "width": 1.83,
+        "depth": 2.85,
+        "from": 4.55,
+        "to": 8.55,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-second-window-4",
+        "at": [22.7, -13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.63,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read eight flank bay centers against the 51.2 m width in the measured elevation. Slightly deepened the blind recesses to cast readable shadows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "beam",
+        "id": "south-window-segmental-hood-4",
+        "path": [
+          [21.53, -13.15, 8.82],
+          [22.08, -13.15, 9.1],
+          [22.7, -13.15, 9.2],
+          [23.32, -13.15, 9.1],
+          [23.87, -13.15, 8.82]
+        ],
+        "size": [0.55, 0.32],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Used four short curve segments to form the alternating arched stone hood shown in the elevation."
+      },
+      {
+        "kind": "opening",
+        "id": "south-ground-window-1",
+        "at": [14.45, -13.05],
+        "width": 1.49,
+        "depth": 2.65,
+        "from": 0.75,
+        "to": 2.74,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the three exposed lower bays on either side in the elevation through the area wells, with stronger recesses for the model. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-ground-window-2",
+        "at": [18.64, -13.05],
+        "width": 1.49,
+        "depth": 2.65,
+        "from": 0.75,
+        "to": 2.74,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the three exposed lower bays on either side in the elevation through the area wells, with stronger recesses for the model. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-ground-window-3",
+        "at": [22.68, -13.05],
+        "width": 1.49,
+        "depth": 2.65,
+        "from": 0.75,
+        "to": 2.74,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the three exposed lower bays on either side in the elevation through the area wells, with stronger recesses for the model. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-portico-second-bay-1",
+        "at": [-4.55, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.47,
+        "to": 13.65,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Sized and spaced the three upper bays in the surveyed north elevation. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-portico-state-bay-1",
+        "at": [-4.55, 13.05],
+        "width": 1.82,
+        "depth": 2.85,
+        "from": 4.52,
+        "to": 8.56,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the north elevation to model the central entrance and its arched fanlight between the state-floor windows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-portico-second-bay-2",
+        "at": [0.0, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.47,
+        "to": 13.65,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Sized and spaced the three upper bays in the surveyed north elevation. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-portico-state-bay-2",
+        "at": [0.0, 13.05],
+        "width": 2.35,
+        "depth": 2.65,
+        "from": 4.02,
+        "to": 9.12,
+        "arch": true,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the north elevation to model the central entrance and its arched fanlight between the state-floor windows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-portico-second-bay-3",
+        "at": [4.55, 13.05],
+        "width": 1.75,
+        "depth": 2.85,
+        "from": 10.47,
+        "to": 13.65,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Sized and spaced the three upper bays in the surveyed north elevation. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "north-portico-state-bay-3",
+        "at": [4.55, 13.05],
+        "width": 1.82,
+        "depth": 2.85,
+        "from": 4.52,
+        "to": 8.56,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Used the north elevation to model the central entrance and its arched fanlight between the state-floor windows. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-bow-state-bay-1",
+        "at": [0, -16.07],
+        "width": 1.73,
+        "depth": 2.85,
+        "from": 4.19,
+        "to": 8.5,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Rotated the recessed bays into the curved wall according to the state-floor plan and south view. Deepened each pocket for shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-bow-second-bay-1",
+        "at": [0, -16.07],
+        "width": 1.73,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.68,
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Rotated the recessed bays into the curved wall according to the state-floor plan and south view. Deepened each pocket for shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-bow-state-bay-2",
+        "at": [3.18, -15.65],
+        "width": 1.73,
+        "depth": 2.85,
+        "from": 4.19,
+        "to": 8.5,
+        "turn": -22,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Rotated the recessed bays into the curved wall according to the state-floor plan and south view. Deepened each pocket for shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-bow-second-bay-2",
+        "at": [3.18, -15.65],
+        "width": 1.73,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.68,
+        "turn": -22,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Rotated the recessed bays into the curved wall according to the state-floor plan and south view. Deepened each pocket for shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-bow-state-bay-3",
+        "at": [5.34, -14.65],
+        "width": 1.73,
+        "depth": 2.85,
+        "from": 4.19,
+        "to": 8.5,
+        "turn": -43,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Rotated the recessed bays into the curved wall according to the state-floor plan and south view. Deepened each pocket for shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-bow-second-bay-3",
+        "at": [5.34, -14.65],
+        "width": 1.73,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.68,
+        "turn": -43,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Rotated the recessed bays into the curved wall according to the state-floor plan and south view. Deepened each pocket for shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-podium-arched-door-1",
+        "at": [0, -20.23],
+        "width": 1.7,
+        "depth": 2.3,
+        "from": 0.01,
+        "to": 2.96,
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Placed the center doorway and flanking arches on the face of the rounded podium from the photograph. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "south-podium-arched-door-2",
+        "at": [4.14, -19.65],
+        "width": 1.7,
+        "depth": 2.3,
+        "from": 0.01,
+        "to": 2.96,
+        "turn": -18,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Placed the center doorway and flanking arches on the face of the rounded podium from the photograph. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-ground-bay-1",
+        "at": [25.6, -9.51],
+        "width": 1.43,
+        "depth": 2.85,
+        "from": 0.71,
+        "to": 2.62,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-state-bay-1",
+        "at": [25.6, -9.51],
+        "width": 1.79,
+        "depth": 2.85,
+        "from": 4.47,
+        "to": 8.54,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-second-bay-1",
+        "at": [25.6, -9.51],
+        "width": 1.78,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.61,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-ground-bay-2",
+        "at": [25.6, -5.28],
+        "width": 1.43,
+        "depth": 2.85,
+        "from": 0.71,
+        "to": 2.62,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-state-bay-2",
+        "at": [25.6, -5.28],
+        "width": 1.79,
+        "depth": 2.85,
+        "from": 4.47,
+        "to": 8.54,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-second-bay-2",
+        "at": [25.6, -5.28],
+        "width": 1.78,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.61,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-ground-bay-3",
+        "at": [25.6, 4.78],
+        "width": 1.43,
+        "depth": 2.85,
+        "from": 0.71,
+        "to": 2.62,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-state-bay-3",
+        "at": [25.6, 4.78],
+        "width": 1.79,
+        "depth": 2.85,
+        "from": 4.47,
+        "to": 8.54,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-second-bay-3",
+        "at": [25.6, 4.78],
+        "width": 1.78,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.61,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-ground-bay-4",
+        "at": [25.6, 9.25],
+        "width": 1.43,
+        "depth": 2.85,
+        "from": 0.71,
+        "to": 2.62,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-state-bay-4",
+        "at": [25.6, 9.25],
+        "width": 1.79,
+        "depth": 2.85,
+        "from": 4.47,
+        "to": 8.54,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-second-bay-4",
+        "at": [25.6, 9.25],
+        "width": 1.78,
+        "depth": 2.85,
+        "from": 10.48,
+        "to": 13.61,
+        "turn": 90,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Scaled the four side bays from the west survey elevation. Mirrored the spacing on the opposite end and exaggerated recess depth. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-palladian-upper-bay",
+        "at": [25.6, -0.27],
+        "width": 3.74,
+        "depth": 2.65,
+        "from": 10.25,
+        "to": 14.12,
+        "turn": 90,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Represented the center fan of the Palladian opening by a single arched recess at print scale. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "opening",
+        "id": "end-wall-central-door",
+        "at": [25.6, -0.27],
+        "width": 2.72,
+        "depth": 2.65,
+        "from": 3.51,
+        "to": 9.15,
+        "turn": 90,
+        "arch": true,
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the large centered entrance below the Palladian opening, with blind depth for a readable shadow. Deepened the opening after the first build so the recess is visible in the model."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-base-1",
+        "from": 4.08,
+        "to": 4.71,
+        "rect": [1.13, 0.64],
+        "at": [9.0, -13.03],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the shallow giant-order pilaster rhythm in the elevation. Enlarged depth to show under oblique light."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-1",
+        "from": 4.48,
+        "to": 14.86,
+        "rect": [0.79, 0.48],
+        "at": [9.0, -13.095],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Traced the slender rectangular pilasters between the south windows, with extra relief for the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-cap-1",
+        "from": 14.55,
+        "to": 15.03,
+        "rect": [1.16, 0.63],
+        "at": [9.0, -13.13],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Estimated a simplified square capital in the shallow space under the cornice."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-base-2",
+        "from": 4.08,
+        "to": 4.71,
+        "rect": [1.13, 0.64],
+        "at": [12.57, -13.03],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the shallow giant-order pilaster rhythm in the elevation. Enlarged depth to show under oblique light."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-2",
+        "from": 4.48,
+        "to": 14.86,
+        "rect": [0.79, 0.48],
+        "at": [12.57, -13.095],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Traced the slender rectangular pilasters between the south windows, with extra relief for the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-cap-2",
+        "from": 14.55,
+        "to": 15.03,
+        "rect": [1.16, 0.63],
+        "at": [12.57, -13.13],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Estimated a simplified square capital in the shallow space under the cornice."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-base-3",
+        "from": 4.08,
+        "to": 4.71,
+        "rect": [1.13, 0.64],
+        "at": [16.61, -13.03],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the shallow giant-order pilaster rhythm in the elevation. Enlarged depth to show under oblique light."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-3",
+        "from": 4.48,
+        "to": 14.86,
+        "rect": [0.79, 0.48],
+        "at": [16.61, -13.095],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Traced the slender rectangular pilasters between the south windows, with extra relief for the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-cap-3",
+        "from": 14.55,
+        "to": 15.03,
+        "rect": [1.16, 0.63],
+        "at": [16.61, -13.13],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Estimated a simplified square capital in the shallow space under the cornice."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-base-4",
+        "from": 4.08,
+        "to": 4.71,
+        "rect": [1.13, 0.64],
+        "at": [20.66, -13.03],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the shallow giant-order pilaster rhythm in the elevation. Enlarged depth to show under oblique light."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-4",
+        "from": 4.48,
+        "to": 14.86,
+        "rect": [0.79, 0.48],
+        "at": [20.66, -13.095],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Traced the slender rectangular pilasters between the south windows, with extra relief for the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-cap-4",
+        "from": 14.55,
+        "to": 15.03,
+        "rect": [1.16, 0.63],
+        "at": [20.66, -13.13],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Estimated a simplified square capital in the shallow space under the cornice."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-base-5",
+        "from": 4.08,
+        "to": 4.71,
+        "rect": [1.13, 0.64],
+        "at": [24.96, -13.03],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Read the shallow giant-order pilaster rhythm in the elevation. Enlarged depth to show under oblique light."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-5",
+        "from": 4.48,
+        "to": 14.86,
+        "rect": [0.79, 0.48],
+        "at": [24.96, -13.095],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Traced the slender rectangular pilasters between the south windows, with extra relief for the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-wall-pilaster-cap-5",
+        "from": 14.55,
+        "to": 15.03,
+        "rect": [1.16, 0.63],
+        "at": [24.96, -13.13],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00009v.jpg",
+        "guess": "Estimated a simplified square capital in the shallow space under the cornice."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-rail-1",
+        "from": 16.98,
+        "to": 17.36,
+        "rect": [17.02, 0.58],
+        "at": [16.86, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-rail-2",
+        "from": 17.97,
+        "to": 18.288,
+        "rect": [17.02, 0.58],
+        "at": [16.86, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-pier-1",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [8.46, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-pier-2",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [12.62, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-pier-3",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [16.8, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-pier-4",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [20.98, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "north-parapet-pier-5",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [25.21, 12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-east-baluster-bank-1",
+        "at": [9.48, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-west-baluster-bank-1",
+        "at": [-9.48, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-east-baluster-bank-2",
+        "at": [13.65, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-west-baluster-bank-2",
+        "at": [-13.65, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-east-baluster-bank-3",
+        "at": [17.82, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-west-baluster-bank-3",
+        "at": [-17.82, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-east-baluster-bank-4",
+        "at": [22.0, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "north-parapet-west-baluster-bank-4",
+        "at": [-22.0, 12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-rail-1",
+        "from": 16.98,
+        "to": 17.36,
+        "rect": [17.02, 0.58],
+        "at": [16.86, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-rail-2",
+        "from": 17.97,
+        "to": 18.288,
+        "rect": [17.02, 0.58],
+        "at": [16.86, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-pier-1",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [8.46, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-pier-2",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [12.62, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-pier-3",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [16.8, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-pier-4",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [20.98, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-parapet-pier-5",
+        "from": 17.09,
+        "to": 18.22,
+        "rect": [0.79, 0.72],
+        "at": [25.21, -12.84],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-east-baluster-bank-1",
+        "at": [9.48, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-west-baluster-bank-1",
+        "at": [-9.48, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-east-baluster-bank-2",
+        "at": [13.65, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-west-baluster-bank-2",
+        "at": [-13.65, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-east-baluster-bank-3",
+        "at": [17.82, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-west-baluster-bank-3",
+        "at": [-17.82, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-east-baluster-bank-4",
+        "at": [22.0, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-parapet-west-baluster-bank-4",
+        "at": [-22.0, -12.84],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [-0.743, 0],
+          "count": 4
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00006v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping four in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-rail-1",
+        "from": 16.98,
+        "to": 17.36,
+        "rect": [0.58, 26.15],
+        "at": [25.19, 0],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-rail-2",
+        "from": 17.97,
+        "to": 18.288,
+        "rect": [0.58, 26.15],
+        "at": [25.19, 0],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://www.whitehousehistory.org/press-room/press-backgrounders/white-house-dimensions",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-pier-1",
+        "from": 17.08,
+        "to": 18.21,
+        "rect": [0.72, 0.75],
+        "at": [25.19, -12.76],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-pier-2",
+        "from": 17.08,
+        "to": 18.21,
+        "rect": [0.72, 0.75],
+        "at": [25.19, -7.66],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-pier-3",
+        "from": 17.08,
+        "to": 18.21,
+        "rect": [0.72, 0.75],
+        "at": [25.19, -2.56],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-pier-4",
+        "from": 17.08,
+        "to": 18.21,
+        "rect": [0.72, 0.75],
+        "at": [25.19, 2.55],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-pier-5",
+        "from": 17.08,
+        "to": 18.21,
+        "rect": [0.72, 0.75],
+        "at": [25.19, 7.66],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "end-wall-parapet-pier-6",
+        "from": 17.08,
+        "to": 18.21,
+        "rect": [0.72, 0.75],
+        "at": [25.19, 12.75],
+        "copies": {
+          "mirror": "x"
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "east-parapet-baluster-bank-1",
+        "at": [25.19, -11.68],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "west-parapet-baluster-bank-1",
+        "at": [-25.19, -11.68],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "east-parapet-baluster-bank-2",
+        "at": [25.19, -6.58],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "west-parapet-baluster-bank-2",
+        "at": [-25.19, -6.58],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "east-parapet-baluster-bank-3",
+        "at": [25.19, -1.48],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "west-parapet-baluster-bank-3",
+        "at": [-25.19, -1.48],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "east-parapet-baluster-bank-4",
+        "at": [25.19, 3.63],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "west-parapet-baluster-bank-4",
+        "at": [-25.19, 3.63],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "east-parapet-baluster-bank-5",
+        "at": [25.19, 8.74],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "lathe",
+        "id": "west-parapet-baluster-bank-5",
+        "at": [-25.19, 8.74],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "copies": {
+          "row": [0, 1.42],
+          "count": 3
+        },
+        "source": "https://tile.loc.gov/storage-services/service/pnp/habshaer/dc/dc0400/dc0402/sheet/00008v.jpg",
+        "guess": "Simplified the turned balusters visible in the elevation, grouping three in each bay and enlarging their narrowest diameter at print scale."
+      },
+      {
+        "kind": "beam",
+        "id": "south-bow-parapet-rail-1",
+        "path": [
+          [8.78, -12.82, 17.205],
+          [8.611, -14.172, 17.205],
+          [8.112, -15.472, 17.205],
+          [7.3, -16.67, 17.205],
+          [6.208, -17.72, 17.205],
+          [4.878, -18.582, 17.205],
+          [3.36, -19.222, 17.205],
+          [1.713, -19.617, 17.205],
+          [0.0, -19.75, 17.205],
+          [-1.713, -19.617, 17.205],
+          [-3.36, -19.222, 17.205],
+          [-4.878, -18.582, 17.205],
+          [-6.208, -17.72, 17.205],
+          [-7.3, -16.67, 17.205],
+          [-8.112, -15.472, 17.205],
+          [-8.611, -14.172, 17.205],
+          [-8.78, -12.82, 17.205]
+        ],
+        "size": [0.62, 0.33],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "beam",
+        "id": "south-bow-parapet-rail-2",
+        "path": [
+          [8.81, -12.82, 18.134],
+          [8.641, -14.174, 18.134],
+          [8.139, -15.476, 18.134],
+          [7.325, -16.676, 18.134],
+          [6.23, -17.727, 18.134],
+          [4.895, -18.59, 18.134],
+          [3.371, -19.232, 18.134],
+          [1.719, -19.627, 18.134],
+          [0.0, -19.76, 18.134],
+          [-1.719, -19.627, 18.134],
+          [-3.371, -19.232, 18.134],
+          [-4.895, -18.59, 18.134],
+          [-6.23, -17.727, 18.134],
+          [-7.325, -16.676, 18.134],
+          [-8.139, -15.476, 18.134],
+          [-8.641, -14.174, 18.134],
+          [-8.81, -12.82, 18.134]
+        ],
+        "size": [0.62, 0.308],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-1",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [8.79, -12.82],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-3",
+        "at": [8.57, -14.363],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-5",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [7.92, -15.829],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-7",
+        "at": [6.872, -17.144],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-9",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [5.48, -18.242],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-11",
+        "at": [3.814, -19.068],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-13",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [1.956, -19.581],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-15",
+        "at": [0.0, -19.755],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-17",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [-1.956, -19.581],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-19",
+        "at": [-3.814, -19.068],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-21",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [-5.48, -18.242],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-23",
+        "at": [-6.872, -17.144],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-25",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [-7.92, -15.829],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      },
+      {
+        "kind": "lathe",
+        "id": "south-bow-parapet-baluster-27",
+        "at": [-8.57, -14.363],
+        "profile": [
+          [17.1, 0.19],
+          [17.28, 0.17],
+          [17.43, 0.112],
+          [17.58, 0.154],
+          [17.77, 0.138],
+          [17.94, 0.105],
+          [18.09, 0.148]
+        ],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Kept one simplified turned baluster between the thicker piers so the curved rail reads clearly in the print."
+      },
+      {
+        "kind": "prism",
+        "id": "south-bow-parapet-pier-29",
+        "from": 17.15,
+        "to": 18.23,
+        "rect": [0.67, 0.74],
+        "at": [-8.79, -12.82],
+        "source": "https://commons.wikimedia.org/wiki/File:WhiteHouseSouthFacade.JPG",
+        "guess": "Traced the balustrade pattern in elevation. Thickened the top and bottom rails and grouped the balusters between solid piers."
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "l18_sagrada_familia",
+  "request": "I want the Sagrada Familia as a 16 cm tall print.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Sagrada Família",
+      "size": {
+        "mode": "z",
+        "mm": 160
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 172.5,
+        "source": "https://sagradafamilia.org/en/-/una-creu-que-arriba-al-cel-de-barcelona",
+        "why": "The cross of the tower of Jesus Christ, set 20 February 2026"
+      },
+      "dimensions": {
+        "length": 107.93,
+        "width": 95,
+        "source": "https://api.openstreetmap.org/api/0.6/relation/9194723.json",
+        "why": "The mapped outline is 107.9 by 83.6 m; the Passion portico's columns and the Nativity ribs stand outside it, on the pack's 95 m base."
+      }
+    }
+  },
+  "why": "Eighteen towers of four kinds, two facades and an apse: the map has a few tapered blocks."
+}

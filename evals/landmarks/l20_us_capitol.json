@@ -1,0 +1,31 @@
+{
+  "id": "l20_us_capitol",
+  "request": "Can you make a model of the US Capitol to 3D print, 20 cm long?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "United States Capitol",
+      "size": {
+        "mode": "long",
+        "mm": 200
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 91.7824,
+        "source": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-building",
+        "why": "288 ft above the east front plaza, and the pack's guess of 4 m down to the west terrace's foot"
+      },
+      "dimensions": {
+        "length": 229.0064,
+        "width": 106.68,
+        "source": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-building",
+        "why": "751 ft 4 in by 350 ft"
+      }
+    }
+  },
+  "why": "A ribbed dome on a ring of columns with its lantern and statue, the two wings, porticoes and terraces: the map had boxes and a bulb."
+}
