@@ -84,9 +84,9 @@ def test_spaghetti_falls_from_the_layer_and_rests_on_what_is_below():
     tp, inp, fail, _ = _story(_t())
     scene, frs, extra, first, st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))
     z = float(inp.layer_z[fail.layer])
-    fell = [a for i, a, b, w in st.links if i == fail.layer][0]
-    assert fell[:, 2].min() >= 0 and fell[:, 2].max() <= z + 0.5  # at most resting on the layer just printed
-    assert np.median(fell[:, 2]) < 1.0  # the arms' lines lie on the bed, 4 mm below where they were laid
+    fell, wide = (np.concatenate([k[j] for k in st.links if k[0] == fail.layer]) for j in (1, 3))
+    assert (fell[:, 2] - wide / 2).min() >= -0.03 and fell[:, 2].max() <= z + 2  # resting on the plate by its own radius, drawn thin or not, or a slack loop a little over the layer
+    assert (fell[:, 2] < 1.0).mean() > 0.4 and np.median(fell[:, 2]) < z / 2  # most of the arms' plastic lies on or near the bed
     assert st.gone.any() and not st.gone[tp.layer < fail.layer].any()  # the scene up to the failure is untouched
     assert [f["layer"] for f in frs[:first]] == list(range(fail.layer))
     lines = [sum(len(it["mesh"][0]) for it in e) for e in extra[first:]]
@@ -140,16 +140,20 @@ def test_a_strand_has_no_gaps_at_any_slope():
 def test_a_strand_with_corners_stays_pinned_where_it_lies_on_plastic():
     tp, inp, fail, _ = _story(_box((20, 20, 3), (0, 0, 0)))
     st = failvideo.Story(tp, inp, fail or failsim.Failure("supports", 5, 1.2, 1.0, "spaghetti", None, {}, []), (255, 255, 255), (260, 260))
-    st.layer_now = 5
-    st.field[:] = 0.0
-    moves = np.flatnonzero(st.ext & (tp.layer == 5))  # walls and infill, full of corners
+    run = st.runs(5, st.ext)[0]  # walls and infill, full of corners
+    mid = np.median(tp.p1[run, 0])
     xs = inp.origin[0] + (np.arange(st.field.shape[1]) + 0.5) * inp.cell
-    loose = np.broadcast_to(xs > np.median(tp.p1[moves, 0]), st.field.shape)
-    st.strand(moves, loose)
-    _, a, b, w = st.links[-1]
+    loose = np.broadcast_to(xs > mid, st.field.shape)
+    st.strand(5, run, loose, 60.0)
+    a = np.vstack([x[1] for x in st.links])
     r, c = st.px(a)
-    far = np.abs(a[:, 0] - np.median(tp.p1[moves, 0])) > 2
-    assert a[far & ~loose[r, c], 2] == pytest.approx(inp.layer_z[5], abs=1e-6) and a[far & loose[r, c], 2].max() < 1.0
+    far = np.abs(a[:, 0] - mid) > 2
+    on = a[far & ~loose[r, c], 2]
+    assert np.median(on) == pytest.approx(inp.layer_z[5] - 0.24, abs=0.01)  # where it was laid, half its thickness down
+    assert np.median(a[far & loose[r, c], 2]) < 0.7 and st.left == 0
+    layer = sum(float((np.pi / 4 * w ** 2 * np.linalg.norm(q - p, axis=1)).sum()) for _, p, q, w in st.links)
+    laid = float((st.flows[run] * (tp.t1 - tp.t0)[run]).sum())
+    assert layer == pytest.approx(laid, rel=0.02)  # all the plastic the print lays, no more
 
 
 def test_a_tall_part_tips_about_its_edge():
@@ -181,7 +185,7 @@ def test_a_late_failure_gets_its_share_and_a_slide_stays_on_the_plate():
     st = failvideo.plan(tp, inp, fail, (255, 255, 255), (142, 142))[4]
     V = st.part[0] + st.mats[-1][:3, 3]
     assert V[:, :2].max() < 142.5 and V[:, :2].min() > -0.5
-    assert st.strand(np.zeros(0, int), None) == []  # a layer with nothing to lay
+    assert st.runs(10 ** 6, st.ext) == []  # a layer with nothing to lay
 
 
 def test_a_dirty_plate_lets_go_slides_and_grows_a_blob():
@@ -191,9 +195,23 @@ def test_a_dirty_plate_lets_go_slides_and_grows_a_blob():
     assert np.linalg.norm(st.mats[-1][:3, 3]) > 10  # it moved
     assert all(i > 0 for i, *_ in st.links)  # every later layer printed into air
     blobs = [np.ptp(it["mesh"][0][:, 0]) for e in extra[first:] for it in e if it.get("name") == "blob"]
-    assert len(blobs) >= len(extra) - first - 1 and blobs[-1] > blobs[0] and blobs == sorted(blobs)
-    want = 2 * (3 * float(failsim.blob_volume(st.flow, frs[-1]["t_s"] - fail.time)) / 4 / np.pi) ** (1 / 3)
-    assert blobs[-1] == pytest.approx(want, rel=0.05)  # the ball holds what stuck to the nozzle since it let go
+    assert len(blobs) >= len(extra) - first - 1 and blobs == sorted(blobs)
+    ball = lambda v: 2 * (3 * v / 4 / np.pi) ** (1 / 3)  # noqa: E731
+    assert blobs[-1] == pytest.approx(ball(st.blob), rel=0.05)
+    assert st.blob > 1.5 * st.hold  # so low, the pile reaches the nozzle and what comes out stays on it
+
+
+def test_high_up_the_nozzle_carries_only_what_its_tip_holds_and_drags_the_strand():
+    tp, inp, fail, _ = _story(_box((20, 20, 12), (0, 0, 0)), "detach")
+    st = failvideo.plan(tp, inp, fail, (255, 255, 255), (260, 260))[4]
+    i = fail.layer + 1
+    assert st.blobs[i] == pytest.approx(failsim.nozzle_hold("PLA")["blob_mm3"], rel=0.02)
+    p, d = st.live[i]  # the strand still hangs from the nozzle when the layer ends
+    end = tp.p1[np.flatnonzero(tp.layer == i)[-1], :3]
+    assert p[-1] == pytest.approx(end, abs=2.0) and p[:, 2].min() < 1.0 < p[-1, 2]
+    laid = sum(float((np.pi / 4 * w ** 2 * np.linalg.norm(q - a, axis=1)).sum()) for k, a, q, w in st.links if k == i)
+    assert laid + float((np.pi / 4 * d ** 2 * np.linalg.norm(np.diff(p, axis=0), axis=1)).sum()) == pytest.approx(
+        float((st.flows * (tp.t1 - tp.t0))[tp.layer == i].sum()) - st.hold + st.flow * len(st.mats) / 30, rel=0.02)
 
 
 def test_no_failure_says_so_and_makes_no_video(jobenv, tmp_path):
@@ -236,7 +254,7 @@ def test_the_video_says_what_it_does_not_simulate(jobenv, tmp_path, monkeypatch)
     from PIL import Image
 
     def render(scene, frs, prof, cam, d, *a, **k):
-        d.mkdir(parents=True)
+        d.mkdir(parents=True, exist_ok=True)
         files = [d / f"{i}.png" for i in range(len(frs))]
         [Image.new("RGB", (64, 48)).save(f) for f in files]
         return files
@@ -248,7 +266,12 @@ def test_the_video_says_what_it_does_not_simulate(jobenv, tmp_path, monkeypatch)
     stl = tmp_path / "p.stl"
     _box((30, 20, 0.6), (0, 0, 0)).export(stl)
     text, _ = cli.run(["timelapse", str(stl), "--fail", "--plate", "dirty"])
-    assert f"Limit: {failvideo.LIMIT}." in text, text
+    assert "Limit:" not in text and "Strand: 0.48 mm thick, it leaves the nozzle at" in text and "The nozzle's tip carries 8.0 mm3." in text, text
+    monkeypatch.setattr(failvideo, "SIM", 1.0)
+    text, _ = cli.run(["timelapse", str(stl), "--fail", "--plate", "dirty"])
+    assert f" {failvideo.LIMIT} 1 s of it, the start of each layer." in text, text
+    data = json.loads((tmp_path / "p.stl-timelapse" / "fail.json").read_text())
+    assert data["strand"]["draw_mn"] > 0 and any("die swell" in a or "as wide as the bore" in a for a in data["assumptions"])
 
 
 @needs_blender
@@ -312,3 +335,48 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     inp = failvideo.inputs(tp, "PLA")
     assert inp.bed is None and inp.fan is True and inp.material.nozzle == failsim.material("PLA").nozzle
     assert "K2 profile's, not the print's own: bed, nozzle, fan, chamber (fan full on)" in inp.notes[1]
+
+
+def test_strands_of_one_layer_lie_where_they_fell_while_the_next_one_comes(monkeypatch):
+    tp, inp, fail, _ = _story(_t())  # two arms, so more than one strand in the failing layer
+    st = failvideo.Story(tp, inp, fail, (255, 255, 255), (260, 260))
+    motion = st.run(fail.layer)
+    lie = [b for i, _, b, _ in st.links if i == fail.layer]
+    settled = lambda p: any(len(b) == len(p) - 1 and np.array_equal(p[1:], b) for b in lie)  # noqa: E731
+    assert len(lie) > 1 and all(settled(p) for pieces, _ in motion for p, _ in pieces[:-1])
+    assert all(settled(p) for p, _ in motion[-1][0])  # the last one comes to rest in the motion too
+    monkeypatch.setattr(failvideo, "SIM", 1e-6)  # nothing is followed: what has plastic under it is drawn as laid
+    st = failvideo.Story(tp, inp, fail, (255, 255, 255), (260, 260))
+    st.run(fail.layer)
+    on = np.asarray(inp.masks[fail.layer - 1], bool)
+    air = np.flatnonzero(st.flew)
+    flat = np.vstack([b[1] for b in st.bent if b[0] == fail.layer])
+    want = np.concatenate([st.line(j, 0.5)[on[st.px(st.line(j, 0.5))]] for j in air])
+    assert len(flat) > 20 and np.mean([np.abs(flat - p).sum(1).min() < 1e-9 for p in want]) > 0.8  # all but single points
+    assert not st.links and st.gone[air].all()
+
+
+def test_a_short_run_lays_its_plastic_and_the_plate_past_the_grid_is_bare():
+    tp, inp, _, _ = _story(_box((20, 20, 3), (0, 0, 0)))
+    st = failvideo.Story(tp, inp, failsim.Failure("supports", 5, 1.2, 1.0, "spaghetti", None, {}, []), (255, 255, 255), (260, 260))
+    run = st.runs(5, st.ext)[0][:1]
+    tp.t1[run] = tp.t0[run] + 0.002  # under one step
+    st.strand(5, run, np.ones(st.field.shape, bool), 60.0)
+    assert st.links and st.left == 0
+    vol = lambda: sum(float((np.pi / 4 * w ** 2 * np.linalg.norm(q - p, axis=1)).sum()) for _, p, q, w in st.links)  # noqa: E731
+    due = float(st.flows[run] @ (tp.t1 - tp.t0)[run])
+    assert vol() - st.owed == pytest.approx(due, rel=0.05)
+    tp.p1[run] = tp.p0[run] + [0.4, 0, 0, 0]  # it starts on plastic and ends in air, within one step
+    xs = inp.origin[0] + (np.arange(st.field.shape[1]) + 0.5) * inp.cell
+    edge = tp.p0[run[0], 0] + 0.3
+    st.links.clear()
+    st.strand(5, run, np.broadcast_to(xs > edge, st.field.shape), 60.0)
+    assert np.linalg.norm(st.links[0][1][0] - tp.p0[run[0], :3]) < 0.5 and len(st.links) == 1  # its first end stays where it was pressed on
+    st.field[:] = 0
+    st.pile(5, np.array([[-30.0, 0, 0.24], [-25.0, 0, 0.24]]), np.array([0.48]))
+    assert not st.field.any()
+
+
+def test_the_fans_share_is_the_winds():
+    still, half, full = (failvideo.strand.numbers("PLA", 10.0, 120.0, fan=f)["set_s_fan"] for f in (0.0, 0.4, 1.0))
+    assert still > half > full and failvideo.strand.Strand([(0, 0, 0), (0, 0, 1)], 0.48, "PLA", fan=0.4).fan == pytest.approx(0.4 * failsim.fact("fan_air_speed"))

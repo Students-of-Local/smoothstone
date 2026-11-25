@@ -87,7 +87,8 @@ def set_time(mat="PLA", d_mm: float | None = None, air_c: float | None = None, w
     return float(((q[1:] + q[:-1]) / 2 * np.diff(t)).sum())
 
 
-def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c: float | None = None, nozzle_c: float | None = None) -> dict:
+def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c: float | None = None, nozzle_c: float | None = None,
+            fan: float = 1.0) -> dict:
     """What decides where a strand goes: the hotend's hold on it, the air's, the plate's and its own heat."""
     m = failsim._mat(mat)
     d, air_c = exit_diameter(bore), m.chamber if air_c is None else air_c
@@ -97,7 +98,7 @@ def numbers(mat, flow_mm3_s: float, speed_mm_s: float, bore: float = 0.4, air_c:
             "draw_mn": round(draw_force(m, flow_mm3_s, speed_mm_s, nozzle_c, bore=bore) * 1e3, 2), "plate_grip_mn_per_100mm": round(grip * 1e3, 2),
             "nozzle_hold_mn": round(hold["hold_n"] * 1e3, 3), "melt_wets_the_tip": hold["wets"], "blob_mm3": round(hold["blob_mm3"], 1),
             "fall_mm_s": round(fall_speed(m, d, air_c)), "set_s_still_air": round(set_time(m, d, air_c, 0, nozzle_c), 2),
-            "set_s_fan": round(set_time(m, d, air_c, failsim.fact("fan_air_speed"), nozzle_c), 2)}
+            "set_s_fan": round(set_time(m, d, air_c, fan * failsim.fact("fan_air_speed"), nozzle_c), 2)}
 
 
 def _norm(v):
@@ -175,7 +176,7 @@ class Strand:
         self.fixed = np.zeros(n, bool)
         self.fixed[list(held)] = True
         self.nozzle, self.flow, self.area = nozzle, flow * 1e-9, math.pi / 4 * (exit_diameter(bore) * 1e-3) ** 2
-        self.fan, self.reach = (failsim.fact("fan_air_speed") if fan else 0.0), failsim.fact("fan_reach") * 1e-3
+        self.fan, self.reach = fan * failsim.fact("fan_air_speed"), failsim.fact("fan_reach") * 1e-3
         self.ground, self.plastic = ground, plastic
         self.mu = failsim.fact("strand_friction") if mu is None else mu
         self.seg = seg * 1e-3
@@ -193,8 +194,8 @@ class Strand:
         return d / ln[:, None], ln
 
     def diameters(self) -> np.ndarray:
-        """mm, of each edge."""
-        return np.sqrt(4 * self.vol / (math.pi * self.lengths()[1])) * 1e3
+        """mm, of each edge; one slumped shorter than it is thick is the drop its plastic makes, not a disc."""
+        return np.minimum(np.sqrt(4 * self.vol / (math.pi * self.lengths()[1])), np.cbrt(6 * self.vol / math.pi)) * 1e3
 
     def points(self) -> np.ndarray:
         return self.x * 1e3
@@ -478,7 +479,7 @@ class Strand:
     def snap(self) -> list:
         """Where it is drawn thinner than a hair it breaks: the pieces off the nozzle, without the hairs between them.
         What is left here has one point when it broke at the nozzle."""
-        thin = np.flatnonzero(self.diameters() < failsim.fact("thread_limit"))
+        thin = np.flatnonzero(4 * self.vol / (math.pi * self.lengths()[1]) < (failsim.fact("thread_limit") * 1e-3) ** 2)
         if not len(thin):
             return []
         cut, n, off = np.r_[-1, thin], len(self.x), []
