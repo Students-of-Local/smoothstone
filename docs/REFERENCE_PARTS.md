@@ -11,8 +11,10 @@ with the same one command.
    with `"guess": "<how it was chosen>"` on that part, and the build marks it guessed.
 2. Metres. `at`, `path` and rings are [x, y] (path: [x, y, z]) from `origin`. y runs along `axis`, a compass bearing in
    degrees (0 = north), and x to its right. z is up from the ground the landmark stands on.
-3. `replace` says what of the map goes: `"none"` (the default), `"all"` (the map is not asked), or a list of OSM ids.
-4. A part thinner than a print can hold is widened to 1.2 mm, and the build says so.
+3. `replace` says what of the map goes: `"none"` (the default), `"all"` (the map is not asked), or a list of OSM ids
+   the map has.
+4. A part thinner than a print can hold, across or up, is widened to 1.2 mm, and its record says so. A part stops at the
+   bed.
 5. Openings are cut after every solid is joined, and cut the map's parts too.
 6. After `copies`, at most 400 parts. A bad part stops the build, named by its place in the list.
 7. `lean` tips everything above the base, map parts too, about the ground at the origin.
@@ -30,7 +32,7 @@ with the same one command.
 | `opening` | `at`, `turn` (the way you walk through), `width`, `depth`, `from`, `to`, `arch` (true: a round head) |
 
 A plan is one of `rect` [x, y], `circle` radius, `ngon` [sides, radius], `ring` [[x, y], ...]. `turn` is degrees clockwise.
-Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, skillion. Any part takes `id`, `source`, `guess` and `copies`:
+Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, skillion (high at -y, falling toward +y). Any part takes `id`, `source`, `guess` and `copies`:
 `{"around": [x, y], "count": n}` (n in all, evenly turned), `{"row": [x, y], "count": n}` (n in all, stepped by x, y) or
 `{"mirror": "x"}` (and its mirror image across the y axis) or `"y"` or `"xy"` (all four).
 

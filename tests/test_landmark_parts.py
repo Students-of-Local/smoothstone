@@ -82,7 +82,25 @@ def test_copies(copies, centres):
 def test_a_thin_part_is_widened_to_print(part):
     record = landmark_parts.read(_pack(part), REFS)[0][0]
     box = m3.Manifold.batch_boolean(record["_build"](1., []), m3.OpType.Add).bounding_box()
-    assert box[3] - box[0] == pytest.approx(1.2, abs=.02)
+    assert box[3] - box[0] == pytest.approx(1.2, abs=.02) and record["print_modifications"]
+
+
+@pytest.mark.parametrize("part, foot, top", [
+    ({"kind": "prism", "rect": [27, 2737], "from": 67, "to": 74.6}, 5.596 - 1.2, 5.596),  # a bridge's deck
+    ({"kind": "lathe", "profile": [[67, 40], [74.6, 30]]}, 5.596 - 1.2, 5.596),
+    ({"kind": "prism", "rect": [40, 40], "from": 0, "to": 40}, 0, 3),
+])
+def test_a_sheet_is_thickened_under_its_top(part, foot, top):
+    record = landmark_parts.read(_pack(part), REFS)[0][0]
+    box = m3.Manifold.batch_boolean(record["_build"](.075, []), m3.OpType.Add).bounding_box()
+    assert box[2] == pytest.approx(foot, abs=.02) and box[5] == pytest.approx(top, abs=.02)
+
+
+def test_a_beams_heights_are_its_solids_and_a_skillion_falls_toward_y():
+    beam = landmark_parts.read(_pack({"kind": "beam", "path": [[0, 0, 0], [0, 0, 9]], "size": [2, 4]}), REFS)[0][0]
+    assert (beam["min_height"]["metres"], beam["height"]["metres"]) == pytest.approx((0, 9))
+    roof = _solid({**BLOCK, "roof": "skillion", "roof_rise": 3})
+    assert roof.slice(9.).bounds()[3] < 0 < -roof.slice(9.).bounds()[1]
 
 
 def test_a_guess_is_marked_and_a_part_may_name_its_source():
@@ -131,7 +149,8 @@ def test_a_bad_part_is_refused_by_its_place(part, why):
     assert "parts[1]" in str(stop.value)
 
 
-@pytest.mark.parametrize("more", [{"origin": None}, {"origin": [0]}, {"axis": "north"}, {"replace": "some"}, {"value": []}, {"scale": 2}])
+@pytest.mark.parametrize("more", [{"origin": None}, {"origin": [0]}, {"axis": "north"}, {"replace": "some"}, {"value": []}, {"scale": 2},
+                                  {"replace": ["7"]}, {"origin": [2.3, 48.9]}])
 def test_a_bad_fact_is_refused(more):
     with pytest.raises(landmark_refs.LandmarkProblem, match="Reference parts"):
         landmark_parts.read(_pack(BLOCK, **more), REFS)
@@ -150,7 +169,7 @@ def build(monkeypatch, tmp_path):
     """Build a pack as `stone landmark --refs` does, with the map answering these parts."""
     asked = []
 
-    def go(pack, parts=()):
+    def go(pack, parts=(), detail="low"):
         monkeypatch.setattr(landmark_refs, "resolve", lambda name, root: {
             **REFS, "label": "Example", "id": "Q1", "height": None, "style": [], "source": SOURCE, "sources": {}})
         ring = [[[-5, -5], [5, -5], [5, 5], [-5, 5]]]
@@ -163,7 +182,7 @@ def build(monkeypatch, tmp_path):
         monkeypatch.setattr(landmark_refs, "fetch", fetch)
         path = tmp_path / "pack.json"
         path.write_text(json.dumps(pack))
-        info = landmark.generate("Example", tmp_path / "job", [200, 200, 200], 100, "low", ref_pack=path)
+        info = landmark.generate("Example", tmp_path / "job", [200, 200, 200], 100, detail, ref_pack=path)
         import trimesh
         mesh = trimesh.load(info["stl"])
         assert mesh.is_watertight
@@ -183,6 +202,43 @@ def test_the_pack_adds_to_the_map_and_takes_the_listed_parts_from_it(build):
     assert asked and [p["id"] for p in refs["parts"]] == [1, 7, "part-0"]
     _, refs, _, _ = build(_pack(tall, replace=[7]), [(1, 10), (7, 12)])
     assert [p["id"] for p in refs["parts"]] == [1, "part-0"]
+
+
+def test_a_leg_set_on_the_ground_stops_at_the_bed(build):
+    """A splayed leg's foot hung 2.5 mm under the base, which then stood on its corners."""
+    leg = {"kind": "beam", "path": [[40, 40, 0], [10, 10, 57]], "size": [25, 25], "copies": {"mirror": "xy"}}
+    man, _, scale, _ = build(_pack(leg, replace="all"))
+    assert man.slice(.2).area() > 4 * (25 * scale) ** 2 * .9 and man.slice(1.9).area() == pytest.approx(man.slice(.2).area(), rel=.1)
+
+
+def test_only_the_packs_own_parts_miss_the_ornament(build, monkeypatch):
+    """The map's corrected records are 'reference' too, and lost theirs."""
+    from smoothstone import landmark_architecture, landmark_style
+    seen = []
+
+    def corrected(records, sections, *_):
+        records[0]["type"] = "reference"
+        return records, sections, []
+    monkeypatch.setattr(landmark_architecture, "reconcile", corrected)
+    monkeypatch.setattr(landmark_style, "decorate", lambda man, records, *a, **k: (seen.extend(p["id"] for p in records) or man, []))
+    build(_pack({**BLOCK, "to": 30}), [(1, 10)], "high")
+    assert seen == [1]
+
+
+def test_a_flagpole_is_not_the_landmark_and_replace_names_mapped_parts(build):
+    pole = {"kind": "beam", "path": [[0, 0, 0], [0, 0, 30]], "size": [1, 1]}
+    with pytest.raises(landmark_refs.LandmarkProblem, match="insufficient"):
+        build(_pack(pole))
+    with pytest.raises(landmark_refs.LandmarkProblem, match="no part 9"):
+        build(_pack(BLOCK, replace=[9]), [(1, 10)])
+
+
+def test_an_openings_source_and_guess_are_kept_and_the_map_is_not_credited(build, tmp_path):
+    hole = {"kind": "opening", "width": 2, "depth": 12, "from": 0, "to": 6, "source": SOURCE + "/door", "guess": "a door"}
+    _, refs, _, _ = build(_pack(BLOCK, hole, replace="all"))
+    credits = (tmp_path / "job/model/credits.txt").read_text()
+    assert "OpenStreetMap" not in credits and SOURCE + "/door" in credits
+    assert any("a door" in note for note in refs["modeling_additions"])
 
 
 def test_an_opening_lets_light_through_and_cuts_the_maps_walls(build):

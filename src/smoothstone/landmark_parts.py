@@ -90,22 +90,22 @@ def _prism(part):
     def build(floor, notes):
         from .landmark import _roof
 
-        body, eave = _wide(cs, floor), hi - rise
+        body, eave, foot = _wide(cs, floor), hi - rise, min(lo, hi - floor)  # thick enough, and the top stays
         x0, y0, x1, y1 = body.bounds()
         mid = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
-        run = eave - lo
+        run = eave - foot
         solids, top = [], body
         if run > 1e-6:
             least = min(1., floor / max(1e-9, min(x1 - x0, y1 - y0)))  # the top prints too
             s = max(scale, least) if scale < 1 else scale
             walls = body.translate((-mid).tolist()).extrude(run, scale_top=[s, s])
-            shear = np.array([[1, 0, shift[0] / run, mid[0]], [0, 1, shift[1] / run, mid[1]], [0, 0, 1, lo]])
+            shear = np.array([[1, 0, shift[0] / run, mid[0]], [0, 1, shift[1] / run, mid[1]], [0, 0, 1, foot]])
             solids.append(walls.transform(shear.tolist()))
             top = body.translate((-mid).tolist()).scale([s, s]).translate((mid + shift).tolist())
         if rise:
             over = min(.02, rise / 4)
             mm = THIN / floor if floor else 1.  # roofs are lofted in print millimetres
-            loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {}},
+            loft = _roof(top.scale([mm, mm]), {"roof_shape": roof, "tags": {"roof:direction": "0"} if roof == "skillion" else {}},
                          (eave - over) * mm, (rise + over) * mm, notes)
             solids.append(loft.scale([1 / mm] * 3))
         return solids
@@ -138,7 +138,8 @@ def _lathe(part):
 
     def build(floor, notes):
         wide = np.maximum(r, floor / 2)
-        ring = [[0, z[0]], *np.c_[wide, z].tolist(), [0, z[-1]]]
+        foot = min(z[0], z[-1] - floor)
+        ring = [[0, foot], [wide[0], foot], *np.c_[wide, z][int(foot == z[0]):].tolist(), [0, z[-1]]]
         return [m3.CrossSection([ring]).revolve(64)]
     return build, z[0], z[-1], 0, "flat"
 
@@ -169,7 +170,7 @@ def _beam(part):
             if i:  # the elbow
                 solids.append(m3.Manifold.hull_points(np.array([path[i] + c for c in [*ends[i - 1], *corners]])))
         return [s for s in solids if not s.is_empty()]
-    return build, path[:, 2].min() - size[1] / 2, path[:, 2].max() + size[1] / 2, 0, "flat"
+    return build, 0, 0, 0, "flat"  # its heights are its solid's
 
 
 def _opening(part):
@@ -239,6 +240,9 @@ def read(pack, refs):
         _need(fact.get("replace", "none") in ("none", "all") or isinstance(fact["replace"], list),
               'replace must be "none", "all" or a list of OSM ids')
         lat, lon = _vector(fact.get("origin"), "origin")
+        _need(isinstance(fact.get("replace", ""), str) or all(type(i) is int for i in fact["replace"]), "replace lists OSM ids as integers")
+        _need(math.dist((lat, lon), (refs["latitude"], refs["longitude"])) < .05,
+              "origin must be [lat, lon] within 5 km of the landmark")
         axis = _number(fact.get("axis", 0), "axis")
         _need(isinstance(fact["value"], list) and fact["value"], "value must list the parts")
     except ValueError as exc:
@@ -262,24 +266,33 @@ def read(pack, refs):
             copies = _copies(part.get("copies"))
             _need(len(records) + len(openings) + len(copies) <= MAX_PARTS, f"more than {MAX_PARTS} parts")
             outline = m3.Manifold.batch_boolean(build(0, []), m3.OpType.Add)
+            if kind == "beam":
+                lo, hi = outline.bounding_box()[2::3]
             for k, copy in enumerate(copies):
                 flat = world @ np.r_[copy, [[0, 0, 1]]] @ np.r_[here, [[0, 0, 1]]]
 
-                def make(scale, notes, flat=flat, build=build):
-                    return _place(build(THIN / scale, notes), flat, scale)
+                record = {}
+
+                def make(scale, notes, flat=flat, build=build, plain=outline, record=record):
+                    solids = build(THIN / scale, notes)
+                    grown = m3.Manifold.batch_boolean(solids, m3.OpType.Add)
+                    if np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01:
+                        record["print_modifications"] = ["Widened to 1.2 mm."]
+                    return _place(solids, flat, scale)
                 if kind == "opening":
-                    openings.append((make, part["width"]))
+                    openings.append((make, part["width"], source, guess))
                     continue
                 name = f"{part.get('id', f'part-{i}')}" + (f"-{k + 1}" if len(copies) > 1 else "")
                 _need(name not in seen, f"id {name} is used twice")
                 seen.add(name)
                 section = _place([outline], flat)[0].project()
-                records.append({
+                record.update({
                     "id": name, "type": "reference", "height": _fact(hi, source, guess is not None, guess),
                     "min_height": _fact(lo, source, guess is not None, guess),
                     "roof_height": _fact(rise, source, guess is not None, guess), "roof_shape": roof,
                     "spire": roof in ("pyramidal", "onion") and rise > math.sqrt(section.area()), "source": source,
                     "tags": {}, "footprint": [ring.tolist() for ring in section.to_polygons()], "_build": make})
+                records.append(record)
                 sections.append(section)
         except ValueError as exc:
             raise LandmarkProblem(f"Reference parts[{i}]: {exc}. See docs/REFERENCE_PARTS.md.") from exc
@@ -290,7 +303,9 @@ def read(pack, refs):
 
 def cut(man, openings, scale, notes):
     """Cut the pack's openings, down to the base."""
-    for make, width in openings:
+    for make, width, _, guess in openings:
+        if guess:
+            notes.append(f"Guessed an opening: {guess}.")
         if width * scale < CUT:
             notes.append(f"Omitted detail below the print floor: an opening {width:g} m wide.")
             continue
