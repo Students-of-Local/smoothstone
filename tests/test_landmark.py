@@ -604,6 +604,47 @@ def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     assert odd["150-1"] == (13, 14, False)
 
 
+def _of(records, start):
+    return {p["id"]: (p["min_height"]["metres"], p["height"]["metres"]) for p in records if str(p["id"]).startswith(start)}
+
+
+def test_two_parts_with_no_height_share_two_missing_levels():
+    from smoothstone import landmark
+
+    odd = _minaret(150)
+    for k in (1, 2):
+        odd[k] = {"id": f"150-{k}u", "footprint": odd[1]["footprint"], "tags": {"building:part": "yes"}}
+    twins = [*_minaret(0), *_minaret(50), *_minaret(100)]
+    for k in range(0, 12, 4):  # the same plan at both levels
+        twins[k + 2]["footprint"] = twins[k + 1]["footprint"]
+    records, _ = landmark.resolve_parts([*twins, *odd], {"geometry_source": "x"})
+    assert {_of(records, "150")[f"150-{k}u"] for k in (1, 2)} == {(13, 14), (32, 32.3)}
+
+
+def test_a_part_mapped_from_the_ground_keeps_it():
+    from smoothstone import landmark
+
+    parts = [*_minaret(0), *_minaret(50), *_minaret(100), *_minaret(150, untagged=True)]
+    for part in parts:
+        if part["id"] == "150-2u":
+            part["tags"]["min_height"] = "0"
+    records, _ = landmark.resolve_parts(parts, {"geometry_source": "x"})
+    assert _of(records, "150")["150-2u"][0] == 0
+
+
+def test_a_pinnacle_on_another_tower_gives_no_level():
+    from smoothstone import landmark
+
+    def part(i, x, half, lo=None, hi=None):
+        ring = [[[x - half, -half], [x + half, -half], [x + half, half], [x - half, half]]]
+        tags = {"building:part": "yes", **({"min_height": lo, "height": hi} if hi else {})}
+        return {"id": i, "footprint": ring, "tags": tags}
+    parts = [part("a", 0, .75, "60", "64"), part("b", 10, .75, "60", "64"), part("tower", 5, 9, "0", "60"),
+             part("low", 50, 2, "10", "25"), part("high", 50, 1.9, "25", "40"), part("odd", 50, .75)]
+    records, _ = landmark.resolve_parts(parts, {"geometry_source": "x"})
+    assert _of(records, "odd")["odd"][0] == 0
+
+
 def test_a_part_with_no_height_and_no_twins_still_stands():
     from smoothstone import landmark
 
@@ -675,4 +716,10 @@ def test_matched_towers_get_the_same_mapped_detail():
     assert all(p["height"]["guessed"] and float(p["tags"]["roof:direction"]) == pytest.approx(157.5) for p, _ in added)
     assert all(cs.area() == pytest.approx(1) for _, cs in added) and notes
     both = parts + added
+    for p, _ in added:  # raised by a sourced amount, it is still a guess
+        p.update(spire=True, roof_shape="pyramidal")
+    facts = {"spire_rise_m": {"value": 12, "source": "https://example.org"}}
+    tops = [(p["height"]["metres"], p["height"]["guessed"]) for p in la.reconcile(
+        [p for p, _ in both], [cs for _, cs in both], {}, facts, ["gothic"])[0] if str(p["id"]).endswith("-twin")]
+    assert tops == [(122, True)] * 4
     assert la._twin_detail(both, [np.array([0., -17]), np.array([0., 17])], 18, 70, []) == []

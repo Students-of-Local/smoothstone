@@ -92,7 +92,7 @@ def _level_from_twin(i, prepared):
     same-plan twins elsewhere share. Returns (min_height, height, id), "duplicate" when every such level
     is already drawn here, or None when nothing repeats it."""
     part, cs, _, lo = prepared[i]
-    if lo:
+    if lo or "min_height" in part.get("tags", {}):
         return None
     levels, here = {}, []
     for other, other_cs, h, other_lo in prepared:
@@ -104,14 +104,23 @@ def _level_from_twin(i, prepared):
             levels.setdefault((round(other_lo, 1), round(h, 1)), []).append((other_lo, h, other.get("id")))
     # One stray match is a coincidence. A set repeats at least twice and stands in for a stack here.
     levels = [v[0] for v in levels.values() if len(v) >= 2]
-    stack = [1 for _, other_cs, h, other_lo in prepared
+    stack = [(other_lo, h) for _, other_cs, h, other_lo in prepared
              if h is not None and other_lo and (cs ^ other_cs).area() > cs.area() * .6]
-    if not levels or len(stack) < 2:
+    if len(stack) < 2:
+        return None
+    # A pinnacle's plan repeats on other towers too. Its level counts only within this stack's height.
+    foot, top = min(a for a, _ in stack), max(b for _, b in stack)
+    levels = sorted(v for v in levels if foot - 1 <= v[0] <= top + 1)
+    if not levels:
         return None
     missing = [v for v in levels if not any(abs(v[0] - a) < .3 and abs(v[1] - b) < .3 for a, b in here)]
-    if not missing:
+    # Several parts here with no height share the missing levels, the lowest first.
+    alike = [j for j, (_, other_cs, h, other_lo) in enumerate(prepared) if h is None and not other_lo
+             and _same_plan(cs, other_cs) and (cs ^ other_cs).area() > cs.area() * .8]
+    rank = alike.index(i)
+    if rank >= len(missing):
         return "duplicate"
-    return missing[0] if len(missing) == 1 else None
+    return missing[rank] if len(alike) >= len(missing) else None
 
 
 def resolve_parts(parts, refs):
