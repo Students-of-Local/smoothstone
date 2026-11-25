@@ -854,7 +854,7 @@ def subject_of(request: str) -> str | None:
     if caps:
         caps = " ".join(w for w in caps.split() if w not in PRINT_WORDS)
         caps = re.sub(r"^(?:the|a|an)\s+", "", caps.strip(" ,."), flags=re.I)
-        if caps:
+        if caps or (caps := next(iter(named_in(req)), None)):  # "Help me print the Tower Bridge": Help is no name
             return caps
     m = re.search(r"\b((?:\w+\s+){0,2}(?:cathedral|basilica|tower|castle|palace|temple|bridge|mosque))\b", req, re.I)
     if m:
@@ -871,7 +871,9 @@ def names_landmark(request: str) -> str | None:
     if not s:
         return None
     # Someone asking for an existing file of a named thing wants that search, building word or not.
-    return s if BUILDING.search(s) or asks_found_model(request) else None
+    if asks_found_model(request):
+        return s
+    return s if BUILDING.search(s) and not for_another_thing(request, s) else None
 
 
 # What may come before the name of the thing asked for, a size and a "model of" last, and what may come after it.
@@ -920,11 +922,22 @@ AFTER = re.compile(rf"""\s*(?:$|[,.;:!?()])|\s+(?:\d|(?:3-?d\s+)?{THING}\b|(?:lo
     |into\s+(?:an?\s+)?(?:3-?d\s+)?{THING}\b|as\s+(?:\w+\s+as\b|(?:an?\s+)?(?:3-?d\s+)?(?:{THING}|gift|present|souvenir|decoration)\b))""", re.I | re.X)
 
 
+def _clauses(request: str) -> list[str]:
+    req = ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'"))
+    return re.split(r"(?<=[.!?;])\s+(?=[A-Za-z])", req)
+
+
+def for_another_thing(request: str, name: str) -> bool:
+    """True when the name is there only for another thing: "a phone case with the Eiffel Tower on it"."""
+    seen = [(c, m) for c in _clauses(request) for m in re.finditer(re.escape(name), c, re.I)]
+    return bool(seen) and all(OTHER_BEFORE.search(c[:m.start()].rstrip()) or not AFTER.match(c, m.end()) for c, m in seen)
+
+
 def named_in(request: str) -> list[str]:
     """Names in capitals that a request may ask for, the longest first: "Turn the Arc de Triomphe into a 3D print". Not
     one that another thing is made for, with or like ("a clip for the Arc"), nor one that names it ("an Arc lamp")."""
     out = []
-    for clause in re.split(r"(?<=[.!?;])\s+(?=[A-Za-z])", ABBREV.sub(lambda m: ABBREVS[m.group(1).lower()] + " ", request.replace("\u2019", "'"))):
+    for clause in _clauses(request):
         for m in NAME.finditer(clause):
             opener = OPENERS.match(m.group())
             name = m.group()[opener.end():] if opener else m.group()
