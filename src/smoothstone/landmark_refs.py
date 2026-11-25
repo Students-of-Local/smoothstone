@@ -69,7 +69,7 @@ def _quantity(value):
 def resolve(name: str, job_root: Path) -> dict:
     """Return sourced facts for the closest structure found by name."""
     normalized = ' '.join(name.casefold().split())
-    key = hashlib.sha256(normalized.encode()).hexdigest()
+    key = hashlib.sha256(f'2 {normalized}'.encode()).hexdigest()  # 2: the ranking that chose the answer
     cache = Path.home() / '.cache' / 'smoothstone' / 'wikidata' / (key + '.json')
     ref_path = Path(job_root) / 'refs' / 'landmark.json'
     if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
@@ -93,8 +93,10 @@ def resolve(name: str, job_root: Path) -> dict:
         entities = _wiki({'action': 'wbgetentities', 'ids': ids,
                           'props': 'labels|descriptions|claims|sitelinks', 'languages': 'en'}).get('entities', {})
         forbidden = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
-        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate)\b', re.I)
-        place = re.compile(r'\b(district|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|island|river|lake|street|square|station|school|company)\b', re.I)
+        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel|fort|fortification|house|ch[aâ]teau|hotel|fountain|dam|windmill|capitol|ruins?|archaeological)\b', re.I)
+        place = re.compile(r'\b(district|place|airport|state|kingdom|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|island|river|lake|street|road|square|station|stop|school|company|settlement|locality|community|area|territory|constituency|capital|mountain|hill|valley|park)\b', re.I)
+        # The words before the first place say what the thing is: a "human settlement in Tower Hamlets" is no tower.
+        kind = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named)\b|[,;(]', re.I)
         candidates = []
         for order, hit in enumerate(hits):
             entity = entities.get(hit['id'], {})
@@ -103,9 +105,21 @@ def resolve(name: str, job_root: Path) -> dict:
             description = hit.get('description', '')
             if forbidden.search(description):
                 continue
-            exact = (structure.search(description) or not place.search(description)) and any(' '.join(label.casefold().split()) == normalized for label in
+            # An exact name counts first only with evidence that this is a building: its own kind says so,
+            # or it has an architectural style, an architect or a count of floors.
+            named = any(' '.join(label.casefold().split()) == normalized for label in
                         (hit.get('label', ''), hit.get('match', {}).get('text', '')))
-            candidates.append(((bool(exact), bool(structure.search(description)), -order), hit, entity))
+            what = kind.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip()
+            designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
+            words = [word.group().casefold() for word in place.finditer(what)]
+            # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
+            placed = bool(words) and not any(m.end() == len(what) for m in structure.finditer(what))
+            # A station or a school is a building when it has an architect; a town of one style is still a town.
+            if placed and designed and set(words) <= {'station', 'school', 'airport'}:
+                placed = False
+            building = not placed and bool(structure.search(what) or designed)
+            rank = 2 * named + building if named and not placed and (what or building) else int(building)
+            candidates.append(((rank, bool(structure.search(description)), named, -order), hit, entity))
         if not candidates:
             raise LandmarkProblem(f'No building with coordinates found for {name}.')
         _, hit, entity = max(candidates, key=lambda x: x[0])

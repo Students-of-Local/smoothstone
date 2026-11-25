@@ -569,8 +569,9 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         surveyed_plan = m3.CrossSection.batch_boolean([outline, *(cs for _, cs in towers)], m3.OpType.Add)
         _, _, spans = _frame(surveyed_plan, {})
         width, length_ = sorted(spans)
-        refs["reference_dimensions_m"].update(length=float(length_), width=float(width),
-                                              associated_outlines=[p["source"] for p, _ in towers])
+        # The building's own outline stays the reference. This is the plan built here, towers included.
+        refs["plan_dimensions_m"] = {"length": float(length_), "width": float(width),
+                                     "associated_outlines": [p["source"] for p, _ in towers]}
     mapped_height = max([length(data.get("tags", {}).get("height")) or 0] +
                         [p["height"]["metres"] for p in records if not p["height"]["guessed"]])
     target = _target(size, bed)

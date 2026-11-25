@@ -13,6 +13,7 @@ import numpy as np
 import trimesh
 
 import models_grade
+from smoothstone import modelprint
 
 RATIO_TOL = 0.04
 MIN_LIKENESS = 8
@@ -82,6 +83,22 @@ def standing_in_mesh(mesh: trimesh.Trimesh, parts: list[dict], scale: float, pli
     return len(found)
 
 
+def printed_mesh(generated: trimesh.Trimesh, parts: list[dict]) -> trimesh.Trimesh | None:
+    """The files that print, put back together where the generator built them. The print step turns the
+    model about the vertical and never scales a landmark, so the same turn taken back lines them up.
+    None when they do not line up, because then nothing can be counted at its recorded place."""
+    turned = modelprint.footprint_turn(generated, [])
+    back = np.linalg.inv(trimesh.registration.procrustes(
+        generated.vertices, turned.vertices, reflection=False, scale=False)[0])
+    meshes = []
+    for part in parts:
+        mesh = trimesh.load(part["file"], force="mesh", process=False)
+        meshes.append(mesh.apply_transform(back @ np.linalg.inv(np.asarray(part["to_print"], float))))
+    mesh = trimesh.util.concatenate(meshes)
+    plan = np.abs(mesh.bounds - generated.bounds)[:, :2]
+    return mesh if plan.max() < 1 else None
+
+
 def feature_grade(parts: list[dict], want: dict) -> tuple[dict, list[str]]:
     counts = Counter(p["feature"] for p in parts if p.get("feature"))
     why = []
@@ -138,6 +155,13 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
     height = float(size[2]) - refs.get("plinth_height_mm", 2)
 
     dimensions = refs.get("reference_dimensions_m", {})
+    # A linked tower prints with the building, so its plan counts only where the spec names the tower.
+    plan = refs.get("plan_dimensions_m") or {}
+    linked = plan.get("associated_outlines", [])
+    if plan and set(linked) <= set(references.get("linked_outlines", [])):
+        dimensions = {**dimensions, "length": plan["length"], "width": plan["width"]}
+    elif plan:
+        why.append("linked towers the spec does not name: " + ", ".join(linked))
     named = want.get("tallest") or {}
     standard = named.get("m") if named.get("source") else refs.get("height")
     if (_positive(standard) and _positive(dimensions.get("length")) and _positive(dimensions.get("width"))
@@ -177,6 +201,15 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
             why.append(f"built height is {height / scale:.2f} m at scale, {label} says {wd:g} m")
         if not _close(tallest, wd):
             why.append(f"tallest part is {tallest:.2f} m, {label} says {wd:g} m")
+    for axis, span in (("length", length), ("width", width)):
+        cited = references.get(f"{axis}_m")
+        if cited and _positive(scale):
+            allowed = cited.get("tolerance", RATIO_TOL)
+            error = abs(span / scale / cited["value"] - 1)
+            out.setdefault("cited", {})[axis] = {"built": span / scale, "reference": cited["value"], "error": error}
+            if error > allowed:
+                why.append(f"built {axis} is {span / scale:.1f} m at scale, {cited['source']} says "
+                           f"{cited['value']:g} m ({allowed:.0%} tolerance)")
     out["features"], failures = feature_grade(refs.get("parts", []), want.get("features", {}))
     why.extend(failures)
     for feature, rule in want.get("features", {}).items():
@@ -184,8 +217,13 @@ def grade(job: Path, spec: dict, checks: bool = True) -> dict:
             continue
         stl = job / "model" / "generated.stl"
         named_parts = [p for p in refs.get("parts", []) if p.get("feature") == feature]
-        stands = (standing_in_mesh(trimesh.load(stl), named_parts, scale, refs.get("plinth_height_mm", 2))
-                  if stl.is_file() and _positive(scale) else 0)
+        mesh = printed_mesh(trimesh.load(stl, force="mesh", process=False), parts) if stl.is_file() else None
+        if not stl.is_file():
+            why.append("no generated model to find the print's frame from")
+        elif mesh is None:
+            why.append("the print files do not line up with the generated model")
+        stands = (standing_in_mesh(mesh, named_parts, scale, refs.get("plinth_height_mm", 2))
+                  if mesh is not None and _positive(scale) else 0)
         out.setdefault("in_mesh", {})[feature] = stands
         if stands < rule["in_mesh"]:
             why.append(f"{stands} {feature} stand in the printed mesh (want at least {rule['in_mesh']})")
