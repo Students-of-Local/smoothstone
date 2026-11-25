@@ -1137,7 +1137,7 @@ saved builds pass the new measurements; no judge ran, because no mesh changed.
 
 ## 2026-11-24 landmark names: the thing a person means
 
-100 famous names, looked up once and scored from the recorded answers. main gave 78 and the change before this one 79:
+100 famous names, looked up once and scored from the recorded answers. main before #138 gave 78 and main 79:
 "White House" was Moscow's, "Buckingham Palace" a cottage in Western Australia, "Rialto Bridge" one in Dublin and
 "Petra" a particle accelerator.
 
@@ -1151,6 +1151,10 @@ saved builds pass the new measurements; no judge ran, because no mesh changed.
   fixes, 98 of 100. "Salisbury" still gives the city (no search returned the cathedral) and "Skellig Michael" the
   island group. A third set of 50 names, scored once after that and not tuned on: 47. "Peterhof" gives an inn and
   "Mezquita" a mosque in Huelva; the third, "Frauenkirche", gives Dresden's, which is fair.
+- After review: an event word before a building's kind ("siege castle") leaves it a building; fires, crashes and the
+  like are events; a name may say the place ("Example Tower Paris"); a busy or broken-off Wikipedia answer counts as
+  none; a population dated before 1900 is nobody living there. Scores unchanged: 47 of 48, 51 of 52, 47 of 50. Left:
+  the exact name of a part whose Wikipedia title redirects to a much better known building still gives the building.
 - The 98 are a recorded test, `tests/fixtures/landmark/names.json`. No sealed landmark's name is in any set.
 
 ### 2026-11-24: a guessed height, and rooms that are not parts

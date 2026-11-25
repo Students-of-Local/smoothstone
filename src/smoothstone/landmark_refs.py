@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import math
 import re
@@ -86,8 +87,11 @@ def _matches(name):
     answered = True
     for params in ({'titles': name, 'redirects': 1}, {'generator': 'search', 'gsrsearch': name, 'gsrlimit': 6}):
         try:
-            pages = _wikipedia(params).get('query', {}).get('pages', {}).values()
-        except (OSError, ValueError):
+            reply = _wikipedia(params)
+            if 'error' in reply:  # a busy server says so in a page that loads
+                raise ValueError(reply['error'])
+            pages = reply.get('query', {}).get('pages', {}).values()
+        except (OSError, ValueError, http.client.HTTPException):
             answered = False  # Wikidata's own search still answers
             continue
         for page in pages:
@@ -103,11 +107,21 @@ def _matches(name):
 
 
 FORBIDDEN = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
-EVENT = re.compile(r'\b(battle|siege|attack|protests?|riots?|election|earthquake)\b', re.I)
+EVENT = re.compile(r'\b(battle|siege|attack|protests?|riots?|election|earthquake|fire|bombing|shooting|collapse|crash|massacre)\b', re.I)
 STRUCTURE = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|memorial|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel|fort|fortification|house|ch[a\u00e2]teau|hotel|fountain|dam|windmill|capitol|prison|penitentiary|residence|ruins?|archaeological)\b', re.I)
 PLACE = re.compile(r'\b(district|(?:designated|populated|inhabited) place|airport|state|kingdom|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|islands?|river|lake|street|road|square|station|stop|school|university|company|settlement|locality|community|area|territory|constituency|capital|mountain|hill|valley|park)\b', re.I)
 # The words before the first preposition say what a thing is: a "human settlement in Tower Hamlets" is no tower.
 KIND = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named|after|during|commemorating)\b|[,;(]', re.I)
+
+
+def _lived_in(entity):
+    """A population counted since 1900. Ancient cities carry estimates dated to their own time."""
+    for claim in entity.get('claims', {}).get('P1082', []):
+        amount = claim.get('mainsnak', {}).get('datavalue', {}).get('value', {}).get('amount', 0)
+        when = [q.get('datavalue', {}).get('value', {}).get('time', '') for q in claim.get('qualifiers', {}).get('P585', [])]
+        if claim.get('rank') != 'deprecated' and float(amount) and (not when or any(re.match(r'\+(19|2\d)\d\d-', w) for w in when)):
+            return not entity['claims'].get('P576')
+    return False
 
 
 def _choose(name, hits, entities):
@@ -125,17 +139,23 @@ def _choose(name, hits, entities):
         named = wanted in names
         # A page Wikipedia only thinks related is no answer. Wikidata's own hits match the start of a name.
         near = hit.get('article') or any(set(wanted) <= set(n) for n in names)
-        if EVENT.search(what) or not (named or near or 'match' in hit):
+        # "Example Tower Paris" is the Example Tower whose description says Paris.
+        told = set(_words(description))
+        near = near or any(n and set(n) < set(wanted) and set(wanted) - set(n) <= told for n in names)
+        # A "siege castle" or a "fire station" ends in its kind, as a "parish church" does.
+        ends = any(m.end() == len(what) for m in STRUCTURE.finditer(what))
+        if (EVENT.search(what) and not ends and not what.casefold().endswith('station')) \
+                or not (named or near or 'match' in hit):
             continue
         designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
         places = {word.group().casefold() for word in PLACE.finditer(what)}
         # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
-        placed = bool(places) and not any(m.end() == len(what) for m in STRUCTURE.finditer(what))
+        placed = bool(places) and not ends
         # A station or a school is a building when it has an architect; a town of one style is still a town.
         if placed and designed and places <= {'station', 'school', 'airport'}:
             placed = False
         # An archaeological site, whatever it once was, unless people still live there.
-        dug = 'Q839954' in _item_ids(entity, 'P31') and not float((_value(entity, 'P1082') or {}).get('amount', 0))
+        dug = 'Q839954' in _item_ids(entity, 'P31') and not _lived_in(entity)
         score = 1 + len(entity.get('sitelinks', {}))
         score *= 8 if named else 1 if near else .05
         score *= 2 if hit.get('article') else 1
@@ -150,7 +170,7 @@ def _choose(name, hits, entities):
 def resolve(name: str, job_root: Path) -> dict:
     """Return sourced facts for the closest structure found by name."""
     normalized = ' '.join(name.casefold().split())
-    key = hashlib.sha256(f'3 {normalized}'.encode()).hexdigest()  # 3: the ranking that chose the answer
+    key = hashlib.sha256(f'4 {normalized}'.encode()).hexdigest()  # 4: the ranking that chose the answer
     cache = Path.home() / '.cache' / 'smoothstone' / 'wikidata' / (key + '.json')
     ref_path = Path(job_root) / 'refs' / 'landmark.json'
     if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
