@@ -509,6 +509,17 @@ def test_a_shipped_pack_s_parts_make_one_body_at_a_small_print(path):
     assert all(r["source"].startswith("http") for r in records)
 
 
+def test_the_dome_of_the_rock_is_as_wide_as_creswells_octagon():
+    """The grader's smallest box lies across the porches, so it does not measure the walls."""
+    path = Path(landmark_refs.__file__).with_name("landmarks") / "dome-of-the-rock.json"
+    pack = json.loads(path.read_text())
+    lat, lon = pack["parts"]["origin"]
+    walls, = (r for r in landmark_parts.read(pack, {"latitude": lat, "longitude": lon})[0]
+              if r["id"] == "octagonal-curtain-walls")
+    west, south, east, north = walls["_build"](1, [])[0].slice(5).bounds()
+    assert np.allclose([east - west, north - south], 49.7, rtol=.005)
+
+
 def test_each_opera_house_sail_stands_on_the_deck():
     """Each half sail once fanned from one point 2 m under its lowest row: the sides of it printed in mid air."""
     path = Path(landmark_refs.__file__).with_name("landmarks") / "sydney-opera-house.json"
@@ -523,9 +534,9 @@ def test_each_opera_house_sail_stands_on_the_deck():
         return [solid.slice(z * 1.04) for z in heights]
     decks = sum((cut(r, 12.2)[0] for r in rows if r["id"] in ("upper-podium", "restaurant-southwest-wing")),
                 m3.CrossSection())
-    ground = sum((cut(r, .5)[0] for r in rows if r["id"] in ("lower-continuous-podium", "monumental-stair-01")),
-                 m3.CrossSection()).rotate(pack["parts"]["axis"])
-    west, south, east, north = ground.bounds()
+    plan = m3.CrossSection.batch_boolean([m3.Manifold.batch_boolean(r["_build"](1.04, []), m3.OpType.Add).project()
+                                          for r in rows], m3.OpType.Add).rotate(pack["parts"]["axis"])
+    west, south, east, north = plan.bounds()
     # the mapped outline, relation 9596872; the published 183 x 118 m is the base's
     assert np.allclose([(north - south) / 1.04, (east - west) / 1.04], [170.5, 114.2], rtol=.02)
     for r in sails:
