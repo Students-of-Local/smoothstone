@@ -884,7 +884,7 @@ MODEL_OF = re.compile(r"""(?:(?:an?|the)\s+)?(?:(?!(?:for|with|of|on|to|under|ho
 NAME_ENDS = re.compile(r"""\s*(?:[,.;:!?()]|$)|\s+(?:[-\u2013\u2014]\s|\d|(?:for|that|which|please|about|with|so|using|from|scaled?|sized)\b
     |(?:in|at)\s+(?:\d|an?\b|one\b|two\b|pla|petg|abs|asa|tpu|resin|plastic|wood|stone|colou?r|white|black|gr[ae]y|red|green|blue
     |gold|silver|bronze|full|true|high|low|small|large|scale|about|around)
-    |as\s+(?:an?\s+)?(?:3d\s+)?(?:model|replica|miniature|print)\b|to\s+(?:print|fit|display)\b)""", re.I | re.X)
+    |as\s+(?:an?\s+)?(?:3d\s+)?(?:model|replica|miniature|print)\b|to\s+(?:be\s+)?(?:3-?d[\s-]?)?(?:print|fit|display)\w*\b|i\s+(?:can|could|want)\b)""", re.I | re.X)
 
 
 def known_landmark(request: str) -> str | None:

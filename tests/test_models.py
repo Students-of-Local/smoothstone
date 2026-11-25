@@ -440,7 +440,7 @@ def test_names_landmark_still_names_buildings(request_, subject):
 
 
 NAMES = ("Arc de Triomphe", "Stonehenge", "alhambra", "Parthenon", "pantheon", "Colosseum", "white house", "pentagon", "lid",
-         "Saint Mark's", "Alhambra", "Kindle Paperwhite", "petra", "stonehenge", "parthenon")
+         "Saint Mark's", "Alhambra", "Kindle Paperwhite", "Petronas Towers", "petra", "stonehenge", "parthenon")
 
 
 @pytest.mark.parametrize("request_, subject", [
@@ -464,6 +464,9 @@ NAMES = ("Arc de Triomphe", "Stonehenge", "alhambra", "Parthenon", "pantheon", "
     ("Could you 3D print the Arc de Triomphe at 1:500 scale?", "Arc de Triomphe"),
     ("A small detailed 12 cm replica of the Parthenon in white", "Parthenon"),
     ("Stonehenge model, 16 cm", "Stonehenge"),
+    ("I need a model of the Petronas Towers to 3D print, 18 cm tall.", "Petronas Towers"),
+    ("a model of the Alhambra to be 3D-printed in PLA", "Alhambra"),
+    ("make the Parthenon I can print on my Ender", "Parthenon"),
     ("A stand for my Kindle Paperwhite", None),
     ("A clip for the Arc de Triomphe", None),
     ("a wall thing", None),
