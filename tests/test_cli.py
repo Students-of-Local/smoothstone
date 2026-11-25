@@ -708,3 +708,18 @@ def test_new_at_a_terminal_names_the_one_command(monkeypatch, capsys):
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     cli.main(["new", "a mini figure of Palmer Luckey"])
     assert "stone go" in capsys.readouterr().err
+
+
+def test_the_cap_on_lines_never_hides_why_a_build_failed():
+    """The Golden Gate Bridge at 80 cm printed 24 lines of parts and "(11 more lines in log.txt)", and no FIX."""
+    out = cli.Out()
+    out.add(*(f"Part {i}: all 15 checks pass" for i in range(30)))
+    out.fix("a part does not pass the print checks at this size")
+    lines = out.render().splitlines()
+    assert len(lines) == cli.MAX_LINES and lines[0] == "Part 0: all 15 checks pass"
+    assert lines[-3] == "FIX: a part does not pass the print checks at this size"
+    assert lines[-2] == "(8 more lines in log.txt)" and lines[-1].startswith("NEXT:")
+    assert [int(ln.split(":")[0][5:]) for ln in lines[:-3]] == list(range(22))
+    out = cli.Out()
+    out.add(*(f"FIX: {i}" for i in range(40)))
+    assert len(out.render().splitlines()) == cli.MAX_LINES
