@@ -1,7 +1,9 @@
 """Reference-backed landmark builds, exercised without network access."""
 
 import copy
+import http.client
 import json
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
@@ -207,7 +209,8 @@ def _chosen(name, *found):
 
 
 @pytest.mark.parametrize("description", ["memorial to the Battle of Example", "monument commemorating the siege",
-                                         "church rebuilt after the 1755 earthquake", "abbey in Battle, East Sussex"])
+                                         "church rebuilt after the 1755 earthquake", "abbey in Battle, East Sussex", "siege castle in Germany",
+                                         "earthquake memorial museum in Kobe", "fire lookout tower in Kent"])
 def test_a_building_that_recalls_an_event_is_still_a_building(description):
     assert _chosen("Example Memorial", _hit("Q1", "Example Memorial", description, 20),
                    _hit("Q2", "Example Memorial Hall", "hall in Kent", 3)) == "Q1"
@@ -216,6 +219,41 @@ def test_a_building_that_recalls_an_event_is_still_a_building(description):
 def test_the_event_itself_is_not():
     assert _chosen("Example", _hit("Q1", "Siege of Example", "1836 major battle in Texas", 50, article=True, aliases=["Example"]),
                    _hit("Q2", "Example Mission", "historic place in Texas", 20, aliases=["Example"])) == "Q2"
+
+
+def test_a_fire_in_a_cathedral_is_not_the_cathedral():
+    assert _chosen("Notre Example", _hit("Q1", "Notre Example fire", "2019 church fire in Paris", 63, article=True),
+                   _hit("Q2", "Notre Example de Paris", "cathedral in Paris", 8)) == "Q2"
+
+
+def test_a_fire_station_is_not_a_fire():
+    assert _chosen("Example Works", _hit("Q1", "Example Works", "fire station in Kent", 2)) == "Q1"
+
+
+def test_wikipedia_is_asked_for_the_items_of_its_pages(monkeypatch):
+    asked = []
+    monkeypatch.undo()
+    monkeypatch.setattr(landmark_refs, "_request", lambda url: asked.append(url) or {"query": {}})
+    assert landmark_refs._wikipedia({"titles": "Example", "redirects": 1}) == {"query": {}}
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(asked[0]).query)
+    assert asked[0].startswith(landmark_refs.WIKIPEDIA + "?")
+    assert query == {"action": ["query"], "format": ["json"], "prop": ["pageprops"], "ppprop": ["wikibase_item"],
+                     "titles": ["Example"], "redirects": ["1"]}
+
+
+def test_a_name_may_say_the_place():
+    hits = (_hit("Q1", "Example Tower", "tower in Paris, France", 60), _hit("Q2", "Example Tower (Paris, Texas)", "tower in Texas", 9))
+    assert _chosen("Example Tower Paris", *hits) == "Q1"
+    assert _chosen("Example Tower Paris Texas", *hits) == "Q2"
+    with pytest.raises(landmark_refs.LandmarkProblem):
+        _chosen("Example Tower Rome", hits[0])
+
+
+def test_the_start_of_a_name_is_kept_and_loses_to_a_name():
+    started, entity = _hit("Q1", "Example Palace", "palace in Kent", 90)
+    started = {**started, "match": {"text": "Example Palace"}}
+    assert _chosen("Example Pal", (started, entity)) == "Q1"
+    assert _chosen("Example Pal", (started, entity), _hit("Q2", "Example Pal", "house in Kent", 2)) == "Q2"
 
 
 def test_a_page_that_is_only_related_is_no_answer():
@@ -230,18 +268,23 @@ def test_the_thing_with_the_name_comes_before_the_building_its_name_redirects_to
                    _hit("Q2", "Seville Cathedral", "cathedral in Seville", 12, article=True)) == "Q1"
 
 
-@pytest.mark.parametrize("people, winner", [("+82000", "Q2"), ("+0", "Q1"), (None, "Q1")])
-def test_a_town_dug_by_archaeologists_is_a_town_while_people_live_there(people, winner):
+@pytest.mark.parametrize("people, when, winner", [("+82000", None, "Q2"), ("+0", None, "Q1"), (None, None, "Q1"),
+                                                  ("+125000", "+0500-00-00T00:00:00Z", "Q1"), ("+900", "-0500-00-00T00:00:00Z", "Q1"),
+                                                  ("+82000", "+2017-00-00T00:00:00Z", "Q2")])
+def test_a_town_dug_by_archaeologists_is_a_town_while_people_live_there(people, when, winner):
     claims = {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q839954"}}}}]}
     if people:
-        claims["P1082"] = [{"mainsnak": {"datavalue": {"value": {"amount": people}}}}]
+        claims["P1082"] = [{"mainsnak": {"datavalue": {"value": {"amount": people}}},
+                            "qualifiers": {"P585": [{"datavalue": {"value": {"time": when}}}]} if when else {}}]
     assert _chosen("Example", _hit("Q1", "Example", "city in Lebanon", 80, article=True, **claims),
                    _hit("Q2", "Temple of Example", "temple in Example", 15)) == winner
 
 
+@pytest.mark.parametrize("trouble", [OSError("rate limited"), http.client.IncompleteRead(b""), {"error": {"code": "busy"}}],
+                         ids=["refused", "cut off", "error page"])
 @pytest.mark.parametrize("down, winner, kept", [((), "Q2", True), (("titles",), "Q3", False), (("generator",), "Q2", False),
                                                 (("titles", "generator"), "Q1", False)])
-def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_path, monkeypatch, down, winner, kept):
+def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_path, monkeypatch, down, winner, kept, trouble):
     """The article of that name, then a page the search found, then Wikidata's own hit."""
     point = [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]
     entities = {key: {"claims": {"P625": point}, "sitelinks": dict.fromkeys(range(links)),
@@ -257,7 +300,9 @@ def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_pat
 
     def wikipedia(params):
         if any(key in params for key in down):
-            raise OSError("rate limited")
+            if isinstance(trouble, dict):
+                return trouble
+            raise trouble
         item, title = ("Q2", "White Example (Kent)") if "titles" in params else ("Q3", "White Example Palace")
         return {"query": {"pages": {"7": {"title": title, "pageprops": {"wikibase_item": item}}}}}
 
