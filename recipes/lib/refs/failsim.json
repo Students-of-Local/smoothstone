@@ -652,19 +652,6 @@
    "assumption": "Coulomb friction 0.5 on the bed and on the part: how far a fallen strand slides, and what the nozzle drags or draws thin against."
   },
   {
-   "id": "failsim.blob_stick",
-   "topic": "failsim",
-   "key": "blob_stick",
-   "value": 0.5,
-   "unit": "ratio",
-   "note": "Share of the plastic extruded with nothing under the nozzle that stays on the nozzle and heater block (blob_on_nozzle); the rest falls as strands.",
-   "source": "stone assumption",
-   "cite": "assumption",
-   "url": "",
-   "checked": "2026-11-24",
-   "assumption": "Half of what is extruded into air stays on the nozzle."
-  },
-  {
    "id": "failsim.bridge_rule",
    "topic": "failsim",
    "key": "bridge_rule",
