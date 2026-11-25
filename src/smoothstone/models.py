@@ -404,6 +404,27 @@ def clear_lead(kept: list[dict]) -> bool:
             and all(top["makes"] > c["makes"] and top["likes"] > c["likes"] for c in rest))
 
 
+# what a file's name says of any model: no sign that it is another thing
+GENERIC = set("stl obj 3mf glb gltf zip part parts piece model print body base top bottom left right front back upper lower middle "
+              "center centre side main all final new fixed repaired repair rev ver scale scaled small large mini big single split "
+              "high low poly merged combined export untitled object mesh support supports with without and the for mm "
+              "tower roof wall dome door gate floor level section half".split())
+
+
+def named_for_another(c: dict, nm: dict) -> bool:
+    """Nobody has printed it, hardly anyone likes it, and its files are all named for some other thing."""
+    chosen = choose_files(c.get("files") or [])[0]
+    if c["source"] != "printables" or c["makes"] or c["likes"] >= 10 or not chosen:
+        return False
+    about = [w for text in (c["name"], c.get("summary", ""), c["author"], *nm["names"]) for w in words(text)]
+
+    def strange(name: str) -> bool:
+        said = [w for w in words(re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name.rsplit(".", 1)[0]).replace("_", " "))
+                if len(w) > 3 and w.isalpha() and w not in GENERIC and set(w) - set("abcdef")]  # no hash
+        return bool(said) and not any(w[:4] == a[:4] for w in said for a in about)
+    return all(strange(f["name"]) for f in chosen)
+
+
 def search(subject: str, request: str, cache: Path | None) -> dict:
     """Everything stone models prints and --take reads: names, ranked candidates, what each source said."""
     nm = names(subject)
@@ -418,6 +439,9 @@ def search(subject: str, request: str, cache: Path | None) -> dict:
                 k["files"] = printables_files(k, cache)
             except Exception:  # listed without it; --take asks again
                 k["files"] = None
+    strange = [k for k in kept if named_for_another(k, nm)]
+    kept = [k for k in kept if k not in strange]
+    out += [{**k, "why": "its file is named for another thing"} for k in strange]
     return {"subject": subject, "names": nm, "terms": terms, "kept": kept, "left_out": out,
             "sources": {"printables": {"found": len(p), "why": pwhy},
                         "commons": {"found": len(c), "why": cwhy},
@@ -467,6 +491,7 @@ ACCESSORY = re.compile(r"crane|\bpins?\b|\bpegs?\b|support|\btest\b|calibrat|key
 WHOLE = re.compile(r"complete|full|whole|assembled|entire|all[-_ ]?in[-_ ]?one|one[-_ ]?piece|single", re.I)
 
 
+COLORS = re.compile(r"(?:multi|dual|two|2|3|4)[-_ ]?colou?r|(?<![a-z])(?:mmu|ams)(?![a-z])", re.I)  # cut up by color
 YEAR = re.compile(r"(?:19|20)\d\d")
 
 
@@ -493,9 +518,12 @@ def choose_files(files: list[dict]) -> tuple[list[dict], list[tuple[dict, str]]]
     if whole:
         pick = max(whole, key=lambda f: f["size"])
         return [pick], left + [(f, f"{pick['name']} is the whole model") for f in stl if f is not pick]
+    plain_files = [f for f in stl if not COLORS.search(f["name"]) and not ACCESSORY.search(f["name"])]
     keep = []
     for f in stl:
-        if ACCESSORY.search(f["name"]) and len(stl) > 1:
+        if plain_files and COLORS.search(f["name"]):
+            left.append((f, "the same model cut up by color"))
+        elif ACCESSORY.search(f["name"]) and len(stl) > 1:
             left.append((f, "an accessory, not the model"))
         elif (twin := _year_twin(f, stl)) is not None:
             left.append((f, f"{twin['name']} is the same model in another year's version"))
@@ -555,6 +583,17 @@ def _3mf_matrix(text: str | None) -> np.ndarray:
     return M
 
 
+_PRODUCTION = "http://schemas.microsoft.com/3dmanufacturing/production/2015/06"
+
+
+def _declared(xml: bytes) -> bytes:
+    """Creality Print writes p:path and never says what p is."""
+    head = re.search(rb"<model\b[^>]*>", xml)
+    if head and b"xmlns:p=" not in head[0] and re.search(rb"\sp:[A-Za-z]+=", xml):
+        return xml[:head.start()] + head[0].replace(b"<model", b'<model xmlns:p="' + _PRODUCTION.encode() + b'"', 1) + xml[head.end():]
+    return xml
+
+
 def read_3mf(path: Path):
     """The build items of a 3MF file as one mesh, read with the standard library (trimesh's own
     reader needs lxml, which stone does not ship): each object's triangles, its components and
@@ -564,7 +603,7 @@ def read_3mf(path: Path):
     import trimesh
 
     with zipfile.ZipFile(path) as z:
-        models = {n: ET.fromstring(z.read(n)) for n in z.namelist() if n.lower().endswith(".model")}
+        models = {n: ET.fromstring(_declared(z.read(n))) for n in z.namelist() if n.lower().endswith(".model")}
     if not models:
         raise ModelsProblem(f"{path.name} holds no 3D model")
     objects: dict[tuple[str, str], object] = {}
@@ -588,7 +627,7 @@ def read_3mf(path: Path):
                 out.append((v, f))
         comps = ob.find(ns + "components")
         for c in (comps if comps is not None else []):
-            ref = c.get("{http://schemas.microsoft.com/3dmanufacturing/production/2015/06}path") or key[0]
+            ref = c.get("{" + _PRODUCTION + "}path") or key[0]
             M = _3mf_matrix(c.get("transform"))
             for v, f in mesh_of(("/" + ref.lstrip("/"), c.get("objectid")), depth + 1):
                 out.append((v @ M[:3, :3].T + M[:3, 3], f))

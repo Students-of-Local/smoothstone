@@ -791,6 +791,49 @@ def test_two_years_of_one_model_are_not_merged():
     assert len(models.choose_files(parts)[0]) == 2
 
 
+def test_the_whole_tower_is_not_laid_out_beside_its_color_pieces():
+    """Tokyo Tower came out as a row 1.36 m long."""
+    names = ["tokyo-tower-multicolor-white-tower-b.stl", "tokyo-tower-multicolor-red-tower-a.stl", "2021-tokyo-tower.stl"]
+    files = [{"id": n, "name": n, "size": 5} for n in names]
+    keep, left = models.choose_files(files)
+    assert [f["name"] for f in keep] == ["2021-tokyo-tower.stl"] and left[0][1] == "the same model cut up by color"
+    assert len(models.choose_files(files[:2])[0]) == 2
+    watercolor = [{"id": "1", "name": "watercolor_box.stl", "size": 5}, {"id": "2", "name": "lid.stl", "size": 5}]
+    assert len(models.choose_files(watercolor)[0]) == 2
+
+
+@pytest.mark.parametrize("name, makes, likes, out", [
+    ("Tiny_Owl_v1_XG.3mf", 0, 1, True), ("Tiny_Owl_v1_XG.3mf", 1, 1, False), ("Tiny_Owl_v1_XG.3mf", 0, 10, False),
+    ("eiffel_v2.stl", 0, 1, False), ("part_1.stl", 0, 1, False), ("6418b28f-e456-4174-baac-05e310e52cb7.stl", 0, 1, False)])
+def test_an_owl_is_no_tower(monkeypatch, name, makes, likes, out):
+    """The only model named for the Temple of Heaven was a file of an owl."""
+    found = cand(makes=makes, likes=likes, files=[{"id": "1", "name": name, "size": 9}])
+    monkeypatch.setattr(models, "names", lambda subject: NM)
+    monkeypatch.setattr(models, "printables_search", lambda *a: ([found], None))
+    for other in ("commons_search", "sketchfab_search"):
+        monkeypatch.setattr(models, other, lambda *a: ([], None))
+    got = models.search("Eiffel Tower", "An Eiffel Tower", None)
+    assert len(got["kept"]) == (not out)
+    assert [c["why"] for c in got["left_out"]] == ["its file is named for another thing"] * out
+
+
+def test_a_3mf_that_never_declares_its_prefix_is_read(tmp_path):
+    """Creality Print writes p:path with no xmlns:p, and the model stopped at "ParseError"."""
+    import zipfile
+
+    core = 'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"'
+    box = trimesh.creation.box((10, 20, 30))
+    v = "".join(f'<vertex x="{a}" y="{b}" z="{c}"/>' for a, b, c in box.vertices)
+    t = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in box.faces)
+    with zipfile.ZipFile(tmp_path / "owl.3mf", "w") as z:
+        z.writestr("3D/3dmodel.model", f'<?xml version="1.0"?><model unit="millimeter" {core}><resources><object id="5">'
+                   '<components><component p:path="/3D/Objects/a.model" objectid="6"/></components></object></resources>'
+                   '<build><item objectid="5"/></build></model>')
+        z.writestr("3D/Objects/a.model", f'<model {core}><resources><object id="6"><mesh><vertices>{v}</vertices>'
+                   f'<triangles>{t}</triangles></mesh></object></resources></model>')
+    assert models.load_mesh([tmp_path / "owl.3mf"]).extents == pytest.approx([10, 20, 30])
+
+
 def test_read_3mf_without_lxml(tmp_path):
     import zipfile
 
