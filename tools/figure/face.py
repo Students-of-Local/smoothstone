@@ -7,8 +7,9 @@ angle in degrees from its biggest face's cheeks, null where no face is found)
 python face.py --box <image> [<image> ...]        (prints a JSON list: each image's biggest face as
 [x, y, w, h] in pixels, null where no face is found)
 
-The face that is biggest in pixels wins across all the photos: a found lead photo is often a whole
-person on a stage, with a face a third the size of a close-up's.
+The first photo's face wins when it is at least half as wide as the biggest one found (it is the
+person's newest look); otherwise the biggest wins: a found lead photo is often a whole person on a
+stage, with a face a third the size of a close-up's.
 
 Runs on the lift venv's python: opencv 4 has the Haar face finder, opencv 5 dropped it. The
 style model keeps a likeness far better with this crop as its first picture: in a whole photo
@@ -65,13 +66,15 @@ def main() -> int:
         print(json.dumps(out))
         return 0
     *srcs, out = sys.argv[1:]
-    best = None
-    for src in srcs:
-        got = biggest(src)
-        if got and (best is None or got[1][2] * got[1][3] > best[1][1][2] * best[1][1][3]):
-            best = (src, got)
-    if best is None:
+    found = [(src, got) for src in srcs for got in [biggest(src)] if got]
+    if not found:
         return 3
+    best = max(found, key=lambda f: f[1][1][2] * f[1][1][3])
+    # the first photo is the person's newest (stone find puts it first): its face wins when it is
+    # at least half as wide as the biggest, since a person's look changes (Palmer Luckey, 2014 clean
+    # shaven, 2026 a goatee); a face a third as wide comes out generic (Shane Gillis)
+    if found[0][0] == srcs[0] and 2 * found[0][1][1][2] >= best[1][1][2]:
+        best = found[0]
     src, (im, (x, y, w, h)) = best
     H, W = im.shape[:2]
     x0, y0 = max(0, int(x - 0.6 * w)), max(0, int(y - 0.8 * h))

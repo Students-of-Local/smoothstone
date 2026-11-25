@@ -1,0 +1,14 @@
+{
+ "id": "r8_palmer_newest_photo",
+ "request": "A mini figure of Palmer Luckey, 90 mm tall, with \"PALMER\" on the base",
+ "why": "Live on 2026-11-22 stone find put Palmer Luckey's 2014 photo first (clean shaven, gray T-shirt). The style render showed him as he looks now (goatee, mullet, Hawaiian shirt, as in the CES 2026 photo it also found), and the build threw out every render as \"added a beard\". The owner: \"that is how palmer looks look up photos of palmer damnit\" and \"We need to get things right dangit\". Photo 1 must be the newest.",
+ "expect": {
+  "recipe": "figure",
+  "params": {"height": 90, "name": "PALMER"},
+  "found": {
+   "wikidata": "Q16269109",
+   "first_year_at_least": 2025,
+   "one_face": true
+  }
+ }
+}

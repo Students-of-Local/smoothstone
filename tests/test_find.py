@@ -445,7 +445,7 @@ def test_a_face_that_is_not_the_persons_is_left_out(monkeypatch, tmp_path):
     monkeypatch.setattr(find, "_get", _fake(_sam_pages(), hits=[SAM]))
     _with_faces(monkeypatch, {5: _one(E0), 1: _one(E1), 3: _one(NEAR0), 4: _one(E0)})
     got = find.fetch("Sam Altman", tmp_path)
-    assert [g["title"] for g in got][0] == "File:Sam Altman TED.jpg"
+    assert "File:Sam Altman TED.jpg" in [g["title"] for g in got]
     assert "File:Sam Altman 2019.jpg" not in [g["title"] for g in got]
     left = json.loads((tmp_path / "found.json").read_text())["left_out"]
     assert {"title": "File:Sam Altman 2019.jpg", "why": "other"} in left
@@ -484,6 +484,7 @@ def test_an_artwork_of_the_person_is_left_out(monkeypatch, tmp_path):
     assert found["File:C215 - Michael Jordan (1).jpg"] and found["File:Michael Jordan in 2014.jpg"]
     assert not found["File:Michael Jordan 1984.jpg"] and not found["File:Michael Jordan.jpg"]
     got = [g["title"] for g in find.fetch("Michael Jordan", tmp_path)]  # faces off: still no artwork
+    # faces off: nothing proves the newest is him, so the main image stays first
     assert got == ["File:Michael Jordan.jpg", "File:Michael Jordan 1984.jpg", "File:Michael Jordan 2006.jpg"]
     left = json.loads((tmp_path / "found.json").read_text())["left_out"]
     assert {"title": "File:C215 - Michael Jordan (1).jpg", "why": "art"} in left
@@ -612,7 +613,54 @@ def test_a_crop_is_the_same_photo_and_one_shoot_does_not_fill_every_slot(monkeyp
     monkeypatch.setattr(find, "_get", _fake(pages, hits=[ent], lead_artist="Quintin Soloviev"))
     _with_faces(monkeypatch, {i: _one(E0) for i in range(6)})
     got = [g["title"] for g in find.fetch("Shane Gillis", tmp_path)]
-    assert got == ["File:Shane Gillis (cropped).jpg", "File:Shane Gillis at MOA (cropped).jpg",
-                   "File:Shane Gillis 2025.jpg"], got
+    assert got == ["File:Shane Gillis 2025.jpg", "File:Shane Gillis (cropped).jpg",
+                   "File:Shane Gillis at MOA (cropped).jpg"], got  # the same three, the dated one first
     left = json.loads((tmp_path / "found.json").read_text())["left_out"]
     assert {"title": "File:Shane Gillis (cropped) (cropped).jpg", "why": "copy"} in left
+
+
+def test_a_persons_newest_photo_comes_first(monkeypatch, tmp_path):
+    """Live, 2026-11-22: Palmer Luckey's Wikidata photo is from 2014, clean shaven, and it came
+    first; at CES 2026 he wore a goatee, so the build threw out every true render as "added a beard".
+    The owner: "that is how palmer looks look up photos of palmer damnit"."""
+    palmer = _ent("Q16269109", "Palmer Luckey", ["Q5"], "Palmer Luckey at SVVR 2014.jpg", sites=40)
+    taken = _page("File:Palmer Luckey speaking.jpg", "CC0", 2)
+    taken["imageinfo"][0]["extmetadata"]["DateTimeOriginal"] = {"value": "2016-03-15 10:02:11"}
+    pages = [_page("File:CES 2026 - Palmer Luckey 01 (cropped).jpg", "CC BY-SA 4.0", 1), taken]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[palmer]))
+    _with_faces(monkeypatch, {})
+    got = find.fetch("Palmer Luckey", tmp_path)
+    assert [g["year"] for g in got] == [2026, 2016, 2014]
+    assert got[0]["title"] == "File:CES 2026 - Palmer Luckey 01 (cropped).jpg" and got[0]["file"].endswith("photo_1.jpg")
+
+
+def test_the_eval_fails_a_person_whose_first_photo_is_old(tmp_path):
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("evrun", Path(__file__).parents[1] / "evals" / "run.py")
+    run = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(run)
+    d = tmp_path / "image" / "found"
+    d.mkdir(parents=True)
+    (d / "found.json").write_text(json.dumps({"wikidata": "Q1", "photos": [{"title": "File:a", "year": 2014},
+                                                                           {"title": "File:b", "year": 2026}]}))
+    why = run.grade_found(tmp_path, {"first_year_at_least": 2025})
+    assert len(why) == 2 and "2014" in why[0]
+
+
+def test_a_camera_number_or_an_upload_date_is_not_when_the_photo_was_taken():
+    assert find.photo_year({}, "File:Palmer Luckey DSC_2087.jpg") is None
+    assert find.photo_year({"DateTime": {"value": "2025-01-02"}}, "File:Old scan.jpg") is None
+    assert find.photo_year({"DateTimeOriginal": {"value": "1996:05:01"}}, "File:A 2024 upload.jpg") == 1996
+
+
+def test_someone_who_has_died_keeps_their_main_image_first(monkeypatch, tmp_path):
+    """Review of the newest-first rule: Muhammad Ali's newest photo is from his last years."""
+    ali = _ent("Q36107", "Muhammad Ali", ["Q5"], "Muhammad Ali NYWTS.jpg", sites=150)
+    ali["claims"]["P570"] = [{"mainsnak": {"datavalue": {"value": {"time": "+2016-06-03T00:00:00Z"}}}}]
+    pages = [_page("File:Muhammad Ali 2012.jpg", "CC BY 2.0", 1), _page("File:Muhammad Ali 1966.jpg", "CC BY 2.0", 2)]
+    monkeypatch.setattr(find, "_get", _fake(pages, hits=[ali]))
+    _with_faces(monkeypatch, {})
+    got = find.fetch("Muhammad Ali", tmp_path)
+    assert got[0]["title"] == "File:Muhammad Ali NYWTS.jpg"
