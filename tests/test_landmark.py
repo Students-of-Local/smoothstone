@@ -479,6 +479,46 @@ def test_a_part_with_no_height_and_no_twins_still_stands():
     assert [p["height"]["metres"] for p in records] == [20, 20]
 
 
+def test_a_guessed_height_follows_the_ground_the_building_covers_not_the_count_of_its_parts():
+    # York Minster: eight small pinnacles at 54 to 63 m and three small 54 m towers stood six chapels up as 54 m blocks
+    from smoothstone import landmark
+
+    def part(i, x, side, **tags):
+        ring = [[x, 0], [x + side, 0], [x + side, side], [x, side]]
+        return {"id": i, "footprint": [ring], "tags": {k.replace("__", ":"): v for k, v in tags.items()}}
+    built = [part(1, 0, 75, height="22"), part(2, 80, 54, height="35"), part(3, 140, 21, height="54"),
+             part(4, 165, 12, height="54"),
+             *[part(10 + k, 200 + 3 * k, 1.6, min_height="54", height="63") for k in range(8)]]
+    records, _ = landmark.resolve_parts([*built, part(30, 300, 9, roof__shape="gabled")], {"geometry_source": "x"})
+    guessed, = [p for p in records if p["id"] == 30]
+    assert guessed["height"]["metres"] == 22 and guessed["height"]["guessed"]
+    # A raised part never ends below its own foot, and with nothing known on the ground the raised parts decide.
+    records, _ = landmark.resolve_parts([*built, part(31, 300, 9, min_height="40")], {"geometry_source": "x"})
+    assert [p["height"]["metres"] for p in records if p["id"] == 31] == [44]
+    records, _ = landmark.resolve_parts([*built[4:], part(32, 300, 9)], {"geometry_source": "x"})
+    assert [p["height"]["metres"] for p in records if p["id"] == 32] == [63]
+
+
+@pytest.mark.parametrize("tags, kept", [
+    ({"indoor": "room", "room": "toilets", "amenity": "toilets", "level": "0"}, False),  # the White House's toilets
+    ({"indoor": "yes"}, False),
+    ({"room": "office"}, False),
+    ({"location": "underground"}, False),
+    ({"indoor": "no"}, True),
+    ({"level": "0"}, True),
+    ({}, True),
+])
+def test_a_room_inside_the_building_is_no_part_of_its_outside(tags, kept):
+    def way(i, half, tags):
+        return {"type": "way", "id": i, "tags": tags,
+                "geometry": [{"lat": y * 1e-4, "lon": x * 1e-4} for x, y in
+                             [(-half, -half), (half, -half), (half, half), (-half, half), (-half, -half)]]}
+    data = {"elements": [way(1, 4, {"building": "yes"}), way(2, 3, {"building:part": "yes", "height": "18"}),
+                         way(3, 1, {"building:part": "yes", **tags})]}
+    parsed = landmark_refs.parse_osm(data, {"latitude": 0, "longitude": 0, "osm_way": 1})
+    assert [p["id"] for p in parsed["parts"]] == ([2, 3] if kept else [2])
+
+
 def test_matched_towers_get_the_same_mapped_detail():
     # Cologne's map draws gables, pinnacles and spire bands on the south tower only
     import manifold3d as m3

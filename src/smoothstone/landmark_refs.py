@@ -304,6 +304,9 @@ def parse_osm(data: dict, refs: dict) -> dict:
         tags = el.get('tags', {})
         if not ('building' in tags or 'building:part' in tags):
             continue
+        # A room, or anything under the ground, has no outside to model.
+        if tags.get('indoor', 'no') != 'no' or 'room' in tags or tags.get('location') == 'underground':
+            continue
         for poly in polygons(el):
             item = {'id': el['id'], 'type': el['type'], 'footprint': poly, 'tags': tags,
                     'source': f"https://www.openstreetmap.org/{el['type']}/{el['id']}"}

@@ -134,7 +134,14 @@ def resolve_parts(parts, refs):
     known = [h for _, _, h, lo in prepared if h is not None and h > lo]
     if not known:
         return [], []
-    median = float(np.median(known))
+    # The height at which half the ground covered by measured parts is lower. A count would
+    # let a row of pinnacles, each as good as a nave, set the height of a chapel.
+    standing = sorted((h, cs.area()) for _, cs, h, lo in prepared if h is not None and h > lo and lo <= .5)
+    if standing:
+        covered = np.cumsum([area for _, area in standing])
+        median = float(standing[int(np.searchsorted(covered, covered[-1] / 2))][0])
+    else:
+        median = float(np.median(known))
     real = length(refs.get("height"))
     # A source-wide height belongs only to a plausible mapped roof or tower.
     # Never add another co-dominant spire when measured heights already reach it.
@@ -173,7 +180,7 @@ def resolve_parts(parts, refs):
                 reason = twin_reason = f"level shared by the same-plan parts of its twins, such as {twin_id}"
             else:
                 h = max(median, lo + 4)
-                reason = "median known part height, raised above min_height when necessary"
+                reason = "median height of the measured ground, raised above min_height when necessary"
         if h is None or h <= lo:
             continue
         roof = str(t.get("roof:shape", "flat")).lower().replace("_", "-")

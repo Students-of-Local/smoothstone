@@ -1152,3 +1152,12 @@ saved builds pass the new measurements; no judge ran, because no mesh changed.
   island group. A third set of 50 names, scored once after that and not tuned on: 47. "Peterhof" gives an inn and
   "Mezquita" a mosque in Huelva; the third, "Frauenkirche", gives Dresden's, which is fair.
 - The 98 are a recorded test, `tests/fixtures/landmark/names.json`. No sealed landmark's name is in any set.
+
+### 2026-11-24: a guessed height, and rooms that are not parts
+
+From 40 landmarks never built before (no model, no judge), looked at one by one.
+
+- A part with no mapped height took the median height of all measured parts, each counted once. York Minster's eight
+  pinnacles at 54 to 63 m made six small chapels 54 m blocks. It now takes the height at which half the ground covered
+  by measured ground parts is lower: 22 m there. With nothing measured on the ground, the old median stands.
+- `indoor`, `room` and underground elements are not parts. The White House's four toilets stood as 21 m blocks.
