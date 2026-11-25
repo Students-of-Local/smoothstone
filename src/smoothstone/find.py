@@ -17,7 +17,7 @@ from pathlib import Path
 from . import faces
 
 API = "https://commons.wikimedia.org/w/api.php"
-AGENT = "smoothstone/0.3 (https://github.com/baney75/smoothstone; stone find)"
+AGENT = "smoothstone/0.3 (https://github.com/Students-of-Local/smoothstone; stone find)"
 OK_LICENSE = re.compile(r"^(public domain|pd|cc0|cc by(-sa)? [1-4]\.0|cc by(-sa)?$|godl)", re.I)
 THUMB_PX = 1280
 # a painting, a drawing, a statue or street art of a person is someone's art, not the person: its

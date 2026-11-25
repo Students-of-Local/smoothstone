@@ -26,7 +26,7 @@ And in the next message:
 ### 2. Integrate very well and easily
 
 - Parts open in the slicers people use, with nothing to fix by hand: Creality Print, OrcaSlicer, Bambu Studio and PrusaSlicer, as STL and as 3MF with color.
-- smoothstone is the part maker inside [Gantrel](https://github.com/baney75/Gantrel), which sends parts to printers through Creality's tools and the open printer standards. A change to `stone`'s output is checked against what Gantrel reads.
+- smoothstone is the part maker inside [Gantrel](https://github.com/Students-of-Local/Gantrel), which sends parts to printers through Creality's tools and the open printer standards. A change to `stone`'s output is checked against what Gantrel reads.
 
 ### 3. Distill through skills to small models
 

@@ -37,7 +37,7 @@ from pathlib import Path
 PASS = 6
 WIKI = "https://en.wikipedia.org/w/api.php"
 MEDIA = "https://en.wikipedia.org/api/rest_v1/page/media-list/"
-AGENT = "smoothstone-evals/0.1 (https://github.com/baney75/smoothstone; likeness judge)"
+AGENT = "smoothstone-evals/0.1 (https://github.com/Students-of-Local/smoothstone; likeness judge)"
 
 TITLE = """A person asked a tool for a collectible figure with this request:
 {request}

@@ -29,7 +29,7 @@ class PlainShape(LandmarkProblem):
 
 
 def _request(url, data=None):
-    agent = 'smoothstone' if url.startswith(OVERPASS) else 'smoothstone (https://github.com/baney75/smoothstone)'
+    agent = 'smoothstone' if url.startswith(OVERPASS) else 'smoothstone (https://github.com/Students-of-Local/smoothstone)'
     request = urllib.request.Request(url, data=data, headers={'User-Agent': agent})
     with urllib.request.urlopen(request, timeout=12) as response:
         return json.load(response)

@@ -24,7 +24,7 @@ from . import config
 PRINTERS_DIR = Path(__file__).resolve().parent / "printers"
 SETTINGS = config.REPO_ROOT / "recipes" / "lib" / "refs" / "printer_settings.json"
 GANTREL = "gantrel-printer"
-GANTREL_INSTALL = "uv tool install git+https://github.com/baney75/Gantrel"
+GANTREL_INSTALL = "uv tool install git+https://github.com/Students-of-Local/Gantrel"
 
 
 @lru_cache(maxsize=1)

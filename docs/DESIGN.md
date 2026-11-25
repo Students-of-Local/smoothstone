@@ -159,4 +159,4 @@ Done means the pass rate with a forced compaction at step 3 is within one run of
 5. Image references: at least 2 held-out requests from images pass for the S-vision condition.
 6. README with renders of real model outputs, install for Claude Code, Codex, pi and llama.cpp,
    results table, MIT license (BOSL2 stays BSD-2).
-7. Repo baney75/smoothstone pushed, CI green.
+7. Repo Students-of-Local/smoothstone pushed, CI green.

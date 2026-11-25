@@ -145,7 +145,7 @@ def test_fixed_ask_share_link_then_done(work):
         assert max(im.size) == share.PX and not im.getexif()
     url = next(ln for ln in text.splitlines() if ln.startswith("https://"))
     q = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
-    assert url.startswith("https://github.com/baney75/smoothstone/issues/new?") and q["template"] == "print-fix.yml"
+    assert url.startswith("https://github.com/Students-of-Local/smoothstone/issues/new?") and q["template"] == "print-fix.yml"
     assert (q["failure"], q["cause"], q["printer"]) == ("bed_adhesion", "plate_contaminated", "creality_k2")
     assert q["title"] == "Fixed: bed_adhesion on creality_k2" and q["fixed_by"] == d["fixed_by"]
     fields = re.findall(r"^\s+id: (\w+)$", (REPO / ".github" / "ISSUE_TEMPLATE" / "print-fix.yml").read_text(), re.M)

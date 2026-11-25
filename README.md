@@ -141,7 +141,7 @@ fan_guard, panel, cable_comb, vase, planter, gridfinity_bin, phone_stand, hook, 
 You need uv, OpenSCAD 2026 or newer (a nightly build has the Manifold backend) and potrace for pictures.
 
 ```
-git clone https://github.com/baney75/smoothstone
+git clone https://github.com/Students-of-Local/smoothstone
 cd smoothstone
 uv tool install -e .
 stone status

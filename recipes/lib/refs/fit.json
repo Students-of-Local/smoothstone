@@ -212,7 +212,7 @@
    "quote": "Press in a rigid plastic: no published range found either; we take the narrow conservative band of 0.1 mm interference to 0.05 mm gap (a quarter of a 0.4 mm line or less).",
    "source": "smoothstone evals/engineering_grade.py FIT table",
    "cite": "smoothstone engineering grader",
-   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "url": "https://github.com/Students-of-Local/smoothstone/blob/main/evals/engineering_grade.py",
    "assumption": "no published range; the grader's conservative band",
    "checked": "2026-11-24"
   },
@@ -229,7 +229,7 @@
    "quote": "PLA and PETG slip 0.15 to 0.45 and snug 0.05 to 0.25, TPU 0.3 interference to 0.1 gap: the owner's ranges (smoothstone engineering program, 2026-11-22). No maker publishes a printed-fit table that covers these, so they stand as given.",
    "source": "smoothstone evals/engineering_grade.py FIT table",
    "cite": "smoothstone engineering grader",
-   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "url": "https://github.com/Students-of-Local/smoothstone/blob/main/evals/engineering_grade.py",
    "assumption": "the owner's ranges; no maker table",
    "checked": "2026-11-24"
   },
@@ -246,7 +246,7 @@
    "quote": "PLA and PETG slip 0.15 to 0.45 and snug 0.05 to 0.25, TPU 0.3 interference to 0.1 gap: the owner's ranges (smoothstone engineering program, 2026-11-22). No maker publishes a printed-fit table that covers these, so they stand as given.",
    "source": "smoothstone evals/engineering_grade.py FIT table",
    "cite": "smoothstone engineering grader",
-   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "url": "https://github.com/Students-of-Local/smoothstone/blob/main/evals/engineering_grade.py",
    "assumption": "the owner's ranges; no maker table",
    "checked": "2026-11-24"
   },
@@ -280,7 +280,7 @@
    "quote": "PLA and PETG slip 0.15 to 0.45 and snug 0.05 to 0.25, TPU 0.3 interference to 0.1 gap: the owner's ranges (smoothstone engineering program, 2026-11-22). No maker publishes a printed-fit table that covers these, so they stand as given.",
    "source": "smoothstone evals/engineering_grade.py FIT table",
    "cite": "smoothstone engineering grader",
-   "url": "https://github.com/baney75/smoothstone/blob/main/evals/engineering_grade.py",
+   "url": "https://github.com/Students-of-Local/smoothstone/blob/main/evals/engineering_grade.py",
    "assumption": "the owner's ranges; no maker table",
    "checked": "2026-11-24"
   },
@@ -294,7 +294,7 @@
    "quote": "A peg in a hole: 0.2 mm. A press fit: 0.05 to 0.1 mm.",
    "source": "smoothstone skill/research.md, step 5",
    "cite": "smoothstone research card",
-   "url": "https://github.com/baney75/smoothstone/blob/main/skill/research.md",
+   "url": "https://github.com/Students-of-Local/smoothstone/blob/main/skill/research.md",
    "assumption": "the reference a calibration is measured against",
    "checked": "2026-11-24"
   },
