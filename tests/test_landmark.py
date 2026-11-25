@@ -195,28 +195,81 @@ def test_a_famous_name_gives_the_landmark_a_person_means(name, wanted, candidate
     assert landmark_refs._choose(name, hits, entities)[0]["id"] == wanted
 
 
-def test_wikipedia_article_joins_the_search_and_its_failure_does_not_stop_it(tmp_path, monkeypatch):
-    house = {"id": "Q1", "label": "White Example", "description": "government building in Moscow"}
+def _hit(identifier, label, description, links=0, article=False, aliases=(), **claims):
     point = [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]
-    entities = {"Q1": {"claims": {"P625": point}}, "Q2": {"claims": {"P625": point},
-                "descriptions": {"en": {"value": "official residence of the president"}}}}
+    return ({"id": identifier, "label": label, "description": description, "article": article},
+            {"claims": {"P625": point, **claims}, "sitelinks": dict.fromkeys(range(links)),
+             "aliases": {"en": [{"value": a} for a in aliases]}})
+
+
+def _chosen(name, *found):
+    return landmark_refs._choose(name, [hit for hit, _ in found], {hit["id"]: entity for hit, entity in found})[0]["id"]
+
+
+@pytest.mark.parametrize("description", ["memorial to the Battle of Example", "monument commemorating the siege",
+                                         "church rebuilt after the 1755 earthquake", "abbey in Battle, East Sussex"])
+def test_a_building_that_recalls_an_event_is_still_a_building(description):
+    assert _chosen("Example Memorial", _hit("Q1", "Example Memorial", description, 20),
+                   _hit("Q2", "Example Memorial Hall", "hall in Kent", 3)) == "Q1"
+
+
+def test_the_event_itself_is_not():
+    assert _chosen("Example", _hit("Q1", "Siege of Example", "1836 major battle in Texas", 50, article=True, aliases=["Example"]),
+                   _hit("Q2", "Example Mission", "historic place in Texas", 20, aliases=["Example"])) == "Q2"
+
+
+def test_a_page_that_is_only_related_is_no_answer():
+    famous = _hit("Q9", "Tower of London", "castle in central London", 140)
+    assert _chosen("Example Works", _hit("Q1", "Example Works", ""), famous) == "Q1"
+    with pytest.raises(landmark_refs.LandmarkProblem, match="No building with coordinates"):
+        _chosen("Example Works", famous)
+
+
+def test_the_thing_with_the_name_comes_before_the_building_its_name_redirects_to():
+    assert _chosen("Tomb of Example", _hit("Q1", "Tomb of Example", "tomb in Seville", 8),
+                   _hit("Q2", "Seville Cathedral", "cathedral in Seville", 12, article=True)) == "Q1"
+
+
+@pytest.mark.parametrize("people, winner", [("+82000", "Q2"), ("+0", "Q1"), (None, "Q1")])
+def test_a_town_dug_by_archaeologists_is_a_town_while_people_live_there(people, winner):
+    claims = {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q839954"}}}}]}
+    if people:
+        claims["P1082"] = [{"mainsnak": {"datavalue": {"value": {"amount": people}}}}]
+    assert _chosen("Example", _hit("Q1", "Example", "city in Lebanon", 80, article=True, **claims),
+                   _hit("Q2", "Temple of Example", "temple in Example", 15)) == winner
+
+
+@pytest.mark.parametrize("down, winner, kept", [((), "Q2", True), (("titles",), "Q3", False), (("generator",), "Q2", False),
+                                                (("titles", "generator"), "Q1", False)])
+def test_wikipedia_joins_the_search_and_an_answer_without_it_is_not_kept(tmp_path, monkeypatch, down, winner, kept):
+    """The article of that name, then a page the search found, then Wikidata's own hit."""
+    point = [{"mainsnak": {"datavalue": {"value": {"latitude": 1., "longitude": 2.}}}}]
+    entities = {key: {"claims": {"P625": point}, "sitelinks": dict.fromkeys(range(links)),
+                      "labels": {"en": {"value": label}}, "descriptions": {"en": {"value": kind}}}
+                for key, label, kind, links in (("Q1", "Little White Example", "house in Kent", 1),
+                                                ("Q2", "White Example", "residence of the president", 5),
+                                                ("Q3", "White Example Palace", "palace in Kent", 30))}
 
     def wiki(params):
         if params["action"] == "wbsearchentities":
-            return {"search": [house]}
-        return {"entities": {key: value for key, value in entities.items() if key in params["ids"]}}
+            return {"search": [{"id": "Q1", "label": "Little White Example", "description": "house in Kent"}]}
+        return {"entities": {key: value for key, value in entities.items() if key in params["ids"].split("|")}}
 
     def wikipedia(params):
-        if "titles" not in params:
+        if any(key in params for key in down):
             raise OSError("rate limited")
-        return {"query": {"pages": {"7": {"title": "White Example", "pageprops": {"wikibase_item": "Q2"}}}}}
+        item, title = ("Q2", "White Example (Kent)") if "titles" in params else ("Q3", "White Example Palace")
+        return {"query": {"pages": {"7": {"title": title, "pageprops": {"wikibase_item": item}}}}}
 
     monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "home")
     monkeypatch.setattr(landmark_refs, "_wiki", wiki)
-    assert landmark_refs.resolve("White Example", tmp_path)["id"] == "Q1"
-    monkeypatch.setattr(landmark_refs.Path, "home", lambda: tmp_path / "other")
     monkeypatch.setattr(landmark_refs, "_wikipedia", wikipedia)
-    assert landmark_refs.resolve("white example", tmp_path)["id"] == "Q2"
+    ref = landmark_refs.resolve("white example", tmp_path)
+    assert (ref["id"], ref["label"]) == (winner, entities[winner]["labels"]["en"]["value"])
+    assert any((tmp_path / "home").rglob("*.json")) == kept
+    hits, _, answered = landmark_refs._matches("white example")
+    assert {hit["id"]: hit.get("article", False) for hit in hits if hit["id"] == "Q3"} in ({}, {"Q3": False})
+    assert answered == kept
 
 
 @pytest.mark.parametrize("a, b", [("Sacr\u00e9-C\u0153ur", "Sacre Coeur"), ("Saint Paul's", "St. Pauls"), ("The Alamo", "Alamo")])
