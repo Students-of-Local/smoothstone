@@ -501,6 +501,40 @@ def _minaret(x, untagged=False):
     return out
 
 
+def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeypatch, tmp_path):
+    # Speyer, Lincoln and Buckingham Palace stood on boat-shaped plates, the convex hull of their plans
+    from smoothstone import landmark
+
+    recorded("Taj Mahal")
+
+    def way(i, ring, tags):
+        ring = [*ring, ring[0]]
+        return {"type": "way", "id": i, "tags": tags, "geometry": [
+            {"lat": 27.175 + y / 111320, "lon": 78.042 + x / 99000} for x, y in ring]}
+
+    def box(x0, y0, x1, y1):
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+    part = {"building:part": "yes", "height": "20"}
+
+    def fetch(refs, root):
+        here = {**refs, "latitude": 27.175, "longitude": 78.042, "osm_way": 1, "osm_relation": None}
+        return landmark_refs.parse_osm({"elements": [
+            way(1, box(-60, -60, 60, 60), {"building": "yes"}),
+            way(2, box(-50, -10, 50, 10), part), way(3, box(-10, 10, 10, 50), part),  # a T
+            way(4, box(40, 40, 50, 50), part)]}, here)  # a pavilion that stands apart
+    monkeypatch.setattr(landmark_refs, "fetch", fetch)
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
+    mesh = trimesh.load(result["stl"])
+    k = result["scale"]
+    plan = (100 * 20 + 20 * 40 + 10 * 10) * k * k
+    base = modelprint.to_manifold(mesh).slice(1.).area()
+    assert plan <= base < plan * 1.05
+    assert len(mesh.split()) == 1
+    notes = json.loads(Path(result["refs"]).read_text())["modeling_additions"]
+    assert any("following the mapped plan" in n for n in notes) and not any("convex" in n for n in notes)
+
+
 def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     # the Taj Mahal's south-west minaret: three parts with no height stood as 40 m columns through its rings and kiosk
     from smoothstone import landmark

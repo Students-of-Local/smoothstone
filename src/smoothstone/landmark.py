@@ -614,7 +614,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         from .landmark_style import WEST_PIER_REACH as reach
     scale = _scale([outline] if is_lattice and not outline.is_empty() else sections, records, target, reach)
     notes = ["Dimensions use local east/north metres, uniformly scaled to millimetres.",
-             "Added a 2 mm convex footprint plinth to join detached ground parts.",
+             "Added a 2 mm plinth following the mapped plan, with short joiners where needed.",
              "Mapped faces overlap by 0.01 metre at wall and roof joins; coordinates are otherwise unsnapped.",
              "Roof tips retain at least 1.6 mm across their loft centre; narrow walls are widened to 1.2 mm."]
     notes.extend(changes)
@@ -673,15 +673,15 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         notes.append("Built four open cross-braced legs and arches with the documented platform heights and an antenna up to the current sourced top.")
     else:
         footprint = m3.CrossSection.batch_boolean(mm_sections, m3.OpType.Add)
-    if towers or pack.get("aisle_wall_datum_m") or pack.get("plinth_follows_plan", {}).get("value"):
+    if is_lattice:
+        base = footprint.hull().offset(.02)  # four feet that stand apart need one plate
+        notes[1] = "Added a 2 mm convex footprint plinth to join the feet."
+    else:
         from .landmark_massing import linked_plinth
 
         base = linked_plinth(footprint.offset(.02))
-        notes[1] = "Added a 2 mm plinth following the mapped plan, with short joiners where needed."
         if towers:
             notes.append("Included measured bell towers explicitly listed as part of the landmark in Wikidata.")
-    else:
-        base = footprint.hull().offset(.02)
     solids.append(base.extrude(2.02))
     man = _union(solids)
     man = _anchor(man, notes)
