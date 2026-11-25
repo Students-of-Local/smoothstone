@@ -492,6 +492,24 @@ def test_a_structure_without_a_building_word_routes_to_stone_landmark(jobenv, mo
 
 
 @pytest.mark.parametrize("request_, name", [
+    ("Help me print the Tower Bridge", "Tower Bridge"),
+    ("print the eiffel tower for my desk", "eiffel tower"),
+    ("a 300 mm tall Eiffel Tower", "Eiffel Tower"),
+    ("a model of Cologne Cathedral that fits my 220 mm bed", "Cologne Cathedral"),
+    ("Download an STL of the Eiffel Tower phone stand", "Eiffel Tower"),
+    ("A phone case with the Eiffel Tower on it", None),
+    ("an Eiffel Tower cookie cutter", None),
+    ("a clip for the Tower Bridge", None),
+    ("a birdhouse that looks like Himeji Castle", None),
+    ("a puzzle of the Golden Gate Bridge", None),
+    ("I work at the Eiffel Tower. Make me a desk hook.", None),
+])
+def test_a_building_named_for_another_thing_is_not_what_is_built(request_, name):
+    got = models.names_landmark(request_)
+    assert got is None if name is None else name in got
+
+
+@pytest.mark.parametrize("request_, name", [
     ("I want a Stonehenge for my desk, 15 cm", "Stonehenge"),
     ("Could I get a 3D printable Arc de Triomphe?", "Arc de Triomphe"),
     ("Any chance you could print the Parthenon?", "Parthenon"),
