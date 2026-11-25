@@ -24,6 +24,10 @@ class LandmarkProblem(Exception):
     """A reference could not be resolved or contains insufficient geometry."""
 
 
+class PlainShape(LandmarkProblem):
+    """The map has one plain shape and no more: an open model is better, and this is better than nothing."""
+
+
 def _request(url, data=None):
     agent = 'smoothstone' if url.startswith(OVERPASS) else 'smoothstone (https://github.com/baney75/smoothstone)'
     request = urllib.request.Request(url, data=data, headers={'User-Agent': agent})
@@ -591,12 +595,15 @@ def _write_atomic(path: Path, content: str):
             os.unlink(name)
 
 
+CROWDED = 'The map around this landmark is too crowded for the OSM map service, and Overpass gave no answer.'
+
+
 def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
     """Fetch and cache OSM responses in the job and shared cache, again when a site reaches past the search."""
     lat, lon = refs['latitude'], refs['longitude']
     # The radius includes half the known span and is capped to bound public requests.
     span = max(refs.get('length') or 0, refs.get('width') or 0)
-    radius = min(1000, max(220, math.ceil(span * 0.6), math.ceil(reach)))
+    radius, small = min(1000, max(220, math.ceil(span * 0.6), math.ceil(reach))), False
     nearby = ''.join(f'{kind}["{tag}"](around:{radius},{lat},{lon});'
                      for tag in ('building', 'building:part') for kind in ('way', 'relation'))
     explicit = ''
@@ -633,23 +640,41 @@ def fetch(refs: dict, job_root: Path, reach: float = 0) -> dict:
                     raise LandmarkProblem('Overpass returned no elements')
             except (OSError, ValueError, LandmarkProblem):
                 # OSM's map API supplies the same primitives when Overpass is unavailable.
-                dx = radius / (111320 * math.cos(math.radians(lat)))
-                dy = radius / 111320
-                bbox = ','.join(str(v) for v in (lon-dx, lat-dy, lon+dx, lat+dy))
-                url = 'https://api.openstreetmap.org/api/0.6/map.json?' + urllib.parse.urlencode({'bbox': bbox})
-                raw = _request(url)
+                while True:
+                    dx = radius / (111320 * math.cos(math.radians(lat)))
+                    dy = radius / 111320
+                    bbox = ','.join(str(v) for v in (lon-dx, lat-dy, lon+dx, lat+dy))
+                    url = 'https://api.openstreetmap.org/api/0.6/map.json?' + urllib.parse.urlencode({'bbox': bbox})
+                    try:
+                        raw = _request(url)
+                        break
+                    except urllib.error.HTTPError as exc:  # it answers 400 for an area with over 50,000 nodes
+                        if exc.code != 400 or radius <= 220:
+                            raise
+                        radius = max(220, radius // 2)
+                        small = True
                 raw_text = json.dumps(raw, ensure_ascii=False)
                 _write_atomic(ref_dir / 'osm-map.json', raw_text)
-                _write_atomic(raw_cache, raw_text)
+                if not small:
+                    _write_atomic(raw_cache, raw_text)
+                ways = {e['id'] for e in raw.get('elements', []) if e.get('type') == 'way'}
+                own = [e for e in raw.get('elements', []) if e.get('type') in ('way', 'relation') and _own(e, refs)]
+                if small and not (own and all(m['ref'] in ways for e in own for m in e.get('members', [])
+                                              if m.get('type') == 'way')):
+                    raise LandmarkProblem(CROWDED)
                 data = _map_as_overpass(raw, refs)
                 data['_smoothstone_response_url'] = url
                 data['_smoothstone_query'] = query
-            _write_atomic(cache, json.dumps(data, ensure_ascii=False))
+            if not small:
+                _write_atomic(cache, json.dumps(data, ensure_ascii=False))
         _write_atomic(job_cache, json.dumps(data, ensure_ascii=False))
         parsed = parse_osm(data, refs)
         far = max((math.hypot(*point) for point in parsed.get('site', [[]])[0]), default=0)
+        around = max([far, *(math.hypot(*point) for ring in parsed['outline'] for point in ring)])
         if far > 1000:
             raise LandmarkProblem('The landmark reaches more than 1 km from its coordinates.')
+        if small and around > radius:
+            raise LandmarkProblem(CROWDED)
         if far > radius:
             return fetch(refs, job_root, far)
         if parsed.get('site') and parsed['tags'].get('man_made') == 'bridge' and _share(parsed['parts'], parsed['site']) < .5:

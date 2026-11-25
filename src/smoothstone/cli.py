@@ -2256,7 +2256,12 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
 
 
 def _landmark_fallback(job: Job, subject: str) -> str:
-    attempted = str(job.status().get("landmark_attempted") or "")
+    status = job.status()
+    job.update(models_out=subject)
+    attempted = str(status.get("landmark_attempted") or "")
+    plain = status.get("landmark_plain") or {}
+    if str(plain.get("subject") or "").casefold() == subject.casefold():
+        return plain["command"]  # its one plain shape is better than nothing
     if attempted.casefold() == subject.casefold():
         return ("ask the person: neither the landmark references nor an open model produced a printable part. "
                 'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
@@ -2276,7 +2281,7 @@ def _next_take(job: Job, n: int) -> str:
 
 def cmd_landmark(args, job: Job) -> Out:
     """Build a named landmark from reference data and run the model print checks."""
-    from . import landmark
+    from . import landmark, landmark_refs
     from . import models as mdl
 
     out = Out()
@@ -2301,12 +2306,20 @@ def cmd_landmark(args, job: Job) -> Out:
     size = args.size
     if size is None:
         size = target if target["mode"] != "fit" or target.get("bed_said") else min(200.0, *bed)
-    job.update(landmark_attempted=subject)
+    job.update(landmark_attempted=subject, landmark_plain=None)
     progress(job, f"building {subject} from landmark references")
     try:
-        options = {"ref_pack": args.refs} if args.refs else {}
+        options = {**({"ref_pack": args.refs} if args.refs else {}), **({"plain": True} if args.plain else {})}
         info = landmark.generate(subject, job.root, bed, size, args.detail, **options)
     except Exception as e:
+        command = None
+        if isinstance(e, landmark_refs.PlainShape):
+            chosen = [a for flag, value in (("--size", args.size), ("--detail", args.detail), ("--refs", args.refs))
+                      if value is not None for a in (flag, str(value))]
+            command = shlex.join(["stone", "landmark", subject, *chosen, "--plain"])
+            job.update(landmark_plain={"subject": subject, "command": command})
+            if str(job.status().get("models_out") or "").casefold() != subject.casefold():
+                command = None  # the open models come first
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
@@ -2314,7 +2327,7 @@ def cmd_landmark(args, job: Job) -> Out:
             out.add(f"Or write the shapes it lacks from cited sources (skill/landmarks.md) and build with "
                     f"{_landmark_command('stone landmark', subject)} --refs pack.json")
         out.fix(str(e))
-        out.next = _landmark_command("stone models", subject)
+        out.next = command or _landmark_command("stone models", subject)
         out.stage = "landmark_failed"
         out.result = f"landmark failed: {str(e)}"[:120]
         return out
@@ -3502,6 +3515,7 @@ def make_parser() -> Parser:
     s.add_argument("--size", type=float, help="longest dimension in millimeters")
     s.add_argument("--detail", choices=("low", "high"))
     s.add_argument("--refs", type=Path, metavar="FILE", help="JSON facts with a source URL for each fact")
+    s.add_argument("--plain", action="store_true", help="build it even when the map has only one plain shape of it")
 
     s = sub.add_parser("models", parents=[common],
                        help='open models of a landmark made for printing: stone models "Cologne Cathedral"')

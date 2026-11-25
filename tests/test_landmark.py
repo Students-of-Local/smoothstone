@@ -5,6 +5,7 @@ import http.client
 import json
 import time
 import os
+import shlex
 import urllib.parse
 from pathlib import Path
 
@@ -597,6 +598,8 @@ def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeyp
     from smoothstone import landmark
 
     recorded("Taj Mahal")
+    monkeypatch.setattr(landmark, "SPLIT_SHARE", 0)
+    monkeypatch.setattr(landmark, "LEAST_HEIGHT", 0)
 
     def way(i, ring, tags):
         ring = [*ring, ring[0]]
@@ -661,6 +664,8 @@ def test_bodies_that_meet_at_a_corner_get_a_real_join(recorded, monkeypatch, tmp
     from smoothstone import landmark
 
     recorded("Taj Mahal")
+    monkeypatch.setattr(landmark, "LEAST_SHARE", 0)
+    monkeypatch.setattr(landmark, "LEAST_HEIGHT", 0)
     _map(monkeypatch, (-50, -50, 0, 0, 20), (0, 0, 50, 50, 20))
     result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
     base = modelprint.to_manifold(trimesh.load(result["stl"])).slice(1.)
@@ -679,7 +684,7 @@ def test_the_base_is_widened_for_what_the_style_adds_too(recorded, monkeypatch, 
         head = m3.Manifold.cube([60, 60, 60], True).translate([(box[0] + box[3]) / 2, (box[1] + box[4]) / 2, box[5] + 29])
         return man + head, ["a heavy head"]
     monkeypatch.setattr(landmark_style, "decorate", decorate)
-    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "high")
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "high", plain=True)
     mesh = trimesh.load(result["stl"])
     assert printable.tip_angle(mesh, printable.occupancy(mesh)) >= printable.TIP_MIN
 
@@ -1037,3 +1042,148 @@ def test_matched_towers_get_the_same_mapped_detail():
         [p for p, _ in both], [cs for _, cs in both], {}, facts, ["gothic"])[0] if str(p["id"]).endswith("-twin")]
     assert tops == [(122, True)] * 4
     assert la._twin_detail(both, [np.array([0., -17]), np.array([0., 17])], 18, 70, []) == []
+
+
+def _drawn(monkeypatch, recorded, *ways, **refs):
+    """The Taj Mahal's recorded facts over a map that draws only these ways."""
+    recorded("Taj Mahal")
+    monkeypatch.setattr(landmark_refs, "fetch", lambda r, root: landmark_refs.parse_osm({"elements": list(ways)}, _site_refs()))
+    real = landmark_refs.resolve
+    monkeypatch.setattr(landmark_refs, "resolve", lambda name, root: {**real(name, root), "height": 73.0, **refs})
+    monkeypatch.setattr(landmark_refs, "load_pack", lambda *args, **kwargs: {})
+
+
+OUTLINE = _way(1, -40, -10, 40, 10, building="yes", wikidata="Q1")
+
+
+@pytest.mark.parametrize("top, refused", [("54", True), ("55", False)])
+def test_a_map_that_stops_far_under_the_sourced_height_is_refused(recorded, monkeypatch, tmp_path, top, refused):
+    """Tokyo Tower came out as a 150 m stub of a 332.6 m tower and was called ready."""
+    from smoothstone import landmark
+
+    _drawn(monkeypatch, recorded, OUTLINE, _way(2, -40, -10, 0, 10, building__part="yes", height=top),
+           _way(3, 0, -10, 40, 10, building__part="yes", height="20"))
+    if refused:
+        with pytest.raises(landmark_refs.LandmarkProblem, match="tallest part of Taj Mahal is 54 m, and the whole stands 73 m"):
+            landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
+        assert not list(tmp_path.rglob("*.stl"))
+    else:
+        assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
+
+
+@pytest.mark.parametrize("inner, refused", [(17, True), (15, False), (0, False)])
+def test_a_map_of_two_ends_and_no_middle_is_refused(recorded, monkeypatch, tmp_path, inner, refused):
+    """The Porta Nigra came out as two blocks joined by a thin strip and was called ready."""
+    from smoothstone import landmark
+
+    _drawn(monkeypatch, recorded, OUTLINE, _way(2, -40, -10, -inner, 10, building__part="yes", height="73"),
+           _way(3, inner, -10, 40, 10, building__part="yes", height="70"))
+    if refused:
+        with pytest.raises(landmark_refs.LandmarkProblem, match="separate pieces covering 5[78]% of its plan"):
+            landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
+    else:
+        assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
+
+
+def _no_models(monkeypatch):
+    from smoothstone import models
+
+    none = {"subject": "Taj Mahal", "kept": [], "left_out": [], "terms": [], "names": {"label": "Taj Mahal"},
+            "sources": {k: {"found": 0, "searched": True, "why": ""} for k in ("printables", "commons", "sketchfab")}}
+    monkeypatch.setattr(models, "search", lambda *args: none)
+
+
+PLAIN = _way(1, -20, -20, 20, 20, building="tower", height="73", wikidata="Q1")
+
+
+def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, monkeypatch, jobenv):
+    """The Temple of Heaven came out as one drum and cone, and was called ready with no search for a better model."""
+    from smoothstone import cli
+
+    def run(*args):
+        text, _ = cli.run(list(args))
+        return text, text.splitlines()[-1]
+
+    _drawn(monkeypatch, recorded, PLAIN)
+    _no_models(monkeypatch)
+    for size in ([], ["--size", "120"]):  # asking again is no permission
+        text, last = run("landmark", "Taj Mahal", *size)
+        assert "one plain shape" in text and last == "NEXT: stone models 'Taj Mahal'"
+    plain = run("models", "Taj Mahal")[1]
+    assert plain == "NEXT: stone landmark 'Taj Mahal' --size 120.0 --plain"
+    text, last = run(*shlex.split(plain)[2:])
+    assert "NOTE, tell the person: the map has Taj Mahal as one plain shape" in text and "Part ready" in text
+    assert "Size: 120 mm" in text
+    assert run("models", "Taj Mahal")[1].startswith("NEXT: ask the person")
+
+
+def test_a_plain_shape_after_the_models_is_not_sent_back_to_them(recorded, monkeypatch, jobenv):
+    from smoothstone import cli
+
+    _drawn(monkeypatch, recorded, PLAIN)
+    _no_models(monkeypatch)
+    cli.run(["new", "Find me an open model of the Taj Mahal, 12 cm tall"])
+    assert cli.run(["models", "Taj Mahal"])[0].splitlines()[-1] == "NEXT: stone landmark 'Taj Mahal'"
+    assert cli.run(["landmark", "Taj Mahal"])[0].splitlines()[-1] == "NEXT: stone landmark 'Taj Mahal' --plain"
+
+
+def test_one_tower_on_a_wide_plan_is_not_the_building(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    _drawn(monkeypatch, recorded, OUTLINE, _way(2, -40, -10, -25, 10, building__part="yes", height="73"))
+    with pytest.raises(landmark_refs.LandmarkProblem, match="a piece covering 19% of its plan"):
+        landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low", plain=True)
+
+
+def test_a_tall_bell_tower_does_not_hide_a_church_without_its_dome(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    tower = _way(5, 60, 0, 70, 10, building="bell_tower", wikidata="Q5", height="73")
+    item = [{"mainsnak": {"datavalue": {"value": {"id": "Q5"}}}}]
+    site = _site_refs(wikidata_raw={"claims": {"P527": item}})
+    _drawn(monkeypatch, recorded, OUTLINE)
+    monkeypatch.setattr(landmark_refs, "fetch", lambda r, root: landmark_refs.parse_osm({"elements": [
+        OUTLINE, tower, _way(2, -40, -10, 0, 10, building__part="yes", height="20"),
+        _way(3, 0, -10, 40, 10, building__part="yes", height="21")]}, site))
+    with pytest.raises(landmark_refs.LandmarkProblem, match="tallest part of Taj Mahal is 21 m"):
+        landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
+
+
+def test_a_whole_pyramid_is_no_plain_shape(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    _drawn(monkeypatch, recorded, _way(1, -40, -40, 40, 40, building="yes", height="73", roof__shape="pyramidal",
+                                       roof__height="73", wikidata="Q1"))
+    assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
+
+
+def test_a_crowded_map_is_asked_again_for_a_smaller_area(monkeypatch, tmp_path):
+    """The Brooklyn Bridge stopped at "HTTP Error 400: Bad Request": the map API refuses over 50,000 nodes."""
+    import urllib.error
+
+    house = _way(3, -8, -8, 8, 8, building="yes", height="12", wikidata="Q1")
+    wide = _way(4, -900, -9, 900, 9, building="yes", height="12", wikidata="Q1")
+    cut = {"type": "relation", "id": 8, "tags": {"building": "yes", "type": "multipolygon", "wikidata": "Q1"},
+           "members": [{"type": "way", "ref": 404, "role": "outer"}]}
+    for i, (drawn, found, more) in enumerate((
+            (house, True, []), (wide, False, []), (house, False, [cut]),
+            (_way(3, -8, -8, 8, 8, building="yes", height="12"), False, []))):  # and its own outline is not in the answer
+        home = tmp_path / str(i)
+        nodes, asked = _map_answer(monkeypatch, home, [drawn])
+        nodes += more
+        answer = landmark_refs._request
+
+        def request(url, data=None, answer=answer):
+            got = answer(url, data)
+            if len(asked) < 3:
+                raise urllib.error.HTTPError(url, 400, "Bad Request", {}, None)
+            return got
+        monkeypatch.setattr(landmark_refs, "_request", request)
+        if found:
+            assert landmark_refs.fetch(_site_refs(length=1825), home)["outline"]
+        else:
+            with pytest.raises(landmark_refs.LandmarkProblem, match="too crowded"):
+                landmark_refs.fetch(_site_refs(length=1825), home)
+        boxes = [[float(v) for v in urllib.parse.parse_qs(url.split("?")[1])["bbox"][0].split(",")] for url in asked]
+        assert [round((b[3] - b[1]) * 111320 / 2) for b in boxes] == [1000, 500, 250]
+        assert not list((home / ".cache/smoothstone/osm").glob("*.json"))

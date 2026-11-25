@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 
 
-from .landmark_refs import LandmarkProblem
+from .landmark_refs import LandmarkProblem, PlainShape
 
 
 def length(value):
@@ -124,6 +124,8 @@ def _level_from_twin(i, prepared):
 
 
 OBELISK_TAPER = .63
+LEAST_HEIGHT = .75  # of the sourced height that a map must reach
+LEAST_SHARE, SPLIT_SHARE = .4, .6  # of its plan that a map must draw, and that one in separate pieces must
 
 
 def resolve_parts(parts, refs):
@@ -581,8 +583,16 @@ def _anchor(man, notes):
     return base
 
 
-def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack=None):
-    """Build sourced geometry, preserving references and handing scale to modelprint."""
+def _plain(records) -> bool:
+    """The whole landmark drawn as one extruded outline: no lighthouse is a cylinder. A pyramid's roof is its shape."""
+    if len(records) != 1 or records[0]["tags"].get("man_made") == "obelisk":
+        return False
+    part, = records
+    return part["roof_height"]["metres"] < .8 * (part["height"]["metres"] - part["min_height"]["metres"])
+
+
+def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack=None, plain=False):
+    """Build sourced geometry, preserving references and handing scale to modelprint. `plain` takes one mapped shape."""
     import manifold3d as m3
     from . import landmark_architecture, landmark_parts, landmark_refs, modelprint
     from .landmark_style import style_keys
@@ -662,6 +672,13 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     if replace != "all" and (not (measured or extra)
                              or (len(measured) / max(1, len(records)) < .35 and coverage < .45)):
         raise LandmarkProblem("insufficient mapped 3D parts with heights across the landmark footprint. Use stone models " + json.dumps(name) + ".")
+    if replace != "all" and not outline.is_empty():
+        drawn = m3.CrossSection.batch_boolean([mapped, *extra_sections], m3.OpType.Add)
+        share = (drawn ^ outline).area() / outline.area()
+        split = len(drawn.offset(.3).decompose()) > 1
+        if share < (SPLIT_SHARE if split else LEAST_SHARE):
+            raise LandmarkProblem(f"the map draws {name} in {'separate pieces' if split else 'a piece'} covering {share:.0%} "
+                                  "of its plan, and the rest is missing.")
     towers, tower_sections = resolve_parts(data.get("linked_towers", []), refs)
     towers = [(p, cs) for p, cs in zip(towers, tower_sections) if not p["height"]["guessed"]]
     if towers:
@@ -705,6 +722,14 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                                      "reason": height.get("reason", "The sourced height describes the complete landmark.")}
     is_lattice = "steel" in keys and replace != "all" and all(fact in pack for fact in (
         "deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m"))
+    if replace != "all" and not is_lattice and refs.get("height"):
+        tallest = max(p["height"]["metres"] for p in records if "association_source" not in p)  # not a linked tower
+        if tallest < LEAST_HEIGHT * refs["height"]:
+            raise LandmarkProblem(f"the map's tallest part of {name} is {tallest:g} m, and the whole stands "
+                                  f"{refs['height']:g} m.")
+    bare = replace != "all" and not (extra or is_lattice) and _plain(records)
+    if bare and not plain:
+        raise PlainShape(f"the map draws {name} as one plain shape, with its outline and height and nothing else.")
     chosen = detail or ("high" if len(records) - len(extra) < 400 else "low")
     if chosen not in ("low", "high"):
         raise LandmarkProblem("detail must be low or high.")
@@ -856,6 +881,8 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     omitted = [note for note in notes if note.startswith("Omitted detail below the print floor")]
     lines = [f"Built {len(records)} modeled 3D parts with {chosen} detail.",
              "© OpenStreetMap contributors, ODbL 1.0." if osm else "Drawn from the reference pack's sources.", f"References and modeling notes: {refpath}"]
+    if bare:
+        lines.append(f"NOTE, tell the person: the map has {name} as one plain shape, and its real shape has more.")
     if omitted:
         lines.append("Omitted architectural detail below the print floor. See the modeling notes for each feature.")
     return {"stl": str(stl), "subject": refs.get("label", name), "name": refs.get("label", name),
