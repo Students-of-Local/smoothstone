@@ -362,6 +362,8 @@ def test_thin_features_name_a_needle_and_stay_quiet_on_a_block():
 def stone(*argv):
     text, code = cli.run(list(argv))
     lines = text.splitlines()
+    if lines[-1].startswith("After the person answers (not before): "):  # the one line allowed after a question
+        lines = lines[:-1]
     assert len(lines) <= cli.MAX_LINES and lines[-1].startswith("NEXT: "), text
     assert "\u2014" not in text and "\u2013" not in text
     return text, code, lines[-1][len("NEXT: "):]
@@ -684,7 +686,7 @@ def test_landmark_without_parts_routes_to_models_and_does_not_loop(jobenv, monke
     }
     monkeypatch.setattr(models, "search", lambda *args: found)
     text, code, nxt = stone("models", "Cologne Cathedral")
-    assert code == 1 and nxt.startswith("ask the person:"), text
+    assert code == 1 and nxt.startswith("none. Your reply to the user is: No open model"), text
 
 
 def test_a_refused_landmark_tells_a_large_model_it_may_write_the_shapes(jobenv, monkeypatch):

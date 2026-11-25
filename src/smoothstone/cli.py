@@ -67,6 +67,12 @@ class Out:
         if self.raw is not None:
             return self.raw
         body = [ln for ln in self.lines if ln is not None]
+        nxt, after = self.next, self.after
+        if nxt.startswith(LANDMARK_ASK):  # LFM3-1.7B loses the thread on who "the person" is and what is left to FIX
+            body = [ln for ln in body if not ln.startswith(("Subject: ", "Searched: ", "FIX: no open model"))]
+            body.append("stone can go no further until the user answers.")
+            after = after + ['After the person answers (not before): stone note "<their answer>", then run the NEXT line it prints.']
+            nxt = REPLY + nxt[len("ask the person: ")].upper() + nxt[len("ask the person: ") + 1:]
         room = MAX_LINES - 1
         passes = [ln for ln in body if ln.startswith("PASS ")]
         if len(body) > room and len(passes) > 1:
@@ -83,7 +89,7 @@ class Out:
             rest = [i for i in range(len(body)) if i not in set(must)]
             keep = sorted(must + rest[: room - 1 - len(must)])
             body = [body[i] for i in keep] + [f"({len(body) - len(keep)} more lines in log.txt)"]
-        return "\n".join(body + [f"NEXT: {self.next}"] + self.after)
+        return "\n".join(body + [f"NEXT: {nxt}"] + after)
 
 
 class UsageError(Exception):
@@ -1877,6 +1883,60 @@ def cmd_measure(args, job: Job) -> Out:
 # done
 
 
+AGREE = set("yes yeah yep ok okay sure fine go".split())
+AGREED = AGREE | set("ahead do the that it a one plain shape box cylinder thanks thank you is that's good great make build as "
+                     "to person user they said says i we just print please want wants tall high wide long across".split())
+SIZED = re.compile(r"\d+(?:\.\d+)?\s*(?:mm|cm|m|in|inch|inches)\b", re.I)
+FILE = re.compile(r"[^\s\"']+\.(?:stl|3mf|obj|step|stp|glb|ply)\b", re.I)
+MAKE = re.compile(r"^\W*(?:no\b\W*)?(?:(?:please|just|can you)\s+)?(?=(?:make|build|design|create)\b)", re.I)
+LEAD = re.compile(r"^\W*(?:(?:yes|try|use|maybe|it'?s|it is|called|the name is)\b\W*)+", re.I)
+NO = re.compile(r"\W*(?:no|nope)\s*(?:$|[,.!;:]|(?:thanks|thank you|please|don['\u2019]?t|do not)\b)", re.I)  # not "No model of it"
+WHERE = "ask the person: where is that file on this computer?"
+INSTEAD = "ask the person: what should I make instead?"
+
+
+def says(text: str) -> str:
+    """"yes" only when every word agrees, a size aside ("OK, don't print it" is neither), "no" when it opens with one, else ""."""
+    words = re.findall(r"[a-z']+", SIZED.sub("", text).lower().replace("\u2019", "'"))
+    if "?" in text or not words:
+        return ""
+    return "yes" if set(words) & AGREE and set(words) <= AGREED else "no" if NO.match(text) else ""
+
+
+def note_landmark(out: Out, job: Job, asked: str, plain: dict, text: str) -> Out:
+    """The person's answer to a landmark question: yes or no, a file, another name, or another thing to make."""
+    from . import models as mdl
+
+    said, file, make = says(text), FILE.search(text), MAKE.match(text)
+    pick = plain and asked == _ask_plain(plain["subject"])
+    out.owns_next = True
+    out.next = asked
+    if "?" in text:
+        out.add("That is a question to you: answer it, then ask again.")
+    elif file:
+        out.next = f"stone check {shlex.quote(file.group())}"
+    elif asked == INSTEAD and said:
+        pass  # a yes or a no names nothing to make
+    elif make or asked == INSTEAD:
+        out.next = f"stone new {shlex.quote(text[make.end():] if make else text)} --force"
+    elif pick and said == "yes":
+        size = {"size": mdl.target(text, config.bed(job.root))} if SIZED.search(text) else {}
+        job.update(landmark_plain={**plain, "yes": True, **size})
+        out.next = re.sub(r" --size \S+", "", plain["command"]) if size else plain["command"]
+    elif pick and said == "no":
+        job.update(landmark_plain={**plain, "yes": False})
+        out.next = _ask_file(plain["subject"])
+    elif pick:
+        out.add('If that was a yes or a no, note just that: stone note "yes" or stone note "no"')
+    elif said == "yes" or asked == WHERE:
+        out.next = WHERE
+    elif said == "no":
+        out.next = INSTEAD
+    else:
+        out.next = _landmark_command("stone landmark", LEAD.sub("", text).strip(" .!"))
+    return out
+
+
 def cmd_note(args, job: Job) -> Out:
     """Keep a researched fact and its source in the job, so it survives a compaction."""
     out = Out(owns_next=False)
@@ -1893,7 +1953,9 @@ def cmd_note(args, job: Job) -> Out:
     if st.get("ask_product") and asked.startswith("stone note"):
         # a set with sizes sent the model here: the job still waits on the person's answer to this question
         asked = f"ask the person: {match.product_size_question(st['ask_product'], bool(st.get('ask_round')))}"
-    if asked.startswith("ask the person") and is_the_question(text, asked):
+    # "yes, print that plain shape" repeats the question's words, and so does "no, don't print that plain shape"
+    mine = asked.startswith(LANDMARK_ASK) and says(text)
+    if asked.startswith("ask the person") and not mine and is_the_question(text, asked):
         out.fix("that is your question, not the person's answer; write the question as your reply and stop")
         out.add("Note only what the person says back.")
         out.next = asked
@@ -1902,6 +1964,8 @@ def cmd_note(args, job: Job) -> Out:
         return out
     notes = job.add_note(text)
     out.add(f"Noted ({len(notes)} notes): {text}")
+    if asked.startswith(LANDMARK_ASK) or asked in (WHERE, INSTEAD):
+        return note_landmark(out, job, asked, st.get("landmark_plain") or {}, text)
     if asked.startswith("ask the person") and st.get("ask_product"):
         # the answer is the product's size: it is kept as a note, never read into the request as a part size
         return note_product(out, job, st, text)
@@ -2259,16 +2323,30 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
     return out
 
 
+REPLY = "none. Your reply to the user is: "  # how a LANDMARK_ASK is printed
+LANDMARK_ASK = "ask the person: no open model of "
+MAKERS = ("recipes", "show", "set", "build", "product", "image")  # commands that make some other part
+
+
+def _ask_plain(subject: str) -> str:
+    return (f"{LANDMARK_ASK}{subject} prints, and the map has it only as one plain shape, like a box or a cylinder, "
+            f"without its real form. Print that plain shape?")
+
+
+def _ask_file(subject: str) -> str:
+    return (f"{LANDMARK_ASK}{subject} prints, and the map gives no printable shape of it. "
+            f"Do you have a model file, or another name?")
+
+
 def _landmark_fallback(job: Job, subject: str) -> str:
     status = job.status()
     job.update(models_out=subject)
     attempted = str(status.get("landmark_attempted") or "")
     plain = status.get("landmark_plain") or {}
     if str(plain.get("subject") or "").casefold() == subject.casefold():
-        return plain["command"]  # its one plain shape is better than nothing
+        return _ask_file(plain["subject"]) if plain.get("yes") is False else _ask_plain(plain["subject"])
     if attempted.casefold() == subject.casefold():
-        return ("ask the person: neither the landmark references nor an open model produced a printable part. "
-                'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
+        return _ask_file(subject)
     return _landmark_command("stone landmark", subject)
 
 
@@ -2310,7 +2388,21 @@ def cmd_landmark(args, job: Job) -> Out:
     size = args.size
     if size is None:
         size = target if target["mode"] != "fit" or target.get("bed_said") else min(200.0, *bed)
-    job.update(landmark_attempted=subject, landmark_plain=None)
+    st = job.status()
+    waits = st.get("landmark_plain") or {}
+    chosen = [a for flag, value in (("--size", args.size), ("--detail", args.detail), ("--refs", args.refs))
+              if value is not None for a in (flag, str(value))]
+    mine = str(waits.get("subject") or "").casefold() == subject.casefold()
+    if args.size is None and mine and waits.get("size"):
+        size = waits["size"]  # the person said it with their yes
+    if args.plain and not (mine and waits.get("yes")):
+        out.fix('the person has not said yes to the plain shape; when they do: stone note "<their answer>"')
+        out.next = (shlex.join(["stone", "landmark", subject, *chosen]) if not mine else _landmark_fallback(job, subject)
+                    if str(st.get("models_out") or "").casefold() == subject.casefold()
+                    else _landmark_command("stone models", subject))
+        out.result = "plain shape refused: not asked"
+        return out
+    job.update(landmark_attempted=subject, landmark_plain=waits if mine else None)
     progress(job, f"building {subject} from landmark references")
     try:
         options = {**({"ref_pack": args.refs} if args.refs else {}), **({"plain": True} if args.plain else {})}
@@ -2318,24 +2410,26 @@ def cmd_landmark(args, job: Job) -> Out:
     except Exception as e:
         command = None
         if isinstance(e, landmark_refs.PlainShape):
-            chosen = [a for flag, value in (("--size", args.size), ("--detail", args.detail), ("--refs", args.refs))
-                      if value is not None for a in (flag, str(value))]
             command = shlex.join(["stone", "landmark", subject, *chosen, "--plain"])
-            job.update(landmark_plain={"subject": subject, "command": command})
-            if str(job.status().get("models_out") or "").casefold() != subject.casefold():
-                command = None  # the open models come first
+            no = {"yes": False} if mine and waits.get("yes") is False else {}  # they said no: it is not asked again
+            job.update(landmark_plain={"subject": subject, "command": command, **no})
+            out_of_models = str(job.status().get("models_out") or "").casefold() == subject.casefold()
+            command = _landmark_fallback(job, subject) if out_of_models else None  # the open models come first
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")
         if config.tier(job.root) == "L":  # only a large model can write what the map lacks
             out.add(f"Or write the shapes it lacks from cited sources (skill/landmarks.md) and build with "
                     f"{_landmark_command('stone landmark', subject)} --refs pack.json")
+        if args.plain:
+            job.update(landmark_plain=None)  # it cannot be built: no second yes to it
         out.fix(str(e))
         out.next = command or _landmark_command("stone models", subject)
         out.stage = "landmark_failed"
         out.result = f"landmark failed: {str(e)}"[:120]
         return out
     out.add(*(info.get("lines") or []))
+    job.update(landmark_plain=None)
     write_json(mdl.model_file(job.root), info)
     job.plan_file.unlink(missing_ok=True)
     (job.root / "build" / "model" / "parts.json").unlink(missing_ok=True)
@@ -3658,7 +3752,14 @@ def run(argv: list[str]) -> tuple[str, int]:
         cmd = args.cmd
         job = Job(config.job_dir(getattr(args, "job", None) or args.job_top))
         catalog.use_job(job.root)
-        out = COMMANDS[cmd](args, job)
+        st = job.status() if job.exists() else {}
+        asked = str(st.get("next", ""))
+        if cmd in MAKERS and asked.startswith(LANDMARK_ASK):
+            out = Out(owns_next=False)  # LFM3-1.7B made a faceplate instead of asking about a lighthouse
+            out.fix('stone waits on the person, not another part; when they answer: stone note "<their answer>"')
+            out.next = asked
+        else:
+            out = COMMANDS[cmd](args, job)
     except UsageError as e:
         out = Out()
         out.fix(f"{e}; commands: status new recipes show set build check image measure colors done")
