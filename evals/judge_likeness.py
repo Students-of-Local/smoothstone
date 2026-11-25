@@ -36,6 +36,7 @@ from pathlib import Path
 
 PASS = 6
 WIKI = "https://en.wikipedia.org/w/api.php"
+MEDIA = "https://en.wikipedia.org/api/rest_v1/page/media-list/"
 AGENT = "smoothstone-evals/0.1 (https://github.com/baney75/smoothstone; likeness judge)"
 
 TITLE = """A person asked a tool for a collectible figure with this request:
@@ -115,6 +116,15 @@ def reference(title: str) -> dict:
         raise JudgeProblem(f"no lead image for the Wikipedia article {title!r}")
     p = pages[0]
     return {"title": p["title"], "url": p["original"]["source"], "caption": p.get("description", "")}
+
+
+def first_photo(title: str) -> str:
+    """The first photo in an article, for one that leads with a logo or a plan."""
+    media = json.loads(_get(MEDIA + urllib.parse.quote(title.replace(" ", "_"), safe=""))).get("items", [])
+    photos = [i for i in media if re.search(r"\.jpe?g$", i.get("title", ""), re.I) and i.get("srcset")]
+    if not photos:
+        raise JudgeProblem(f"the Wikipedia article {title!r} leads with a drawing and has no photo")
+    return urllib.parse.urljoin(WIKI, photos[0]["srcset"][-1]["src"])
 
 
 def _file_key(name: str) -> str:

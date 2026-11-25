@@ -180,6 +180,8 @@ def judge(job: Path, request: str, title: str | None = None, model: str = "opus"
     if not title:
         title = jl.claude(jl.TITLE.format(request=request), model=model).strip().strip('"').splitlines()[0]
     ref = jl.reference(title)
+    if ".svg" in ref["url"].lower():  # a logo is no photo of it
+        ref["url"] = jl.first_photo(ref["title"])
     data = jl._get(ref["url"])
     ext = jl._suffix(data)
     if not ext:

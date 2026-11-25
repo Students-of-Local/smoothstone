@@ -157,3 +157,34 @@ def test_pinnacles_are_counted_in_the_file_that_prints(tmp_path, turn):
     half = tmp_path / "half.stl"
     whole.copy().apply_scale(.5).export(half)
     assert landmarks_grade.printed_mesh(generated, [{"file": str(half), "to_print": np.eye(4).tolist()}]) is None
+
+
+def test_an_article_that_leads_with_a_logo_is_judged_by_its_first_photo(tmp_path, monkeypatch):
+    """Petronas Towers: the lead image is a logo, and the judge could not answer."""
+    import io
+    import judge_likeness as jl
+    import models_grade
+    from PIL import Image
+
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "views.png").write_bytes(b"views")
+    items = [{"title": "File:Logo.svg", "srcset": [{"src": "//up/logo.svg.png"}]}, {"title": "File:Anthem.ogg"},
+             {"title": "File:Twins 2019.JPG", "srcset": [{"src": "//up/small.jpg"}, {"src": "//up/large.jpg"}]}]
+
+    def get(url, timeout=60):
+        if "media-list/Petronas_Towers" in url:
+            return json.dumps({"items": items}).encode()
+        if "api.php" in url:
+            return json.dumps({"query": {"pages": {"1": {"title": "Petronas Towers",
+                                                         "original": {"source": "https://up/Logo.svg?utm=x"}}}}}).encode()
+        picture = io.BytesIO()
+        Image.new("RGB", (8, 8)).save(picture, "JPEG")
+        return picture.getvalue() if url == "https://up/large.jpg" else b"<svg/>"
+
+    monkeypatch.setattr(jl, "_get", get)
+    monkeypatch.setattr(jl, "claude", lambda *a, **k: '{"score": 9, "conflicts": []}')
+    result = models_grade.judge(tmp_path, "Petronas Towers", "Petronas Towers")
+    assert result["pass"] and result["reference"]["url"] == "https://up/large.jpg"
+    del items[2]
+    with pytest.raises(jl.JudgeProblem, match="no photo"):
+        models_grade.judge(tmp_path, "Petronas Towers", "Petronas Towers")
