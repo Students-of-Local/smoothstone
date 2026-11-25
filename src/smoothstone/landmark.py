@@ -567,7 +567,7 @@ def _anchor(man, notes):
 def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack=None):
     """Build sourced geometry, preserving references and handing scale to modelprint."""
     import manifold3d as m3
-    from . import clean, landmark_architecture, landmark_refs, modelprint
+    from . import clean, landmark_architecture, landmark_parts, landmark_refs, modelprint
     from .landmark_style import style_keys
 
     root = Path(job_root)
@@ -603,7 +603,14 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         refpath.write_text(json.dumps(refs, indent=2, ensure_ascii=False) + "\n")
 
     save()
-    data = landmark_refs.fetch(refs, root)
+    extra, extra_sections, openings = landmark_parts.read(pack, refs)
+    replace = pack.get("parts", {}).get("replace", "none")
+    if replace == "all":
+        data = {"outline": [], "parts": [], "source": pack["parts"]["source"], "tags": {}, "linked_towers": []}
+    else:
+        data = landmark_refs.fetch(refs, root)
+        if replace != "none":
+            data["parts"] = [p for p in data["parts"] if p["id"] not in replace]
     refs.update(geometry_source=data.get("source"), outline=data.get("outline", []),
                 mapped_parts=data.get("parts", []))
     save()
@@ -626,7 +633,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     coverage = (sourced ^ outline).area() / outline.area() if outline.area() > 0 else sourced.area() / max(mapped.area(), .001)
     refs.update(height_source_coverage=coverage, height_source_parts=len(measured))
     save()
-    if not measured or (len(measured) / len(records) < .35 and coverage < .45):
+    if not extra and (not measured or (len(measured) / len(records) < .35 and coverage < .45)):
         raise LandmarkProblem("insufficient mapped 3D parts with heights across the landmark footprint. Use stone models " + json.dumps(name) + ".")
     towers, tower_sections = resolve_parts(data.get("linked_towers", []), refs)
     towers = [(p, cs) for p, cs in zip(towers, tower_sections) if not p["height"]["guessed"]]
@@ -655,6 +662,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         records, sections, westward, changes = infer_massing(records, sections, outline, data, refs, target, keys)
     records, sections, corrections = landmark_architecture.reconcile(records, sections, refs, pack, keys)
     changes.extend(corrections)
+    records, sections = [*records, *extra], [*sections, *extra_sections]
     if refs.get("height") and abs(mapped_height / refs["height"] - 1) > .03:
         recorded = max(p["height"]["metres"] for p in records)
         reason = ("The sourced top includes a style-appropriate finial above the mapped peak."
@@ -684,7 +692,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     notes.extend(changes)
     solids, mm_sections = [], []
     mughal = "mughal" in keys
-    for p, original in (() if is_lattice else zip(records, sections)):
+    for p, original in zip(extra, extra_sections) if is_lattice else zip(records, sections):
         if p["roof_shape"] == "gabled":
             x0, y0, x1, y1 = original.bounds()
             width, span = sorted((x1 - x0, y1 - y0))
@@ -697,6 +705,11 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                     for q, other in zip(records, sections)
                 )
         cs = original.scale([scale, scale])
+        if "_build" in p:  # a reference part brings its own shape
+            part = _union(p.pop("_build")(scale, notes)).translate([0, 0, 2])
+            mm_sections.append(part.project())
+            solids.append(part)
+            continue
         comps = []
         for c in cs.decompose():
             if c.offset(-.6).is_empty():
@@ -749,11 +762,16 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     solids.append(base.extrude(2.02))
     man = _union(solids)
     man = _footing(_anchor(man, notes), notes)
-    if chosen == "high" and not is_lattice:
+    # A reference part is drawn as its sources show it, with no style's ornament over it.
+    drawn = [(p, cs) for p, cs in zip(records, mm_sections) if p.get("type") != "reference"]
+    if chosen == "high" and drawn and not is_lattice:
         from .landmark_style import decorate
-        man, additions = decorate(man, records, mm_sections, scale, styles, pack, outline.scale([scale, scale]),
-                                  westward=westward)
+        man, additions = decorate(man, *map(list, zip(*drawn)), scale, styles, pack,
+                                  outline.scale([scale, scale]), westward=westward)
         notes.extend(additions)
+    man = landmark_parts.cut(man, openings, scale, notes)
+    if "lean" in pack:
+        man = _footing(landmark_parts.lean(man, pack["lean"], notes), notes)
     if man.status() != m3.Error.NoError:
         raise LandmarkProblem(f"mapped geometry could not form a closed solid ({man.status().name}).")
     raw_mesh = modelprint.to_trimesh(man)
