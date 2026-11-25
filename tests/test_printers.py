@@ -308,3 +308,10 @@ def test_heat_the_printer_does_not_reach_is_cut_and_said():
     s = printers.settings(printers.get("creality_ender3_v3"), "PLA")  # nothing around it holds the profile's 35 C air
     assert "chamber" not in s and "open frame" in s["cut"][0] and printers.settings(printers.get("creality_k2"), "ABS")["chamber"] == 60
     assert printers.settings(printers.get("creality_k2"), "HIPS") is None and printers.settings({"id": "other"}, "PLA") is None
+
+
+@pytest.mark.parametrize("layer_s, share", [(40, 0.0), (30, 0.10), (21, 0.35), (12, 0.6), (3, 0.6)])
+def test_the_fan_runs_faster_on_layers_that_take_less_time(layer_s, share):
+    s = {"fan_min": 10, "fan_max": 60, "fan_long": 0, "fan_min_layer_s": 30, "fan_max_layer_s": 12}
+    assert printers.fan(s, layer_s) == pytest.approx(share)
+    assert printers.fan({**s, "fan_max_layer_s": 30}, 30) == 0.6  # no slope to speak of

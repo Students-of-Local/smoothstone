@@ -62,6 +62,15 @@ def settings(p: dict, material: str) -> dict | None:
     return out
 
 
+def fan(s: dict, layer_s: float) -> float:
+    """Share of full speed a profile (settings) runs the fan at on layers that take layer_s."""
+    if layer_s > s["fan_min_layer_s"]:
+        return s["fan_long"] / 100
+    a, b = s["fan_max_layer_s"], s["fan_min_layer_s"]
+    short = 1.0 if b <= a else min(max((b - layer_s) / (b - a), 0.0), 1.0)
+    return (s["fan_min"] + short * (s["fan_max"] - s["fan_min"])) / 100
+
+
 def process(p: dict) -> dict | None:
     """This printer's slicer process: layer (mm) and widths, speeds, accels, shells, retract_mm, nozzle_volume_mm3 (where Orca gives it)."""
     e = _settings().get(f"orca.{p['id']}.process")
