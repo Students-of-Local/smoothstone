@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import failsim, printers, strand, timelapse
+from . import failsim, printers, strand, timelapse, toolpaths
 
 OFF_C = 10  # C a hotend may be off what it is set to before that is said
 MODES = ("auto", "supports", "detach", "droop", "bridge")
@@ -99,6 +99,16 @@ def moves_of(tp, *features) -> np.ndarray:
     return tp.extruding() & (tp.layer >= 0) & np.isin(tp.feature, [F.index(k) for k in features])
 
 
+def leaving(inp) -> failsim.Material:
+    """Its plastic at the heat it leaves the nozzle with, set on it and said in its notes in place of what they said."""
+    m = inp.material = failsim.leaving(inp)
+    inp.notes[:] = [n for n in inp.notes if not n.startswith(("the melt leaves", "that nozzle is too cold"))]
+    inp.notes.append(f"the melt leaves the nozzle at {m.out:.0f} C, set to {m.nozzle:.0f} C" + (f", at {inp.flow:.1f} mm3/s" if inp.flow else ""))
+    if m.out <= m.set + 5:
+        inp.notes.append(f"that nozzle is too cold for {m.name}, which sets at {m.set:.0f} C; the model takes the melt 5 C over it")
+    return m
+
+
 def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True, heat: bool = True,
            prof: dict | None = None) -> failsim.Inputs:
     """failsim's per-layer masks from the toolpath's extruding moves, the part's and its supports': a skirt and a prime
@@ -115,6 +125,13 @@ def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True,
         tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], np.where(of, tp.layer, -1)[ext], z, **kw)
     inp = masks(ext & ~skirt & ~moves_of(tp, "prime tower"), z, layer_t=layer_times(tp), layer=thick, clean=clean, supports=bool(sup.any()), enclosed=enclosed)
     inp = replace(inp, **settings(tp, material, enclosed, heat, prof))
+    part, whose = ext & tp.part(), printers.short_name(prof or printers.get("creality_k2"))
+    fed, took = (tp.p1 - tp.p0)[part, 3] * toolpaths.FIL_AREA, np.maximum(tp.t1 - tp.t0, 1e-9)[part]
+    inp.flow = float(fed.sum() / took.sum()) if part.any() else None
+    m = leaving(inp)
+    if fed[fed > 1.05 * m.max_flow * took].sum() > 0.05 * fed.sum():
+        inp.notes.append(f"this print asks the hotend for up to {np.percentile(fed / took, 99):.1f} mm3/s; the {whose} profile lets it melt {m.max_flow:g} "
+                         f"of {m.name}, and lines that come out thin past that are not drawn")
     rim, foot = masks(skirt, z[:1]).masks[0], inp.masks[0]
     lab, _ = ndimage.label(ndimage.binary_dilation(rim | foot))  # a slicer leaves a hair between brim and part
     inp.brim = rim & np.isin(lab, np.setdiff1d(lab[foot], 0))
@@ -331,6 +348,10 @@ class Story:
         tp, m, d, dt = self.tp, self.inp.material, strand.exit_diameter(), strand.DT
         z, t0, t1 = float(self.inp.layer_z[i]), tp.t0[run], tp.t1[run]
         came = np.r_[0.0, np.cumsum(self.flows[run] * (t1 - t0))]  # mm3 out of the nozzle by each move's end
+        own = np.isin(np.arange(tp.n), run) & self.ext
+        hot = failsim.melt_c(m, self.mean(self.flows, own)) if own.any() else m.out  # its own flow's: over air slicers slow down
+        if self.rod is not None:
+            self.rod.hot = hot
         first, snaps = len(self.links), []
         high = max(z - d, 0.0)  # what lies higher, the nozzle pushes down
         ground = lambda x, y: np.where(self.off(np.c_[x, y]), 0.0, np.minimum(self.field[self.px(np.c_[x, y])], high))  # noqa: E731
@@ -354,7 +375,7 @@ class Story:
                     was = head
                     continue
                 first_up = was - (0, 0, min(d, max(was[2] - d / 2, d / 4)))
-                self.rod = strand.Strand([first_up, was], d, m, bore=d / failsim.fact("die_swell"), fan=self.inp.fan, air=self.inp.air,
+                self.rod = strand.Strand([first_up, was], d, m, temp=hot, bore=d / failsim.fact("die_swell"), fan=self.inp.fan, air=self.inp.air,
                                          ground=ground, plastic=plastic, nozzle=True, held=() if loose[self.px(was[None])][0] else (0,))
                 self.owed += float(self.rod.vol[0]) * 1e9
             s, was, paid = self.rod, head, min(self.owed, out * dt)  # what it starts with comes out of the flow that follows
@@ -669,7 +690,7 @@ def live(inp, prof: dict) -> failsim.Inputs:
         inp.notes.append(f"{nozzle:.0f} C is too cold for {m.name} to flow; its set heat, {m.nozzle:g} C, is used")
         nozzle = None
     inp = replace(inp, bed=got.get("bed_c", inp.bed), material=replace(m, nozzle=nozzle or m.nozzle, chamber=got.get("chamber_c", m.chamber)))
-    inp.material = failsim.leaving(inp)
+    leaving(inp)
     return inp
 
 
@@ -794,7 +815,7 @@ def cmd(args, job, prof, out):
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
             "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
-            "predicted": [x.kind for x in fails], "strand": strand.numbers(inp.material, st.flow, st.mean_speed, air_c=inp.air, fan=float(inp.fan)), "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
+            "predicted": [x.kind for x in fails], "strand": strand.numbers(inp.material, st.flow, st.mean_speed, air_c=inp.air, nozzle_c=failsim.melt_c(inp.material, st.flow) if st.flew.any() else None, fan=float(inp.fan)), "source": what, "input": str(f), "printer": prof.get("id"), "camera": cam, "video_s": round(secs, 2),
             "pre_failure_frame": str(files[first - 1].relative_to(dest)) if first else None,
             "first_failure_frame": str(files[first].relative_to(dest)),
             "frames": [{"t_s": round(fr["t_s"], 2), "layer": fr["layer"], "z_mm": fr["z_mm"], "failing": k >= first,

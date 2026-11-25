@@ -92,7 +92,7 @@ def _level_from_twin(i, prepared):
     same-plan twins elsewhere share. Returns (min_height, height, id), "duplicate" when every such level
     is already drawn here, or None when nothing repeats it."""
     part, cs, _, lo = prepared[i]
-    if lo:
+    if lo or "min_height" in part.get("tags", {}):
         return None
     levels, here = {}, []
     for other, other_cs, h, other_lo in prepared:
@@ -104,14 +104,26 @@ def _level_from_twin(i, prepared):
             levels.setdefault((round(other_lo, 1), round(h, 1)), []).append((other_lo, h, other.get("id")))
     # One stray match is a coincidence. A set repeats at least twice and stands in for a stack here.
     levels = [v[0] for v in levels.values() if len(v) >= 2]
-    stack = [1 for _, other_cs, h, other_lo in prepared
+    stack = [(other_lo, h) for _, other_cs, h, other_lo in prepared
              if h is not None and other_lo and (cs ^ other_cs).area() > cs.area() * .6]
-    if not levels or len(stack) < 2:
+    if len(stack) < 2:
+        return None
+    # A pinnacle's plan repeats on other towers too. Its level counts only within this stack's height.
+    foot, top = min(a for a, _ in stack), max(b for _, b in stack)
+    levels = sorted(v for v in levels if foot - 1 <= v[0] <= top + 1)
+    if not levels:
         return None
     missing = [v for v in levels if not any(abs(v[0] - a) < .3 and abs(v[1] - b) < .3 for a, b in here)]
-    if not missing:
+    # Several parts here with no height share the missing levels, the lowest first.
+    alike = [j for j, (_, other_cs, h, other_lo) in enumerate(prepared) if h is None and not other_lo
+             and _same_plan(cs, other_cs) and (cs ^ other_cs).area() > cs.area() * .8]
+    rank = alike.index(i)
+    if rank >= len(missing):
         return "duplicate"
-    return missing[0] if len(missing) == 1 else None
+    return missing[rank] if len(alike) >= len(missing) else None
+
+
+OBELISK_TAPER = .63
 
 
 def resolve_parts(parts, refs):
@@ -438,6 +450,70 @@ def _scale(sections, records, target, reach=0.):
     return min((mm - .04 - reach) / max(ext), (mm - 2) / high)
 
 
+def _footing(man, notes):
+    """Widen the base of a model that would tip over, until it leans a degree more than the check asks."""
+    from . import modelprint, printable
+
+    mass = modelprint.to_trimesh(man).center_mass
+    stands = man.slice(.01).hull()
+    ring = stands.to_polygons()[0]
+    edge = np.roll(ring, -1, axis=0) - ring
+    edge = edge[:, ::-1] * [1, -1] / np.linalg.norm(edge, axis=1)[:, None]  # outward: the ring runs counterclockwise
+    inside = ((ring - mass[:2]) * edge).sum(axis=1).min()
+    short = mass[2] * math.tan(math.radians(printable.TIP_MIN + 1)) - inside
+    if short <= 0:
+        return man
+    import manifold3d as m3
+
+    notes.append(f"Widened the base {short:.1f} mm each way so the slender model stands.")
+    return _union([man, stands.offset(short, m3.JoinType.Miter).extrude(2.02)])
+
+
+WELD = .08
+
+
+def _weld(man, mesh, notes):
+    """Join bodies that meet only along a line, which no slicer takes as closed."""
+    import manifold3d as m3
+
+    points, index = np.unique(np.asarray(mesh.vertices, np.float32), axis=0, return_inverse=True)
+    faces = index.reshape(-1)[mesh.faces]
+    edges = np.sort(np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
+    edges, count = np.unique(edges[edges[:, 0] != edges[:, 1]], axis=0, return_counts=True)
+    touching = edges[count > 2]
+    cube = m3.Manifold.cube([WELD] * 3, True)
+    bars = [(cube.translate(points[a].tolist()) + cube.translate(points[b].tolist())).hull() for a, b in touching]
+    notes.append(f"Welded {len(bars)} edges where two bodies touched along a line.")
+    return _union([man, *bars])
+
+
+def _closed(man, raw, notes):
+    """The mesh a slicer takes as closed, by the lightest repair that gives one."""
+    from . import clean, modelprint
+
+    try:
+        return clean.for_slicer(raw)
+    except ValueError:
+        pass
+    # Quantize Boolean intersections that landed on opposite sides of a
+    # float32 boundary. The 0.00001 mm grid stays far below print detail.
+    snapped = raw.copy()
+    snapped.vertices = np.round(snapped.vertices, decimals=5)
+    try:
+        mesh = clean.for_slicer(snapped)
+        notes.append("Snapped sub-micron intersections before rechecking the mesh for the slicer.")
+        return mesh
+    except ValueError:
+        pass
+    welded = modelprint.to_trimesh(_weld(man, raw, notes))
+    try:
+        return clean.for_slicer(welded)
+    except ValueError:
+        mesh = clean.for_slicer(welded, .03)
+        notes.append("Collapsed edges under 0.03 mm, far below a nozzle's line, to close the mesh.")
+        return mesh
+
+
 def _anchor(man, notes):
     """Join floating mapped levels only where a real lower surface overlaps."""
     import manifold3d as m3
@@ -503,7 +579,7 @@ def _anchor(man, notes):
 def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack=None):
     """Build sourced geometry, preserving references and handing scale to modelprint."""
     import manifold3d as m3
-    from . import clean, landmark_architecture, landmark_refs, modelprint
+    from . import clean, landmark_architecture, landmark_parts, landmark_refs, modelprint
     from .landmark_style import style_keys
 
     root = Path(job_root)
@@ -539,7 +615,18 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         refpath.write_text(json.dumps(refs, indent=2, ensure_ascii=False) + "\n")
 
     save()
-    data = landmark_refs.fetch(refs, root)
+    extra, extra_sections, openings = landmark_parts.read(pack, refs)
+    replace = pack.get("parts", {}).get("replace", "none")
+    if replace == "all":
+        data = {"outline": [], "parts": [], "source": pack["parts"]["source"], "tags": {}, "linked_towers": []}
+    else:
+        data = landmark_refs.fetch(refs, root)
+        if replace != "none":
+            mapped = {p["id"] for key in ("parts", "linked_towers") for p in data[key]}
+            if set(replace) - mapped:
+                raise LandmarkProblem(f"Reference parts: the map has no part {min(set(replace) - mapped)} to replace.")
+            for key in ("parts", "linked_towers"):
+                data[key] = [p for p in data[key] if p["id"] not in replace]
     refs.update(geometry_source=data.get("source"), outline=data.get("outline", []),
                 mapped_parts=data.get("parts", []))
     save()
@@ -556,13 +643,19 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                             "feature": "modeled architectural feature, when identified",
                             "tags": "all source tags", "footprint": "outer ring then holes, local east/north metres"}
     save()
+    refs["feature_sources"].extend(source for _, _, source, _ in openings)
     measured = [cs for p, cs in zip(records, sections) if not p["height"]["guessed"] or "building:levels" in p["tags"]]
     mapped = m3.CrossSection.batch_boolean(sections, m3.OpType.Add)
     sourced = m3.CrossSection.batch_boolean(measured, m3.OpType.Add)
     coverage = (sourced ^ outline).area() / outline.area() if outline.area() > 0 else sourced.area() / max(mapped.area(), .001)
     refs.update(height_source_coverage=coverage, height_source_parts=len(measured))
     save()
-    if not measured or (len(measured) / len(records) < .35 and coverage < .45):
+    if extra:
+        drawn = m3.CrossSection.batch_boolean([sourced, *extra_sections], m3.OpType.Add)
+        whole = m3.CrossSection.batch_boolean([mapped, *extra_sections], m3.OpType.Add) if outline.is_empty() else outline
+        coverage = (drawn ^ whole).area() / whole.area()
+    if replace != "all" and (not (measured or extra)
+                             or (len(measured) / max(1, len(records)) < .35 and coverage < .45)):
         raise LandmarkProblem("insufficient mapped 3D parts with heights across the landmark footprint. Use stone models " + json.dumps(name) + ".")
     towers, tower_sections = resolve_parts(data.get("linked_towers", []), refs)
     towers = [(p, cs) for p, cs in zip(towers, tower_sections) if not p["height"]["guessed"]]
@@ -585,13 +678,14 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     changes = []
     westward = None
     # A pack we ship covers the massing. Facts someone adds for another building do not switch it off.
-    if not landmark_refs.load_pack(name, label=refs.get("label")) and not outline.is_empty():
+    if records and not landmark_refs.load_pack(name, label=refs.get("label")) and not outline.is_empty():
         from .landmark_massing import infer_massing
 
         records, sections, westward, changes = infer_massing(records, sections, outline, data, refs, target, keys)
     records, sections, corrections = landmark_architecture.reconcile(records, sections, refs, pack, keys)
     changes.extend(corrections)
-    if refs.get("height") and abs(mapped_height / refs["height"] - 1) > .03:
+    records, sections = [*records, *extra], [*sections, *extra_sections]
+    if replace != "all" and refs.get("height") and abs(mapped_height / refs["height"] - 1) > .03:
         recorded = max(p["height"]["metres"] for p in records)
         reason = ("The sourced top includes a style-appropriate finial above the mapped peak."
                   if any(p.get("finial") for p in records) and recorded > mapped_height
@@ -604,9 +698,9 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                                      "chosen_m": max(p["height"]["metres"] for p in records),
                                      "source": refs["sources"]["height"],
                                      "reason": height.get("reason", "The sourced height describes the complete landmark.")}
-    is_lattice = "steel" in keys and all(fact in pack for fact in (
+    is_lattice = "steel" in keys and replace != "all" and all(fact in pack for fact in (
         "deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m"))
-    chosen = detail or ("high" if len(records) < 400 else "low")
+    chosen = detail or ("high" if len(records) - len(extra) < 400 else "low")
     if chosen not in ("low", "high"):
         raise LandmarkProblem("detail must be low or high.")
     reach = 0.
@@ -614,13 +708,13 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         from .landmark_style import WEST_PIER_REACH as reach
     scale = _scale([outline] if is_lattice and not outline.is_empty() else sections, records, target, reach)
     notes = ["Dimensions use local east/north metres, uniformly scaled to millimetres.",
-             "Added a 2 mm convex footprint plinth to join detached ground parts.",
+             "Added a 2 mm plinth following the mapped plan, with short joiners where needed.",
              "Mapped faces overlap by 0.01 metre at wall and roof joins; coordinates are otherwise unsnapped.",
              "Roof tips retain at least 1.6 mm across their loft centre; narrow walls are widened to 1.2 mm."]
     notes.extend(changes)
     solids, mm_sections = [], []
     mughal = "mughal" in keys
-    for p, original in (() if is_lattice else zip(records, sections)):
+    for p, original in zip(extra, extra_sections) if is_lattice else zip(records, sections):
         if p["roof_shape"] == "gabled":
             x0, y0, x1, y1 = original.bounds()
             width, span = sorted((x1 - x0, y1 - y0))
@@ -633,6 +727,11 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                     for q, other in zip(records, sections)
                 )
         cs = original.scale([scale, scale])
+        if "_build" in p:  # a reference part brings its own shape
+            part = _union(p.pop("_build")(scale, notes)).translate([0, 0, 2]).trim_by_plane([0, 0, 1], 0)
+            mm_sections.append(part.project())
+            solids.append(part)
+            continue
         comps = []
         for c in cs.decompose():
             if c.offset(-.6).is_empty():
@@ -659,7 +758,16 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
             solids.extend(flying_buttress(cs, p, lo, eave, top, notes))
             continue
         overlap = .01 * scale
-        walls = cs.offset(overlap).extrude(max(.02, eave - lo + overlap)).translate([0, 0, lo - overlap])
+        shaft = cs.offset(overlap)
+        if p["tags"].get("man_made") == "obelisk":
+            x0, y0, x1, y1 = shaft.bounds()
+            at = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
+            walls = shaft.translate((-at).tolist()).extrude(
+                max(.02, eave - lo + overlap), scale_top=[OBELISK_TAPER] * 2).translate([*at, lo - overlap])
+            cs = cs.translate((-at).tolist()).scale([OBELISK_TAPER] * 2).translate(at.tolist())
+            notes.append("Tapered the obelisk's shaft to 63% of its foot, a usual obelisk's; no source gives its taper here.")
+        else:
+            walls = shaft.extrude(max(.02, eave - lo + overlap)).translate([0, 0, lo - overlap])
         roof = _roof(cs, p, eave - .005, min(rh + .005, top - eave + .005), notes, mughal)
         if p.get("chhatri_columns"):
             from .landmark_style import chhatri
@@ -673,34 +781,35 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
         notes.append("Built four open cross-braced legs and arches with the documented platform heights and an antenna up to the current sourced top.")
     else:
         footprint = m3.CrossSection.batch_boolean(mm_sections, m3.OpType.Add)
-    if towers or pack.get("aisle_wall_datum_m") or pack.get("plinth_follows_plan", {}).get("value"):
+    if is_lattice:
+        base = footprint.hull().offset(.02)  # four feet that stand apart need one plate
+        notes[1] = "Added a 2 mm convex footprint plinth to join the feet."
+    else:
         from .landmark_massing import linked_plinth
 
-        base = linked_plinth(footprint.offset(.02))
-        notes[1] = "Added a 2 mm plinth following the mapped plan, with short joiners where needed."
+        base = footprint
+        if data.get("site"):  # the castle's ground carries its buildings
+            base += _section(data["site"]).scale([scale, scale]) ^ footprint.hull()
+        base = linked_plinth(base.offset(.02))
         if towers:
             notes.append("Included measured bell towers explicitly listed as part of the landmark in Wikidata.")
-    else:
-        base = footprint.hull().offset(.02)
     solids.append(base.extrude(2.02))
     man = _union(solids)
-    man = _anchor(man, notes)
-    if chosen == "high" and not is_lattice:
+    man = _footing(_anchor(man, notes), notes)
+    # A reference part is drawn as its sources show it, with no style's ornament over it.
+    drawn = len(records) - len(extra)
+    if chosen == "high" and drawn and not is_lattice:
         from .landmark_style import decorate
-        man, additions = decorate(man, records, mm_sections, scale, styles, pack, outline.scale([scale, scale]),
-                                  westward=westward)
+        man, additions = decorate(man, records[:drawn], mm_sections[:drawn], scale, styles, pack,
+                                  outline.scale([scale, scale]), westward=westward)
         notes.extend(additions)
+    man = landmark_parts.cut(man, openings, scale, notes)
+    if "lean" in pack:
+        man = _footing(landmark_parts.lean(man, pack["lean"], notes), notes)
     if man.status() != m3.Error.NoError:
         raise LandmarkProblem(f"mapped geometry could not form a closed solid ({man.status().name}).")
     raw_mesh = modelprint.to_trimesh(man)
-    try:
-        mesh = clean.for_slicer(raw_mesh)
-    except ValueError:
-        # Quantize Boolean intersections that landed on opposite sides of a
-        # float32 boundary. The 0.00001 mm grid stays far below print detail.
-        raw_mesh.vertices = np.round(raw_mesh.vertices, decimals=5)
-        mesh = clean.for_slicer(raw_mesh)
-        notes.append("Snapped sub-micron intersections before rechecking the mesh for the slicer.")
+    mesh = _closed(man, raw_mesh, notes)
     if len(modelprint.to_manifold(mesh).decompose()) != 1:
         raise LandmarkProblem("mapped parts remain disconnected after print support repair; review refs/landmark.json.")
     mesh.apply_translation([0, 0, -mesh.bounds[0, 2]])
@@ -711,7 +820,9 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     refs.update(parts=records, target=target, scale_mm_per_metre=scale, detail=chosen,
                 modeling_additions=list(dict.fromkeys(notes)), size_mm=mesh.extents.tolist(), plinth_height_mm=2)
     save()
-    credits = "© OpenStreetMap contributors. Building geometry: ODbL 1.0, https://www.openstreetmap.org/copyright\n"
+    osm = replace != "all"
+    credits = ("© OpenStreetMap contributors. Building geometry: ODbL 1.0, https://www.openstreetmap.org/copyright\n" if osm
+               else "Geometry drawn from the sources below.\n")
     urls = {refs["source"], refs["geometry_source"], *refs["sources"].values(),
             *refs["feature_sources"], *(p["source"] for p in records)}
     credits += "\n".join(sorted(url for url in urls if url)) + "\n"
@@ -719,11 +830,12 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     credits_path.write_text(credits)
     omitted = [note for note in notes if note.startswith("Omitted detail below the print floor")]
     lines = [f"Built {len(records)} modeled 3D parts with {chosen} detail.",
-             "© OpenStreetMap contributors, ODbL 1.0.", f"References and modeling notes: {refpath}"]
+             "© OpenStreetMap contributors, ODbL 1.0." if osm else "Drawn from the reference pack's sources.", f"References and modeling notes: {refpath}"]
     if omitted:
         lines.append("Omitted architectural detail below the print floor. See the modeling notes for each feature.")
     return {"stl": str(stl), "subject": refs.get("label", name), "name": refs.get("label", name),
-            "author": "OpenStreetMap contributors", "license": "Open Database License 1.0", "license_code": "ODbL-1.0",
+            **({"author": "OpenStreetMap contributors", "license": "Open Database License 1.0", "license_code": "ODbL-1.0"} if osm
+               else {"author": "the reference pack's sources", "license": "none stated", "license_code": ""}),
             "source": "landmark", "url": refs.get("wikipedia_url") or refs.get("source"), "id": refs.get("id"),
             "credits": str(credits_path), "target": target, "scale": scale, "refs": str(refpath),
             "lines": lines}

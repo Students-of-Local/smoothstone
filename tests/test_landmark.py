@@ -501,6 +501,96 @@ def _minaret(x, untagged=False):
     return out
 
 
+def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeypatch, tmp_path):
+    # Speyer, Lincoln and Buckingham Palace stood on boat-shaped plates, the convex hull of their plans
+    from smoothstone import landmark
+
+    recorded("Taj Mahal")
+
+    def way(i, ring, tags):
+        ring = [*ring, ring[0]]
+        return {"type": "way", "id": i, "tags": tags, "geometry": [
+            {"lat": 27.175 + y / 111320, "lon": 78.042 + x / 99000} for x, y in ring]}
+
+    def box(x0, y0, x1, y1):
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+    part = {"building:part": "yes", "height": "20"}
+
+    def fetch(refs, root):
+        here = {**refs, "latitude": 27.175, "longitude": 78.042, "osm_way": 1, "osm_relation": None}
+        return landmark_refs.parse_osm({"elements": [
+            way(1, box(-60, -60, 60, 60), {"building": "yes"}),
+            way(2, box(-50, -10, 50, 10), part), way(3, box(-10, 10, 10, 50), part),  # a T
+            way(4, box(40, 40, 50, 50), part)]}, here)  # a pavilion that stands apart
+    monkeypatch.setattr(landmark_refs, "fetch", fetch)
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
+    mesh = trimesh.load(result["stl"])
+    k = result["scale"]
+    plan = (100 * 20 + 20 * 40 + 10 * 10) * k * k
+    base = modelprint.to_manifold(mesh).slice(1.).area()
+    assert plan <= base < plan * 1.05
+    assert len(mesh.split()) == 1
+    notes = json.loads(Path(result["refs"]).read_text())["modeling_additions"]
+    assert any("following the mapped plan" in n for n in notes) and not any("convex" in n for n in notes)
+
+
+@pytest.mark.parametrize("width, height, widened", [(18, 180, True), (60, 180, False), (40, 60, False)])
+def test_a_slender_tower_gets_a_wider_base(width, height, widened):
+    # the Washington Monument, 18 by 180 mm, leaned 7 degrees before it tipped and was refused
+    import manifold3d as m3
+    from smoothstone import landmark, printable
+
+    tower, notes = m3.Manifold.cube([width, width, height]).translate([5, 9, 0]), []
+    out = landmark._footing(tower, notes)
+    assert bool(notes) == widened
+    if not widened:
+        assert out.volume() == tower.volume()
+    mesh = modelprint.to_trimesh(out)
+    assert printable.tip_angle(mesh, printable.occupancy(mesh)) >= printable.TIP_MIN
+    assert out.slice(3).area() == pytest.approx(width * width)
+
+
+def test_two_walls_that_meet_along_a_line_are_welded():
+    # Westminster Abbey: two buttress corners meet along a 24 mm line, "still 1 non-manifold edges"
+    import manifold3d as m3
+    from smoothstone import clean, landmark
+
+    base = m3.Manifold.cube([40, 40, 2])
+    man = base + m3.Manifold.cube([10, 10, 20]).translate([10, 10, 0]) + m3.Manifold.cube([10, 10, 30]).translate([20, 20, 0])
+    raw, notes = modelprint.to_trimesh(man), []
+    view = clean.slicer_view(np.asarray(raw.vertices), np.asarray(raw.faces))
+    assert view["bad_edges"]
+    welded = modelprint.to_trimesh(landmark._weld(man, raw, notes))
+    out = clean.for_slicer(welded)
+    assert not clean.problems(clean.slicer_view(out.vertices, out.faces)) and len(out.split()) == 1
+    assert out.volume == pytest.approx(man.volume(), rel=1e-4) and "Welded 1 edge" in notes[0]
+
+
+@pytest.mark.parametrize("fails, note", [(0, None), (1, "Snapped"), (2, "Welded"), (3, "Collapsed"), (4, None)])
+def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeypatch):
+    import manifold3d as m3
+    from smoothstone import clean, landmark
+
+    calls, real = [], clean.for_slicer
+
+    def stubborn(mesh, tolerance=.01):
+        calls.append(tolerance)
+        if len(calls) <= fails:
+            raise ValueError("still 1 zero-area faces after three repair passes")
+        return real(mesh, tolerance)
+    monkeypatch.setattr(clean, "for_slicer", stubborn)
+    man, notes = m3.Manifold.cube([10, 10, 10]), []
+    raw = modelprint.to_trimesh(man)
+    if fails == 4:
+        with pytest.raises(ValueError, match="zero-area"):
+            landmark._closed(man, raw, notes)
+        return
+    assert landmark._closed(man, raw, notes).volume == pytest.approx(1000)
+    assert calls == [.01, .01, .01, .03][:fails + 1]
+    assert (notes[-1].startswith(note) if note else notes == [])
+
+
 def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     # the Taj Mahal's south-west minaret: three parts with no height stood as 40 m columns through its rings and kiosk
     from smoothstone import landmark
@@ -514,6 +604,47 @@ def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     assert odd["150-1"] == (13, 14, False)
 
 
+def _of(records, start):
+    return {p["id"]: (p["min_height"]["metres"], p["height"]["metres"]) for p in records if str(p["id"]).startswith(start)}
+
+
+def test_two_parts_with_no_height_share_two_missing_levels():
+    from smoothstone import landmark
+
+    odd = _minaret(150)
+    for k in (1, 2):
+        odd[k] = {"id": f"150-{k}u", "footprint": odd[1]["footprint"], "tags": {"building:part": "yes"}}
+    twins = [*_minaret(0), *_minaret(50), *_minaret(100)]
+    for k in range(0, 12, 4):  # the same plan at both levels
+        twins[k + 2]["footprint"] = twins[k + 1]["footprint"]
+    records, _ = landmark.resolve_parts([*twins, *odd], {"geometry_source": "x"})
+    assert {_of(records, "150")[f"150-{k}u"] for k in (1, 2)} == {(13, 14), (32, 32.3)}
+
+
+def test_a_part_mapped_from_the_ground_keeps_it():
+    from smoothstone import landmark
+
+    parts = [*_minaret(0), *_minaret(50), *_minaret(100), *_minaret(150, untagged=True)]
+    for part in parts:
+        if part["id"] == "150-2u":
+            part["tags"]["min_height"] = "0"
+    records, _ = landmark.resolve_parts(parts, {"geometry_source": "x"})
+    assert _of(records, "150")["150-2u"][0] == 0
+
+
+def test_a_pinnacle_on_another_tower_gives_no_level():
+    from smoothstone import landmark
+
+    def part(i, x, half, lo=None, hi=None):
+        ring = [[[x - half, -half], [x + half, -half], [x + half, half], [x - half, half]]]
+        tags = {"building:part": "yes", **({"min_height": lo, "height": hi} if hi else {})}
+        return {"id": i, "footprint": ring, "tags": tags}
+    parts = [part("a", 0, .75, "60", "64"), part("b", 10, .75, "60", "64"), part("tower", 5, 9, "0", "60"),
+             part("low", 50, 2, "10", "25"), part("high", 50, 1.9, "25", "40"), part("odd", 50, .75)]
+    records, _ = landmark.resolve_parts(parts, {"geometry_source": "x"})
+    assert _of(records, "odd")["odd"][0] == 0
+
+
 def test_a_part_with_no_height_and_no_twins_still_stands():
     from smoothstone import landmark
 
@@ -522,6 +653,161 @@ def test_a_part_with_no_height_and_no_twins_still_stands():
              {"id": 2, "footprint": [[[30, 0], [39, 0], [39, 9], [30, 9]]], "tags": {}}]
     records, _ = landmark.resolve_parts(parts, {"geometry_source": "x"})
     assert [p["height"]["metres"] for p in records] == [20, 20]
+
+
+def _way(i, x0, y0, x1, y1, **tags):
+    """A rectangle in metres about latitude and longitude zero."""
+    ring = [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]
+    return {"type": "way", "id": i, "tags": {k.replace("__", ":"): v for k, v in tags.items()},
+            "geometry": [{"lat": y / 111320, "lon": x / 111320} for x, y in ring]}
+
+
+CASTLE = [_way(1, -100, -60, 100, 60, historic="castle", wikidata="Q1", name="Example Castle"),
+          _way(2, -10, -10, 10, 10, building="yes", name="Round Tower", height="30"),
+          _way(3, 40, 0, 70, 20, building="yes", height="12"), _way(4, 40, 0, 55, 20, building__part="yes", height="12"),
+          _way(5, -70, 0, -40, 20, building="yes"), _way(6, 200, 0, 230, 20, building="yes", height="9")]
+
+
+def _site_refs(**more):
+    return {"latitude": 0, "longitude": 0, "id": "Q1", "label": "Example Castle", **more}
+
+
+@pytest.mark.parametrize("change, parts, source", [
+    ({}, [4, 2, 5], "way/1"),  # Windsor Castle was built as its Round Tower
+    ({"refs": {"id": "Q2", "osm_way": "1"}}, [4, 2, 5], "way/1"),  # Wikidata's OSM way, no wikidata tag on the map
+    ({"tags": {"historic": "monument"}}, [2], "way/2"),  # grounds are not a site
+    ({"refs": {"id": "Q2"}}, [2], "way/2"),  # a castle the landmark happens to stand in
+    ({"tower": {"name": "The Example Castle Keep"}}, [2], "way/2"),  # the building has the landmark's name
+])
+def test_a_castle_is_every_building_on_its_site(change, parts, source):
+    elements = copy.deepcopy(CASTLE)
+    elements[0]["tags"].update(change.get("tags", {}))
+    elements[1]["tags"].update({"roof:shape": "pyramidal", **change.get("tower", {})})
+    parsed = landmark_refs.parse_osm({"elements": elements}, _site_refs(**change.get("refs", {})))
+    assert parsed["source"].endswith(source)
+    assert [p["id"] for p in parsed["parts"]] == parts
+    assert bool(parsed.get("site")) == (source == "way/1")
+
+
+def _map_answer(monkeypatch, tmp_path, drawn):
+    """Overpass is down and the OSM map answers with these ways. Returns its nodes and what was asked."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    nodes, ways, asked = [], [], []
+    for way in drawn:
+        ids = [way["id"] * 100 + k for k in range(4)]
+        nodes += [{"type": "node", "id": n, **g} for n, g in zip(ids, way["geometry"])]
+        ways.append({"type": "way", "id": way["id"], "tags": way["tags"], "nodes": [*ids, ids[0]]})
+
+    def request(url, data=None):
+        if data is not None:
+            raise OSError("Overpass is down")
+        asked.append(url)
+        return {"elements": nodes + ways}
+    monkeypatch.setattr(landmark_refs, "_request", request)
+    return nodes, asked
+
+
+BRIDGE = _way(1, -700, -60, 400, 60, man_made="bridge", wikidata="Q1")
+DECK = _way(7, -700, -40, 400, 40, building__part="yes", min_height="8", height="10")
+
+
+def test_the_map_answer_keeps_a_site_and_a_far_site_is_searched_again(monkeypatch, tmp_path):
+    nodes, asked = _map_answer(monkeypatch, tmp_path, [
+        BRIDGE, DECK, CASTLE[1], _way(9, 0, 0, 5, 5, man_made="bridge", wikidata="Q8")])
+    parsed = landmark_refs.fetch(_site_refs(label="Example Bridge"), tmp_path)
+    assert parsed["site"] and [p["id"] for p in parsed["parts"]] == [7, 2]
+    assert len(asked) == 2  # 220 m, then the 703 m the bridge reaches
+    nodes[0]["lon"] *= 2
+    with pytest.raises(landmark_refs.LandmarkProblem, match="1 km"):
+        landmark_refs.fetch(_site_refs(label="Example Bridge", osm_way="1"), tmp_path)
+
+
+def test_overpass_is_asked_for_the_landmarks_own_area(monkeypatch, tmp_path):
+    """A castle's area has no building tag, so the search for buildings alone never returned it."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    asked = []
+
+    def request(url, data=None):
+        asked.append(urllib.parse.parse_qs(data.decode())["data"][0])
+        wanted = '"wikidata"="Q1"' in asked[-1]
+        return {"elements": CASTLE if wanted else CASTLE[1:]}
+    monkeypatch.setattr(landmark_refs, "_request", request)
+    assert [p["id"] for p in landmark_refs.fetch(_site_refs(), tmp_path)["parts"]] == [4, 2, 5]
+    assert 'way["wikidata"="Q1"](around:1000,' in asked[0] and 'relation["wikidata"="Q1"]' in asked[0]
+
+
+def test_a_statue_the_map_answer_has_is_refused_and_a_dome_on_a_site_keeps_its_walls(monkeypatch, tmp_path):
+    _map_answer(monkeypatch, tmp_path, [_way(1, -3, -3, 3, 3, artwork_type="statue", wikidata="Q1"),
+                                        _way(2, -8, -8, 8, 8, building="yes", height="12")])
+    with pytest.raises(landmark_refs.LandmarkProblem, match="statue"):
+        landmark_refs.fetch(_site_refs(), tmp_path)
+    domed = [CASTLE[0], _way(2, -25, -25, 25, 25, building="yes", height="17"),
+             _way(3, -10, -10, 10, 10, building__part="yes", height="34", roof__shape="dome")]
+    assert [p["id"] for p in landmark_refs.parse_osm({"elements": domed}, _site_refs())["parts"]] == [3, 2]
+
+
+def test_a_bridge_with_no_mapped_deck_is_refused_after_the_far_search(monkeypatch, tmp_path):
+    """The Golden Gate Bridge was built as two towers and no bridge."""
+    _, asked = _map_answer(monkeypatch, tmp_path, [BRIDGE, *CASTLE[1:3]])
+    with pytest.raises(landmark_refs.LandmarkProblem, match="deck"):
+        landmark_refs.fetch(_site_refs(label="Example Bridge"), tmp_path)
+    assert len(asked) == 2
+
+
+@pytest.mark.parametrize("walls, dome, drum, parts", [
+    ("17", "34", 20, [2, 1]),  # the Dome of the Rock was built as its dome, with no octagon
+    ("34", "34", 20, [2]),  # the height of the whole, not of the walls
+    (None, "34", 20, [2]),
+    ("17", "34", 44, [2]),  # the parts are the building
+    ("17", "34", -44, [2, 1]),  # Angkor Wat's galleries stood in the air over its 23 m platform
+])
+def test_the_walls_around_a_mapped_dome_are_a_part(walls, dome, drum, parts):
+    r = abs(drum) / 2
+    raised = {"min_height": "17"} if drum < 0 else {}
+    whole = _way(1, -25, -25, 25, 25, building="mosque", wikidata="Q1", **({"height": walls} if walls else {}))
+    elements = [whole, _way(2, -r, -r, r, r, building__part="yes", height=dome, roof__shape="dome", **raised)]
+    assert [p["id"] for p in landmark_refs.parse_osm({"elements": elements}, _site_refs())["parts"]] == parts
+
+
+@pytest.mark.parametrize("tags, parts", [
+    ({"height": "169.3", "roof:shape": "pyramidal", "roof:height": "16.8"}, [1]),  # the Washington Monument
+    ({"height": "60", "man_made": "lighthouse"}, [1]),
+    ({"height": "60", "building": "tower"}, [1]),
+    ({"height": "20"}, []),  # a box says nothing of a palace
+    ({"height": "20", "roof:shape": "flat"}, []),
+    ({"height": "96", "roof:shape": "gabled"}, []),  # 96 m is the cathedral's spire
+    ({"roof:shape": "pyramidal"}, []),
+])
+def test_a_tower_with_its_own_height_is_its_own_part(tags, parts):
+    way = _way(1, -8, -8, 8, 8, **{"building": "yes", **tags})
+    assert [p["id"] for p in landmark_refs.parse_osm({"elements": [way]}, _site_refs())["parts"]] == parts
+
+
+@pytest.mark.parametrize("tags", [{"artwork_type": "statue"}, {"monument": "statue"}])
+def test_a_statue_is_refused_for_what_it_is(tags):
+    way = _way(1, -8, -8, 8, 8, building="yes", building__part="yes", height="10", **tags)
+    with pytest.raises(landmark_refs.LandmarkProblem, match="statue"):
+        landmark_refs.parse_osm({"elements": [way]}, _site_refs(osm_way="1"))
+    # A statue that only stands near the landmark refuses nothing.
+    near = _way(2, 20, 20, 22, 22, building__part="yes", height="4", **tags)
+    house = _way(3, -8, -8, 8, 8, building="yes")
+    assert landmark_refs.parse_osm({"elements": [house, near]}, _site_refs())["parts"] == []
+
+
+def test_an_obelisk_tapers(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    recorded("Taj Mahal")
+    way = _way(1, -8.4, -8.4, 8.4, 8.4, building="yes", man_made="obelisk", height="169.3", roof__shape="pyramidal",
+               roof__height="16.8")
+    monkeypatch.setattr(landmark_refs, "fetch", lambda refs, root: landmark_refs.parse_osm(
+        {"elements": [way]}, _site_refs()))
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
+    solid = modelprint.to_manifold(trimesh.load(result["stl"]))
+    k = result["scale"]
+    widths = [np.ptp([solid.slice(2 + z * k).bounds()[i] for i in (0, 2)]) / k for z in (1, 152, 160)]
+    assert widths[0] == pytest.approx(16.8, abs=.2) and widths[1] == pytest.approx(16.8 * .63, abs=.2)
+    assert widths[2] < widths[1] * .7 and len(solid.decompose()) == 1
 
 
 def test_a_guessed_height_follows_the_ground_the_building_covers_not_the_count_of_its_parts():
@@ -585,4 +871,10 @@ def test_matched_towers_get_the_same_mapped_detail():
     assert all(p["height"]["guessed"] and float(p["tags"]["roof:direction"]) == pytest.approx(157.5) for p, _ in added)
     assert all(cs.area() == pytest.approx(1) for _, cs in added) and notes
     both = parts + added
+    for p, _ in added:  # raised by a sourced amount, it is still a guess
+        p.update(spire=True, roof_shape="pyramidal")
+    facts = {"spire_rise_m": {"value": 12, "source": "https://example.org"}}
+    tops = [(p["height"]["metres"], p["height"]["guessed"]) for p in la.reconcile(
+        [p for p, _ in both], [cs for _, cs in both], {}, facts, ["gothic"])[0] if str(p["id"]).endswith("-twin")]
+    assert tops == [(122, True)] * 4
     assert la._twin_detail(both, [np.array([0., -17]), np.array([0., 17])], 18, 70, []) == []

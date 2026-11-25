@@ -1157,6 +1157,11 @@ saved builds pass the new measurements; no judge ran, because no mesh changed.
   the exact name of a part whose Wikipedia title redirects to a much better known building still gives the building.
 - The 98 are a recorded test, `tests/fixtures/landmark/names.json`. No sealed landmark's name is in any set.
 
+### 2026-11-24: reference parts
+
+A pack can carry parts (`docs/REFERENCE_PARTS.md`): prisms, lathes, beams and openings, from cited sources, for what the
+map does not have, and a lean. A strong model writes them once; every model builds them with `stone landmark "<name>"`.
+
 ### 2026-11-24: a guessed height, and rooms that are not parts
 
 From 40 landmarks never built before (no model, no judge), looked at one by one.
@@ -1165,3 +1170,41 @@ From 40 landmarks never built before (no model, no judge), looked at one by one.
   pinnacles at 54 to 63 m made six small chapels 54 m blocks. It now takes the height at which half the ground covered
   by measured ground parts is lower: 22 m there. With nothing measured on the ground, the old median stands.
 - `indoor`, `room` and underground elements are not parts. The White House's four toilets stood as 21 m blocks.
+
+### 2026-11-24: PR 141's review mediums
+
+- Several parts with no height at one spot share the missing levels, lowest first. They stood as full columns.
+- A twin's level counts only within the height of the stack it joins, so a pinnacle's plan repeated on another tower
+  gives none. An explicit `min_height=0` is kept.
+- A guessed height raised by a sourced amount stays marked guessed.
+
+The parts of 41 saved maps resolve the same before and after.
+
+### 2026-11-24: the base follows the plan
+
+The 2 mm base was the convex hull of the plan, a boat-shaped plate around Speyer, Lincoln and Buckingham Palace, and the
+judge's complaint on St. Vitus. It now follows the mapped plan, with short joiners between bodies, as Notre-Dame's
+already did (its `plinth_follows_plan` fact is gone). The Eiffel Tower's four feet keep one plate.
+
+- A model too slender to lean the 10 degrees the print check asks for gets a wider base (the Washington Monument leaned 7).
+- Two walls that meet along a line are welded with a thin bar where that line stops the mesh from closing. Westminster
+  needed it, 262 short edges 10 to 34 mm up; its old base happened to close.
+- Where that still leaves a sliver, edges under 0.03 mm are collapsed (0.01 before). The Lotus Temple failed on one.
+
+One judged build each on the new base: Cologne 9, Taj 9, St Paul's 9 (was 8), Westminster 9, St. Vitus 8, all passing, and
+the judge no longer mentions St. Vitus's base. The other four graded bases are unchanged.
+
+### 2026-11-24: which mapped thing is the landmark
+
+- A castle, fort or bridge that Wikidata ties to a map area, not a building, is every part and building on it. Windsor
+  Castle was its Round Tower; Edinburgh Castle, Tower Bridge and the Alhambra were refused. Windsor, with 13% of its
+  ground measured, is now refused too. A building that bears the landmark's whole name is still the landmark.
+- A site past the map search is searched again, up to 1 km.
+- Overpass is asked for the landmark's own area; it answered with buildings alone. A dome on a castle keeps its walls.
+- A tower, obelisk, dome, cone or pyramid with its own height and no parts is its own part; a gabled box is not. An
+  obelisk tapers to 63%, guessed.
+- A statue is refused as one.
+- A bridge whose mapped parts cover under half of its area is refused. The Golden Gate Bridge (2%) was its two towers.
+- Where the parts that stand on the ground cover under half of a building and rise above the outline's own height, the
+  outline is a part too. The Dome of the Rock was its dome with no octagon, and Angkor Wat's galleries stood in the air.
+  Of 50 saved maps this changes those two and the Flatiron Building, and none that is graded.

@@ -15,6 +15,11 @@ def _measurement(metres, source, reason):
     return {"metres": float(metres), "source": source, "guessed": False, "reason": reason}
 
 
+def _moved(old, metres, source, reason):
+    """A level raised by a sourced amount. A guess raised is still a guess."""
+    return {**_measurement(metres, source, reason), "guessed": old["guessed"]}
+
+
 def _new_part(identifier, cs, lo, top, roof, shape, source, feature):
     from .landmark import _fact
 
@@ -45,8 +50,8 @@ def reconcile(records, sections, refs, facts, styles):
                     measured = p["roof_height"]["metres"]
                     if measured < rise["value"]:
                         delta = rise["value"] - measured
-                        p["height"] = _measurement(p["height"]["metres"] + delta, rise["source"],
-                                                   "Typical pinnacle rise above the mapped shaft.")
+                        p["height"] = _moved(p["height"], p["height"]["metres"] + delta, rise["source"],
+                                             "Typical pinnacle rise above the mapped shaft.")
                         p["roof_height"] = _measurement(rise["value"], rise["source"],
                                                          "Typical rise measured from the terrace.")
                     p["pinnacle_profile"] = True
@@ -298,8 +303,8 @@ def _minaret_levels(parts, fact, notes):
             for key in ("min_height", "height"):
                 z = p[key]["metres"]
                 if z > platform:
-                    p[key] = _measurement(z + stretch * (min(z, mapped_base) - platform),
-                                          fact["source"], "Adjusted mapped level to the sourced minaret rise.")
+                    p[key] = _moved(p[key], z + stretch * (min(z, mapped_base) - platform),
+                                    fact["source"], "Adjusted mapped level to the sourced minaret rise.")
                     changed = True
     if changed:
         notes.append("Retained the surveyed minaret footprints and distributed their sourced rise above the platform through the shafts.")
