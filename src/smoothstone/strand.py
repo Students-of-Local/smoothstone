@@ -418,10 +418,11 @@ class Strand:
     def _slide(self, a, b, r, floor):
         """Where nodes going from a to b get, and the ground there: ground higher than they are stops them at its side,
         and they go on along it."""
+        fine = max(r.min(), failsim.fact("thread_limit") * 1e-3 / 2)  # a thinner thread is about to break
         for k in (slice(0, 3), 0, 1):
             go = np.zeros_like(a)
             go[:, k] = (b - a)[:, k]
-            s = np.linspace(0, 1, int(_norm(go[:, :2]).max() / r.min()) + 2)
+            s = np.linspace(0, 1, int(_norm(go[:, :2]).max() / fine) + 2)
             via = a + s[:, None, None] * go
             path = self._top(via) + r
             clear = ~np.logical_or.accumulate((path > via[:, :, 2] + r) & (path > floor + 1e-6))

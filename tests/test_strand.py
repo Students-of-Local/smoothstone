@@ -641,3 +641,11 @@ def test_it_starts_again_just_over_the_plate_without_a_point_over_the_nozzle(spe
     was = off[0].points()
     off[0].step(head=(0, 0, 50))
     assert off[0].points() == pytest.approx(was)  # a scrap off the nozzle stays where it fell
+
+
+def test_a_thread_about_to_break_does_not_slow_the_rest():
+    asked = []
+    s = rod(20, n=5, ground=lambda x, y: asked.append(len(x)) or np.zeros(len(x)))
+    to, r = s.x + [0.016, 0, 0], np.array([2e-4, 2e-4, 3e-7, 2e-4, 2e-4])  # 3e-4 mm, what a hot TPU thread got to
+    at, floor = s._slide(s.x, to, r, np.zeros(5))
+    assert np.allclose(at, to) and max(asked) < 5 * 700
