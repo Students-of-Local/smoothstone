@@ -917,6 +917,14 @@ def test_the_walls_around_a_mapped_dome_are_a_part(walls, dome, drum, parts):
     assert [p["id"] for p in landmark_refs.parse_osm({"elements": elements}, _site_refs())["parts"]] == parts
 
 
+def test_a_building_mapped_off_the_ground_is_not_filled_in_under_its_antenna():
+    """The Atomium's nine balls were built as one block, its plan 102 m tall, because its antenna is taller."""
+    whole = _way(1, -25, -25, 25, 25, building="yes", wikidata="Q1", height="102")
+    ball = _way(2, -24, -24, 24, 24, building__part="yes", height="76", min_height="58")
+    antenna = _way(3, -1, -1, 1, 1, building__part="yes", height="110", min_height="102")
+    assert [p["id"] for p in landmark_refs.parse_osm({"elements": [whole, ball, antenna]}, _site_refs())["parts"]] == [2, 3]
+
+
 @pytest.mark.parametrize("tags, parts", [
     ({"height": "169.3", "roof:shape": "pyramidal", "roof:height": "16.8"}, [1]),  # the Washington Monument
     ({"height": "60", "man_made": "lighthouse"}, [1]),
