@@ -599,6 +599,7 @@ def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeyp
 
     recorded("Taj Mahal")
     monkeypatch.setattr(landmark, "SPLIT_SHARE", 0)
+    monkeypatch.setattr(landmark, "LEAST_SHARE", 0)
     monkeypatch.setattr(landmark, "LEAST_HEIGHT", 0)
 
     def way(i, ring, tags):
@@ -665,6 +666,7 @@ def test_bodies_that_meet_at_a_corner_get_a_real_join(recorded, monkeypatch, tmp
 
     recorded("Taj Mahal")
     monkeypatch.setattr(landmark, "LEAST_SHARE", 0)
+    monkeypatch.setattr(landmark, "SPLIT_SHARE", 0)
     monkeypatch.setattr(landmark, "LEAST_HEIGHT", 0)
     _map(monkeypatch, (-50, -50, 0, 0, 20), (0, 0, 50, 50, 20))
     result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
