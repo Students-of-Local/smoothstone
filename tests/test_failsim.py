@@ -119,6 +119,8 @@ def test_curl_lifts_the_ledge_by_the_bilayer_curvature():
 def test_bridge_sags_one_layer_at_the_usable_length():
     assert -fs.bridge_sag(10.0, [5.0], 0.2)[0] == pytest.approx(0.2, rel=1e-9)
     assert -fs.bridge_sag(20.0, [10.0], 0.2)[0] > 0.2
+    a = fs.catenary_a(0.2)
+    assert -fs.bridge_sag(60.0, [30.0], 0.2)[0] == pytest.approx(a * (math.cosh(30 / a) - 1))  # the catenary, not its parabola
 
 
 # model 4: detachment and toppling
