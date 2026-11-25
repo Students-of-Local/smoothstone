@@ -114,6 +114,9 @@ def _level_from_twin(i, prepared):
     return missing[0] if len(missing) == 1 else None
 
 
+OBELISK_TAPER = .63
+
+
 def resolve_parts(parts, refs):
     """Resolve dimensions conservatively and return public records plus sections."""
     prepared = []
@@ -723,7 +726,16 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
             solids.extend(flying_buttress(cs, p, lo, eave, top, notes))
             continue
         overlap = .01 * scale
-        walls = cs.offset(overlap).extrude(max(.02, eave - lo + overlap)).translate([0, 0, lo - overlap])
+        shaft = cs.offset(overlap)
+        if p["tags"].get("man_made") == "obelisk":
+            x0, y0, x1, y1 = shaft.bounds()
+            at = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
+            walls = shaft.translate((-at).tolist()).extrude(
+                max(.02, eave - lo + overlap), scale_top=[OBELISK_TAPER] * 2).translate([*at, lo - overlap])
+            cs = cs.translate((-at).tolist()).scale([OBELISK_TAPER] * 2).translate(at.tolist())
+            notes.append("Tapered the obelisk's shaft to 63% of its foot, a usual obelisk's; no source gives its taper here.")
+        else:
+            walls = shaft.extrude(max(.02, eave - lo + overlap)).translate([0, 0, lo - overlap])
         roof = _roof(cs, p, eave - .005, min(rh + .005, top - eave + .005), notes, mughal)
         if p.get("chhatri_columns"):
             from .landmark_style import chhatri
@@ -743,7 +755,10 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     else:
         from .landmark_massing import linked_plinth
 
-        base = linked_plinth(footprint.offset(.02))
+        base = footprint
+        if data.get("site"):  # the castle's ground carries its buildings
+            base += _section(data["site"]).scale([scale, scale]) ^ footprint.hull()
+        base = linked_plinth(base.offset(.02))
         if towers:
             notes.append("Included measured bell towers explicitly listed as part of the landmark in Wikidata.")
     solids.append(base.extrude(2.02))

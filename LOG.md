@@ -1179,3 +1179,14 @@ already did (its `plinth_follows_plan` fact is gone). The Eiffel Tower's four fe
 
 One judged build each on the new base: Cologne 9, Taj 9, St Paul's 9 (was 8), Westminster 9, St. Vitus 8, all passing, and
 the judge no longer mentions St. Vitus's base. The other four graded bases are unchanged.
+- Two walls that meet along a line are welded with a thin bar when that line stops the mesh from closing. The old plate
+  hid none of it: Westminster's failed at 10 to 34 mm up, and only on the new base.
+
+### 2026-11-24: which mapped thing is the landmark
+
+- A castle, fort or bridge that Wikidata ties to a map area, not a building, is every part and building on it. Windsor
+  Castle was its Round Tower; Edinburgh Castle, Tower Bridge and the Alhambra were refused. Windsor, with 13% of its
+  ground measured, is now refused too. A building that bears the landmark's whole name is still the landmark.
+- A site past the map search is searched again, up to 1 km.
+- A tower, obelisk or shaped roof with its own height and no parts is its own part. An obelisk tapers to 63%, guessed.
+- A statue is refused as one.
