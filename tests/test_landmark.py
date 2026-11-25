@@ -639,6 +639,48 @@ def test_a_slender_tower_gets_a_wider_base(width, height, widened):
     assert out.slice(3).area() == pytest.approx(width * width)
 
 
+def _map(monkeypatch, *boxes, outline=(-60, -60, 60, 60)):
+    """The Taj's map, answering with these boxes of building: (x0, y0, x1, y1, height) in metres."""
+    def way(i, box, tags):
+        x0, y0, x1, y1 = box
+        return {"type": "way", "id": i, "tags": tags, "geometry": [
+            {"lat": 27.175 + y / 111320, "lon": 78.042 + x / 99000}
+            for x, y in [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]]}
+
+    def fetch(refs, root):
+        here = {**refs, "latitude": 27.175, "longitude": 78.042, "osm_way": 1, "osm_relation": None}
+        return landmark_refs.parse_osm({"elements": [way(1, outline, {"building": "yes"}), *(
+            way(i + 2, b[:4], {"building:part": "yes", "height": str(b[4])}) for i, b in enumerate(boxes))]}, here)
+    monkeypatch.setattr(landmark_refs, "fetch", fetch)
+
+
+def test_bodies_that_meet_at_a_corner_get_a_real_join(recorded, monkeypatch, tmp_path):
+    from smoothstone import landmark
+
+    recorded("Taj Mahal")
+    _map(monkeypatch, (-50, -50, 0, 0, 20), (0, 0, 50, 50, 20))
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "low")
+    base = modelprint.to_manifold(trimesh.load(result["stl"])).slice(1.)
+    assert len(base.offset(-.2).decompose()) == 1
+
+
+def test_the_base_is_widened_for_what_the_style_adds_too(recorded, monkeypatch, tmp_path):
+    import manifold3d as m3
+    from smoothstone import landmark, landmark_style, printable
+
+    recorded("Taj Mahal")
+    _map(monkeypatch, (-8, -8, 8, 8, 90), outline=(-8, -8, 8, 8))
+
+    def decorate(man, *args, **kw):  # a heavy head
+        box = man.bounding_box()
+        head = m3.Manifold.cube([60, 60, 60], True).translate([(box[0] + box[3]) / 2, (box[1] + box[4]) / 2, box[5] + 29])
+        return man + head, ["a heavy head"]
+    monkeypatch.setattr(landmark_style, "decorate", decorate)
+    result = landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 100, "high")
+    mesh = trimesh.load(result["stl"])
+    assert printable.tip_angle(mesh, printable.occupancy(mesh)) >= printable.TIP_MIN
+
+
 def test_two_walls_that_meet_along_a_line_are_welded():
     # Westminster Abbey: two buttress corners meet along a 24 mm line, "still 1 non-manifold edges"
     import manifold3d as m3
@@ -655,6 +697,22 @@ def test_two_walls_that_meet_along_a_line_are_welded():
     assert out.volume == pytest.approx(man.volume(), rel=1e-4) and "Welded 1 edge" in notes[0]
 
 
+def test_a_weld_stays_above_the_bed_and_leaves_a_collapsed_sliver_alone():
+    import manifold3d as m3
+    import trimesh
+    from smoothstone import landmark
+
+    man = m3.Manifold.cube([10, 10, 20]) + m3.Manifold.cube([10, 10, 20]).translate([10, 10, 0])  # a line from the bed up
+    welded = landmark._weld(man, modelprint.to_trimesh(man), [])
+    assert welded.bounding_box()[2] == 0 and welded.volume() > man.volume()
+    box = modelprint.to_trimesh(m3.Manifold.cube([10, 10, 10]))
+    a, b = np.asarray(box.edges[0])
+    sliver = [[a, b, len(box.vertices)]] * 2  # a third corner at a's own place: flat, and gone at float32
+    flat = trimesh.Trimesh(np.vstack([box.vertices, box.vertices[a]]), np.vstack([box.faces, sliver]), process=False)
+    notes = []
+    assert landmark._weld(man, flat, notes) is man and notes == []
+
+
 @pytest.mark.parametrize("fails, note", [(0, None), (1, "Snapped"), (2, "Welded"), (3, "Collapsed"), (4, None)])
 def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeypatch):
     import manifold3d as m3
@@ -668,13 +726,15 @@ def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeyp
             raise ValueError("still 1 zero-area faces after three repair passes")
         return real(mesh, tolerance)
     monkeypatch.setattr(clean, "for_slicer", stubborn)
-    man, notes = m3.Manifold.cube([10, 10, 10]), []
+    man, notes = m3.Manifold.cube([40, 40, 2]) + m3.Manifold.cube([10, 10, 20]).translate([10, 10, 0]), []
+    if fails > 1:
+        man += m3.Manifold.cube([10, 10, 30]).translate([20, 20, 0])  # they meet along a line
     raw = modelprint.to_trimesh(man)
     if fails == 4:
         with pytest.raises(ValueError, match="zero-area"):
             landmark._closed(man, raw, notes)
         return
-    assert landmark._closed(man, raw, notes).volume == pytest.approx(1000)
+    assert landmark._closed(man, raw, notes).volume == pytest.approx(man.volume(), rel=1e-4)
     assert calls == [.01, .01, .01, .03][:fails + 1]
     assert (notes[-1].startswith(note) if note else notes == [])
 
