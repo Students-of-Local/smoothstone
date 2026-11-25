@@ -1,7 +1,9 @@
+import ctypes
 import gc
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,12 +13,15 @@ from smoothstone import config
 REPO = Path(__file__).resolve().parent.parent
 
 
-@pytest.fixture(autouse=True, scope="module")
-def collected_after():
-    """Meshes refer to their own caches in cycles, so without this a worker holds every mesh of the
-    files before this one."""
+@pytest.fixture(autouse=True)
+def memory_returned_after():
+    """A test's meshes hold their own caches in cycles, and glibc keeps what they free. A worker past
+    test_parts.py held 1.7 GB and 0.2 GB once trimmed. Four such workers ran the suite out of memory."""
     yield
     gc.collect()
+    trim = getattr(ctypes.CDLL(None), "malloc_trim", None) if sys.platform == "linux" else None
+    if trim:
+        trim(0)
 
 
 @pytest.fixture(autouse=True)
