@@ -14,7 +14,7 @@ GALLERY = ROOT / "failures" / "gallery"
 LABELS = GALLERY / "labels.jsonl"
 CREDITS = GALLERY / "CREDITS.md"
 TAXONOMY = ROOT / "src" / "smoothstone" / "failures" / "taxonomy.json"
-REPO_LICENSE = "https://github.com/Students-of-Local/smoothstone/blob/main/LICENSE"
+REPO_LICENSE = "https://github.com/baney75/smoothstone/blob/main/LICENSE"
 
 # license name as written in labels.jsonl -> its legal text
 LICENSES = {
