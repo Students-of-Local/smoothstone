@@ -1,102 +1,16 @@
 {
-  "expected_height_m": {
-    "value": 87.7824,
-    "source": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-building",
-    "reason": "The published height is measured from the East Front Plaza. The model also includes the lower west terrace."
-  },
-  "overall_plan_m": {
-    "value": [
-      229.0064,
-      106.68
-    ],
-    "source": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-building"
-  },
-  "dome_diameter_m": {
-    "value": 41.148,
-    "source": "https://www.aoc.gov/what-we-do/projects/dome-restoration-project/by-the-numbers"
-  },
-  "tholos_balcony_height_m": {
-    "value": 64.008,
-    "source": "https://www.aoc.gov/what-we-do/projects/dome-restoration-project/by-the-numbers"
-  },
-  "statue_and_pedestal_heights_m": {
-    "value": [
-      5.9436,
-      5.6388
-    ],
-    "source": "https://www.aoc.gov/explore-capitol-campus/art/statue-freedom"
-  },
-  "reference_alignment": {
-    "value": [
-      38.889722,
-      -77.009167,
-      0
-    ],
-    "source": "https://www.wikidata.org/wiki/Q54109",
-    "guess": "Use the Wikidata site coordinate as the local origin and align the east and west fronts to the cardinal directions."
-  },
+  "expected_height_m": {"value": 87.7824, "source": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-building", "reason": "The published height is measured from the East Front Plaza. The model also includes the lower west terrace."},
+  "overall_plan_m": {"value": [229.0064, 106.68], "source": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-building"},
+  "dome_diameter_m": {"value": 41.148, "source": "https://www.aoc.gov/what-we-do/projects/dome-restoration-project/by-the-numbers"},
+  "tholos_balcony_height_m": {"value": 64.008, "source": "https://www.aoc.gov/what-we-do/projects/dome-restoration-project/by-the-numbers"},
+  "statue_and_pedestal_heights_m": {"value": [5.9436, 5.6388], "source": "https://www.aoc.gov/explore-capitol-campus/art/statue-freedom"},
+  "reference_alignment": {"value": [38.889722, -77.009167, 0], "source": "https://www.wikidata.org/wiki/Q54109", "guess": "Use the Wikidata site coordinate as the local origin and align the east and west fronts to the cardinal directions."},
   "parts": {
     "source": "https://www.wikidata.org/wiki/Q54109",
-    "origin": [
-      38.889722,
-      -77.009167
-    ],
+    "origin": [38.889722, -77.009167],
     "axis": 0,
     "replace": "all",
-    "plinth": {
-      "ring": [
-        [
-          -46.15,
-          -114.5032
-        ],
-        [
-          34,
-          -114.5032
-        ],
-        [
-          34,
-          -109.5
-        ],
-        [
-          52.98,
-          -109.5
-        ],
-        [
-          52.98,
-          109.5
-        ],
-        [
-          34,
-          109.5
-        ],
-        [
-          34,
-          114.5032
-        ],
-        [
-          -46.15,
-          114.5032
-        ],
-        [
-          -46.15,
-          46.5
-        ],
-        [
-          -52.85,
-          46.5
-        ],
-        [
-          -52.85,
-          -46.5
-        ],
-        [
-          -46.15,
-          -46.5
-        ]
-      ],
-      "source": "https://commons.wikimedia.org/wiki/File:Aerial_of_the_U.S._Capitol_under_restoration,_Washington,_D.C_LCCN2010630859.jpg",
-      "guess": "Followed the building and terrace perimeter close to the lowest courses, filling narrow gaps at the joins without extending the model beyond the published overall length and width."
-    },
+    "plinth": {"ring": [[-46.15, -114.5032], [34, -114.5032], [34, -109.5], [52.98, -109.5], [52.98, 109.5], [34, 109.5], [34, 114.5032], [-46.15, 114.5032], [-46.15, 46.5], [-52.85, 46.5], [-52.85, -46.5], [-46.15, -46.5]], "source": "https://commons.wikimedia.org/wiki/File:Aerial_of_the_U.S._Capitol_under_restoration,_Washington,_D.C_LCCN2010630859.jpg", "guess": "Followed the building and terrace perimeter close to the lowest courses, filling narrow gaps at the joins without extending the model beyond the published overall length and width."},
     "value": [
       {"kind": "prism", "id": "old-center-block", "rect": [60, 122], "at": [-1, 0], "from": 0, "to": 27.0, "source": "https://commons.wikimedia.org/wiki/File:Capitol_Building_Full_View.jpg", "guess": "Estimated the wall depth, setback and height from the photographed elevations and the footprint. Wall masses overlap the connecting corridors."},
       {"kind": "prism", "id": "linking-galleries", "rect": [48, 23], "at": [-1, 66.3], "from": 0, "to": 25.8, "copies": {"mirror": "y"}, "source": "https://commons.wikimedia.org/wiki/File:US_Capitol_east_side.JPG", "guess": "Estimated the wall depth, setback and height from the photographed elevations and the footprint. Wall masses overlap the connecting corridors."},
