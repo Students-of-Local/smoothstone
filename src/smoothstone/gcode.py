@@ -83,6 +83,7 @@ class Toolpath:
     run: np.ndarray | None = None  # (n, 5) part fan 0 to 1, bed, nozzle and chamber C, and tool in force; nan: not said
     infill: float | None = None  # %
     material: str = ""
+    fil_mm: float = 1.75  # the filament's diameter
 
     @property
     def n(self) -> int:
@@ -178,7 +179,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     layer_z: list[float] = []
     pending_z = False  # a layer began but its height is not known yet
     dwell = 0.0
-    fil_area = math.pi * (1.75 / 2) ** 2
+    fil_mm = 1.75
     rows: list[tuple] = []
     sets: list[tuple] = []  # each set of limits that was in force, in file order; a row names its set
     at, hot = [math.nan] * 5, {}  # Toolpath.run's row; each tool's nozzle C
@@ -189,7 +190,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
         slicer = m.group(1).strip()[:60]
     m = re.search(r";\s*filament_diameter\s*[:=]\s*([\d.]+)", text)
     if m:
-        fil_area = math.pi * (float(m.group(1)) / 2) ** 2
+        fil_mm = float(m.group(1))
     m = re.search(r";\s*total layer number:\s*(\d+)", head) or re.search(r";LAYER_COUNT:(\d+)", head)
     header_layers = int(m.group(1)) if m else None
     # Cura marks layers with ;LAYER:n; others write ;LAYER_CHANGE, and a Klipper start script may add
@@ -363,7 +364,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     held = np.array(sets, float).reshape(-1, 17)[a[:, 15].astype(int)]  # each move's own limits
     tp = Toolpath(a[:, 0:4], a[:, 4:8], a[:, 8], a[:, 9], a[:, 10].astype(int), a[:, 11].astype(int),
                   a[:, 12], a[:, 13], a[:, 14], layer_z, held[:, 0:4], held[:, 4:8], held[:, 8:12], "gcode", slicer,
-                  slicer_estimate(text), header_layers, run=held[:, 12:])
+                  slicer_estimate(text), header_layers, run=held[:, 12:], fil_mm=fil_mm)
     m = re.search(r"^;\s*(?:sparse_infill_density|fill_density)\s*=\s*([\d.]+)", text, re.M)
     tp.infill = float(m.group(1)) if m else None
     m = re.search(r"^;\s*filament_type\s*=\s*(.+)", text, re.M)
@@ -376,7 +377,7 @@ def parse(source, limits: Limits | None = None) -> Toolpath:
     d = tp.p1 - tp.p0
     ln = np.hypot(d[:, 0], d[:, 1])
     miss = (tp.width <= 0) & tp.extruding()  # Cura names no width: the filament's volume over length and height
-    tp.width[miss] = d[miss, 3] * fil_area / (ln[miss] * np.where(tp.height[miss] > 0, tp.height[miss], 0.2))
+    tp.width[miss] = d[miss, 3] * math.pi * (fil_mm / 2) ** 2 / (ln[miss] * np.where(tp.height[miss] > 0, tp.height[miss], 0.2))
     return tp
 
 

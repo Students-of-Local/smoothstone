@@ -356,6 +356,18 @@ def test_the_model_runs_at_the_prints_own_settings(jobenv, tmp_path):
     assert mini.fan == printers.fan(printers.settings(printers.get("prusa_mini"), "ABS"), secs)
 
 
+@pytest.mark.parametrize("file, used_mm, used_g, density", [("orca_cube", 398.94, 1.20, 1.25), ("prusa_screw", 1706.22, 5.09, 1.24)])
+def test_filament_is_what_the_slicer_counts(file, used_mm, used_g, density):
+    tp = gcode.parse(Path(__file__).parent / "fixtures" / "gcode" / f"{file}.gcode.gz")
+    gcode.plan(tp)
+    q = failvideo.filament(tp, tp.total_s() / 2, density)
+    assert (q["used_m"] + q["after_m"]) * 1e3 == pytest.approx(used_mm, rel=0.02)
+    assert q["used_g"] + q["after_g"] == pytest.approx(used_g, rel=0.02) and min(q["used_m"], q["after_m"]) > 0
+    tp.fil_mm = 2.85  # the same length of a thicker filament
+    assert failvideo.filament(tp, 1e9, density) == {**q, "diameter_mm": 2.85, "used_m": pytest.approx(used_mm / 1e3, rel=0.02),
+                                                    "used_g": pytest.approx(used_g * (2.85 / 1.75) ** 2, rel=0.02), "after_m": 0, "after_g": 0}
+
+
 def test_strands_of_one_layer_lie_where_they_fell_while_the_next_one_comes(monkeypatch):
     tp, inp, fail, _ = _story(_t())  # two arms, so more than one strand in the failing layer
     st = failvideo.Story(tp, inp, fail, (255, 255, 255), (260, 260))

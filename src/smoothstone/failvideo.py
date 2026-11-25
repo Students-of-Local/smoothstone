@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import failsim, printers, strand, timelapse, toolpaths
+from . import failsim, printers, strand, timelapse
 
 MODES = ("auto", "supports", "detach", "droop", "bridge")
 AFTER = 12  # layers drawn after the failure (assumption: enough to see it; the printer would go on)
@@ -115,7 +115,7 @@ def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True,
     inp = masks(ext & ~skirt & ~moves_of(tp, "prime tower"), z, layer_t=layer_times(tp), layer=thick, clean=clean, supports=bool(sup.any()), enclosed=enclosed)
     inp = replace(inp, **settings(tp, material, enclosed, heat, prof))
     part, whose = ext & tp.part(), printers.short_name(prof or printers.get("creality_k2"))
-    fed, took = (tp.p1 - tp.p0)[part, 3] * toolpaths.FIL_AREA, np.maximum(tp.t1 - tp.t0, 1e-9)[part]
+    fed, took = (tp.p1 - tp.p0)[part, 3] * math.pi * (tp.fil_mm / 2) ** 2, np.maximum(tp.t1 - tp.t0, 1e-9)[part]
     inp.flow = float(fed.sum() / took.sum()) if part.any() else None
     m = inp.material = failsim.leaving(inp)
     inp.notes.append(f"the melt leaves the nozzle at {m.out:.0f} C, set to {m.nozzle:.0f} C" + (f", at {inp.flow:.1f} mm3/s" if inp.flow else ""))
@@ -647,6 +647,16 @@ def caption(png: Path, text: str) -> None:
     im.save(png)
 
 
+def filament(tp, t_s: float, density: float) -> dict:
+    """What is printed by t_s and after it: meters of the file's filament, and grams."""
+    fed, done = (tp.p1 - tp.p0)[:, 3] * tp.extruding(), tp.t1 <= t_s
+    g = density * math.pi * (tp.fil_mm / 2) ** 2 * 1e-3  # per mm
+    out = {"diameter_mm": tp.fil_mm}
+    for k, mm in (("used", float(fed[done].sum())), ("after", float(fed[~done].sum()))):
+        out |= {k + "_m": round(mm / 1e3, 3), k + "_g": round(mm * g, 2)}
+    return out
+
+
 def numbers_line(f) -> str:
     n = f.numbers
     if "edge_stress_mpa" in n and "bond_mpa" in n:
@@ -782,6 +792,7 @@ def cmd(args, job, prof, out):
         for x in (dest / "fail").glob("*.npz"):
             x.unlink()
     data = {"model_not_recording": True, "mode": mode, "what_if": what_if, "kind": fail.kind, "taxonomy": fail.taxonomy,
+            "filament": filament(tp, fail.time or 0.0, inp.material.density),
             "what": WHAT[fail.kind], "layer": fail.layer, "layer_number": (fail.layer or 0) + 1, "z_mm": fail.z,
             "time_s": fail.time, "where_mm": fail.where, "numbers": fail.numbers, "dominant_assumption": dom,
             "assumptions": [*fail.assumptions, *note, *dict.fromkeys(st.notes)], "material": mat, "plate": args.plate,
@@ -802,6 +813,9 @@ def cmd(args, job, prof, out):
                 + (f" ({n['set_s_fan']} s in the fan's air)" if inp.fan else "") + f". The nozzle's tip carries {n['blob_mm3']} mm3.")
     for x in (x for x in st.notes if LIMIT in x):
         out.add(f"Limit: {x}.")
+    q = data["filament"]
+    out.add(f"Filament ({q['diameter_mm']:g} mm): {q['used_m']:.2f} m ({q['used_g']:.1f} g) is printed when it fails; nobody stopping it "
+            f"wastes {q['after_m']:.2f} m ({q['after_g']:.1f} g) more.")
     out.add(f"Sheet: {png}")
     out.add(f"Data: {js} ({time.time() - t_start:.0f} s)")
     out.result = f"failure video made: {fail.kind}{' (what-if)' if what_if else ''}"

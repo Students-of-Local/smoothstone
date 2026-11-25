@@ -301,6 +301,17 @@ def test_the_k2s_process_is_the_one_the_refs_already_cite():
         assert {n: proc[k][n] for n in want} == want, k
 
 
+@pytest.mark.parametrize("pid", sorted(printers.load()))
+def test_show_says_its_plastics_and_lengths(pid):
+    p = printers.get(pid)
+    text = "\n".join(printers.show_lines(p))
+    assert (f"PLA {printers.settings(p, 'PLA')['nozzle']:g} / " in text) is bool(printers.settings(p, "PLA"))
+    assert ("Cutter to nozzle tip" in text) is bool((printers.process(p) or {}).get("nozzle_volume_mm3"))
+    assert ("275 mm tube" in text) is (pid == "prusa_mini")  # the one Bowden printer here
+    if pid == "creality_k2":
+        assert "76 mm of filament (183 mm3)" in text  # 183 / (pi 1.75^2 / 4)
+
+
 def test_heat_the_printer_does_not_reach_is_cut_and_said():
     s = printers.settings(printers.get("creality_k2"), "PC")  # the profile asks for 110 C
     assert s["bed"] == 100 and s["cut"] == ["OrcaSlicer Generic PC @System wants the bed at 110 C; the Creality K2 reaches 100 C"]

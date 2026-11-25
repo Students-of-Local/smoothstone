@@ -64,6 +64,7 @@ stone timelapse t.stl --supports off --fail ->
   until something holds it.
   Air and heat: it falls at 2.3 m/s at most, and sets in 7.54 s (1.05 s in the fan's air). The
   nozzle's tip carries 8.5 mm3.
+  Filament (1.75 mm): 0.05 m (0.1 g) is printed when it fails; nobody stopping it wastes 0.06 m (0.2 g) more.
   Sheet: .../t.stl-timelapse/fail_sheet.png
   Data: .../t.stl-timelapse/fail.json (31 s)
   NEXT: ask the person: the model says this print fails (supports); print it with supports, or the

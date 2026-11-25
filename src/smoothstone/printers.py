@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -147,6 +148,19 @@ def clean_line(p: dict) -> str:
     return f"Clean it (maker's steps): {s['clean']} ({s['source']})"
 
 
+def filament_lines(p: dict) -> list[str]:
+    """The plastics its slicer profile prints, and how much filament sits past where it can be pulled back from."""
+    got = {k: settings(p, k) for k in (i.split(".")[2] for i in _settings() if i.startswith(f"orca.{p['id']}.")) if k != "process"}
+    lines = ["Plastics in its slicer profiles (nozzle / bed C, most mm3/s): "
+             + "; ".join(f"{k} {s['nozzle']:g} / {s['bed']:g}, {s['max_flow']:g}" for k, s in got.items())] if got else []
+    kept = (process(p) or {}).get("nozzle_volume_mm3")
+    if kept:
+        lines.append(f"Cutter to nozzle tip: {kept / (math.pi * 1.75 ** 2 / 4):.0f} mm of filament ({kept:g} mm3), purged at each change of filament")
+    if tube := p.get("bowden_mm"):
+        lines.append(f"Feed: a {tube['value']:g} mm tube from the extruder to the hotend ({tube['source']})")
+    return lines
+
+
 def show_lines(p: dict) -> list[str]:
     x, y, z = p["build_volume_mm"]
     mm = p.get("multi_material") or "none"
@@ -165,6 +179,7 @@ def show_lines(p: dict) -> list[str]:
     if cam.get("where"):
         lines.append(f"Camera: {cam['where']}" + (", IR night view" if cam.get("ir_night") else "")
                      + (" (position is an assumption)" if cam.get("assumption") else ""))
+    lines += filament_lines(p)
     for q in p.get("quirks", [])[:4]:
         lines.append(f"Known issue ({q['failure']}): {q['note']} ({q['source']})")
     return lines
