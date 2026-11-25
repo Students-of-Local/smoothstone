@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -176,7 +177,9 @@ def test_owner_flow_photo_words_answer_try_fixed(work):
 
     text, code, nxt = stone("doctor", "answer", "purple")
     assert "could not tell" in text and nxt.startswith("ask the person: Wet the cold plate")
-    text, code, nxt = stone("doctor", "answer", "it beads up into little drops")
+    text, code, nxt = stone("note", "it beads up into little drops")  # card S notes every answer
+    assert nxt == "stone doctor answer 'it beads up into little drops'"
+    text, code, nxt = stone(*shlex.split(nxt)[1:])
     assert "Answer taken as: beads." in text and nxt == "stone doctor try plate_contaminated"
 
     text, code, nxt = stone("doctor", "try", "plate_contaminated")

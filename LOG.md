@@ -1407,3 +1407,21 @@ in 20 of 32. The ten runs with it: 10 of 10. Adding
 It is there because larger models need it, not for a gain: noting the answer is still the gap. Given the person's yes or
 no, the 1.7B model noted it in 0 of 24 replays without that line and 2 of 24 with it. The ten runs on the code with that
 line and the first review fixes: 8 of 10 (the 10 of 10 was before them); both misses thought past the cut. At temperature 0.1 five seeds are close to one sample.
+
+LFM3-1.7B and the person's answer (2026-11-25, replays of one turn over landmark names, temperature 0.1, one seed). With card
+S as it was, it noted the answer in 2 of 24 turns: its thoughts went round over "NEXT: none" and the template
+"<their answer>" until the token limit. Literal lines under the question (If the user says yes: stone note "yes") alone
+noted 1 of 16, and "NEXT, when the user has replied" 1 of 16. A rule of its own in the card, "The user answered your
+question: call stone note ... at once", noted 6 of 16 with the old line and 9 of 16 with the literal ones. Four wordings
+of that rule on 16 fresh names: 12, 9, 4 and 8 of 16; the first is in the card. The fourth kept "run the command NEXT
+names for the answer"; instead stone note now gives that command as NEXT, with the answer in it. With the rule and the
+lines the question is asked in 30 of 32 names; with the lines and the old rule in 12 of 16.
+The wording was picked on those same 16 names, so its 12 flatters it.
+
+One run each, seed 1, on 14 specs (two throwaway Cape Hatteras dialogs, the five follow-up specs, e11, e12, t1 to t4 and
+t7): the new card and lines pass 9, the old ones 8. The only verdict that differs is a2_case, which the old card failed by
+not asking; one run can't tell that from luck. Both Cape Hatteras dialogs fail under both. In the yes dialog the new card
+asked with "Please reply: yes or no.", which the harness scores as "ended without asking" since it looks for a question
+mark; then it noted the yes and built the part, 180 mm tall, all 15 checks passing. The old card asked and replied nothing
+to the yes. In the no dialog ("No, not like that.") the new card replied nothing, and the old one ran stone status and
+stone recipes and then replied nothing. The grader is unchanged. A no is still the gap.
