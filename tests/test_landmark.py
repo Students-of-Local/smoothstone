@@ -535,6 +535,38 @@ def test_the_base_follows_the_plan_and_joins_what_stands_apart(recorded, monkeyp
     assert any("following the mapped plan" in n for n in notes) and not any("convex" in n for n in notes)
 
 
+@pytest.mark.parametrize("width, height, widened", [(18, 180, True), (60, 180, False), (40, 60, False)])
+def test_a_slender_tower_gets_a_wider_base(width, height, widened):
+    # the Washington Monument, 18 by 180 mm, leaned 7 degrees before it tipped and was refused
+    import manifold3d as m3
+    from smoothstone import landmark, printable
+
+    tower, notes = m3.Manifold.cube([width, width, height]).translate([5, 9, 0]), []
+    out = landmark._footing(tower, notes)
+    assert bool(notes) == widened
+    if not widened:
+        assert out.volume() == tower.volume()
+    mesh = modelprint.to_trimesh(out)
+    assert printable.tip_angle(mesh, printable.occupancy(mesh)) >= printable.TIP_MIN
+    assert out.slice(3).area() == pytest.approx(width * width)
+
+
+def test_two_walls_that_meet_along_a_line_are_welded():
+    # Westminster Abbey: two buttress corners meet along a 24 mm line, "still 1 non-manifold edges"
+    import manifold3d as m3
+    from smoothstone import clean, landmark
+
+    base = m3.Manifold.cube([40, 40, 2])
+    man = base + m3.Manifold.cube([10, 10, 20]).translate([10, 10, 0]) + m3.Manifold.cube([10, 10, 30]).translate([20, 20, 0])
+    raw, notes = modelprint.to_trimesh(man), []
+    view = clean.slicer_view(np.asarray(raw.vertices), np.asarray(raw.faces))
+    assert view["bad_edges"]
+    welded = modelprint.to_trimesh(landmark._weld(man, raw, notes))
+    out = clean.for_slicer(welded)
+    assert not clean.problems(clean.slicer_view(out.vertices, out.faces)) and len(out.split()) == 1
+    assert out.volume == pytest.approx(man.volume(), rel=1e-4) and "Welded 1 edge" in notes[0]
+
+
 def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     # the Taj Mahal's south-west minaret: three parts with no height stood as 40 m columns through its rings and kiosk
     from smoothstone import landmark

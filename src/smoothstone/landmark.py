@@ -438,6 +438,43 @@ def _scale(sections, records, target, reach=0.):
     return min((mm - .04 - reach) / max(ext), (mm - 2) / high)
 
 
+def _footing(man, notes):
+    """Widen the base of a model that would tip over, until it leans a degree more than the check asks."""
+    from . import modelprint, printable
+
+    mass = modelprint.to_trimesh(man).center_mass
+    stands = man.slice(.01).hull()
+    ring = stands.to_polygons()[0]
+    edge = np.roll(ring, -1, axis=0) - ring
+    edge = edge[:, ::-1] * [1, -1] / np.linalg.norm(edge, axis=1)[:, None]  # outward: the ring runs counterclockwise
+    inside = ((ring - mass[:2]) * edge).sum(axis=1).min()
+    short = mass[2] * math.tan(math.radians(printable.TIP_MIN + 1)) - inside
+    if short <= 0:
+        return man
+    import manifold3d as m3
+
+    notes.append(f"Widened the base {short:.1f} mm each way so the slender model stands.")
+    return _union([man, stands.offset(short, m3.JoinType.Miter).extrude(2.02)])
+
+
+WELD = .08
+
+
+def _weld(man, mesh, notes):
+    """Join bodies that meet only along a line, which no slicer takes as closed."""
+    import manifold3d as m3
+
+    points, index = np.unique(np.asarray(mesh.vertices, np.float32), axis=0, return_inverse=True)
+    faces = index.reshape(-1)[mesh.faces]
+    edges = np.sort(np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
+    edges, count = np.unique(edges[edges[:, 0] != edges[:, 1]], axis=0, return_counts=True)
+    touching = edges[count > 2]
+    cube = m3.Manifold.cube([WELD] * 3, True)
+    bars = [(cube.translate(points[a].tolist()) + cube.translate(points[b].tolist())).hull() for a, b in touching]
+    notes.append(f"Welded {len(bars)} edges where two bodies touched along a line.")
+    return _union([man, *bars])
+
+
 def _anchor(man, notes):
     """Join floating mapped levels only where a real lower surface overlaps."""
     import manifold3d as m3
@@ -684,7 +721,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
             notes.append("Included measured bell towers explicitly listed as part of the landmark in Wikidata.")
     solids.append(base.extrude(2.02))
     man = _union(solids)
-    man = _anchor(man, notes)
+    man = _footing(_anchor(man, notes), notes)
     if chosen == "high" and not is_lattice:
         from .landmark_style import decorate
         man, additions = decorate(man, records, mm_sections, scale, styles, pack, outline.scale([scale, scale]),
@@ -698,9 +735,13 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     except ValueError:
         # Quantize Boolean intersections that landed on opposite sides of a
         # float32 boundary. The 0.00001 mm grid stays far below print detail.
-        raw_mesh.vertices = np.round(raw_mesh.vertices, decimals=5)
-        mesh = clean.for_slicer(raw_mesh)
-        notes.append("Snapped sub-micron intersections before rechecking the mesh for the slicer.")
+        snapped = raw_mesh.copy()
+        snapped.vertices = np.round(snapped.vertices, decimals=5)
+        try:
+            mesh = clean.for_slicer(snapped)
+            notes.append("Snapped sub-micron intersections before rechecking the mesh for the slicer.")
+        except ValueError:
+            mesh = clean.for_slicer(modelprint.to_trimesh(_weld(man, raw_mesh, notes)))
     if len(modelprint.to_manifold(mesh).decompose()) != 1:
         raise LandmarkProblem("mapped parts remain disconnected after print support repair; review refs/landmark.json.")
     mesh.apply_translation([0, 0, -mesh.bounds[0, 2]])
