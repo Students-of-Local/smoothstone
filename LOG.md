@@ -1175,6 +1175,7 @@ already did (its `plinth_follows_plan` fact is gone). The Eiffel Tower's four fe
 - A model too slender to lean the 10 degrees the print check asks for gets a wider base (the Washington Monument leaned 7).
 - Two walls that meet along a line are welded with a thin bar where that line stops the mesh from closing. Westminster
   needed it, 262 short edges 10 to 34 mm up; its old base happened to close.
+- Where that still leaves a sliver, edges under 0.03 mm are collapsed (0.01 before). The Lotus Temple failed on one.
 
 One judged build each on the new base: Cologne 9, Taj 9, St Paul's 9 (was 8), Westminster 9, St. Vitus 8, all passing, and
 the judge no longer mentions St. Vitus's base. The other four graded bases are unchanged.

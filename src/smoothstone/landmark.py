@@ -475,6 +475,33 @@ def _weld(man, mesh, notes):
     return _union([man, *bars])
 
 
+def _closed(man, raw, notes):
+    """The mesh a slicer takes as closed, by the lightest repair that gives one."""
+    from . import clean, modelprint
+
+    try:
+        return clean.for_slicer(raw)
+    except ValueError:
+        pass
+    # Quantize Boolean intersections that landed on opposite sides of a
+    # float32 boundary. The 0.00001 mm grid stays far below print detail.
+    snapped = raw.copy()
+    snapped.vertices = np.round(snapped.vertices, decimals=5)
+    try:
+        mesh = clean.for_slicer(snapped)
+        notes.append("Snapped sub-micron intersections before rechecking the mesh for the slicer.")
+        return mesh
+    except ValueError:
+        pass
+    welded = modelprint.to_trimesh(_weld(man, raw, notes))
+    try:
+        return clean.for_slicer(welded)
+    except ValueError:
+        mesh = clean.for_slicer(welded, .03)
+        notes.append("Collapsed edges under 0.03 mm, far below a nozzle's line, to close the mesh.")
+        return mesh
+
+
 def _anchor(man, notes):
     """Join floating mapped levels only where a real lower surface overlaps."""
     import manifold3d as m3
@@ -730,18 +757,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     if man.status() != m3.Error.NoError:
         raise LandmarkProblem(f"mapped geometry could not form a closed solid ({man.status().name}).")
     raw_mesh = modelprint.to_trimesh(man)
-    try:
-        mesh = clean.for_slicer(raw_mesh)
-    except ValueError:
-        # Quantize Boolean intersections that landed on opposite sides of a
-        # float32 boundary. The 0.00001 mm grid stays far below print detail.
-        snapped = raw_mesh.copy()
-        snapped.vertices = np.round(snapped.vertices, decimals=5)
-        try:
-            mesh = clean.for_slicer(snapped)
-            notes.append("Snapped sub-micron intersections before rechecking the mesh for the slicer.")
-        except ValueError:
-            mesh = clean.for_slicer(modelprint.to_trimesh(_weld(man, raw_mesh, notes)))
+    mesh = _closed(man, raw_mesh, notes)
     if len(modelprint.to_manifold(mesh).decompose()) != 1:
         raise LandmarkProblem("mapped parts remain disconnected after print support repair; review refs/landmark.json.")
     mesh.apply_translation([0, 0, -mesh.bounds[0, 2]])

@@ -567,6 +567,30 @@ def test_two_walls_that_meet_along_a_line_are_welded():
     assert out.volume == pytest.approx(man.volume(), rel=1e-4) and "Welded 1 edge" in notes[0]
 
 
+@pytest.mark.parametrize("fails, note", [(0, None), (1, "Snapped"), (2, "Welded"), (3, "Collapsed"), (4, None)])
+def test_a_mesh_is_closed_by_the_lightest_repair_that_works(fails, note, monkeypatch):
+    import manifold3d as m3
+    from smoothstone import clean, landmark
+
+    calls, real = [], clean.for_slicer
+
+    def stubborn(mesh, tolerance=.01):
+        calls.append(tolerance)
+        if len(calls) <= fails:
+            raise ValueError("still 1 zero-area faces after three repair passes")
+        return real(mesh, tolerance)
+    monkeypatch.setattr(clean, "for_slicer", stubborn)
+    man, notes = m3.Manifold.cube([10, 10, 10]), []
+    raw = modelprint.to_trimesh(man)
+    if fails == 4:
+        with pytest.raises(ValueError, match="zero-area"):
+            landmark._closed(man, raw, notes)
+        return
+    assert landmark._closed(man, raw, notes).volume == pytest.approx(1000)
+    assert calls == [.01, .01, .01, .03][:fails + 1]
+    assert (notes[-1].startswith(note) if note else notes == [])
+
+
 def test_a_part_with_no_height_takes_its_twins_level_not_the_median():
     # the Taj Mahal's south-west minaret: three parts with no height stood as 40 m columns through its rings and kiosk
     from smoothstone import landmark
