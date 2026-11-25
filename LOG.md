@@ -1293,3 +1293,16 @@ Not from a source: the Capitol's 4 m drop to the west terrace is the pack's gues
 its depth to the stairs (51.7 m) are scaled from HABS's west elevation; Tower Bridge's 71.99 m is 63 m above the road plus
 the 29 ft 6 in of headway under it. The judges' notes stay open: White House windows and attic too faint, the Capitol's
 drum short, Sagrada's nave windows plain.
+
+### 2026-11-25: batch 3's review
+
+PR 170's reviewers read the packs' numbers, and these were wrong on the print: gables that faced along the road, not
+across it (Tower Bridge's road dormers, Sagrada's nave end); the walkways 1 m under their published level; the Capitol's
+wing roofs inside a solid parapet and its west stairs inside the terrace; the White House's north columns off the end of
+their landing and the Truman balcony's posts off its deck; two louvres and two recesses inside other walls. One build and
+one judge each at fc3259e: l17 9, l18 9, l19 8, l20 8, every check passing, as before. LFM3-1.7B was not run again: it
+types the same one command, and the packs' names did not change.
+
+More that is not from a source: l18's 95 m width is the pack's own base, l19's 22.27 m is built 22.58 m with the
+chimneys, and Tower Bridge's road sits at a guessed 11.3 m, which makes its top 74.3 m over the pack's water, not 71.99.
+The White House's windows are cut 1.3 m deep; views.png is lit from the camera, so a recess does not darken there.
