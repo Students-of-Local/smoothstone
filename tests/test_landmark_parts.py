@@ -60,6 +60,20 @@ def test_a_tapered_roof_sits_on_the_narrowed_top():
     assert solid.bounding_box()[5] == pytest.approx(12, abs=.02)
 
 
+@pytest.mark.parametrize("roof, ridge, x, y", [  # the half extents of what stands above 9.9 of 10
+    ("gabled", None, .07, 3), ("gabled", 0, .07, 3), ("gabled", 90, 2, .11), ("hipped", 90, .07, .11), ("round", 90, 2, .76)])
+def test_a_roofs_ridge_runs_the_way_it_is_told(roof, ridge, x, y):
+    part = {**BLOCK, "roof": roof, "roof_rise": 3, **({} if ridge is None else {"ridge": ridge})}
+    top = _solid(part, scale=100).trim_by_plane([0, 0, 1], 9.9).bounding_box()
+    assert top[:2] + top[3:5] == pytest.approx((-x, -y, x, y), abs=.02)
+
+
+def test_a_ridge_turns_clockwise_from_y():
+    top = _solid({**BLOCK, "rect": [4, 4], "roof": "gabled", "roof_rise": 3, "ridge": 45}, scale=100).trim_by_plane([0, 0, 1], 9.9)
+    right = top.trim_by_plane([1, 0, 0], .5)
+    assert right.bounding_box()[1] > .3 and right.bounding_box()[4] == pytest.approx(2, abs=.02)
+
+
 @pytest.mark.parametrize("copies, centres", [
     ({"around": [0, 0], "count": 4}, {(3, 4), (4, -3), (-3, -4), (-4, 3)}),
     ({"mirror": "x"}, {(3, 4), (-3, 4)}),
@@ -132,6 +146,8 @@ def test_a_guess_is_marked_and_a_part_may_name_its_source():
     ({**BLOCK, "top_scale": 0}, "more than 0"),
     ({"kind": "lathe", "profile": [[5, 1], [0, 1]]}, "must rise"),
     ({"kind": "lathe", "profile": [[0, 0], [5, 0]]}, "radius above 0"),
+    ({**BLOCK, "roof": "pyramidal", "roof_rise": 3, "ridge": 0}, "ridge needs a roof"),
+    ({**BLOCK, "ridge": 0}, "ridge needs a roof"),
     ({"kind": "lathe"}, "profile must list"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 0]], "size": [1, 1]}, "repeats a point"),
     ({"kind": "beam", "path": [[0, 0, 0], [0, 0, 1]], "size": [0, 1]}, "more than 0"),

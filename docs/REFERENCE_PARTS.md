@@ -32,13 +32,14 @@ with the same one command.
 
 | kind | fields |
 | --- | --- |
-| `prism` | a plan, `at`, `turn`, `from`, `to`, and any of `roof` + `roof_rise` (`to` is the roof's top), `top_scale`, `top_shift` [x, y] |
+| `prism` | a plan, `at`, `turn`, `from`, `to`, and any of `roof` + `roof_rise` (`to` is the roof's top), `ridge`, `top_scale`, `top_shift` [x, y] |
 | `lathe` | `at`, `profile` [[z, radius], ...] with z rising |
 | `beam` | `path` [[x, y, z], ...], `size` [width, height] or one for each point of `path`, `round` (true: an oval section) |
 | `opening` | `at`, `turn` (the way you walk through), `width`, `depth`, `from`, `to`, `arch` (true: a round head) |
 
 A plan is one of `rect` [x, y], `circle` radius, `ngon` [sides, radius], `ring` [[x, y], ...]. `turn` is degrees clockwise.
-Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, skillion (high at -y, falling toward +y). Any part takes `id`, `source`, `guess` and `copies`, and any solid without a roof takes `least`:
+Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, half-hipped, gambrel, mansard, skillion (high at -y, falling toward +y).
+`ridge` is the ridge's direction, in degrees clockwise from the part's y; without it the ridge follows the long side. Any part takes `id`, `source`, `guess` and `copies`, and any solid without a roof takes `least`:
 `{"around": [x, y], "count": n}` (n in all, evenly turned), `{"row": [x, y], "count": n}` (n in all, stepped by x, y) or
 `{"mirror": "x"}` (and its mirror image across the y axis) or `"y"` or `"xy"` (all four).
 
@@ -50,6 +51,7 @@ Roofs: flat, pyramidal, gabled, hipped, dome, onion, round, skillion (high at -y
 | the same, `axis` 90 | y runs east: 6 m east, 4 m north |
 | `top_scale` .5 | the top is half the plan |
 | `top_shift` [3, 0] | the top's centre is 3 m along x from the foot's |
+| `rect` [4, 6], `roof` gabled | the ridge runs along y; with `ridge` 90, along x, and its gables face left and right |
 | `lathe` [[0, 5], [10, 1]] | a cone 10 m tall |
 | `beam` of two points | a bar between them, of `size`, never under its `least` (1.2 mm unless given) |
 | `beam` with `size` [[4, 4], [2, 2]] | 4 m square at the first point, 2 m at the last |
