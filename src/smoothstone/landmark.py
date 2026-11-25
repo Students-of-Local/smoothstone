@@ -638,9 +638,10 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     coverage = (sourced ^ outline).area() / outline.area() if outline.area() > 0 else sourced.area() / max(mapped.area(), .001)
     refs.update(height_source_coverage=coverage, height_source_parts=len(measured))
     save()
-    if extra and not outline.is_empty():
+    if extra:
         drawn = m3.CrossSection.batch_boolean([sourced, *extra_sections], m3.OpType.Add)
-        coverage = (drawn ^ outline).area() / outline.area()
+        whole = m3.CrossSection.batch_boolean([mapped, *extra_sections], m3.OpType.Add) if outline.is_empty() else outline
+        coverage = (drawn ^ whole).area() / whole.area()
     if replace != "all" and (not (measured or extra)
                              or (len(measured) / max(1, len(records)) < .35 and coverage < .45)):
         raise LandmarkProblem("insufficient mapped 3D parts with heights across the landmark footprint. Use stone models " + json.dumps(name) + ".")
@@ -665,7 +666,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
     changes = []
     westward = None
     # A pack we ship covers the massing. Facts someone adds for another building do not switch it off.
-    if not landmark_refs.load_pack(name, label=refs.get("label")) and not outline.is_empty():
+    if records and not landmark_refs.load_pack(name, label=refs.get("label")) and not outline.is_empty():
         from .landmark_massing import infer_massing
 
         records, sections, westward, changes = infer_massing(records, sections, outline, data, refs, target, keys)
@@ -685,7 +686,7 @@ def generate(name: str, job_root: Path, bed, size=None, detail=None, *, ref_pack
                                      "chosen_m": max(p["height"]["metres"] for p in records),
                                      "source": refs["sources"]["height"],
                                      "reason": height.get("reason", "The sourced height describes the complete landmark.")}
-    is_lattice = "steel" in keys and all(fact in pack for fact in (
+    is_lattice = "steel" in keys and replace != "all" and all(fact in pack for fact in (
         "deck_widths_m", "deck_heights_m", "foot_width_m", "arch_height_m", "historic_top_m"))
     chosen = detail or ("high" if len(records) - len(extra) < 400 else "low")
     if chosen not in ("low", "high"):

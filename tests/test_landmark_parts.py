@@ -169,14 +169,14 @@ def build(monkeypatch, tmp_path):
     """Build a pack as `stone landmark --refs` does, with the map answering these parts."""
     asked = []
 
-    def go(pack, parts=(), detail="low"):
+    def go(pack, parts=(), detail="low", outline=None):
         monkeypatch.setattr(landmark_refs, "resolve", lambda name, root: {
             **REFS, "label": "Example", "id": "Q1", "height": None, "style": [], "source": SOURCE, "sources": {}})
         ring = [[[-5, -5], [5, -5], [5, 5], [-5, 5]]]
 
         def fetch(refs, root):
             asked.append(1)
-            return {"outline": ring, "source": SOURCE, "tags": {}, "linked_towers": [], "parts": [
+            return {"outline": ring if outline is None else outline, "source": SOURCE, "tags": {}, "linked_towers": [], "parts": [
                 {"id": i, "type": "way", "footprint": ring if i == 1 else [[[6, -5], [16, -5], [16, 5], [6, 5]]],
                  "tags": {"height": str(h)}, "source": SOURCE} for i, h in parts]}
         monkeypatch.setattr(landmark_refs, "fetch", fetch)
@@ -249,6 +249,28 @@ def test_an_opening_lets_light_through_and_cuts_the_maps_walls(build):
     assert whole.volume() - man.volume() == pytest.approx(4 * 10 * 6 * scale ** 3, rel=.02)
     arched, _, _, _ = build(_pack(tower, {**hole, "arch": True}), [(1, 10)])
     assert whole.volume() - arched.volume() == pytest.approx((4 * 4 + math.pi * 2) * 10 * scale ** 3, rel=.03)
+
+
+def test_an_opening_in_a_widened_wall_lets_light_through_and_a_recess_stays_shallow(build):
+    """A bridge tower's portal, deeper than its 10 m wall and not than the wall as printed, was a sealed pocket."""
+    tower = {"kind": "prism", "rect": [200, 10], "to": 227}
+    deck = {"kind": "prism", "rect": [30, 2737], "to": 8}
+    portal = {"kind": "opening", "width": 100, "depth": 12, "from": 100, "to": 180}
+    man, _, scale, _ = build(_pack(tower, deck, portal, replace="all"))
+    man = man.trim_by_plane([0, 0, 1], 2 + 110 * scale).trim_by_plane([0, 0, -1], -(2 + 170 * scale))
+    assert len(man.decompose()) == 2
+    block = {"kind": "prism", "rect": [60, 60], "to": 60}
+    recess = {"kind": "opening", "at": [0, -30], "width": 20, "depth": .5, "from": 20, "to": 40}
+    whole, _, scale, _ = build(_pack(block, replace="all"))
+    man, _, _, _ = build(_pack(block, recess, replace="all"))
+    assert whole.volume() - man.volume() == pytest.approx(20 * 20 * .25 * scale ** 3, rel=.1)
+
+
+def test_a_pack_stands_in_for_a_map_with_no_outline_or_no_heights(build):
+    _, refs, _, _ = build(_pack({**BLOCK, "rect": [10, 10]}, replace=[1]), [(1, 10)])
+    assert [p["id"] for p in refs["parts"]] == ["part-0"]
+    _, refs, _, _ = build(_pack(BLOCK, replace=[1]), [(1, 10)], outline=[])
+    assert [p["id"] for p in refs["parts"]] == ["part-0"]
 
 
 def test_a_lean_tips_all_above_a_level_base(build):

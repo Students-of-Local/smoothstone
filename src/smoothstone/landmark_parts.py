@@ -189,8 +189,9 @@ def _opening(part):
                         for a in np.linspace(0, math.pi, 25)]
         else:
             profile += [[width / 2, hi], [-width / 2, hi]]
-        solid = m3.CrossSection([profile]).extrude(depth)  # x stays x, the profile's y is up, its depth is y
-        return [solid.transform([[1, 0, 0, 0], [0, 0, -1, depth / 2], [0, 1, 0, 0]])]
+        deep = max(depth, floor)
+        solid = m3.CrossSection([profile]).extrude(deep)  # x stays x, the profile's y is up, its depth is y
+        return [solid.transform([[1, 0, 0, 0], [0, 0, -1, deep / 2], [0, 1, 0, 0]])]
     return build, lo, hi, 0, "flat"
 
 
@@ -279,8 +280,10 @@ def read(pack, refs):
                     if np.abs(np.subtract(grown.bounding_box(), plain.bounding_box())).max() * scale > .01:
                         record["print_modifications"] = ["Widened to 1.2 mm."]
                     return _place(solids, flat, scale)
+                def hole(scale, floor=0., flat=flat, build=build):
+                    return _place(build(floor, []), flat, scale)[0].translate([0, 0, 2]).trim_by_plane([0, 0, 1], 2.02)
                 if kind == "opening":
-                    openings.append((make, part["width"], source, guess))
+                    openings.append((hole, part["width"], source, guess))
                     continue
                 name = f"{part.get('id', f'part-{i}')}" + (f"-{k + 1}" if len(copies) > 1 else "")
                 _need(name not in seen, f"id {name} is used twice")
@@ -303,14 +306,16 @@ def read(pack, refs):
 
 def cut(man, openings, scale, notes):
     """Cut the pack's openings, down to the base."""
-    for make, width, _, guess in openings:
+    for hole, width, _, guess in openings:
         if guess:
             notes.append(f"Guessed an opening: {guess}.")
         if width * scale < CUT:
             notes.append(f"Omitted detail below the print floor: an opening {width:g} m wide.")
             continue
-        for solid in make(scale, notes):
-            man = man - solid.translate([0, 0, 2]).trim_by_plane([0, 0, 1], 2.02)
+        solid = hole(scale)
+        if (solid - man).volume() < 1e-6 * solid.volume():  # the wall was widened past it: a pocket no light gets through
+            solid = hole(scale, 1.1 * THIN / scale)
+        man = man - solid
     return man
 
 
