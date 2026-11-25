@@ -179,7 +179,10 @@ def judge(job: Path, request: str, title: str | None = None, model: str = "opus"
         raise jl.JudgeProblem(f"no views at {views}")
     if not title:
         title = jl.claude(jl.TITLE.format(request=request), model=model).strip().strip('"').splitlines()[0]
-    ref = jl.reference(title)
+    try:
+        ref = jl.reference(title)
+    except jl.JudgeProblem:  # an article Wikipedia has chosen no lead image for (Chrysler Building)
+        ref = {"title": title, "url": jl.first_photo(title), "caption": ""}
     if ".svg" in ref["url"].lower():  # a logo is no photo of it
         ref["url"] = jl.first_photo(ref["title"])
     data = jl._get(ref["url"])

@@ -159,8 +159,9 @@ def test_pinnacles_are_counted_in_the_file_that_prints(tmp_path, turn):
     assert landmarks_grade.printed_mesh(generated, [{"file": str(half), "to_print": np.eye(4).tolist()}]) is None
 
 
-def test_an_article_that_leads_with_a_logo_is_judged_by_its_first_photo(tmp_path, monkeypatch):
-    """Petronas Towers: the lead image is a logo, and the judge could not answer."""
+@pytest.mark.parametrize("lead", [{"original": {"source": "https://up/Logo.svg?utm=x"}}, {}])
+def test_an_article_that_leads_with_a_logo_or_nothing_is_judged_by_its_first_photo(tmp_path, monkeypatch, lead):
+    """Petronas Towers leads with a logo and Chrysler Building with nothing: the judge could not answer."""
     import io
     import judge_likeness as jl
     import models_grade
@@ -175,8 +176,7 @@ def test_an_article_that_leads_with_a_logo_is_judged_by_its_first_photo(tmp_path
         if "media-list/Petronas_Towers" in url:
             return json.dumps({"items": items}).encode()
         if "api.php" in url:
-            return json.dumps({"query": {"pages": {"1": {"title": "Petronas Towers",
-                                                         "original": {"source": "https://up/Logo.svg?utm=x"}}}}}).encode()
+            return json.dumps({"query": {"pages": {"1": {"title": "Petronas Towers", **lead}}}}).encode()
         picture = io.BytesIO()
         Image.new("RGB", (8, 8)).save(picture, "JPEG")
         return picture.getvalue() if url == "https://up/large.jpg" else b"<svg/>"
