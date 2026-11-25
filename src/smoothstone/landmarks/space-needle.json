@@ -1,0 +1,600 @@
+{
+  "expected_height_m": {
+    "value": 184.404,
+    "source": "https://www.spaceneedle.com/about/"
+  },
+  "shaft_base_diameter_m": {
+    "value": 31.0896,
+    "source": "https://www.seattle.gov/Documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/RelatedDocuments/space-needle-designation.pdf"
+  },
+  "shaft_waist_height_m": {
+    "value": 113.6904,
+    "source": "https://www.seattle.gov/Documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/RelatedDocuments/space-needle-designation.pdf"
+  },
+  "column_pair_spacing_m": {
+    "value": [5.4864, 3.3528, 9.144],
+    "source": "https://www.scribd.com/document/234078327/Construction-of-the-Space-Needle",
+    "reason": "Paired column centers at grade, at the waist, and at the support ring."
+  },
+  "restaurant_support_diameter_m": {
+    "value": 20.1168,
+    "source": "https://www.arup.com/globalassets/downloads/arup-journal/the-arup-journal-2019-issue-1.pdf"
+  },
+  "restaurant_and_observation_diameters_m": {
+    "value": [28.8036, 42.0624],
+    "source": "https://www.tclf.org/sites/default/files/landslide/2008/psc/40yearsofchange.pdf"
+  },
+  "parts": {
+    "source": "https://www.geonames.org/5811572",
+    "origin": [47.62051, -122.34928],
+    "replace": "all",
+    "value": [
+      {
+        "kind": "beam",
+        "id": "column-left",
+        "path": [
+          [-2.7432, 15.301, 0],
+          [-2.62, 13.48, 16],
+          [-2.5, 11.98, 30.48],
+          [-2.34, 10.55, 45.72],
+          [-2.16, 9.03, 60.96],
+          [-1.98, 7.2, 79.248],
+          [-1.83, 5.88, 92.35],
+          [-1.72, 4.94, 103.63],
+          [-1.68, 4.63, 110.49],
+          [-1.6764, 4.57, 113.6904],
+          [-1.72, 4.66, 118.87],
+          [-1.95, 5.07, 128.016],
+          [-2.6, 6.04, 137.16],
+          [-3.48, 7.33, 144.78],
+          [-4.57, 8.96, 152.5]
+        ],
+        "size": [1.28, 1.48],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Fitted the intermediate stations to north elevation A3.01 c, with a 102 ft base circle, a 373 ft waist, and the published 18, 11 and 30 ft pair spacings as anchors. Enlarged the rectangular steel section to 1.28 by 1.48 m for printing."
+      },
+      {
+        "kind": "beam",
+        "id": "column-right",
+        "path": [
+          [2.7432, 15.301, 0],
+          [2.62, 13.48, 16],
+          [2.5, 11.98, 30.48],
+          [2.34, 10.55, 45.72],
+          [2.16, 9.03, 60.96],
+          [1.98, 7.2, 79.248],
+          [1.83, 5.88, 92.35],
+          [1.72, 4.94, 103.63],
+          [1.68, 4.63, 110.49],
+          [1.6764, 4.57, 113.6904],
+          [1.72, 4.66, 118.87],
+          [1.95, 5.07, 128.016],
+          [2.6, 6.04, 137.16],
+          [3.48, 7.33, 144.78],
+          [4.57, 8.96, 152.5]
+        ],
+        "size": [1.28, 1.48],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Fitted the intermediate stations to north elevation A3.01 c, with a 102 ft base circle, a 373 ft waist, and the published 18, 11 and 30 ft pair spacings as anchors. Enlarged the rectangular steel section to 1.28 by 1.48 m for printing."
+      },
+      {
+        "kind": "beam",
+        "id": "waist-shirt",
+        "path": [
+          [0, 7.2, 79.248],
+          [0, 5.88, 92.35],
+          [0, 4.94, 103.63],
+          [0, 4.63, 110.49],
+          [0, 4.57, 113.6904],
+          [0, 4.66, 118.87],
+          [0, 5.07, 128.016]
+        ],
+        "size": [3.65, 1.25],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.asce.org/publications-and-news/civil-engineering-source/civil-engineering-magazine/issues/magazine-issue/article/2024/07/engineers-and-steel-took-seattles-space-needle-skyward",
+        "guess": "Used a 3.65 m wide, 1.25 m thick web to fill each paired leg across the documented 260 to 420 ft shirtwaist, following the traced column path."
+      },
+      {
+        "kind": "beam",
+        "id": "column-cross-tie-1",
+        "path": [
+          [-2.57, 12.76, 23.16],
+          [2.57, 12.76, 23.16]
+        ],
+        "size": [1.35, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Space_Needle,_Seattle,_Washington,_US,_2024.jpg",
+        "guess": "Sampled the ladder-like ties between each pair from the lower photographs and north elevation. Set beam sections to 1.35 by 1.55 m for a printable bridge between the columns."
+      },
+      {
+        "kind": "beam",
+        "id": "column-cross-tie-2",
+        "path": [
+          [-2.43, 11.33, 37.8],
+          [2.43, 11.33, 37.8]
+        ],
+        "size": [1.35, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Space_Needle,_Seattle,_Washington,_US,_2024.jpg",
+        "guess": "Sampled the ladder-like ties between each pair from the lower photographs and north elevation. Set beam sections to 1.35 by 1.55 m for a printable bridge between the columns."
+      },
+      {
+        "kind": "beam",
+        "id": "column-cross-tie-3",
+        "path": [
+          [-2.29, 10.13, 49.95],
+          [2.29, 10.13, 49.95]
+        ],
+        "size": [1.35, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Space_Needle,_Seattle,_Washington,_US,_2024.jpg",
+        "guess": "Sampled the ladder-like ties between each pair from the lower photographs and north elevation. Set beam sections to 1.35 by 1.55 m for a printable bridge between the columns."
+      },
+      {
+        "kind": "beam",
+        "id": "column-cross-tie-4",
+        "path": [
+          [-2.16, 9.03, 60.96],
+          [2.16, 9.03, 60.96]
+        ],
+        "size": [1.35, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Space_Needle,_Seattle,_Washington,_US,_2024.jpg",
+        "guess": "Sampled the ladder-like ties between each pair from the lower photographs and north elevation. Set beam sections to 1.35 by 1.55 m for a printable bridge between the columns."
+      },
+      {
+        "kind": "beam",
+        "id": "column-cross-tie-5",
+        "path": [
+          [-2.05, 8.13, 69.8],
+          [2.05, 8.13, 69.8]
+        ],
+        "size": [1.35, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Space_Needle,_Seattle,_Washington,_US,_2024.jpg",
+        "guess": "Sampled the ladder-like ties between each pair from the lower photographs and north elevation. Set beam sections to 1.35 by 1.55 m for a printable bridge between the columns."
+      },
+      {
+        "kind": "beam",
+        "id": "column-cross-tie-6",
+        "path": [
+          [-1.99, 7.4, 77.2],
+          [1.99, 7.4, 77.2]
+        ],
+        "size": [1.35, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Space_Needle,_Seattle,_Washington,_US,_2024.jpg",
+        "guess": "Sampled the ladder-like ties between each pair from the lower photographs and north elevation. Set beam sections to 1.35 by 1.55 m for a printable bridge between the columns."
+      },
+      {
+        "kind": "prism",
+        "id": "elevator-core",
+        "ring": [
+          [-2.35, 2.1],
+          [2.35, 2.1],
+          [2.88, 1.18],
+          [0.53, -2.89],
+          [-0.53, -2.89],
+          [-2.88, 1.18]
+        ],
+        "from": 0,
+        "to": 153.15,
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Estimated the outside limits of the clipped triangular core from the stair plan and north elevation. Used a solid spine to support the exposed cage relief at this scale."
+      },
+      {
+        "kind": "beam",
+        "id": "elevator-core-diagonals-right",
+        "path": [
+          [1.42, 2.43, 6.0],
+          [-1.42, 2.43, 14.0],
+          [1.42, 2.43, 22.0],
+          [-1.42, 2.43, 30.0],
+          [1.42, 2.43, 38.0],
+          [-1.42, 2.43, 46.0],
+          [1.42, 2.43, 54.0],
+          [-1.42, 2.43, 62.0],
+          [1.42, 2.43, 70.0],
+          [-1.42, 2.43, 78.0],
+          [1.42, 2.43, 86.0],
+          [-1.42, 2.43, 94.0],
+          [1.42, 2.43, 102.0],
+          [-1.42, 2.43, 110.0],
+          [1.42, 2.43, 118.0],
+          [-1.42, 2.43, 126.0],
+          [1.42, 2.43, 134.0],
+          [-1.42, 2.43, 142.0],
+          [1.42, 2.43, 150.0]
+        ],
+        "size": [1.28, 1.3],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Reduced the density of the visible stair-cage diagonals from the north elevation to 18 X bays per face. Thickened the diagonals and joined them to the solid spine so the 180 mm print retains a readable relief."
+      },
+      {
+        "kind": "beam",
+        "id": "elevator-core-diagonals-left",
+        "path": [
+          [-1.42, 2.37, 6.0],
+          [1.42, 2.37, 14.0],
+          [-1.42, 2.37, 22.0],
+          [1.42, 2.37, 30.0],
+          [-1.42, 2.37, 38.0],
+          [1.42, 2.37, 46.0],
+          [-1.42, 2.37, 54.0],
+          [1.42, 2.37, 62.0],
+          [-1.42, 2.37, 70.0],
+          [1.42, 2.37, 78.0],
+          [-1.42, 2.37, 86.0],
+          [1.42, 2.37, 94.0],
+          [-1.42, 2.37, 102.0],
+          [1.42, 2.37, 110.0],
+          [-1.42, 2.37, 118.0],
+          [1.42, 2.37, 126.0],
+          [-1.42, 2.37, 134.0],
+          [1.42, 2.37, 142.0],
+          [-1.42, 2.37, 150.0]
+        ],
+        "size": [1.32, 1.36],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Reduced the density of the visible stair-cage diagonals from the north elevation to 18 X bays per face. Thickened the diagonals and joined them to the solid spine so the 180 mm print retains a readable relief."
+      },
+      {
+        "kind": "beam",
+        "id": "core-tie-1",
+        "path": [
+          [0, 0.5, 30.48],
+          [0, 12.15, 30.48]
+        ],
+        "size": [2.05, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.asce.org/publications-and-news/civil-engineering-source/civil-engineering-magazine/issues/magazine-issue/article/2024/07/engineers-and-steel-took-seattles-space-needle-skyward",
+        "guess": "Used the documented 100 and 200 ft tie levels. Fitted the visible radial ties to the core and outer legs from the elevation, with enough overlap for a single printable body."
+      },
+      {
+        "kind": "beam",
+        "id": "core-tie-2",
+        "path": [
+          [0, 0.5, 60.96],
+          [0, 9.22, 60.96]
+        ],
+        "size": [2.05, 1.55],
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.asce.org/publications-and-news/civil-engineering-source/civil-engineering-magazine/issues/magazine-issue/article/2024/07/engineers-and-steel-took-seattles-space-needle-skyward",
+        "guess": "Used the documented 100 and 200 ft tie levels. Fitted the visible radial ties to the core and outer legs from the elevation, with enough overlap for a single printable body."
+      },
+      {
+        "kind": "lathe",
+        "id": "pavilion-lobby",
+        "profile": [
+          [0, 16.6],
+          [1.05, 16.6],
+          [1.5, 15.7],
+          [3.9, 15.7],
+          [4.15, 16.1],
+          [4.38, 16.1],
+          [4.55, 10.45],
+          [5.42, 10.45],
+          [6.05, 9.6]
+        ],
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Sampled the ground enclosure from the elevation, with a simplified circular podium and a narrower upper lobby at the mezzanine datum."
+      },
+      {
+        "kind": "prism",
+        "id": "skyline-underframe",
+        "ring": [
+          [-1.728, 0.864],
+          [-6.66, -6.048],
+          [-6.012, -8.712],
+          [-3.6, -10.1664],
+          [0.0, -11.3184],
+          [3.6, -10.1664],
+          [6.012, -8.712],
+          [6.66, -6.048],
+          [1.728, 0.864]
+        ],
+        "from": 28.72,
+        "to": 31.7,
+        "top_scale": 1.3889,
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Traced the three cantilevering wings from north elevation and photographs. Used a tapered solid underside with the depth read from the elevation and the inner end bearing on the core.",
+        "top_shift": [0, -2.033]
+      },
+      {
+        "kind": "prism",
+        "id": "skyline-window-band",
+        "ring": [
+          [-2.316, 1.158],
+          [-8.9262, -8.106],
+          [-8.0577, -11.6765],
+          [-4.825, -13.6258],
+          [0.0, -15.1698],
+          [4.825, -13.6258],
+          [8.0577, -11.6765],
+          [8.9262, -8.106],
+          [2.316, 1.158]
+        ],
+        "from": 31.6,
+        "to": 33.88,
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Estimated the facade height from the elevation and drew the continuous window strip as a recessed solid band."
+      },
+      {
+        "kind": "prism",
+        "id": "skyline-roof",
+        "ring": [
+          [-2.4408, 1.2204],
+          [-9.4072, -8.5428],
+          [-8.4919, -12.3057],
+          [-5.085, -14.36],
+          [0.0, -15.9872],
+          [5.085, -14.36],
+          [8.4919, -12.3057],
+          [9.4072, -8.5428],
+          [2.4408, 1.2204]
+        ],
+        "from": 33.75,
+        "to": 35.72,
+        "top_scale": 0.67,
+        "copies": {
+          "around": [0, 0],
+          "count": 3
+        },
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Traced the low three-wing canopy from north elevation and photographs, and thickened the eaves so they survive the print."
+      },
+      {
+        "kind": "lathe",
+        "id": "restaurant-level",
+        "profile": [
+          [151.9, 10.0584],
+          [152.3, 10.35],
+          [152.5, 12.5],
+          [152.81, 14.74],
+          [153.29, 16.24],
+          [153.89, 17.03],
+          [154.18, 17.0],
+          [154.45, 15.18],
+          [154.67, 14.4018],
+          [156.92, 15.02],
+          [157.45, 15.45]
+        ],
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Sampled the rounded underside and tapered window band from north elevation A3.01 c, using the 500 ft restaurant datum, 66 ft support ring, and 94.5 ft restaurant diameter as references. The glass floor and windows are solid in this print."
+      },
+      {
+        "kind": "beam",
+        "id": "restaurant-canoe-ribs",
+        "path": [
+          [0, 9.1, 152.02],
+          [0, 12.55, 152.24],
+          [0, 14.85, 152.55],
+          [0, 16.37, 153.05],
+          [0, 17.04, 153.85]
+        ],
+        "size": [1.3, 1.3],
+        "copies": {
+          "around": [0, 0],
+          "count": 24
+        },
+        "source": "https://www.arup.com/globalassets/downloads/arup-journal/the-arup-journal-2019-issue-1.pdf",
+        "guess": "Traced the curved beams from the underside photograph. Kept every other one of the 48 real radial beams, with 1.3 m sections so the relief survives the print."
+      },
+      {
+        "kind": "lathe",
+        "id": "observation-halo-and-glazing",
+        "profile": [
+          [157.25, 15.34],
+          [157.45, 17.4],
+          [158.02, 20.42],
+          [158.39, 21.0312],
+          [158.62, 21.0312],
+          [159.29, 16.45],
+          [159.59, 14.94],
+          [162.82, 15.28],
+          [163.06, 15.43]
+        ],
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Sampled the lip, rolled underside and tapered glazing from north elevation. Used the published 138 ft observation diameter for the outer lip and represented the glass with a recessed printable band."
+      },
+      {
+        "kind": "beam",
+        "id": "observation-guard-brackets",
+        "path": [
+          [0, 17.12, 159.03],
+          [0, 17.64, 162.55]
+        ],
+        "size": [1.31, 1.26],
+        "copies": {
+          "around": [0, 0],
+          "count": 24
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Downtown_Seattle_skyline_from_Kerry_Park_-_October_2019.jpg",
+        "guess": "Sampled the outward cant and separation from the recessed indoor glazing in the photograph and elevation. Used 24 open brackets at a pitch the print can bridge to represent the clear glass guard."
+      },
+      {
+        "kind": "prism",
+        "id": "observation-guard-rim",
+        "ring": [
+          [18.2649, -0.9572],
+          [18.2824, 0.5266],
+          [18.1795, 2.007],
+          [17.957, 3.4742],
+          [17.6162, 4.9185],
+          [17.1595, 6.3305],
+          [16.5898, 7.7007],
+          [15.9109, 9.0203],
+          [15.1273, 10.2805],
+          [14.2441, 11.473],
+          [13.2671, 12.59],
+          [12.2028, 13.6241],
+          [11.0581, 14.5685],
+          [9.8407, 15.417],
+          [8.5584, 16.1641],
+          [7.2199, 16.8047],
+          [5.8338, 17.3347],
+          [4.4093, 17.7506],
+          [2.9557, 18.0496],
+          [1.4827, 18.2298],
+          [0.0, 18.29],
+          [-1.4827, 18.2298],
+          [-2.9557, 18.0496],
+          [-4.4093, 17.7506],
+          [-5.8338, 17.3347],
+          [-7.2199, 16.8047],
+          [-8.5584, 16.1641],
+          [-9.8407, 15.417],
+          [-11.0581, 14.5685],
+          [-12.2028, 13.6241],
+          [-13.2671, 12.59],
+          [-14.2441, 11.473],
+          [-15.1273, 10.2805],
+          [-15.9109, 9.0203],
+          [-16.5898, 7.7007],
+          [-17.1595, 6.3305],
+          [-17.6162, 4.9185],
+          [-17.957, 3.4742],
+          [-18.1795, 2.007],
+          [-18.2824, 0.5266],
+          [-18.2649, -0.9572],
+          [-16.9667, -0.8892],
+          [-16.983, 0.4892],
+          [-16.8874, 1.8644],
+          [-16.6807, 3.2273],
+          [-16.3641, 4.5689],
+          [-15.9399, 5.8805],
+          [-15.4107, 7.1534],
+          [-14.78, 8.3792],
+          [-14.0521, 9.5498],
+          [-13.2317, 10.6575],
+          [-12.3241, 11.6951],
+          [-11.3354, 12.6558],
+          [-10.2721, 13.533],
+          [-9.1412, 14.3212],
+          [-7.9501, 15.0152],
+          [-6.7067, 15.6103],
+          [-5.4191, 16.1026],
+          [-4.0959, 16.4889],
+          [-2.7456, 16.7667],
+          [-1.3774, 16.9341],
+          [0.0, 16.99],
+          [1.3774, 16.9341],
+          [2.7456, 16.7667],
+          [4.0959, 16.4889],
+          [5.4191, 16.1026],
+          [6.7067, 15.6103],
+          [7.9501, 15.0152],
+          [9.1412, 14.3212],
+          [10.2721, 13.533],
+          [11.3354, 12.6558],
+          [12.3241, 11.6951],
+          [13.2317, 10.6575],
+          [14.0521, 9.5498],
+          [14.78, 8.3792],
+          [15.4107, 7.1534],
+          [15.9399, 5.8805],
+          [16.3641, 4.5689],
+          [16.6807, 3.2273],
+          [16.8874, 1.8644],
+          [16.983, 0.4892],
+          [16.9667, -0.8892]
+        ],
+        "from": 161.94,
+        "to": 163.19,
+        "copies": {
+          "around": [0, 0],
+          "count": 2
+        },
+        "source": "https://commons.wikimedia.org/wiki/File:Downtown_Seattle_skyline_from_Kerry_Park_-_October_2019.jpg",
+        "guess": "Sampled the exterior glass guard radius and top height from the photograph and elevation. Replaced the transparent edge with a 1.3 m wide rim joined to the brackets, using two overlapping sectors."
+      },
+      {
+        "kind": "lathe",
+        "id": "saucer-roof-and-equipment-cap",
+        "profile": [
+          [162.94, 15.33],
+          [163.19, 15.14],
+          [166.27, 6.27],
+          [166.66, 5.7],
+          [167.23, 5.39],
+          [168.03, 5.39],
+          [168.69, 6.05],
+          [169.43, 7.08],
+          [169.66, 7.08],
+          [170.04, 5.33],
+          [171.74, 5.02],
+          [171.92, 1.64],
+          [173.77, 1.45]
+        ],
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Sampled the low cone, pinched upper shoulder, rolled cap and setback equipment housing from north elevation and the Kerry Park photograph. The housing uses a round profile in place of the small rooftop details."
+      },
+      {
+        "kind": "lathe",
+        "id": "tapered-spire-and-beacon",
+        "profile": [
+          [173.53, 1.28],
+          [174.02, 1.17],
+          [182.94, 0.65],
+          [183.29, 0.64],
+          [183.51, 0.94],
+          [184.15, 0.83],
+          [184.404, 0.64]
+        ],
+        "source": "https://www.seattle.gov/documents/Departments/Neighborhoods/HistoricPreservation/Landmarks/LandmarksPreservationBoard/MeetingDocuments/2023/LPB101823SpaceNeedlePP.pdf#page=4",
+        "guess": "Used the official 605 ft tip. Sampled the taper and beacon from north elevation A3.01 c and the Kerry Park photograph. Combined the mast frame into a round section with a 1.24 mm minimum printed diameter."
+      }
+    ]
+  }
+}

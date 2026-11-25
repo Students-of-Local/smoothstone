@@ -2,6 +2,7 @@
 
 import json
 import math
+from pathlib import Path
 
 import manifold3d as m3
 import numpy as np
@@ -359,3 +360,20 @@ def test_a_lattice_tower_refuses_a_plinth(build, monkeypatch):
     pack = {**_pack(BLOCK, plinth={"rect": [40, 60]}), **{f: {"source": SOURCE, "value": 5} for f in facts}}
     with pytest.raises(landmark_refs.LandmarkProblem, match="Leave plinth out"):
         build(pack, parts=[(1, 20)])
+
+
+SHIPPED = sorted(p for p in Path(landmark_refs.__file__).with_name("landmarks").glob("*.json") if "parts" in json.loads(p.read_text()))
+
+
+@pytest.mark.parametrize("path", SHIPPED, ids=lambda p: p.stem)
+def test_a_shipped_pack_s_parts_make_one_body_at_a_small_print(path):
+    pack = json.loads(path.read_text())
+    lat, lon = pack["parts"]["origin"]
+    records, _, _ = landmark_parts.read(pack, {"latitude": lat, "longitude": lon})
+    tall = max(r["height"]["metres"] for r in records)
+    wide = max(abs(v) for r in records for ring in r["footprint"] for point in ring for v in point)
+    scale = 150 / max(tall, 2 * wide)
+    solid = m3.Manifold.batch_boolean([s for r in records for s in r["_build"](scale, [])], m3.OpType.Add)
+    base = solid.project().extrude(2).translate([0, 0, -1.98])
+    assert len((solid + base).decompose()) == 1
+    assert all(r["source"].startswith("http") for r in records)
