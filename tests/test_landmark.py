@@ -1293,11 +1293,12 @@ def test_a_tall_bell_tower_does_not_hide_a_church_without_its_dome(recorded, mon
         landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")
 
 
-def test_a_whole_pyramid_is_no_plain_shape(recorded, monkeypatch, tmp_path):
+@pytest.mark.parametrize("tags", [{"building": "yes", "roof__height": "73"}, {"building": "pyramid"},
+                                  {"building": "yes", "man_made": "pyramid"}])
+def test_a_whole_pyramid_is_no_plain_shape(recorded, monkeypatch, tmp_path, tags):
     from smoothstone import landmark
 
-    _drawn(monkeypatch, recorded, _way(1, -40, -40, 40, 40, building="yes", height="73", roof__shape="pyramidal",
-                                       roof__height="73", wikidata="Q1"))
+    _drawn(monkeypatch, recorded, _way(1, -40, -40, 40, 40, height="73", roof__shape="pyramidal", wikidata="Q1", **tags))
     assert landmark.generate("Taj Mahal", tmp_path, (220, 220, 220), 172, "low")["stl"]
 
 
