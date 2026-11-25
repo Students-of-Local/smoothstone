@@ -279,6 +279,7 @@ def turned(s):
 
 def rest(s, monkeypatch, steps=600):
     quiet(s, monkeypatch)
+    fs.viscosity(200, 0, "PLA")  # a melt is as thick as its flow index test, which weighs it, says
     monkeypatch.setattr(st.failsim, "fact", lambda key, was=fs.fact: 0.0 if key == "gravity" else was(key))
     s.fixed[2:] = False
     for _ in range(steps):
@@ -360,6 +361,7 @@ def inertia(s, about):
 def test_a_cold_strand_spins_on_in_its_own_shape(monkeypatch, axis, speed):
     """Straight or set in a curve, turned about any axis: nothing resists turning as a whole."""
     quiet(None, monkeypatch)
+    fs.viscosity(200, 0, "PLA")  # a melt is as thick as its flow index test, which weighs it, says
     monkeypatch.setattr(st.failsim, "fact", lambda key, was=fs.fact: 0.0 if key == "gravity" else was(key))
     for s in (rod(12, temp=25, air=25, n=11), arc(12)):
         m, r, _ = inertia(s, (s._nodes(s.vol)[:, None] * s.x).sum(0) / s.vol.sum())
