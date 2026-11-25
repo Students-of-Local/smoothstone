@@ -8,6 +8,12 @@ from pathlib import Path
 
 import pytest
 
+if sys.platform == "linux":  # M_ARENA_MAX: glibc's arena per thread kept 1.1 GB in a worker that two arenas hold at 0.2 GB
+    try:
+        ctypes.CDLL(None).mallopt(-8, 2)
+    except AttributeError:
+        pass  # another libc
+
 from smoothstone import config
 
 REPO = Path(__file__).resolve().parent.parent
