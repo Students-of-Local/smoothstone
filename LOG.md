@@ -1378,7 +1378,8 @@ Five were called ready and were wrong. Tokyo Tower was a 150 m stub of a 332.6 m
 whose tallest part is under three quarters of the sourced height. The Porta Nigra was two end blocks joined by a strip; it
 is refused, as is any map whose separate pieces cover under 60% of the plan, or one piece under 40%. Cape Hatteras Lighthouse (a cylinder) and the
 Temple of Heaven (a drum and a cone) are one plain shape on the map: stone now looks for an open model first, and when
-there is none, `stone landmark --plain` builds the plain shape and says so. Rialto Bridge is a solid block with no arch, and still is. On 60 other
+there is none, `stone landmark --plain` builds the plain shape and says so. Rialto Bridge is a solid block with no arch; a bridge whose
+parts stand on over 90% of its plan is now refused (Tower Bridge's map: 3%). On 60 other
 landmarks' saved references the two floors refuse only two old wrong readings (White House, Sagrada Familia).
 The Brooklyn Bridge stopped at "HTTP Error 400": the map API refuses an area with over 50,000 nodes, and is now asked for a
 smaller one. The bridge is refused all the same, since the map has no area for it.
