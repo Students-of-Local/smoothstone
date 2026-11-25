@@ -391,3 +391,98 @@ def test_a_short_run_lays_its_plastic_and_the_plate_past_the_grid_is_bare():
 def test_the_fans_share_is_the_winds():
     still, half, full = (failvideo.strand.numbers("PLA", 10.0, 120.0, fan=f)["set_s_fan"] for f in (0.0, 0.4, 1.0))
     assert still > half > full and failvideo.strand.Strand([(0, 0, 0), (0, 0, 1)], 0.48, "PLA", fan=0.4).fan == pytest.approx(0.4 * failsim.fact("fan_air_speed"))
+
+
+def test_a_skirt_is_not_the_part_and_stays_when_it_goes():
+    tp = gcode.parse(Path(__file__).parent / "fixtures" / "gcode" / "prusa_screw.gcode.gz")
+    gcode.plan(tp)
+    skirt = failvideo.moves_of(tp, "skirt")
+    assert skirt.any()
+    inp = failvideo.inputs(tp, "PLA", enclosed=False)
+    r, c = np.nonzero(inp.masks[0])
+    wide = (c.max() - c.min() + 1) * inp.cell
+    assert 22 < wide < 26 and not inp.brim.any()  # the screw's head, 23.6 mm wide; the skirt round it is 31.4
+    assert not any("brim" in n for n in inp.notes)
+    fail, _ = failvideo.choose(failsim.predict(inp), "detach", inp)
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    assert not (st.ext & skirt).any() and st.ext.any()
+    st.loose(30.0)
+    st.moved()
+    at = tp.p1[skirt & (tp.layer == 0), :3]
+    assert (st.field[st.px(at)] >= at[:, 2] - 1e-6).all()  # still there, for strands to land on
+    ring, part = (x["mesh"][0] for x in st.items(st.L, 0.0, None)[::-1])
+    assert np.ptp(ring[:, 0]) == pytest.approx(31.8, abs=0.5) and abs(ring[:, 0].mean() - at[:, 0].mean()) < 0.5
+    tp.feature[(tp.layer > 0) & (tp.feature == timelapse.gcode.FEATURES.index("outer wall"))] = timelapse.gcode.FEATURES.index("support")
+    again = failvideo.inputs(tp, "PLA", enclosed=False)  # supports carry the part, and go with it
+    assert (again.masks[3] == inp.masks[3]).all() and again.supports
+
+
+def test_a_brim_holds_against_sliding_and_goes_with_the_part():
+    tp = _toolpath(_box((20, 20, 2), (0, 0, 0)))
+    F = timelapse.gcode.FEATURES
+    bare = failvideo.inputs(tp, "PLA")
+    tp.feature[(tp.layer == 0) & np.isin(tp.feature, [F.index("outer wall"), F.index("inner wall")])] = F.index("skirt")
+    inp = failvideo.inputs(tp, "PLA")
+    total = int(bare.masks[0].sum())
+    assert 0 < inp.brim.sum() and abs(int((inp.brim | inp.masks[0]).sum()) - total) < 0.05 * total
+    assert inp.masks[0].sum() < total and any("brim" in n for n in inp.notes)
+    hold = [failsim.predict(replace(i, drag=1e6, brim=b))[0].numbers["hold_n"] for i, b in ((inp, None), (inp, inp.brim))]
+    grown = (inp.brim & ~inp.masks[0]).sum() * inp.cell ** 2 * failsim.fact("adhesion.shear")
+    assert hold[1] - hold[0] == pytest.approx(grown, rel=1e-3)
+    fail, _ = failvideo.choose(failsim.predict(inp), "detach", inp)
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    assert (st.ext == (tp.extruding() & (tp.layer >= 0))).all()
+    tip = failsim.Failure("topple", 5, 1.2, 10.0, "toppled", (100, 100), {"direction": [1.0, 0.0]})
+    st = failvideo.Story(tp, inp, tip, (1, 1, 1), (250, 250))
+    for T in st.loose(30.0):  # about the brim's edge: none of it goes through the plate
+        assert (st.part[0] @ T[:3, :3].T + T[:3, 3])[:, 2].min() > -0.3
+
+
+def test_strands_fall_on_the_part_where_it_slid_to():
+    tp, inp, fail, _ = _story(_box((20, 20, 2), (0, 0, 0)), "detach")
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    st.loose(30.0)
+    st.moved()
+    move = st.mats[-1][:2, 3]
+    r, c = np.nonzero(inp.masks[0])
+    mid = np.array([inp.origin[0] + (c.mean() + 0.5) * inp.cell, inp.origin[1] + (r.mean() + 0.5) * inp.cell])
+    top = float(inp.layer_z[st.L])
+    near = lambda at: st.field[st.px(np.c_[at + np.stack(np.meshgrid(*[np.linspace(-3, 3, 31)] * 2), -1).reshape(-1, 2), np.zeros(961)])]  # noqa: E731
+    assert np.linalg.norm(move) > 15
+    assert near(mid + move).max() == pytest.approx(top, abs=0.01)
+    rim = st.field[st.px(np.c_[mid[0] + move[0] + np.linspace(-9.8, 9.8, 99), np.full(99, mid[1] + move[1] - 9.4), np.zeros(99)])]
+    assert (rim > 0).all()  # its walls are as wide as their lines, not a row of threads
+    assert near(mid).max() == 0  # it left that spot bare
+
+
+def test_what_is_over_a_brim_is_not_in_the_air():
+    tp = _toolpath(_box((20, 20, 2), (0, 0, 0)))
+    bare, mid = failvideo.inputs(tp, "PLA"), float(tp.p1[tp.part(), 0].mean())
+    tp.feature[tp.extruding() & (tp.layer == 0) & (np.maximum(tp.p0, tp.p1)[:, 0] > mid)] = timelapse.gcode.FEATURES.index("skirt")
+    inp = failvideo.inputs(tp, "PLA")
+    assert inp.masks[0].sum() < 0.7 * bare.masks[0].sum() and inp.brim.any()
+    assert [f.kind for f in failsim.predict(replace(inp, brim=None))][0] == "supports"  # half of it hangs over nothing
+    assert [f.kind for f in failsim.predict(inp)] == [f.kind for f in failsim.predict(bare)] == ["none"]
+    assert failvideo._first(replace(inp, brim=None), "supports") and not failvideo._first(inp, "supports")
+    st = failvideo.Story(tp, inp, failsim.Failure("supports", 1, 0.4, 1.0, "spaghetti", None, {}, []), (1, 1, 1), (250, 250))
+    st.run(2)
+    assert not st.flew.any() and not st.gone.any()
+
+
+def test_a_prime_tower_is_there_for_strands_to_end_on():
+    tp = _toolpath(_union(_t(), _box((8, 8, 8), (45, 0, 0))))
+    bar = failvideo.inputs(_toolpath(_t()), "PLA")
+    left = float(tp.p0[tp.part(), 0].min())
+    at = tp.extruding() & (tp.p0[:, 0] > left + 40) & (tp.p1[:, 0] > left + 40)
+    tp.feature[at] = timelapse.gcode.FEATURES.index("prime tower")
+    inp = failvideo.inputs(tp, "PLA")
+    fail, _ = failvideo.choose(failsim.predict(inp), "auto", inp)
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    assert at.any() and not (st.ext & at).any() and fail.kind == "supports"
+    assert [int(m.sum()) for m in inp.masks[:3]] == pytest.approx([int(m.sum()) for m in bar.masks[:3]], rel=0.05)
+    strand, air = st.strand, []
+    st.strand = lambda i, run, loose, *a, **k: (air.append(loose), strand(i, run, loose, *a, **k))[1]
+    st.run(st.L)
+    top = tp.p1[at & (tp.layer == st.L), :3]
+    assert len(top) and (st.field[st.px(top)] >= inp.layer_z[st.L] - 1e-6).all()
+    assert air and not air[0][st.px(top)].any()  # a strand the nozzle takes there is pressed onto it

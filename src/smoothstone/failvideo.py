@@ -85,19 +85,32 @@ def settings(tp, material: str, enclosed: bool, heat: bool = True) -> dict:  # h
     return {**got, "material": m, "fan": True if fan is None else fan, "notes": notes}
 
 
+def moves_of(tp, *features) -> np.ndarray:
+    F = timelapse.gcode.FEATURES
+    return tp.extruding() & (tp.layer >= 0) & np.isin(tp.feature, [F.index(k) for k in features])
+
+
 def inputs(tp, material: str = "PLA", clean: float = 1.0, enclosed: bool = True, heat: bool = True) -> failsim.Inputs:
-    """failsim's per-layer masks from the toolpath's extruding moves; supports count when it prints them. The gaps
-    in sparse infill are filled: failsim's masks are outlines, and it counts the infill's density itself."""
+    """failsim's per-layer masks from the toolpath's extruding moves, the part's and its supports': a skirt and a prime
+    tower are not its footprint or its weight. The gaps in sparse infill are filled: failsim's masks are outlines, and
+    it counts the infill's density itself."""
     from scipy import ndimage
 
-    ext = tp.extruding() & (tp.layer >= 0)
     F = timelapse.gcode.FEATURES
-    sup = bool((ext & np.isin(tp.feature, [F.index("support"), F.index("support interface")])).any())
+    ext, skirt = tp.extruding() & (tp.layer >= 0), moves_of(tp, "skirt")
+    sup = moves_of(tp, "support", "support interface")
     z = np.asarray(tp.layer_z, float)
     thick = float(np.median(np.diff(z))) if len(z) > 1 else float(z[0]) if len(z) else 0.2  # the first layer may differ
-    inp = failsim.inputs_from_segments(tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], tp.layer[ext], z, layer_times(tp),
-                                       layer=thick, clean=clean, supports=sup, enclosed=enclosed)
+    masks = lambda of, z, **kw: failsim.inputs_from_segments(  # noqa: E731  # every move sizes the grid, some are drawn
+        tp.p0[ext, :2], tp.p1[ext, :2], tp.width[ext], np.where(of, tp.layer, -1)[ext], z, **kw)
+    inp = masks(ext & ~skirt & ~moves_of(tp, "prime tower"), z, layer_t=layer_times(tp), layer=thick, clean=clean, supports=bool(sup.any()), enclosed=enclosed)
     inp = replace(inp, **settings(tp, material, enclosed, heat))
+    rim, foot = masks(skirt, z[:1]).masks[0], inp.masks[0]
+    lab, _ = ndimage.label(ndimage.binary_dilation(rim | foot))  # a slicer leaves a hair between brim and part
+    inp.brim = rim & np.isin(lab, np.setdiff1d(lab[foot], 0))
+    if inp.brim.any():
+        inp.notes.append("assumption: the brim holds against sliding only; what it holds against tipping and curling corners is not "
+                         "counted, so this print holds better than the model says")
     infill = ext & (tp.feature == F.index("sparse infill"))
     for i in np.unique(tp.layer[infill]):
         sel, mk = infill & (tp.layer == i), inp.masks[i]
@@ -143,10 +156,16 @@ def _width(inp) -> float:
     return inp.width or failsim.fact("k2_widths")["outer_wall"]
 
 
+def _below(inp: failsim.Inputs, i: int) -> np.ndarray:
+    """What layer i is printed on: the layer under it, and the brim round the first."""
+    mk = np.asarray(inp.masks[i - 1], bool)
+    return mk if i > 1 or inp.brim is None else mk | inp.brim
+
+
 def _first(inp: failsim.Inputs, mode: str):
     """The first layer with a piece that fails the asked way: (layer, piece mask, mm past)."""
     for i in range(1, len(inp.masks)):
-        for comp, big, kind in pieces(np.asarray(inp.masks[i], bool), _dist(np.asarray(inp.masks[i - 1], bool), inp.cell), inp):
+        for comp, big, kind in pieces(np.asarray(inp.masks[i], bool), _dist(_below(inp, i), inp.cell), inp):
             if kind == mode:
                 return i, comp, big
     return None
@@ -195,10 +214,15 @@ class Story:
         self.tp, self.inp, self.fail, self.rgb, self.bed = tp, inp, fail, rgb, bed
         self.kind = "detach" if fail.kind in ("detach", "topple") else fail.kind
         self.L = int(fail.layer or 0)
-        self.ext = tp.extruding() & (tp.layer >= 0)
         self.gone = np.zeros(tp.n, bool)
         self.rch, self.cell = failsim.reach(inp.layer), inp.cell
         self.field = np.zeros(np.shape(inp.masks[0]))  # mm, top of what is printed or piled
+        self.origin = inp.origin
+        skirt = moves_of(tp, "skirt")  # this and a prime tower stay when the part goes; a brim goes with it
+        if inp.brim is not None:
+            skirt[skirt] &= ~((tp.layer[skirt] == 0) & inp.brim[self.px(tp.p1[skirt, :3])])
+        self.prints = tp.extruding() & (tp.layer >= 0)
+        self.ext = self.prints & ~skirt & ~moves_of(tp, "prime tower")
         self.links: list[tuple] = []  # (from layer, A, B, width): fallen strands, for good
         self.rod, self.live = None, {}  # the strand on the nozzle, and where it was when each layer ended
         self.blob, self.blobs, self.left = 0.0, {}, 0.0  # mm3 on the nozzle, by layer; s of printing left out
@@ -218,13 +242,13 @@ class Story:
 
     def px(self, p):
         h, w = self.field.shape
-        ox, oy = self.inp.origin
+        ox, oy = self.origin
         return (np.clip(((p[:, 1] - oy) / self.cell).astype(int), 0, h - 1),
                 np.clip(((p[:, 0] - ox) / self.cell).astype(int), 0, w - 1))
 
     def off(self, p):
         """Past the grid's edge: bare plate."""
-        q = (p[:, :2] - self.inp.origin) / self.cell
+        q = (p[:, :2] - self.origin) / self.cell
         return ((q < 0) | (q >= self.field.shape[::-1])).any(1)
 
     def line(self, j, step=1.0) -> np.ndarray:
@@ -238,12 +262,26 @@ class Story:
         prints on plastic again."""
         out, now = [], []
         for j in np.flatnonzero(self.tp.layer == i):
-            if self.ext[j] and not air[j]:
+            if self.prints[j] and not air[j]:
                 out.append(now)
                 now = []
             elif self.ext[j] or now:
                 now.append(j)
         return [np.array(r) for r in [*out, now] if r]
+
+    def stamp(self, p, k):
+        """Points as tops of the field, k cells round each."""
+        for off in np.ndindex(2 * k + 1, 2 * k + 1):
+            at = p + np.array([*((np.array(off) - k) * self.cell), 0.0])
+            at = at[~self.off(at)]
+            np.maximum.at(self.field, self.px(at), at[:, 2])
+
+    def lay(self, moves, T=np.eye(4)):
+        """Printed lines in the field, where T has taken them."""
+        ps = [self.line(j, self.cell) for j in moves]
+        k = np.repeat(np.round(self.tp.width[moves] / 2 / self.cell).astype(int), [len(p) for p in ps])
+        for n in np.unique(k):
+            self.stamp(np.vstack(ps)[k == n] @ T[:3, :3].T + T[:3, 3], n)
 
     def pile(self, i, pts, d, skip=0):
         """A strand that lies still: drawn for good, and something to land on."""
@@ -254,11 +292,7 @@ class Story:
         for a, b, w in zip(pts[:-1], pts[1:], d):
             n = int(math.ceil(np.linalg.norm(b - a) / self.cell)) + 1
             p = a + (b - a) * np.linspace(0, 1, n)[:, None]
-            k = int(round(w / 2 / self.cell))
-            for off in np.ndindex(2 * k + 1, 2 * k + 1):
-                at = p + np.array([*((np.array(off) - k) * self.cell), 0.0])
-                at = at[~self.off(at)]
-                np.maximum.at(self.field, self.px(at), at[:, 2] + w / 2)
+            self.stamp(p + (0, 0, w / 2), int(round(w / 2 / self.cell)))
 
     def drop(self, i, s, pin=False):
         """What the nozzle let go, or pressed onto plastic, falls until it lies still; where it necks to a hair it breaks."""
@@ -303,7 +337,7 @@ class Story:
             out = float(np.diff(np.interp([t - dt, t], np.r_[t0[0], t1], came))[0]) / dt
             at = self.px(head[None])
             solid = not loose[at][0]
-            if self.kind == "detach" and (self.blob < self.hold or self.field[at][0] > head[2] - self.inp.layer / 2):
+            if self.kind == "detach" and (self.blob < self.hold or self.field[at][0] > head[2] - (z - float(self.inp.layer_z[i - 1])) / 2):
                 self.blob, out = self.blob + out * dt, 0.0  # the tip carries it, or it has nowhere to go
             if self.rod is None:
                 if out <= 0:
@@ -360,18 +394,22 @@ class Story:
         """Steps the physics layer by layer from the failure to last. Returns the failure's own motion."""
         tp, inp, L = self.tp, self.inp, self.L
         for j in range(L):
-            self.field[np.asarray(inp.masks[j], bool)] = inp.layer_z[j]
-        solid = np.asarray(inp.masks[L - 1], bool) if L > 0 else np.zeros(self.field.shape, bool)
+            self.field[_below(inp, j + 1)] = inp.layer_z[j]
+        other = self.prints & ~self.ext  # a skirt, a prime tower
+        self.lay(np.flatnonzero(other & (tp.layer < L)))
+        solid = _below(inp, L) if L > 0 else np.zeros(self.field.shape, bool)
         motion = []
         if self.kind == "detach":
             motion = self.loose(fps)
-            self.field[:] = 0.0  # the part has moved off its spot: later layers fall to the plate
+            self.moved()
             self.blob = min(self.hold, self.flow * len(motion) / fps)
             self.notes.append(failsim.note("nozzle_tip"))
         layers = range(L + (self.kind == "detach"), last + 1)
         for i in layers:
             secs = (SIM - self.told) / (last + 1 - i)
-            moves = np.flatnonzero(self.ext & (tp.layer == i))
+            moves, was = np.flatnonzero(self.ext & (tp.layer == i)), self.field.copy()
+            self.lay(np.flatnonzero(other & (tp.layer == i)))  # the tower grows on
+            tower = self.field > was
             if self.kind == "detach":
                 self.gone[moves] = True
                 if len(moves):
@@ -398,7 +436,7 @@ class Story:
             solid = mk & ~falls  # what fell supports nothing above it
             self.since[falls] = -1
             self.field[solid] = np.maximum(self.field[solid], inp.layer_z[i])
-            loose = (d > self.rch) & ~held
+            loose = (d > self.rch) & ~held & ~tower
             air = [j for j in moves if loose[self.px(self.line(j))].any()]
             self.gone[air] = self.flew[air] = True
             over = np.zeros(tp.n, bool)
@@ -433,6 +471,8 @@ class Story:
         self.part = timelapse.ribbons(tp.p0[sel, :3], tp.p1[sel, :3], np.maximum(tp.width[sel], 0.1), np.maximum(tp.height[sel], 0.05))
         r, c = np.nonzero(np.asarray(inp.masks[0], bool))
         fx, fy = inp.origin[0] + (c + 0.5) * self.cell, inp.origin[1] + (r + 0.5) * self.cell
+        foot = sel & (tp.layer == 0)  # all that moves with it, a brim too
+        ends, half = np.vstack([tp.p0[foot, :2], tp.p1[foot, :2]]), np.tile(tp.width[foot] / 2, 2)[:, None]
         last = np.flatnonzero(sel & (tp.layer == L))
         if f.kind == "topple" and f.numbers.get("direction"):
             u = np.asarray(f.numbers["direction"], float)
@@ -442,18 +482,29 @@ class Story:
         a = np.array([np.asarray(m, bool).sum() for m in inp.masks[:L + 1]], float)
         z = np.asarray(inp.layer_z[:L + 1]) - inp.layer / 2
         com = np.array([fx.mean(), fy.mean(), float((a * z).sum() / max(a.sum(), 1))])
-        proj = fx * u[0] + fy * u[1]
+        proj = ends @ u
+        near, far = float((proj - half[:, 0]).min()), float((proj + half[:, 0]).max())
         if f.kind == "topple":
-            edge = com[:2] + (proj.max() + self.cell / 2 - com[:2] @ u) * u
+            edge = com[:2] + (far - com[:2] @ u) * u
             mats = failsim.rigid_tip(edge, u, com, fps=fps)
             self.notes.append("the part tips as a solid box about its footprint edge (failsim.rigid_tip)")
         else:
-            reach = float(proj.max() - proj.min()) + self.cell
-            room = [(b - v.max() if c > 0 else v.min()) / abs(c) for b, v, c in zip(self.bed, (fx, fy), u) if abs(c) > 1e-6]
-            mats = failsim.rigid_slide(u, max(0.0, min(reach, *room)), MOTION)
-            self.notes.append("assumption: the nozzle drags the loose part one footprint length along its last line, or to the plate's edge")
+            room = [(b - hi if c > 0 else lo) / abs(c) for b, lo, hi, c in zip(self.bed, (ends - half).min(0), (ends + half).max(0), u) if abs(c) > 1e-6]
+            mats = failsim.rigid_slide(u, max(0.0, min(far - near, *room)), MOTION)
+            self.notes.append("assumption: the nozzle drags the loose part one footprint length along its last line, or to the plate's edge; "
+                              "a skirt or tower in its way does not stop it")
         self.mats = [mats[k] for k in sorted(set(np.linspace(0, len(mats) - 1, MOTION).round().astype(int)))]
         return self.mats
+
+    def moved(self):
+        """The field once the part has come loose, as wide as the plate: its plastic where it lies now, and what stays."""
+        tp, T, (h, w) = self.tp, self.mats[-1], self.field.shape
+        lo = np.minimum(0.0, self.origin)
+        hi = np.maximum(self.bed, np.add(self.origin, (w * self.cell, h * self.cell)))
+        self.origin, self.field = tuple(lo), np.zeros(tuple(np.ceil((hi - lo) / self.cell).astype(int)[::-1] + 1))
+        on = self.prints & (tp.layer <= self.L)
+        self.lay(np.flatnonzero(on & self.ext), T)
+        self.lay(np.flatnonzero(on & ~self.ext))
 
     def items(self, layer: int, t_s: float, head, motion=None, scale=1.0) -> list[dict]:
         """The extra geometry of a frame showing layer (from the failure on)."""
@@ -485,6 +536,10 @@ class Story:
             T = motion if motion is not None else self.mats[-1]
             V, Q = self.part
             out.append({"mesh": ((V @ T[:3, :3].T + T[:3, 3]).astype(np.float32), Q), "rgb": self.rgb})
+            stays = self.prints & ~self.ext & (self.tp.layer <= layer)  # skirt, prime tower
+            if stays.any():
+                out.append({"mesh": timelapse.ribbons(self.tp.p0[stays, :3], self.tp.p1[stays, :3], np.maximum(self.tp.width[stays], 0.1),
+                                                      np.maximum(self.tp.height[stays], 0.05)), "rgb": self.rgb})
             vol = self.blobs.get(layer, 0.0) if motion is None else min(self.hold, self.flow * max(0.0, t_s - float(self.fail.time or 0.0)))
             if vol > 0 and head is not None:
                 import trimesh
@@ -672,7 +727,10 @@ def cmd(args, job, prof, out):
     out.add(f"Main assumption: {dom}")
     done = nxt if nxt and nxt != "stone status" else "none, the failure video is made"
     if not what_if:
-        done = f"ask the person: the model says this print fails ({fail.kind}); print it with {REMEDY[fail.kind]}?"
+        remedy = REMEDY[fail.kind]
+        if inp.brim is not None and inp.brim.any():  # it has one
+            remedy = {"detach": "a clean plate", "topple": "the part lying down"}.get(fail.kind, remedy)
+        done = f"ask the person: the model says this print fails ({fail.kind}); print it with {remedy}?"
     no = timelapse.missing()
     if no:
         out.fix(f"no video: {no}")
