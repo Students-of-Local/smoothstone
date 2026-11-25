@@ -8,6 +8,7 @@ import re
 import os
 import tempfile
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -66,10 +67,90 @@ def _quantity(value):
     return None if factor is None else amount * factor
 
 
+def _wikipedia(params):
+    return _request(WIKIPEDIA + '?' + urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'pageprops',
+                                                              'ppprop': 'wikibase_item', **params}))
+
+
+def _words(text):
+    """A name's words, without accents or punctuation: "Sacr\u00e9-C\u0153ur" and "Sacre Coeur" are one name."""
+    text = unicodedata.normalize('NFKD', text.casefold().replace('\u0153', 'oe')).replace("'", '').replace('\u2019', '')
+    words = re.findall(r'[^\W_]+', ''.join(c for c in text if not unicodedata.combining(c)))
+    return tuple('st' if w == 'saint' else w for w in (words[1:] if words[:1] == ['the'] and len(words) > 1 else words))
+
+
+def _matches(name):
+    """What Wikidata and Wikipedia find for a name: hits, their entities, and whether Wikipedia answered."""
+    hits = {hit['id']: hit for hit in _wiki({'action': 'wbsearchentities', 'search': name, 'language': 'en',
+                                             'limit': 15}).get('search', [])}
+    answered = True
+    for params in ({'titles': name, 'redirects': 1}, {'generator': 'search', 'gsrsearch': name, 'gsrlimit': 6}):
+        try:
+            pages = _wikipedia(params).get('query', {}).get('pages', {}).values()
+        except (OSError, ValueError):
+            answered = False  # Wikidata's own search still answers
+            continue
+        for page in pages:
+            item = page.get('pageprops', {}).get('wikibase_item')
+            if item:
+                hit = hits.setdefault(item, {'id': item, 'label': page.get('title', ''), 'description': ''})
+                hit['article'] = hit.get('article') or 'titles' in params
+    if not hits:
+        raise LandmarkProblem(f'No Wikidata entity found for {name}.')
+    entities = _wiki({'action': 'wbgetentities', 'ids': '|'.join(hits), 'languages': 'en',
+                      'props': 'labels|descriptions|aliases|claims|sitelinks'}).get('entities', {})
+    return list(hits.values()), entities, answered
+
+
+FORBIDDEN = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
+EVENT = re.compile(r'\b(battle|siege|attack|protests?|riots?|election|earthquake)\b', re.I)
+STRUCTURE = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|memorial|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel|fort|fortification|house|ch[a\u00e2]teau|hotel|fountain|dam|windmill|capitol|prison|penitentiary|residence|ruins?|archaeological)\b', re.I)
+PLACE = re.compile(r'\b(district|(?:designated|populated|inhabited) place|airport|state|kingdom|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|islands?|river|lake|street|road|square|station|stop|school|university|company|settlement|locality|community|area|territory|constituency|capital|mountain|hill|valley|park)\b', re.I)
+# The words before the first preposition say what a thing is: a "human settlement in Tower Hamlets" is no tower.
+KIND = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named|after|during|commemorating)\b|[,;(]', re.I)
+
+
+def _choose(name, hits, entities):
+    """The hit a person most likely means: its name, what kind of thing it is, and how widely it is written about."""
+    wanted, best = _words(name), None
+    for hit in hits:
+        entity = entities.get(hit['id'], {})
+        description = hit.get('description') or entity.get('descriptions', {}).get('en', {}).get('value', '')
+        if not _value(entity, 'P625') or FORBIDDEN.search(description):
+            continue
+        names = [_words(text) for text in (hit.get('label', ''), hit.get('match', {}).get('text', ''),
+                                           entity.get('labels', {}).get('en', {}).get('value', ''),
+                                           *(a['value'] for a in entity.get('aliases', {}).get('en', [])))]
+        what = KIND.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip()
+        named = wanted in names
+        # A page Wikipedia only thinks related is no answer. Wikidata's own hits match the start of a name.
+        near = hit.get('article') or any(set(wanted) <= set(n) for n in names)
+        if EVENT.search(what) or not (named or near or 'match' in hit):
+            continue
+        designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
+        places = {word.group().casefold() for word in PLACE.finditer(what)}
+        # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
+        placed = bool(places) and not any(m.end() == len(what) for m in STRUCTURE.finditer(what))
+        # A station or a school is a building when it has an architect; a town of one style is still a town.
+        if placed and designed and places <= {'station', 'school', 'airport'}:
+            placed = False
+        # An archaeological site, whatever it once was, unless people still live there.
+        dug = 'Q839954' in _item_ids(entity, 'P31') and not float((_value(entity, 'P1082') or {}).get('amount', 0))
+        score = 1 + len(entity.get('sitelinks', {}))
+        score *= 8 if named else 1 if near else .05
+        score *= 2 if hit.get('article') else 1
+        score *= (4 if dug else .02 if placed else 4 if designed or STRUCTURE.search(what) else 1 if what else .5)
+        if best is None or score > best[0]:
+            best = score, {**hit, 'description': description}, entity
+    if best is None:
+        raise LandmarkProblem(f'No building with coordinates found for {name}.')
+    return best[1:]
+
+
 def resolve(name: str, job_root: Path) -> dict:
     """Return sourced facts for the closest structure found by name."""
     normalized = ' '.join(name.casefold().split())
-    key = hashlib.sha256(f'2 {normalized}'.encode()).hexdigest()  # 2: the ranking that chose the answer
+    key = hashlib.sha256(f'3 {normalized}'.encode()).hexdigest()  # 3: the ranking that chose the answer
     cache = Path.home() / '.cache' / 'smoothstone' / 'wikidata' / (key + '.json')
     ref_path = Path(job_root) / 'refs' / 'landmark.json'
     if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
@@ -85,48 +166,13 @@ def resolve(name: str, job_root: Path) -> dict:
         except (OSError, ValueError, TypeError):
             pass
     try:
-        result = _wiki({'action': 'wbsearchentities', 'search': name, 'language': 'en', 'limit': 15})
-        hits = result.get('search', [])
-        if not hits:
-            raise LandmarkProblem(f'No Wikidata entity found for {name}.')
-        ids = '|'.join(hit['id'] for hit in hits)
-        entities = _wiki({'action': 'wbgetentities', 'ids': ids,
-                          'props': 'labels|descriptions|claims|sitelinks', 'languages': 'en'}).get('entities', {})
-        forbidden = re.compile(r'\b(painting|film|song|book|album|photograph|person|surname|disambiguation)\b', re.I)
-        structure = re.compile(r'\b(cathedral|church|abbey|building|structure|mosque|palace|tower|temple|monument|mausoleum|castle|bridge|landmark|basilica|shrine|fortress|opera house|skyscraper|tomb|arch|gate|amphitheat(?:re|er)|theat(?:re|er)|stadium|museum|statue|chapel|minster|lighthouse|pyramid|venue|hall|library|monastery|priory|synagogue|pagoda|observatory|obelisk|aqueduct|villa|mansion|citadel|fort|fortification|house|ch[aâ]teau|hotel|fountain|dam|windmill|capitol|ruins?|archaeological)\b', re.I)
-        place = re.compile(r'\b(district|place|airport|state|kingdom|city|town|village|hamlet|municipality|commune|suburb|neighbou?rhood|ward|parish|borough|county|region|province|country|island|river|lake|street|road|square|station|stop|school|company|settlement|locality|community|area|territory|constituency|capital|mountain|hill|valley|park)\b', re.I)
-        # The words before the first place say what the thing is: a "human settlement in Tower Hamlets" is no tower.
-        kind = re.compile(r'\b(?:in|of|on|at|near|by|from|within|between|for|to|with|known|serving|named)\b|[,;(]', re.I)
-        candidates = []
-        for order, hit in enumerate(hits):
-            entity = entities.get(hit['id'], {})
-            if not _value(entity, 'P625'):
-                continue
-            description = hit.get('description', '')
-            if forbidden.search(description):
-                continue
-            # An exact name counts first only with evidence that this is a building: its own kind says so,
-            # or it has an architectural style, an architect or a count of floors.
-            named = any(' '.join(label.casefold().split()) == normalized for label in
-                        (hit.get('label', ''), hit.get('match', {}).get('text', '')))
-            what = kind.split(re.sub(r'^\s*\([^)]*\)', '', description), maxsplit=1)[0].strip()
-            designed = any(_value(entity, claim) for claim in ('P149', 'P84', 'P1101'))
-            words = [word.group().casefold() for word in place.finditer(what)]
-            # A "cathedral city" is a city and an "island off the coast" an island; a "parish church" ends in its kind.
-            placed = bool(words) and not any(m.end() == len(what) for m in structure.finditer(what))
-            # A station or a school is a building when it has an architect; a town of one style is still a town.
-            if placed and designed and set(words) <= {'station', 'school', 'airport'}:
-                placed = False
-            building = not placed and bool(structure.search(what) or designed)
-            rank = 2 * named + building if named and not placed and (what or building) else int(building)
-            candidates.append(((rank, bool(structure.search(description)), named, -order), hit, entity))
-        if not candidates:
-            raise LandmarkProblem(f'No building with coordinates found for {name}.')
-        _, hit, entity = max(candidates, key=lambda x: x[0])
+        hits, entities, answered = _matches(name)
+        hit, entity = _choose(name, hits, entities)
         entity_id = hit['id']
         source = f'https://www.wikidata.org/wiki/{entity_id}'
         coordinate = _value(entity, 'P625')
-        ref = {'id': entity_id, 'label': hit.get('label', name), 'matched_name': normalized,
+        label = entity.get('labels', {}).get('en', {}).get('value') or hit.get('label', name)
+        ref = {'id': entity_id, 'label': label, 'matched_name': normalized,
                'latitude': coordinate['latitude'], 'longitude': coordinate['longitude'],
                'height': _quantity(_value(entity, 'P2048')),
                'length': _quantity(_value(entity, 'P2043')),
@@ -182,7 +228,8 @@ def resolve(name: str, job_root: Path) -> dict:
         ref_dir.mkdir(parents=True, exist_ok=True)
         encoded = json.dumps(ref, indent=2, ensure_ascii=False) + '\n'
         _write_atomic(ref_dir / 'landmark.json', encoded)
-        _write_atomic(cache, encoded)
+        if answered:
+            _write_atomic(cache, encoded)
         return ref
     except LandmarkProblem:
         raise
