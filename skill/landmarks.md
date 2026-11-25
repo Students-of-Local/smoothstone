@@ -9,7 +9,7 @@ stone landmark "<name>"
 ```
 
 It looks the name up, reads the map and the landmark's cited facts, builds it to the size in the request, checks that it
-prints and draws `build/views.png`. Follow its NEXT line, with `--plain` only when NEXT has it. Nothing else is needed when it says Part ready. `--size 180` sets
+prints and draws `build/views.png`. Follow its NEXT line, with `--plain` only once the person says yes to the plain shape NEXT asks them about: note their answer with `stone note "<their answer>"` and run the NEXT line it prints. Nothing else is needed when it says Part ready. `--size 180` sets
 the longest side in mm.
 
 ## 2. Look at it

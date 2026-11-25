@@ -1396,3 +1396,14 @@ models are now welded there as landmarks are. The test for that showed the repai
 through, closing two touching boxes by cutting 17% off them and calling it clean; a repair that changes the volume by
 over 0.5% is now refused. The one model named for the Temple of Heaven is an owl (#188).
 With the fixes Tokyo Tower prints from its first model, 200 mm tall, all 15 checks passing, on stone's own NEXT lines.
+
+The question stone asks when no open model of a landmark prints (Cape Hatteras, Rialto; LFM3-1.7B, five seeds each, one
+run per code state): 7 of 10 runs put it to the person, then 1 of 3 with a line "Reply with just this" (stopped early),
+then 3 of 10 with other parts refused while it waits. The misses thought past 2,048 tokens about who "the person" is, how
+to ask and what was left to fix. Six wordings of that result were replayed over 16 landmark names, and the best two over 16
+fresh ones: "NEXT: none. Your reply to the user is: ..." with the search lines left out asked in 29 of 32, the first wording
+in 20 of 32. The ten runs with it: 10 of 10. Adding
+"After the person answers (not before): stone note ..." below it, as stone's other questions have, asked in 29 of 32 again.
+It is there because larger models need it, not for a gain: noting the answer is still the gap. Given the person's yes or
+no, the 1.7B model noted it in 0 of 24 replays without that line and 2 of 24 with it. The ten runs on the code with that
+line and the first review fixes: 8 of 10 (the 10 of 10 was before them); both misses thought past the cut. At temperature 0.1 five seeds are close to one sample.

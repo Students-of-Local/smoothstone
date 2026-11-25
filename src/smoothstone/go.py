@@ -38,12 +38,17 @@ def _open(path: str) -> bool:
 
 
 def _split(text: str) -> tuple[list[str], str]:
+    from .cli import REPLY
+
     lines = text.splitlines()
     # NEXT is the last line, or comes before a line meant for later (after an ask)
     at = max((i for i, ln in enumerate(lines) if ln.startswith("NEXT: ")), default=None)
     if at is None:
         return lines, ""
-    return lines[:at] + lines[at + 1:], lines[at][len("NEXT: "):]
+    nxt = lines[at][len("NEXT: "):]
+    if nxt.startswith(REPLY):  # a question to the person, not a finished part
+        nxt = "ask the person: " + nxt[len(REPLY):]
+    return lines[:at] + lines[at + 1:], nxt
 
 
 def _value(lines: list[str], head: str) -> str | None:
@@ -166,7 +171,7 @@ def _go(words, run, say, live, drawn) -> int:
             say('To ask another way: stone go "<the request in other words>"')
         else:
             say(f"Needs you: {ask}")
-            if last is not None and "After the person answers" in last[1]:
+            if ask.startswith("No open model of ") or last is not None and "After the person answers" in last[1]:
                 # the answer must reach stone: stone note keeps it, then stone go goes on from it
                 say('When you have the answer, run: stone note "<your answer>", then stone go')
             else:
