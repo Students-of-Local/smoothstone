@@ -1231,9 +1231,11 @@ def _patch_nz(mesh, faces: np.ndarray, radius: float) -> np.ndarray:
     c = mesh.triangles_center
     n = mesh.face_normals * mesh.area_faces[:, None]
     out = np.empty(len(faces))
-    for i, nb in enumerate(cKDTree(c).query_ball_point(c[faces], radius)):
-        v = n[nb].sum(0)
-        out[i] = v[2] / max(float(np.linalg.norm(v)), 1e-12)
+    tree = cKDTree(c)
+    for at in range(0, len(faces), 256):  # every face's neighbors at once took 2.4 GB on a test mesh
+        for i, nb in enumerate(tree.query_ball_point(c[faces[at:at + 256]], radius), at):
+            v = n[nb].sum(0)
+            out[i] = v[2] / max(float(np.linalg.norm(v)), 1e-12)
     return out
 
 

@@ -285,6 +285,24 @@ def test_a_neck_leaning_back_over_the_collar_is_a_wall_not_a_ledge():
     assert not C.ledge_faults(found), found
 
 
+def test_the_patch_check_on_a_fine_mesh_holds_few_neighbors_at_once():
+    """test_a_neck_leaning_back_over_the_collar_is_a_wall_not_a_ledge peaked at 3.4 GB and four workers ran the
+    suite out of memory: each face's neighbors, as a list of Python ints, were held for every face at once."""
+    import tracemalloc
+
+    x, y = np.meshgrid(np.linspace(0, 3, 41), np.linspace(0, 3, 41))
+    v = np.c_[x.ravel(), y.ravel(), np.zeros(x.size)]
+    i = np.arange(40)[:, None] * 41 + np.arange(40)
+    i = i.ravel()
+    m = trimesh.Trimesh(v, np.r_[np.c_[i, i + 1, i + 42], np.c_[i, i + 42, i + 41]], process=False)
+    m.triangles_center, m.face_normals, m.area_faces  # the mesh's own caches are not what is measured
+    tracemalloc.start()
+    up = C._patch_nz(m, np.arange(len(m.faces)), 1.0)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    assert up == pytest.approx(np.ones(3200)) and peak < 30e6, peak
+
+
 def _zoned(m, z, below, above, parts_by_zone):
     """The mesh cut level at z, a zone per face by its side, regions per zone (nothing merged), the
     region list with a part each (the largest region of a zone takes parts_by_zone[zone], the
