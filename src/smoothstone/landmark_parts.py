@@ -391,7 +391,8 @@ def read(pack, refs):
 
 
 def cut(man, openings, scale, notes):
-    """Cut the pack's openings, down to the base."""
+    """Cut the pack's openings, down to the base. One buried in solid would be a sealed cavity, so it is left out."""
+    buried = []
     for hole, width, _, guess in openings:
         if guess:
             notes.append(f"Guessed an opening: {guess}.")
@@ -399,9 +400,17 @@ def cut(man, openings, scale, notes):
             notes.append(f"Omitted detail below the print floor: an opening {width:g} m wide.")
             continue
         solid = hole(scale)
-        if (solid - man).volume() < 1e-6 * solid.volume():  # the wall was widened past it: a pocket no light gets through
+        if (solid - man).volume() < 1e-6 * solid.volume():  # the wall was widened past it, or a part covers it
             solid = hole(scale, 1.1 * THIN / scale)
+            if (solid - man).volume() < 1e-6 * solid.volume():
+                buried.append((solid, width))
+                continue
         man = man - solid
+    for solid, width in buried:  # another opening may have reached it
+        if (solid - man).volume() < 1e-6 * solid.volume():
+            notes.append(f"Left out an opening {width:g} m wide that another part covers.")
+        else:
+            man = man - solid
     return man
 
 

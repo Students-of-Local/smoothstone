@@ -7,7 +7,7 @@
     "origin": [51.17888889, -1.82611111],
     "axis": 0,
     "replace": "all",
-    "plinth": {"circle": 21},
+    "plinth": {"circle": 21, "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg", "guess": "A round of turf 1.4 m past the furthest stone of the circle. The bank, the ditch, the station stones and the Heel Stone lie outside it: with them in, a stone prints 5 mm tall."},
     "value": [
       {"kind": "prism", "id": "sarsen-1-shaft", "at": [12.614, 8.693], "ring": [[-0.952, 0.591], [-0.125, -0.872], [0.352, -0.99], [0.881, -0.853], [0.853, -0.32], [0.069, 0.91], [-0.535, 1.108], [-0.876, 0.948]], "from": -0.05, "to": 3.165, "top_scale": 0.894, "top_shift": [-0.057, 0.0], "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg", "guess": "Base, plan aspect and orientation traced from the numbered plan. Height, lean and upper taper approximate the standing stone in photographs."},
       {"kind": "prism", "id": "sarsen-1-shoulder", "at": [12.557, 8.693], "ring": [[-0.901, 0.571], [-0.064, -0.882], [0.362, -0.987], [0.831, -0.657], [0.713, -0.243], [0.012, 0.856], [-0.528, 1.033], [-0.735, 0.745]], "from": 3.14, "to": 4.02, "top_scale": 0.9400000000000001, "top_shift": [-0.014, 0.0], "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg", "guess": "Small irregular taper at the crown is approximated from photographs. The two stone sections overlap."},
@@ -119,6 +119,5 @@
       {"kind": "prism", "id": "bluestone-72", "at": [-1.013, 7.418], "ring": [[-0.254, -0.475], [0.387, -0.22], [0.475, -0.038], [0.31, 0.356], [0.173, 0.408], [-0.393, 0.206], [-0.519, -0.034], [-0.417, -0.351]], "from": -0.05, "to": 0.47, "top_scale": 0.77, "top_shift": [0.052, -0.023], "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg", "guess": "Visible bluestone traced by its numbered centre and long axis. Exposed height and taper are estimated. The print floor widens some small stones."},
       {"kind": "prism", "id": "bluestone-150", "at": [11.242, 2.614], "ring": [[-0.48, -1.054], [0.539, 0.398], [0.814, 0.929], [0.599, 1.063], [0.232, 0.728], [-0.625, -0.557], [-0.844, -1.052], [-0.6, -1.045]], "from": -0.05, "to": 0.44, "top_scale": 0.77, "top_shift": [0.052, -0.023], "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg", "guess": "Visible bluestone traced by its numbered centre and long axis. Exposed height and taper are estimated. The print floor widens some small stones."}
     ]
-  },
-  "turf_plinth_radius_m": {"value": 21, "source": "https://commons.wikimedia.org/wiki/File:Stone_Plan.jpg", "guess": "A round of turf 1.4 m past the furthest stone of the circle. The bank, the ditch, the station stones and the Heel Stone lie outside it: with them in, a stone prints 5 mm tall."}
+  }
 }
