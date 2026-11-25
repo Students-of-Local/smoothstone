@@ -165,6 +165,7 @@ def test_a_guess_is_marked_and_a_part_may_name_its_source():
     ({"kind": "prism", "circle": 0, "to": 3}, "more than 0"),
     ({"kind": "prism", "ngon": [2, 4], "to": 3}, "3 to 64"),
     ({"kind": "prism", "ring": [[0, 0], [1, 0], [2, 0]], "to": 3}, "encloses no area"),
+    ({"kind": "prism", "ring": [[0, 0], [9, 0], [9, 9], [4, -1], [0, 9]], "to": 3}, "ring crosses itself"),
     ({**BLOCK, "roof": "dome"}, "needs roof_rise"),
     ({**BLOCK, "roof_rise": 2}, "needs roof_rise"),
     ({**BLOCK, "roof": "tent", "roof_rise": 2}, "roof must be"),
@@ -490,3 +491,16 @@ def test_a_shipped_pack_s_parts_make_one_body_at_a_small_print(path):
     assert sum(d.volume() > 1e-3 for d in whole.decompose()) == 1  # less is a sliver of the join
     assert not [n for n in notes if "covers" in n]
     assert all(r["source"].startswith("http") for r in records)
+
+
+def test_each_opera_house_sail_stands_on_the_deck():
+    """Each half sail once fanned from one point 2 m under its lowest row: the sides of it printed in mid air."""
+    path = Path(landmark_refs.__file__).with_name("landmarks") / "sydney-opera-house.json"
+    pack = json.loads(path.read_text())
+    lat, lon = pack["parts"]["origin"]
+    sails = [r for r in landmark_parts.read(pack, {"latitude": lat, "longitude": lon})[0] if "-skin-" in r["id"]]
+    assert len(sails) == 100
+    for r in sails:
+        solid = m3.Manifold.batch_boolean(r["_build"](1.04, []), m3.OpType.Add)
+        foot, wall = solid.slice(12.2 * 1.04), solid.slice(14 * 1.04)
+        assert (foot ^ wall).area() > .9 * wall.area() > 0, r["id"]

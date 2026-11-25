@@ -1279,6 +1279,31 @@ print size, from the three packs judged above. A refused landmark points a tier 
 A collapsed sliver's edge is no longer welded, and no bar goes below the bed; bodies that
 meet only at a corner or across a hairline gap get a real join; the base is widened after the style's detail is added.
 
+### 2026-11-25: the Sydney Opera House, the Petronas Towers and the Dome of the Rock
+
+Three packs of reference parts by GPT-6.2 Sol, the first with lofts. Sol's weekly quota ended before it compared its own
+builds with the photographs, so only the judge has. Every attempt, one each:
+
+| spec | judged build | LFM3-1.7B, card S |
+| --- | --- | --- |
+| l10 Sydney | 398a5b3: 9, pass | 398a5b3: 9, pass |
+| l22 Petronas | 398a5b3: no verdict (Wikipedia's lead image is an SVG logo). 2c50e9d, the judge takes the first photo: 9, pass | 398a5b3: no verdict, same cause. 2c50e9d: fail, no build. 7a998dc: 9, pass |
+| l23 Dome | 398a5b3: 9, pass | 398a5b3: 9, pass |
+
+The failed Petronas run was routing: the request's name was read as "Petronas Towers to 3D print", so `stone new` named no
+landmark and the model went to the figure recipe. Earlier runs reached `stone landmark` by the model's own choice. A
+name in capitals is now read anywhere in a sentence (the figures are in PR 172).
+
+l10's height (67 m, Wikidata) and plan (183 x 118 m, New South Wales) are cited now. Not from a source: the
+Dome's porches reach 28.7 m from the centre along the door axes by the pack's choice, 51.5 m across in the smallest box, at 45 degrees. Petronas's plan is the pack's measure of the map's podium and bustles.
+
+The review found that the opera house's sails fanned from one point under their lowest row, in mid air. Each foot now runs
+straight down into the deck: `stone slice` at 0.2 mm finds 2 unsupported ledges, 24 before. Its stair starts at the
+pavement, the concert hall's portico at Petronas shows, the Dome's windows clear its porch hoods, the south hood
+stands on its columns, and a ring that crosses itself is refused. Judged once each after that: Sydney 8 (9 before; the new notes
+are on the shells' spacing and shape), Petronas 9 (the first try gave no verdict: the judge could not read the photo until
+PR 171), the Dome 9. LFM3 was not rerun. The Dome's porch roofs are 12 ledges before and after.
+
 ### 2026-11-25: openings another part covers, and four packs fixed
 
 The second review of those packs found 14 windows of Himeji's (15 came out) and 2 pockets of Golden Gate's that were sealed inside

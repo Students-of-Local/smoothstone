@@ -70,8 +70,12 @@ def _plan(part):
         _need(sides == int(sides) and 3 <= sides <= 64 and radius > 0, "ngon must be [3 to 64 sides, radius]")
         cs = m3.CrossSection.circle(float(radius), int(sides)).rotate(90 + 180 / sides)  # a flat side to the front
     else:
-        cs = _section([_points(value, "ring", 2, 3).tolist()])
+        ring = _points(value, "ring", 2, 3)
+        cs = _section([ring.tolist()])
+        x, y = ring.T
+        wound = abs(x @ np.roll(y, -1) - y @ np.roll(x, -1)) / 2  # a loop wound the other way takes area off this one
     _need(not cs.is_empty() and cs.area() > 1e-6, f"{kind} encloses no area")
+    _need(kind != "ring" or abs(cs.area() - wound) <= 1e-5 * cs.area(), "ring crosses itself")
     return cs
 
 

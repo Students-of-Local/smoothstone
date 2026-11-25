@@ -1,0 +1,31 @@
+{
+  "id": "l22_petronas_towers",
+  "request": "I need a model of the Petronas Towers to 3D print, 18 cm tall.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Petronas Towers",
+      "size": {
+        "mode": "z",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 451.9,
+        "source": "https://onlinelibrary.wiley.com/doi/10.1002/(SICI)1099-1794(199712)6:4%3C245::AID-TAL103%3E3.0.CO;2-T",
+        "why": "Street level to the top of the pinnacles"
+      },
+      "dimensions": {
+        "length": 258.5,
+        "width": 219.4,
+        "source": "https://www.openstreetmap.org/way/23034336",
+        "why": "The mapped podium and the towers' bustles, as the pack measured them."
+      }
+    }
+  },
+  "why": "The map's towers are plain extrusions: the sixteen-point plan, the setbacks, the bands, the pinnacles, the skybridge and its legs come from the pack."
+}
