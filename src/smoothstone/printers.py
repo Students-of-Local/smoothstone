@@ -224,6 +224,29 @@ def pick(rows: list[dict], p: dict | None, name: str | None = None) -> dict | No
     return rows[0] if len(rows) == 1 else None
 
 
+def live(p: dict | None) -> tuple[dict | None, str]:
+    """The paired printer's own heat now, read once: name, state and, where it says, nozzle_c, nozzle_target_c, bed_c,
+    bed_target_c and chamber_c. Or None and why not."""
+    binary = gantrel()
+    if binary is None:
+        return None, f"{GANTREL} is not installed"
+    row = pick(paired(binary), p)
+    if row is None:
+        return None, "no paired printer matches"
+    code, text = _run([binary, "status", row["name"], "--json"])
+    try:
+        got = json.loads(text) if code == 0 else None
+    except json.JSONDecodeError:
+        got = None
+    if not isinstance(got, dict):
+        return None, f"{row['name']} did not answer"
+    if got.get("state") not in ("printing", "paused"):
+        return None, f"{row['name']} is not printing"
+    ok = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 0 < v < 500  # noqa: E731
+    return {"name": row["name"], "state": got["state"],
+            **{k: float(got[k]) for k in ("nozzle_c", "nozzle_target_c", "bed_c", "bed_target_c", "chamber_c") if ok(got.get(k))}}, ""
+
+
 def how_to_connect(p: dict | None) -> list[str]:
     c = (p or {}).get("connect") or {}
     kind = c.get("gantrel_type") or "<type>"

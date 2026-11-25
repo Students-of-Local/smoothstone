@@ -31,6 +31,8 @@ physics model, not a recording. It does not print.
 - "A corner lifting is not judged" (PC, nylon, TPU): nobody has published how hard these hold a plate.
   Say the model cannot tell whether a corner lifts. --fail detach still shows one; its what-if then does
   not mean the part holds.
+- --live: at the nozzle, bed and chamber heat the paired printer is at right now. Use it when the print is running.
+  It only reads. "Live heat: ..." with a reason means it could not read it: tell them, and the rest still stands.
 - --plate dirty: a plate that needs cleaning (holds about 5% as well). Use it when they ask about
   a dirty plate or a part that came loose.
 - Always tell the person:

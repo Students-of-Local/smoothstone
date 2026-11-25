@@ -543,3 +543,35 @@ def test_a_prime_tower_is_there_for_strands_to_end_on():
     top = tp.p1[at & (tp.layer == st.L), :3]
     assert len(top) and (st.field[st.px(top)] >= inp.layer_z[st.L] - 1e-6).all()
     assert air and not air[0][st.px(top)].any()  # a strand the nozzle takes there is pressed onto it
+
+
+@pytest.mark.parametrize("said, nozzle, bed, air, note", [
+    ({"state": "printing", "nozzle_c": 211.4, "nozzle_target_c": 210, "bed_c": 55.2, "bed_target_c": 55, "chamber_c": 41}, 211.4, 55.2, 41,
+     "live heat from k2 (printing), in place of the print's own: nozzle 211 C (set to 210 C), bed 55 C (set to 55 C), chamber 41 C"),
+    ({"state": "printing", "nozzle_c": 190, "nozzle_target_c": 220}, 190, None, 35, "its nozzle is 30 C under what it is set to"),
+    ({"state": "paused", "nozzle_c": 60, "nozzle_target_c": 0, "bed_c": 50}, 220, 50, 35, "60 C is too cold for PLA to flow; its set heat, 220 C, is used"),
+    ({"state": "idle", "nozzle_c": 25, "bed_c": 25}, 220, None, 35, "live heat: k2 is not printing"),
+    ({"state": "printing", "nozzle_c": "hot", "bed_c": True, "chamber_c": -40}, 220, None, 35, "in place of the print's own: none given"),
+    (None, 220, None, 35, "live heat: k2 did not answer")])
+def test_the_printers_own_heat_now(monkeypatch, said, nozzle, bed, air, note):
+    calls = []
+
+    def fake(argv, timeout=60):
+        calls.append(argv[1])
+        if argv[1] == "list":
+            return 0, json.dumps({"printers": [{"name": "k2", "model": "creality-k2"}]})
+        return (0, json.dumps({**said, "next": "x"})) if said else (1, "no route to host")
+
+    monkeypatch.setattr(printers, "gantrel", lambda: "/fake/gantrel-printer")
+    monkeypatch.setattr(printers, "_run", fake)
+    base = failsim.Inputs([], 0.2, material=failsim.material("PLA"))
+    failvideo.leaving(base)
+    inp = failvideo.live(base, printers.get("creality_k2"))
+    assert (inp.material.nozzle, inp.bed, inp.air) == (nozzle, bed, air) and any(note in n for n in inp.notes), inp.notes
+    assert calls == ["list", "status"]  # it only reads
+    if nozzle != 220:
+        assert inp.material.out < nozzle  # the melt is that hotend's
+    assert [n for n in inp.notes if n.startswith("the melt leaves")] == [
+        f"the melt leaves the nozzle at {inp.material.out:.0f} C, set to {inp.material.nozzle:.0f} C"]  # said once, of that heat
+    monkeypatch.setattr(printers, "gantrel", lambda: None)
+    assert "not installed" in failvideo.live(failsim.Inputs([], 0.2), printers.get("creality_k2")).notes[0]

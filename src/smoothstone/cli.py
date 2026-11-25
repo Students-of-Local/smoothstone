@@ -3437,6 +3437,7 @@ def make_parser() -> Parser:
                    help="the print failing as physics says (a model): auto, or a what-if: supports, detach, droop, bridge")
     s.add_argument("--plate", choices=("clean", "dirty"), default="clean", help="for --fail: the plate's state")
     s.add_argument("--material", help="for --fail: PLA, PETG, ABS, ASA, PC, PA (nylon), TPU, PLA-CF or PETG-CF; default: the file's or the job's")
+    s.add_argument("--live", action="store_true", help="for --fail: at the heat the paired printer is at now (read only)")
 
     s = sub.add_parser("image", parents=[common], help="turn a picture into silhouette and height map")
     s.add_argument("path")
