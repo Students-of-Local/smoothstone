@@ -405,8 +405,37 @@ def test_a_print_that_outruns_the_hotend_says_so():
     box = _box((20, 20, 4), (0, 0, 0))
     ok, fast = (failvideo.inputs(_toolpath(box, m), "PLA") for m in ("PLA", None))  # None: the K2's speeds, uncapped
     said = [[n for n in i.notes if "asks the hotend" in n] for i in (ok, fast)]
-    assert not said[0] and "lets it melt 14 of PLA" in said[1][0]
-    assert fast.material.out <= ok.material.out < ok.material.nozzle  # the faster the cooler
+    assert not said[0] and "the K2 profile lets it melt 14 of PLA" in said[1][0]
+    slow = failvideo.inputs(_toolpath(box, "TPU"), "PLA")  # at most 2 mm3/s
+    assert fast.flow > ok.flow > slow.flow and slow.material.out > ok.material.out and slow.material.nozzle > slow.material.out
+    assert f"the melt leaves the nozzle at {ok.material.out:.0f} C, set to 220 C, at {ok.flow:.1f} mm3/s" in ok.notes
+    tp = _toolpath(box)
+    tp.feature[tp.feature == timelapse.gcode.FEATURES.index("inner wall")] = timelapse.gcode.FEATURES.index("outer wall")
+    assert failvideo.inputs(tp, "PLA").material.out == ok.material.out  # by what it lays, whatever the lines are called
+    tp.run = np.full((tp.n, 5), np.nan)
+    tp.run[:, 2] = 150
+    cold = failvideo.inputs(tp, "PA")
+    assert cold.material.out == 153 and any("too cold for PA, which sets at 148 C" in n for n in cold.notes)
+
+
+def test_a_strand_leaves_at_its_own_flows_heat():
+    tp, inp, fail, _ = _story(_t())
+    st = failvideo.Story(tp, inp, fail, (1, 1, 1), (250, 250))
+    st.flows = st.flows / 4
+    hot, make = [], failvideo.strand.Strand
+    st_mod = failvideo.strand
+
+    class Seen(make):
+        def __init__(self, *a, **k):
+            hot.append(k.get("temp"))
+            super().__init__(*a, **k)
+
+    st_mod.Strand = Seen
+    try:
+        st.run(st.L)
+    finally:
+        st_mod.Strand = make
+    assert hot[0] == pytest.approx(failsim.melt_c(inp.material, 3), abs=0.1) and hot[0] > inp.material.out + 3
 
 
 def test_a_skirt_is_not_the_part_and_stays_when_it_goes():

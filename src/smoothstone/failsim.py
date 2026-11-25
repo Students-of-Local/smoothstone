@@ -74,6 +74,7 @@ class Material:
     stand_ins: tuple = ()  # data borrowed from another plastic, said out loud
     source: str = ""
     max_flow: float = math.inf  # mm3/s its slicer profile lets the hotend melt
+    hotend: float = math.inf  # mm3/s of PLA that hotend melts
     leaves: float | None = None  # C it leaves the nozzle at, default the nozzle's heat
 
     @property
@@ -139,7 +140,7 @@ def material(name: str = "PLA", printer: str = "creality_k2") -> Material:
     ours = fact(k2) if "failsim." + k2 in facts() else {}
     heat = ours if ours and printer == "creality_k2" else printers.settings(printers.get(printer), m) or ours
     air = heat.get("chamber", fact("k2_air"))
-    melts = heat.get("max_flow") or printers.settings(printers.get("creality_k2"), m)["max_flow"]
+    most, hotend = (printers.settings(printers.get(printer), x)["max_flow"] for x in (m, "PLA"))
     solid, cp = _own(m, "set") or tg, fact("pla.cp")
     k = _own(m, "k")
     if base == "ABS":  # average cp from Tg to the nozzle on Bhandari's table, and k up to Tg
@@ -167,7 +168,7 @@ def material(name: str = "PLA", printer: str = "creality_k2") -> Material:
               if "assumption" in p[key]]
     return Material(m, p["density"]["value"], tg, p["cte"]["value"] * 1e-6, p["e_xy"]["value"],
                     tuple(map(tuple, curve)), p["tensile_z"]["value"], cp, k, fact("peel." + base.lower()) if base in fact("peel_bed") else None,
-                    fact("peel_bed").get(base), solid, heat["bed"], air, heat["nozzle"], tuple(dict.fromkeys(stand)), src, melts)
+                    fact("peel_bed").get(base), solid, heat["bed"], air, heat["nozzle"], tuple(dict.fromkeys(stand)), src, most, hotend)
 
 
 def _mat(m) -> Material:
@@ -472,12 +473,13 @@ def edge_stress(mat, temps, layer: float = 0.2, band: float = math.inf, bed: flo
 
 
 def melt_c(mat, flow: float) -> float:
-    """C the plastic leaves the nozzle at, flow mm3/s: less than the nozzle is set to, and less the faster it goes through."""
+    """C the plastic leaves the nozzle at, flow mm3/s: less than the nozzle is set to, and less the faster it goes through. Never
+    colder than 5 C over where it sets: colder is no print, and the model says so."""
     m, q, room = _mat(mat), fact("melt_exit"), fact("room_air")
     c = q[like(m.name) if like(m.name) in q else "PETG"]
-    set_, f = np.clip(m.nozzle, *c["set_c"]), np.clip(flow / m.max_flow * q["flow"][1], *q["flow"])
+    set_, f = np.clip(m.nozzle, *c["set_c"]), np.clip(flow / m.hotend * q["flow"][1], *q["flow"])
     out = c["1"] + c["T"] * set_ + c["Q"] * f + c["QQ"] * f * f + c["TQ"] * set_ * f
-    return float(room + (out - room) / (set_ - room) * (m.nozzle - room))
+    return max(float(room + (out - room) / (set_ - room) * (m.nozzle - room)), m.set + 5)
 
 
 def nozzle_drag(mat="PLA", speed_mm_s: float | None = None, layer: float = 0.2) -> float:
@@ -577,6 +579,7 @@ class Inputs:
     brim: np.ndarray | None = None  # what is printed round the first layer and holds it, as a mask
     speed: float | None = None  # mm/s, default the process's inner wall
     width: float | None = None  # mm, default the process's outer wall
+    flow: float | None = None  # mm3/s, the mean over the part's lines, default its walls
     process: dict | None = None  # the printer's (printers.process), default the K2 profile's
     drag: float | None = None  # N, a push to use instead of the nozzle's drag
     notes: list = field(default_factory=list)
@@ -609,14 +612,14 @@ def run(inp: Inputs) -> tuple[float, float]:
     than the hotend melts."""
     got = inp.process or {"widths": fact("k2_widths"), "speeds": fact("k2_speeds")}
     width = inp.width or got["widths"]["outer_wall"]
-    return width, inp.speed or min(got["speeds"]["inner_wall"], _mat(inp.material).max_flow / (width * inp.layer))
+    return width, inp.speed or min(got["speeds"]["inner_wall"], _mat(inp.material).max_flow / _bead(width, inp.layer)[0])
 
 
 def leaving(inp: Inputs) -> Material:
-    """Its plastic, at the heat it leaves the nozzle with as its walls are printed."""
+    """Its plastic, at the heat it leaves the nozzle with at the print's own flow, else as its walls are printed."""
     width, speed = run(inp)
     m = _mat(inp.material)
-    return replace(m, leaves=melt_c(m, width * inp.layer * speed))
+    return replace(m, leaves=melt_c(m, inp.flow or _bead(width, inp.layer)[0] * speed))
 
 
 def _times(inp: Inputs, width: float, speed: float) -> np.ndarray:

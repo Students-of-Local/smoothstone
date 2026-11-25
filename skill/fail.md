@@ -24,7 +24,7 @@ physics model, not a recording. It does not print.
   profile for that plastic; walls and solid layers are the profile's. No printer set: it is a K2's. Ask which printer, then
   stone printer set <id> (or --printer <id>).
 - The melt leaves the nozzle cooler than it is set to, more so when printing fast, as measured on one hotend. "This
-  print asks the hotend for ... mm3/s": it prints faster than that hotend melts. Tell them to slow down or print hotter.
+  print asks the hotend for ... mm3/s": faster than that printer's profile lets its hotend melt. Tell them to slow down.
 - "PLA is assumed": ask what plastic it is, then add --material (PETG, ABS, ASA, PC, PA for nylon, TPU,
   PLA-CF or PETG-CF). "No numbers for HIPS, so this is PLA's": tell them the video is
   that plastic's (the line names it), not theirs.
@@ -51,6 +51,7 @@ stone timelapse t.stl --supports off --fail ->
   Material: PLA is assumed; say --material PETG, ABS, ASA, PC, PA, TPU, PLA-CF or PETG-CF.
   This print's own settings: inner wall 172 mm/s, line 0.42 mm.
   The K2 profile's, not the print's own: bed, nozzle, fan, infill, chamber (fan 100%).
+  The melt leaves the nozzle at 191 C, set to 220 C, at 7.9 mm3/s.
   Predicted: supports at layer 21 (z 4.2 mm, 20 s in): lines with nothing under them print into
   air and fall (spaghetti).
   Why: ledge 12.0 mm past the layer below droops 11.654 mm.
@@ -59,17 +60,17 @@ stone timelapse t.stl --supports off --fail ->
   Video: .../t.stl-timelapse/fail.mp4 (32 frames, 4.0 s; from layer 21 on: the model, closer in,
   only the nozzle drawn)
   Strand: 0.48 mm thick, it leaves the nozzle at 56.4 mm/s while the nozzle moves at 120.1. Pulling
-  it that fast takes 13.71 mN; 100 mm of it on the plate holds 0.11 mN, so the hotend drags it along
+  it that fast takes 11.47 mN; 100 mm of it on the plate holds 0.11 mN, so the hotend drags it along
   until something holds it.
-  Air and heat: it falls at 2.3 m/s at most, and sets in 7.41 s (1.03 s in the fan's air). The
-  nozzle's tip carries 8.6 mm3.
+  Air and heat: it falls at 2.3 m/s at most, and sets in 7.54 s (1.05 s in the fan's air). The
+  nozzle's tip carries 8.5 mm3.
   Sheet: .../t.stl-timelapse/fail_sheet.png
   Data: .../t.stl-timelapse/fail.json (31 s)
   NEXT: ask the person: the model says this print fails (supports); print it with supports, or the
   part turned over?
 Reply: Here is a model of it (fail.mp4), not a real recording. Without supports, the arms of the
-T start at layer 21 (4.2 mm up) with nothing under them. Those lines fall to the bed, and the
-hotend drags them along into spaghetti, because the plate holds them less than it takes to pull
+T start at layer 21 (4.2 mm up) with nothing under them. Those lines sag and fall, some to the bed, and
+the hotend drags them along into spaghetti, because the plate holds them less than it takes to pull
 them thin. Shall I print it with supports on, or turned upside down? (I took it as PLA.)
 
 Request: My plate was dirty. Show me the plate coming loose.
@@ -79,7 +80,7 @@ stone timelapse plate.stl --fail --plate dirty ->
   Why: edge pull 2.69 MPa against a plate bond of 1.52 MPa (margin 0.56).
   Main assumption: A contaminated plate keeps the same fraction of its hold as PP keeps of
   PLA's on a clean plate. (failsim.contamination)
-  Limit: 294 s of printing into air is not drawn: the video follows 60 s of it, the start of each
+  Limit: 375 s of printing into air is not drawn: the video follows 60 s of it, the start of each
   layer.
   NEXT: ask the person: the model says this print fails (detach); print it with a clean plate and a
   brim?
