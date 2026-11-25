@@ -761,12 +761,12 @@ def check_part(path: str, bed, bodies: int = 1) -> list[dict]:
 def export(mesh, path: Path) -> tuple[object, np.ndarray, bool]:
     """Write the part as a slicer will read it (float32, closed, no zero-area faces), its lowest
     corner at the origin. Returns the mesh written and the shift that put it there."""
-    from . import clean
+    from . import landmark
 
     broken = False
-    try:
-        m = clean.for_slicer(mesh)
-    except ValueError:  # solids that only touch keep edges a slicer calls broken (LOG.md, models 1)
+    try:  # edges where solids only touch are welded (LOG.md, models 1)
+        m = landmark._closed(to_manifold(mesh), mesh, [])
+    except ValueError:
         m, broken = mesh.copy(), True
     shift = -np.asarray(m.bounds[0], float)
     m.apply_translation(shift)
