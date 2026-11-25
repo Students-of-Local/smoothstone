@@ -418,8 +418,10 @@ def _body(selected, parts, boundary):
     from .landmark import length
     walls = length(selected['tags'].get('height'))
     tops = [length(p['tags'].get('height')) or 0 for p in parts]
-    standing = [p for p in parts if not length(p['tags'].get('min_height')) and not length(p['tags'].get('building:min_level'))]
-    return [selected] if walls and max(tops, default=0) > walls and _share(standing, boundary) < .5 else []
+    # Parts well under the top of the walls are the building itself, though they hang in the air as the Atomium's do.
+    low = [p for p in parts if (length(p['tags'].get('min_height')) or 0) < .75 * walls
+           and (p['tags'].get('min_height') or not length(p['tags'].get('building:min_level')))] if walls else []
+    return [selected] if walls and max(tops, default=0) > walls and _share(low, boundary) < .5 else []
 
 
 def _site(site, candidates, pieces, data):
