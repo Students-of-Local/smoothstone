@@ -67,7 +67,11 @@ class Out:
         if self.raw is not None:
             return self.raw
         body = [ln for ln in self.lines if ln is not None]
-        room = MAX_LINES - 1
+        reply = []
+        if self.next.startswith(LANDMARK_ASK):  # a small model loses the thread working out how to ask
+            said = self.next.removeprefix("ask the person: ").removesuffix(THEN_NOTE)
+            reply = [f'Reply with just this and no tool call: "{said[0].upper()}{said[1:]}"']
+        room = MAX_LINES - 1 - len(reply)
         passes = [ln for ln in body if ln.startswith("PASS ")]
         if len(body) > room and len(passes) > 1:
             # a passing check asks for nothing; the lines after the checks (the STL, the views)
@@ -83,7 +87,7 @@ class Out:
             rest = [i for i in range(len(body)) if i not in set(must)]
             keep = sorted(must + rest[: room - 1 - len(must)])
             body = [body[i] for i in keep] + [f"({len(body) - len(keep)} more lines in log.txt)"]
-        return "\n".join(body + [f"NEXT: {self.next}"] + self.after)
+        return "\n".join(body + reply + [f"NEXT: {self.next}"] + self.after)
 
 
 class UsageError(Exception):
@@ -1897,6 +1901,14 @@ def cmd_note(args, job: Job) -> Out:
     if st.get("ask_product") and asked.startswith("stone note"):
         # a set with sizes sent the model here: the job still waits on the person's answer to this question
         asked = f"ask the person: {match.product_size_question(st['ask_product'], bool(st.get('ask_round')))}"
+    plain = st.get("landmark_plain") or {}
+    if plain and asked == _ask_plain(plain["subject"]) and (YES.match(text) or NO.match(text)):
+        yes = bool(YES.match(text))
+        out.add(f"Noted ({len(job.add_note(text))} notes): {text}")
+        job.update(landmark_plain={**plain, "yes": yes})
+        out.owns_next = True
+        out.next = plain["command"] if yes else _ask_file(plain["subject"])
+        return out
     if asked.startswith("ask the person") and is_the_question(text, asked):
         out.fix("that is your question, not the person's answer; write the question as your reply and stop")
         out.add("Note only what the person says back.")
@@ -1915,11 +1927,6 @@ def cmd_note(args, job: Job) -> Out:
             f.write(f"\nAnswer: {text}\n")
         out.owns_next = True
         out.next = f"stone show {st['ask_recipe']}"
-        return out
-    plain = st.get("landmark_plain") or {}
-    if plain and asked == _ask_plain(plain["subject"], plain["command"]) :
-        out.owns_next = True
-        out.next = plain["command"] if YES.match(text) else ASK_FILE if NO.match(text) else asked
         return out
     if st.get("ask_then") and asked == st.get("ask_then_q"):
         # only the coupon question's answer calibrates; "later, carry on" drops the question instead
@@ -2268,13 +2275,18 @@ def models_route(out: Out, subject: str, request: str = "") -> Out:
     return out
 
 
-def _ask_plain(subject: str, command: str) -> str:
-    return (f"ask the person: no open model of {subject} prints, and the map has it only as one plain shape, like a "
-            f"box or a cylinder, without its real form. Print that plain shape? When they say yes: {command}")
+LANDMARK_ASK = "ask the person: no open model of "
+THEN_NOTE = ' When they answer: stone note "<their answer>"'
 
 
-ASK_FILE = ("ask the person: neither the landmark references nor an open model produced a printable part. "
-            'Do you have a model file, or another name? When they answer: stone note "<their answer>"')
+def _ask_plain(subject: str) -> str:
+    return (f"{LANDMARK_ASK}{subject} prints, and the map has it only as one plain shape, like a box or a cylinder, "
+            f"without its real form. Print that plain shape?{THEN_NOTE}")
+
+
+def _ask_file(subject: str) -> str:
+    return (f"{LANDMARK_ASK}{subject} prints, and the map gives no printable shape of it. "
+            f"Do you have a model file, or another name?{THEN_NOTE}")
 
 
 def _landmark_fallback(job: Job, subject: str) -> str:
@@ -2283,9 +2295,9 @@ def _landmark_fallback(job: Job, subject: str) -> str:
     attempted = str(status.get("landmark_attempted") or "")
     plain = status.get("landmark_plain") or {}
     if str(plain.get("subject") or "").casefold() == subject.casefold():
-        return _ask_plain(subject, plain["command"])
+        return _ask_plain(subject)
     if attempted.casefold() == subject.casefold():
-        return ASK_FILE
+        return _ask_file(subject)
     return _landmark_command("stone landmark", subject)
 
 
@@ -2327,6 +2339,14 @@ def cmd_landmark(args, job: Job) -> Out:
     size = args.size
     if size is None:
         size = target if target["mode"] != "fit" or target.get("bed_said") else min(200.0, *bed)
+    st = job.status()
+    waits = st.get("landmark_plain") or {}
+    if args.plain and waits and not waits.get("yes") and waits["subject"].casefold() == subject.casefold():
+        out.fix("the person has not said yes to the plain shape")
+        out.next = (_ask_plain(subject) if str(st.get("models_out") or "").casefold() == subject.casefold()
+                    else _landmark_command("stone models", subject))
+        out.result = "plain shape refused: not asked"
+        return out
     job.update(landmark_attempted=subject, landmark_plain=None)
     progress(job, f"building {subject} from landmark references")
     try:
@@ -2340,7 +2360,7 @@ def cmd_landmark(args, job: Job) -> Out:
             command = shlex.join(["stone", "landmark", subject, *chosen, "--plain"])
             job.update(landmark_plain={"subject": subject, "command": command})
             out_of_models = str(job.status().get("models_out") or "").casefold() == subject.casefold()
-            command = _ask_plain(subject, command) if out_of_models else None  # the open models come first
+            command = _ask_plain(subject) if out_of_models else None  # the open models come first
         if not isinstance(e, landmark.LandmarkProblem):
             job.log("landmark failed:\n" + traceback.format_exc())
             e = landmark.LandmarkProblem(f"building {subject} from references failed ({type(e).__name__}: {e})")

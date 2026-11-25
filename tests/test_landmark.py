@@ -1151,14 +1151,20 @@ def test_one_plain_shape_is_built_only_after_the_open_models_are_out(recorded, m
     for size in ([], ["--size", "120"]):  # asking again is no permission
         text, last = run("landmark", "Taj Mahal", *size)
         assert "one plain shape" in text and last == "NEXT: stone models 'Taj Mahal'"
-    asked = run("models", "Taj Mahal")[1]
-    assert asked.startswith("NEXT: ask the person: no open model of Taj Mahal prints") and "box or a cylinder" in asked
-    question, command = asked.split(" When they say yes: ")
-    assert question.endswith("?") and command == "stone landmark 'Taj Mahal' --size 120.0 --plain"
+    plain = ("landmark", "Taj Mahal", "--size", "120.0", "--plain")
+    assert run(*plain)[1] == "NEXT: stone models 'Taj Mahal'"
+    text, asked = run("models", "Taj Mahal")
+    question = "o open model of Taj Mahal prints, and the map has it only as one plain shape, like a box or a cylinder, " \
+               "without its real form. Print that plain shape?"
+    assert asked == f'NEXT: ask the person: n{question} When they answer: stone note "<their answer>"'
+    assert f'Reply with just this and no tool call: "N{question}"' in text
+    text, last = run(*plain)
+    assert "has not said yes" in text and last == asked  # LFM3-1.7B built it unasked, and called it the real form
     assert run("note", "how tall would it be?")[1] == asked
-    assert run("note", "Yes, print it")[1] == f"NEXT: {command}"  # an answer noted first still leads on
-    assert run("models", "Taj Mahal")[1] == asked
     assert "Do you have a model file" in run("note", "no thanks")[1]
+    assert run("models", "Taj Mahal")[1] == asked
+    assert run("note", "Yes, print that plain shape")[1] == "NEXT: " + shlex.join(["stone", *plain])
+    command = "stone landmark 'Taj Mahal' --size 120.0 --plain"
     text, last = run(*shlex.split(command)[1:])
     assert "NOTE, tell the person: the map has Taj Mahal as one plain shape" in text and "Part ready" in text
     assert "Size: 120 mm" in text
@@ -1173,7 +1179,7 @@ def test_a_plain_shape_after_the_models_is_not_sent_back_to_them(recorded, monke
     cli.run(["new", "Find me an open model of the Taj Mahal, 12 cm tall"])
     assert cli.run(["models", "Taj Mahal"])[0].splitlines()[-1] == "NEXT: stone landmark 'Taj Mahal'"
     last = cli.run(["landmark", "Taj Mahal"])[0].splitlines()[-1]
-    assert last.startswith("NEXT: ask the person") and last.endswith("yes: stone landmark 'Taj Mahal' --plain")
+    assert last.startswith("NEXT: ask the person") and "Print that plain shape?" in last
 
 
 def test_one_tower_on_a_wide_plan_is_not_the_building(recorded, monkeypatch, tmp_path):
