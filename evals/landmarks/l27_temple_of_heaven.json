@@ -1,0 +1,31 @@
+{
+  "id": "l27_temple_of_heaven",
+  "request": "Can you make the Temple of Heaven in Beijing as a 3D print, 18 cm across?",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Temple of Heaven",
+      "size": {
+        "mode": "long",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 38.2,
+        "source": "https://whc.unesco.org/uploads/nominations/881.pdf",
+        "why": "The Hall of Prayer for Good Harvests, the part people mean, to the top of its finial."
+      },
+      "dimensions": {
+        "length": 90,
+        "width": 90,
+        "source": "https://whc.unesco.org/uploads/nominations/881.pdf",
+        "why": "The three round terraces' base, 90 m across, is the widest thing on it."
+      }
+    }
+  },
+  "why": "Wikidata's Temple of Heaven is the whole park and the map has the hall as one 28 m drum: the three terraces, the stairs, the columns and the three round roofs come from the pack."
+}

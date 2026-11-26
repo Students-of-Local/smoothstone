@@ -1,0 +1,31 @@
+{
+  "id": "l28_rialto_bridge",
+  "request": "I'd like a 3D print of the Rialto Bridge in Venice, 18 cm long.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Rialto Bridge",
+      "size": {
+        "mode": "long",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 16.8,
+        "source": "https://ordineingegnerivenezia.org/wp-content/uploads/2025/06/ing.-andrea-marascalchi-ponte-di-rialto-e-ca-da-mosto-venezia-ordine-ingegneri-venezia.pdf#page=18",
+        "why": "The central portico's top over mean water. The survey gives the arch's 6.92 m clearance; the portico's height over it is the pack's, so this holds the print to the pack. Wikidata's 6.7 m is the clearance."
+      },
+      "dimensions": {
+        "length": 47.61,
+        "width": 22.91,
+        "source": "https://www.openstreetmap.org/relation/2289364",
+        "why": "The smallest rectangle round the bridge's mapped outline; the Venice tourist office gives 48 x 22 m."
+      }
+    }
+  },
+  "why": "The map's bridge has no arch: the open vault, the ramps, the two rows of shops and the central portico come from the pack."
+}
