@@ -124,6 +124,8 @@ card: read it when the question comes up, run the command, tell the person what 
 These are models, checked against hand numbers and slicers, not against this person's printer. Pass on
 the limits they print.
 
+To edit the part in CAD, `stone export` writes an editable STEP and a SolidCraft design beside the STL.
+
 ## When a print fails
 
 Follow doctor.md: `stone doctor "<what the print looks like>"`, with `--image photo.jpg` for a photo or
