@@ -11,7 +11,7 @@ from test_cli import stone
 
 # A stand-in solidcraft-cli: `run` writes the STEP and the design holding the STL's volume times
 # FAKE_SCALE, `eval` reads it back; FAKE_MODE=fail exits 1 with stderr, FAKE_MODE=hang sleeps,
-# FAKE_MODE=nowrite answers as if it worked and writes nothing.
+# FAKE_MODE=nowrite answers as if it worked and writes nothing, FAKE_MODE=nosave writes no design.
 FAKE = """#!{py}
 import json, os, sys, time
 import trimesh
@@ -26,7 +26,7 @@ if sys.argv[1] == "run":
     cmds = json.load(open(sys.argv[2]))["commands"]
     v = trimesh.load(cmds[0]["params"]["path"], force="mesh").volume * float(os.environ.get("FAKE_SCALE", "1"))
     outs = [c["params"]["path"] for c in cmds if c["command"] == "file.export_step"]
-    if "--save" in sys.argv:
+    if "--save" in sys.argv and mode != "nosave":
         outs.append(sys.argv[sys.argv.index("--save") + 1])
     for o in outs if mode != "nowrite" else []:
         open(o, "w").write(json.dumps({{"v": v}}))
@@ -109,6 +109,20 @@ def test_export_ignores_an_earlier_export(jobenv, fake_cli, monkeypatch):
     monkeypatch.setenv("FAKE_MODE", "nowrite")
     text, code, _ = stone("export")
     assert code == 1 and "FIX: SolidCraft wrote no fake_hook.step" in text and "STEP:" not in text
+
+
+def test_export_step_keeps_the_persons_design(jobenv, fake_cli):
+    job = built_job(jobenv)
+    (job / "fake_hook.sc").write_text("edited in SolidCraft")
+    assert stone("export", "--format", "step")[1] == 0
+    assert (job / "fake_hook.sc").read_text() == "edited in SolidCraft"
+
+
+def test_export_needs_the_design_too(jobenv, fake_cli, monkeypatch):
+    built_job(jobenv)
+    monkeypatch.setenv("FAKE_MODE", "nosave")
+    text, code, _ = stone("export")
+    assert code == 1 and "FIX: SolidCraft wrote no fake_hook.sc" in text and "STEP:" not in text
 
 
 def test_export_refuses_a_volume_that_drifted(jobenv, fake_cli, monkeypatch):

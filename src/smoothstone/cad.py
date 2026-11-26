@@ -73,16 +73,18 @@ def export_one(exe: str, job, stl: Path, name: str, fmt: str) -> dict:
             {"command": "mesh.convert", "params": {"body": stl.stem}}]
     if fmt in ("step", "both"):
         cmds.append({"command": "file.export_step", "params": {"path": str(step)}})
-    for f in (step, design):
-        f.unlink(missing_ok=True)  # an earlier export's file must not pass for this one
+    writes = [f for f, on in ((step, fmt in ("step", "both")), (design, fmt in ("sc", "both"))) if on]
+    for f in writes:
+        f.unlink(missing_ok=True)  # an earlier export's file must not pass for this one; others stay
     script = job.build_dir / f"solidcraft_{name}.json"
     write_json(script, {"commands": cmds})
     log = job.build_dir / "solidcraft.log"
     run = [exe, "run", str(script), "--results"] + (["--save", str(design)] if fmt in ("sc", "both") else [])
     _call(run, log)
-    target = step if fmt in ("step", "both") else design
-    if not target.is_file():
-        raise Failed(f"SolidCraft wrote no {target.name} (log: {log})")
+    missing = [f for f in writes if not f.is_file()]
+    if missing:
+        raise Failed(f"SolidCraft wrote no {missing[0].name} (log: {log})")
+    target = writes[0]
     try:
         ev = json.loads(_call([exe, "eval", str(target)], log))
         bodies, vol = ev["bodies"], float(ev["total"]["volume_mm3"])
