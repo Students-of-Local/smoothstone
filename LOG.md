@@ -1434,11 +1434,11 @@ cone and a block with no arch. Sol compared each build with two photographs. LFM
 | spec | first attempt | after fixes |
 | --- | --- | --- |
 | l26 Cape Hatteras | 8, fail: the spec's plan size took in the entry steps | spec measures the base alone: 8, pass |
-| l27 Temple of Heaven | 7, fail: side stairs at uneven angles, H/length 4% off | stairs parallel beside the central ones: ratios pass, 7, open |
+| l27 Temple of Heaven | 7, fail: side stairs at uneven angles, H/length 4% off | stairs parallel beside the central ones, balustrades re-cut to open at them: ratios pass, 7, open |
 | l28 Rialto | 7, open | not rerun |
 
 Sol named the Temple's pack for the Hall of Prayer for Good Harvests, which "Temple of Heaven" did not find; it is
 temple-of-heaven.json now, so the hall's own name finds no pack. Not from a source: Cape Hatteras's base width (HABS gives
 the shaft only; the map draws a rough 15 m circle) and the Rialto portico's top, 16.8 m. Both specs hold the print to the
 pack there. Open, from the judge: Rialto's shop faces need their run of arched openings and a taller central portico; the
-Temple's roofs need more overhang and its terraces their balustrades; Cape Hatteras's daymark reads as thin grooves.
+Temple's roofs need more overhang, and the hall reads small on its terrace (the terrace is the cited 90 m); Cape Hatteras's daymark reads as thin grooves.
