@@ -1506,6 +1506,16 @@ def cmd_supports(args, job: Job) -> Out:
     return supports.cmd(args, job, Out(owns_next=False))
 
 
+def cmd_export(args, job: Job) -> Out:
+    """The built part as an editable STEP and SolidCraft design for CAD (cad.py)."""
+    from . import cad
+
+    out = Out(owns_next=False)
+    if not need_job(job, out):
+        return out
+    return cad.cmd(args, job, out)
+
+
 def cmd_timelapse(args, job: Job) -> Out:
     """The printer's own timelapse of this print, predicted (timelapse.py)."""
     from . import timelapse
@@ -3610,6 +3620,8 @@ def make_parser() -> Parser:
     s.add_argument("items", nargs="*")
 
     sub.add_parser("done", parents=[common], help="finish the job")
+    s = sub.add_parser("export", parents=[common], help="the part as an editable STEP and SolidCraft design for CAD")
+    s.add_argument("--format", choices=("step", "sc", "both"), default="both")
 
     s = sub.add_parser("colors", parents=[common], help="color regions, then a painted 3MF: stone colors 1=black rest=white")
     s.add_argument("items", nargs="*")
@@ -3683,6 +3695,7 @@ COMMANDS = {
     "strength": cmd_strength,
     "heat": cmd_heat,
     "done": cmd_done,
+    "export": cmd_export,
     "colors": cmd_colors,
     "video": cmd_video,
     "models": cmd_models,
@@ -3744,7 +3757,7 @@ def _fallback_next(job: Job, argv: list[str]) -> str:
     return "stone build" if job.plan() else "stone recipes"
 
 
-LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "fit", "doctor", "usage", "error", "supports", "timelapse")  # commands that change no build
+LOOK_ONLY = ("recipes", "show", "check", "note", "refs", "printer", "fit", "doctor", "usage", "error", "supports", "timelapse", "export")  # commands that change no build
 
 
 def _fail_key(cmdline: str, out: Out) -> str | None:
