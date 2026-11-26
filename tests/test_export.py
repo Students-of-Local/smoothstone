@@ -10,7 +10,8 @@ from smoothstone import cad
 from test_cli import stone
 
 # A stand-in solidcraft-cli: `run` writes the STEP and the design holding the STL's volume times
-# FAKE_SCALE, `eval` reads it back; FAKE_MODE=fail exits 1 with stderr, FAKE_MODE=hang sleeps.
+# FAKE_SCALE, `eval` reads it back; FAKE_MODE=fail exits 1 with stderr, FAKE_MODE=hang sleeps,
+# FAKE_MODE=nowrite answers as if it worked and writes nothing.
 FAKE = """#!{py}
 import json, os, sys, time
 import trimesh
@@ -27,7 +28,7 @@ if sys.argv[1] == "run":
     outs = [c["params"]["path"] for c in cmds if c["command"] == "file.export_step"]
     if "--save" in sys.argv:
         outs.append(sys.argv[sys.argv.index("--save") + 1])
-    for o in outs:
+    for o in outs if mode != "nowrite" else []:
         open(o, "w").write(json.dumps({{"v": v}}))
     print(json.dumps([{{}} for _ in cmds]))
 elif sys.argv[1] == "eval":
@@ -100,6 +101,14 @@ def test_export_names_the_cli_error(jobenv, fake_cli, monkeypatch):
     assert code == 1
     assert "FIX: SolidCraft failed: error: mesh.convert: the mesh is not closed" in text
     assert str(job / "build" / "solidcraft.log") in text and "STEP:" not in text
+
+
+def test_export_ignores_an_earlier_export(jobenv, fake_cli, monkeypatch):
+    built_job(jobenv)
+    assert stone("export")[1] == 0
+    monkeypatch.setenv("FAKE_MODE", "nowrite")
+    text, code, _ = stone("export")
+    assert code == 1 and "FIX: SolidCraft wrote no fake_hook.step" in text and "STEP:" not in text
 
 
 def test_export_refuses_a_volume_that_drifted(jobenv, fake_cli, monkeypatch):

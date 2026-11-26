@@ -32,18 +32,6 @@ def find_cli() -> str | None:
     return next((p for p in FALLBACKS if Path(p).is_file()), None)
 
 
-def version() -> str | None:
-    """`solidcraft-cli --version`, or None when it is not installed or does not answer."""
-    exe = find_cli()
-    if not exe:
-        return None
-    try:
-        r = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return (r.stdout.strip() or r.stderr.strip()).splitlines()[0] if r.returncode == 0 else None
-
-
 def parts(job) -> list[tuple[Path, str]]:
     """The job's built parts as (STL, name): a recipe build's part, or every part of a fitted model."""
     data = read_json(job.build_dir / "model" / "parts.json") or {}
@@ -85,6 +73,8 @@ def export_one(exe: str, job, stl: Path, name: str, fmt: str) -> dict:
             {"command": "mesh.convert", "params": {"body": stl.stem}}]
     if fmt in ("step", "both"):
         cmds.append({"command": "file.export_step", "params": {"path": str(step)}})
+    for f in (step, design):
+        f.unlink(missing_ok=True)  # an earlier export's file must not pass for this one
     script = job.build_dir / f"solidcraft_{name}.json"
     write_json(script, {"commands": cmds})
     log = job.build_dir / "solidcraft.log"
