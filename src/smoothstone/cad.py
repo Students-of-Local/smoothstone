@@ -74,6 +74,10 @@ def export_one(exe: str, job, stl: Path, name: str, fmt: str) -> dict:
     if fmt in ("step", "both"):
         cmds.append({"command": "file.export_step", "params": {"path": str(step)}})
     writes = [f for f, on in ((step, fmt in ("step", "both")), (design, fmt in ("sc", "both"))) if on]
+    kept = None
+    if design in writes and design.is_file():  # the person may have edited it in SolidCraft
+        kept = design.with_suffix(".sc.bak")
+        design.replace(kept)
     for f in writes:
         f.unlink(missing_ok=True)  # an earlier export's file must not pass for this one; others stay
     script = job.build_dir / f"solidcraft_{name}.json"
@@ -97,7 +101,7 @@ def export_one(exe: str, job, stl: Path, name: str, fmt: str) -> dict:
     if diff > MAX_DIFF:
         raise Failed(f"{'STEP' if target == step else 'design'} volume differs from the STL by {diff:.1f}%")
     return {"step": step if fmt in ("step", "both") else None, "sc": design if fmt in ("sc", "both") else None,
-            "faces": sum(int(b.get("faces") or 0) for b in bodies), "volume": vol, "diff": diff}
+            "faces": sum(int(b.get("faces") or 0) for b in bodies), "volume": vol, "diff": diff, "kept": kept}
 
 
 def cmd(args, job, out):
@@ -127,6 +131,8 @@ def cmd(args, job, out):
         if r["sc"]:
             out.add(f"SolidCraft design: {r['sc']}" + ("" if r["step"] else
                                                        f" ({r['faces']} faces, within {r['diff']:.3f}% of the STL)"))
-    out.next = "open it in SolidCraft"
+        if r["kept"]:
+            out.add(f"The design that was there is kept as {r['kept']}")
+    out.next = "none, the part is ready; the person opens the design in SolidCraft"
     out.result = f"exported {len(found)} part{'s' if len(found) > 1 else ''} for CAD"
     return out

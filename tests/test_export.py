@@ -64,7 +64,7 @@ def test_export_writes_step_and_design(jobenv, fake_cli):
     assert (job / "fake_hook.step").is_file() and (job / "fake_hook.sc").is_file()
     assert f"STEP: {job / 'fake_hook.step'} (12 faces, 8000 mm3, within 0.000% of the STL)" in text
     assert f"SolidCraft design: {job / 'fake_hook.sc'}" in text
-    assert nxt == "open it in SolidCraft"
+    assert nxt == "none, the part is ready; the person opens the design in SolidCraft"
     assert "$ " in (job / "build" / "solidcraft.log").read_text()
     script = json.loads((job / "build" / "solidcraft_fake_hook.json").read_text())
     assert [c["command"] for c in script["commands"]] == ["file.insert_mesh", "mesh.convert", "file.export_step"]
@@ -118,6 +118,15 @@ def test_export_step_keeps_the_persons_design(jobenv, fake_cli):
     assert (job / "fake_hook.sc").read_text() == "edited in SolidCraft"
 
 
+def test_export_backs_up_an_edited_design(jobenv, fake_cli):
+    job = built_job(jobenv)
+    (job / "fake_hook.sc").write_text("edited in SolidCraft")
+    text, code, _ = stone("export")
+    assert code == 0, text
+    assert (job / "fake_hook.sc.bak").read_text() == "edited in SolidCraft"
+    assert f"kept as {job / 'fake_hook.sc.bak'}" in text
+
+
 def test_export_needs_the_design_too(jobenv, fake_cli, monkeypatch):
     built_job(jobenv)
     monkeypatch.setenv("FAKE_MODE", "nosave")
@@ -157,4 +166,4 @@ def test_export_with_real_solidcraft(jobenv, openscad):
                                    text=True, timeout=300).stdout)
     assert all(b["closed"] for b in ev["bodies"])
     assert abs(ev["total"]["volume_mm3"] - v0) / v0 < 0.005
-    assert (job / "_demo.sc").is_file() and nxt == "open it in SolidCraft"
+    assert (job / "_demo.sc").is_file() and nxt == "none, the part is ready; the person opens the design in SolidCraft"
