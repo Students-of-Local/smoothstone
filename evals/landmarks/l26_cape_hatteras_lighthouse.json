@@ -1,0 +1,31 @@
+{
+  "id": "l26_cape_hatteras_lighthouse",
+  "request": "Print me the Cape Hatteras Lighthouse, about 18 cm tall.",
+  "input": "text",
+  "expect": {
+    "landmarks": {
+      "wikipedia": "Cape Hatteras Lighthouse",
+      "size": {
+        "mode": "z",
+        "mm": 180
+      },
+      "bed": [
+        220,
+        220,
+        220
+      ],
+      "tallest": {
+        "m": 60.49975,
+        "source": "https://www.nps.gov/caha/planyourvisit/chls.htm",
+        "why": "198.5 ft to the top. Wikidata's 64 m and the map's 64 m are higher; this is the Park Service's own figure."
+      },
+      "dimensions": {
+        "length": 12.78,
+        "width": 12.78,
+        "source": "https://tile.loc.gov/storage-services/master/pnp/habshaer/nc/nc0400/nc0432/data/nc0432data.pdf#page=9",
+        "why": "The pack's octagonal base across its quoined corners, as the grader measures it. HABS gives the shaft's 32 ft 5.5 in but no width for the base, and the map draws a rough 15 m circle, so this holds the print to the pack. A photograph from the entry puts the base near 12.9 m."
+      }
+    }
+  },
+  "why": "The map has it as one plain cylinder: the taper, the octagonal base, the spiral daymark, the gallery and the lantern come from the pack."
+}
