@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -60,6 +60,8 @@ class Result:
     # the setting the part itself names as the fix, and its value now (see TEXT_ECHO)
     param: str = ""
     at: float | None = None
+    # flat ledges excluded from the wall reading (window sill, port rim, post face), mm
+    steps: list[float] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -77,10 +79,14 @@ def load_off(path) -> "trimesh.Trimesh":
     lines = [ln for ln in Path(path).read_text().splitlines() if ln.strip() and not ln.startswith("#")]
     if not lines or not lines[0].startswith("OFF"):
         raise ValueError("not an OFF file")
-    nv, nf = (int(w) for w in lines[1].split()[:2])
-    verts = np.array([ln.split()[:3] for ln in lines[2:2 + nv]], dtype=float).reshape(nv, 3)
+    # counts live on the OFF header line when OpenSCAD writes it that way ("OFF 1244 2488 0"),
+    # otherwise on the next line ("OFF" alone).
+    counts = (lines[0].split() + lines[1].split())[1:3]
+    nv, nf = (int(w) for w in counts)
+    body = lines[1:] if lines[0].split()[1:3] else lines[2:]
+    verts = np.array([ln.split()[:3] for ln in body[:nv]], dtype=float).reshape(nv, 3)
     tris = []
-    for ln in lines[2 + nv:2 + nv + nf]:
+    for ln in body[nv:nv + nf]:
         w = ln.split()  # count, indices, then optional face color
         k = int(w[0])
         idx = [int(x) for x in w[1:1 + k]]
@@ -102,16 +108,24 @@ def _load(path: Path):
     return mesh
 
 
-def _ray_hits(mesh, origins, dirs):
-    """First hit locations per ray. Returns (index_ray, locations) or None."""
+def _first_hits(mesh, origins, dirs, multiple_hits=False):
+    """First hit locations per ray. Returns (index_ray, locations, face_ids) or None."""
     try:
-        loc, idx_ray, _ = mesh.ray.intersects_location(origins, dirs, multiple_hits=False)
-        return idx_ray, loc
+        loc, idx_ray, face_ids = mesh.ray.intersects_location(origins, dirs, multiple_hits=multiple_hits)
+        return idx_ray, loc, face_ids
     except ImportError:
         return None
 
 
-def thinnest_wall(mesh, samples: int = WALL_SAMPLES, seed: int = 0) -> float | None:
+def thinnest_wall(mesh, samples: int = WALL_SAMPLES, seed: int = 0):
+    """(thinnest wall mm, list of step mm).
+
+    A wall run leaves the part on a face whose outward normal points along the ray. A step run
+    crossed a cut's own ledge (window sill, port rim) and came back out of the face it started on,
+    so its hit face's normal points back at the ray. That is topology, not a distance: a 0.4 mm
+    plate's run is 0.4 mm and still a wall; a post boss's 1.7 mm face is a distinct surface and
+    still reported as a wall. Steps are returned separately so nothing is silently hidden.
+    """
     import trimesh
 
     try:
@@ -120,17 +134,24 @@ def thinnest_wall(mesh, samples: int = WALL_SAMPLES, seed: int = 0) -> float | N
         pts, fi = trimesh.sample.sample_surface(mesh, samples)
     normals = mesh.face_normals[fi]
     origins = pts - normals * 1e-4
-    got = _ray_hits(mesh, origins, -normals)
+    got = _first_hits(mesh, origins, -normals)
     if got is None:
-        return None
-    idx_ray, loc = got
+        return None, []
+    idx_ray, loc, hit_ids = got
     if len(idx_ray) == 0:
-        return None
+        return None, []
     dist = np.linalg.norm(loc - origins[idx_ray], axis=1)
-    dist = dist[dist > 5e-3]  # drop self hits from float error
-    if len(dist) == 0:
-        return None
-    return float(np.percentile(dist, WALL_PERCENTILE))
+    keep = dist > 5e-3  # drop self hits from float error
+    dist, hit_ids = dist[keep], hit_ids[keep]
+    # a wall run exits the part, so its hit face's outward normal opposes the start normal; a step
+    # run crossed a cut's own ledge and came back out of the face it started on, so the hit face
+    # looks the same way (dot > 0)
+    is_step = np.einsum("ij,ij->i", normals[idx_ray][keep], mesh.face_normals[hit_ids]) > 0
+    steps = sorted({round(float(d), 2) for d in dist[is_step]})
+    walls = dist[~is_step]
+    if len(walls) == 0:
+        return None, steps
+    return float(np.percentile(walls, WALL_PERCENTILE)), steps
 
 
 def slice_area(mesh, z: float) -> tuple[float, float]:
@@ -273,6 +294,12 @@ def _check_rest(mesh, out, sliced, recipe, params, bed, log, max_bodies, max_ove
     out.append(Result("watertight", wt, wt, "closed surface" if wt else "surface has holes",
                       advice="the surface has holes; go back to the default parameters"))
 
+    # a hole through the part (a case window, a port) is a legitimate print feature: it changes the
+    # surface's shape but does not mean the mesh is broken, so the window/port cuts must not FIX
+    holes = (2 - mesh.euler_number) // 2 if wt else 0
+    if holes > 0:
+        out.append(Result("through_holes", True, holes, f"{holes} through holes (window/port cuts)"))
+
     from .clean import problems, slicer_view
 
     bad = problems(slicer_view(mesh.vertices, mesh.faces))
@@ -337,15 +364,16 @@ def _check_rest(mesh, out, sliced, recipe, params, bed, log, max_bodies, max_ove
     # before min_wall: thin letters are thin walls too, and the text fix sizes both at once
     out.extend(text_results(log))
 
-    wall = thinnest_wall(mesh)
+    wall, steps = thinnest_wall(mesh)
     need_wall = recipe.min_wall if recipe else MIN_WALL
     if wall is None:
         out.append(Result("min_wall", True, None, "skipped (no ray engine or no hits)"))
     else:
+        step_txt = f"; steps {steps} mm" if steps else ""
         out.append(Result("min_wall", wall >= need_wall, round(wall, 2),
-                          f"thinnest wall {wall:.2f} mm (need {need_wall} mm)",
+                          f"thinnest wall {wall:.2f} mm (need {need_wall} mm){step_txt}",
                           advice="a wall is too thin; make it thicker",
-                          direction="up", need=need_wall, measured=wall))
+                          direction="up", need=need_wall, measured=wall, steps=steps))
 
     face_zmin = tri_z.min(axis=1)
     face_zmax = tri_z.max(axis=1)

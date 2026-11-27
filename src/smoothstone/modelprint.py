@@ -637,10 +637,10 @@ def surface_thickness(mesh, samples: int = 3000) -> dict:
     pts, fi = trimesh.sample.sample_surface(mesh, samples, seed=0)
     n = mesh.face_normals[fi]
     o = pts - n * 1e-4
-    got = check._ray_hits(mesh, o, -n)
+    got = check._first_hits(mesh, o, -n)
     if got is None or not len(got[0]):
         return {"one_line": None, "two_lines": None, "wall": None}
-    idx, loc = got
+    idx, loc, _ = got
     d = np.linalg.norm(loc - o[idx], axis=1)
     d = d[d > 5e-3]
     if not len(d):

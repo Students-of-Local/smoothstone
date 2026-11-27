@@ -1526,7 +1526,7 @@ def grade(job: Path, spec: dict, stl: Path | None) -> dict:
     measured["support"] = sup
     measured["access"] = acc
     measured["holes"] = holes
-    wall = checks.thinnest_wall(mesh)
+    wall, _ = checks.thinnest_wall(mesh)
     measured["min_wall"] = None if wall is None else round(wall, 2)
     if wall is not None and wall < MIN_WALL:
         why.append(f"walls: thinnest wall {wall:.2f} mm (need {MIN_WALL} mm)")
