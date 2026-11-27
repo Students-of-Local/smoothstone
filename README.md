@@ -147,7 +147,7 @@ uv tool install -e .
 stone status
 ```
 
-stone finds OpenSCAD through `STONE_OPENSCAD`, then `openscad` on your PATH, then `vendor/openscad/AppRun`.
+stone finds OpenSCAD through `STONE_OPENSCAD`, then `openscad` on your PATH, then `vendor/openscad/AppRun`. On macOS it also uses the app bundle: `/Applications/OpenSCAD.app`, `~/Applications/OpenSCAD.app`, or wherever Spotlight has the bundle registered, and `STONE_OPENSCAD` may name either the bundle or the binary inside it.
 
 `stone export` turns a built part into an editable STEP and a [SolidCraft](https://github.com/tangency-labs/solidcraft) design for CAD. SolidCraft is optional; stone finds its CLI through `STONE_SOLIDCRAFT`, then `solidcraft-cli` on your PATH.
 
