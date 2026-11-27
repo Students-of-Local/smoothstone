@@ -1,0 +1,272 @@
+{
+ "name": "case",
+ "title": "Open-front case",
+ "summary": "Enclosure open at the front, with one window and one side port cutout and four screw posts in the back corners. The front closes with a separate cover that snaps shut: cantilever hooks on the cover's rim catch in pockets cut into the walls. Prints lying on its back, no support.",
+ "tags": [
+  "box",
+  "cantilever",
+  "case",
+  "closure",
+  "cover",
+  "device",
+  "enclosure",
+  "housing",
+  "lid",
+  "panel",
+  "shell",
+  "snap"
+ ],
+ "makes": [
+  "project box",
+  "project case",
+  "project enclosure",
+  "electronics case",
+  "electronics enclosure",
+  "snap case",
+  "housing"
+ ],
+ "tier": "S",
+ "params": [
+  {
+   "name": "w",
+   "type": "number",
+   "default": 80,
+   "min": 30,
+   "max": 220,
+   "unit": "mm",
+   "help": "outside width"
+  },
+  {
+   "name": "d",
+   "type": "number",
+   "default": 60,
+   "min": 30,
+   "max": 220,
+   "unit": "mm",
+   "help": "outside depth"
+  },
+  {
+   "name": "h",
+   "type": "number",
+   "default": 30,
+   "min": 12,
+   "max": 120,
+   "unit": "mm",
+   "help": "outside height"
+  },
+  {
+   "name": "wall",
+   "type": "number",
+   "default": 2.5,
+   "min": 1.6,
+   "max": 6,
+   "unit": "mm",
+   "help": "wall thickness"
+  },
+  {
+   "name": "floor",
+   "type": "number",
+   "default": 2.5,
+   "min": 1.6,
+   "max": 6,
+   "unit": "mm",
+   "help": "back wall thickness"
+  },
+  {
+   "name": "corner_r",
+   "type": "number",
+   "default": 6,
+   "min": 0,
+   "max": 30,
+   "unit": "mm",
+   "help": "outside corner radius"
+  },
+  {
+   "name": "win_w",
+   "type": "number",
+   "default": 50,
+   "min": 0,
+   "max": 200,
+   "unit": "mm",
+   "help": "window width, 0 for none"
+  },
+  {
+   "name": "win_h",
+   "type": "number",
+   "default": 20,
+   "min": 0,
+   "max": 100,
+   "unit": "mm",
+   "help": "window height, 0 for none"
+  },
+  {
+   "name": "win_z",
+   "type": "number",
+   "default": 5,
+   "min": 0,
+   "max": 100,
+   "unit": "mm",
+   "help": "window bottom above the inside floor"
+  },
+  {
+   "name": "port_w",
+   "type": "number",
+   "default": 12,
+   "min": 0,
+   "max": 100,
+   "unit": "mm",
+   "help": "side port width, 0 for none"
+  },
+  {
+   "name": "port_h",
+   "type": "number",
+   "default": 8,
+   "min": 0,
+   "max": 100,
+   "unit": "mm",
+   "help": "side port height, 0 for none"
+  },
+  {
+   "name": "port_z",
+   "type": "number",
+   "default": 4,
+   "min": 0,
+   "max": 100,
+   "unit": "mm",
+   "help": "side port bottom above the inside floor"
+  },
+  {
+   "name": "post_d",
+   "type": "number",
+   "default": 6,
+   "min": 0,
+   "max": 12,
+   "unit": "mm",
+   "help": "screw post diameter, 0 for none"
+  },
+  {
+   "name": "post_hole_d",
+   "type": "number",
+   "default": 2.6,
+   "min": 0,
+   "max": 6,
+   "unit": "mm",
+   "help": "screw hole diameter"
+  },
+  {
+   "name": "quality",
+   "type": "int",
+   "default": 64,
+   "min": 16,
+   "max": 128,
+   "help": "circle smoothness"
+  },
+  {
+   "name": "close",
+   "type": "choice",
+   "default": "snap",
+   "choices": [
+    "snap",
+    "none"
+   ],
+   "help": "snap: print a cover that snaps shut | none: print the body alone"
+  },
+  {
+   "name": "part",
+   "type": "choice",
+   "default": "both",
+   "choices": [
+    "both",
+    "body",
+    "cover"
+   ],
+   "help": "both prints body and cover side by side; body or cover prints one part"
+  },
+  {
+   "name": "clr",
+   "type": "number",
+   "default": 0.25,
+   "min": 0.1,
+   "max": 0.4,
+   "unit": "mm",
+   "help": "cover-to-wall clearance per side (FDM 0.2-0.3)"
+  },
+  {
+   "name": "cover_t",
+   "type": "number",
+   "default": 2.5,
+   "min": 1.6,
+   "max": 6,
+   "unit": "mm",
+   "help": "cover plate thickness"
+  },
+  {
+   "name": "material",
+   "type": "choice",
+   "default": "PLA",
+   "choices": [
+    "PLA",
+    "PETG",
+    "TPU"
+   ],
+   "help": "sets the snap hook's strain limit"
+  }
+ ],
+ "dims": {
+  "x": "w if part != 'both' or close == 'none' else 2 * w + 6",
+  "y": "d",
+  "z": "h"
+ },
+ "dims_tol": 0.6,
+ "max_bodies": 2,
+ "max_overhang": 0.06,
+ "fix": {
+  "min_wall": "wall",
+  "bed": "w",
+  "first_layer": "w"
+ },
+ "examples": [
+  {
+   "name": "small",
+   "params": {
+    "w": 60,
+    "d": 40,
+    "h": 30,
+    "win_w": 30,
+    "win_h": 10,
+    "win_z": 2,
+    "port_h": 6
+   }
+  },
+  {
+   "name": "bare",
+   "params": {
+    "win_w": 0,
+    "win_h": 0,
+    "port_w": 0,
+    "post_d": 0,
+    "close": "none"
+   }
+  }
+ ],
+ "phrases": {
+  "just the cover": {
+   "part": "cover"
+  },
+  "only the cover": {
+   "part": "cover"
+  },
+  "cover only": {
+   "part": "cover"
+  },
+  "no cover": {
+   "part": "body"
+  },
+  "without a cover": {
+   "part": "body"
+  },
+  "without the cover": {
+   "part": "body"
+  }
+ }
+}

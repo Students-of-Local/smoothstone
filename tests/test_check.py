@@ -64,6 +64,48 @@ def test_thin_plate_fails_wall():
     assert res["min_wall"].value == pytest.approx(0.4, abs=0.05)
 
 
+def case_shell(wall=3.2, win_h=10, win_z=5):
+    """The case recipe's own geometry, made with trimesh: 80x60x30 shell, open top, one window cut.
+
+    The window's bottom face is a 3.2 mm deep sill ledge. It is a step, not a wall.
+    """
+    from trimesh.creation import box
+    outer = box((80, 60, 30))
+    outer.apply_translation((0, 0, 15))
+    cavity = box((80 - 2 * wall, 60 - 2 * wall, 30 - wall))
+    cavity.apply_translation((0, 0, wall + (30 - wall) / 2))
+    shell = outer.difference(cavity)
+    cut = box((50, 90, win_h))
+    cut.apply_translation((0, 0, wall + win_z + win_h / 2))
+    return on_bed(shell.difference(cut))
+
+
+def test_window_sill_is_not_a_wall():
+    res = by_name(check.check_mesh(case_shell(wall=3.2)))
+    assert res["min_wall"].ok
+    assert res["min_wall"].value == pytest.approx(3.2, abs=0.2)
+
+
+def test_post_boss_face_is_still_reported(openscad, tmp_path):
+    # the real recipe with posts but no window/port: the post's front face sits 1.698 mm off the
+    # inner back wall. It is a distinct surface, so the step rule must not hide it.
+    from smoothstone import scad
+    from pathlib import Path
+    r = recipes._load_one(Path(__file__).resolve().parent.parent / "recipes" / "case")
+    assert r is not None
+    params = r.merged({"win_w": 0, "win_h": 0, "port_w": 0})
+    out = tmp_path / "case.off"
+    assert scad.build_stl(openscad, r, params, out).ok
+    res = by_name(check.check_stl(out, recipe=r, params=params))
+    assert res["min_wall"].value == pytest.approx(1.7, abs=0.1)
+
+
+def test_genuine_thin_wall_with_a_window_still_fails():
+    res = by_name(check.check_mesh(case_shell(wall=0.8, win_h=8)))
+    assert not res["min_wall"].ok
+    assert res["min_wall"].value == pytest.approx(0.8, abs=0.2)
+
+
 def test_t_shape_fails_overhang():
     m = t_shape()
     res = by_name(check.check_mesh(m))

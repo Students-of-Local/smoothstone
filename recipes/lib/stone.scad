@@ -97,3 +97,33 @@ module teardrop2d(d) {
     circle(d = d);
     rotate(45) square(d / 2);
 }
+
+// A cantilever snap hook, 2D, extruded: an arm up from (0, 0) of real thickness t, a catch on its
+// tip leaning toward the part it holds, and a 60 degree ramp on the catch's far side that bends the
+// arm as it passes the rim. Caller places it at the hook's root; the catch's underside sits at z = L
+// and its top at z = L + t. rise is the deflection the hook's ramp has to bend through, sized so the
+// arm's strain stays at 75% of the material's limit: eps = 1.5 * rise * t / L^2 (Bayer
+// MaterialScience, "Snap-Fit Joints for Plastics", Table 1 shape A), same as recipes/fitted_case.
+// The catch leans out to -X only, so the caller puts the root on the part's -X side and the hook
+// never leaves the part's footprint. The ramp is 60 degrees off the arm, so it prints unsupported.
+// Both faces of the arm are parallel, so the hook is never a thin wall the wall check would flag.
+// snap_profile is the hook's outline and snap_catch_profile the catch and ramp alone, both in the
+// frame of a hook whose root is at (0, 0); a recipe that cuts the catch's pocket out of a wall can
+// subtract the second one in the hook's own place, so the pocket is never wider than the catch.
+function snap_rise(L, t, material) =
+    floor(0.75 * (material == "PLA" ? 0.02 : material == "PETG" ? 0.03 : 0.2) * L * L / (1.5 * t) * 10) / 10;
+
+function snap_profile(L, t, r) =
+    [[0, 0], [0, L], [-r, L], [-r, L + t], [0, L + t + r * 1.732], [t, L + t + r * 1.732], [t, 0]];
+
+function snap_catch_profile_pts(L, t, r) =
+    [[0, L], [-r, L], [-r, L + t], [0, L + t + r * 1.732], [t, L + t + r * 1.732], [t, L]];
+
+module snap_catch_profile(L = 5, t = 1.2, r = 1) {
+    polygon(snap_catch_profile_pts(L, t, r));
+}
+
+module snap_hook(L = 5, t = 1.2, rise = 1, w = 6) {
+    r = rise <= 0 ? snap_rise(L, t, "PLA") : rise;
+    linear_extrude(w, center = true) polygon(snap_profile(L, t, r));
+}

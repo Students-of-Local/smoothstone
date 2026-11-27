@@ -93,6 +93,12 @@ def build_stl(binary: str, recipe: Recipe, params: dict, out_stl: Path, defines:
         return ScadRun(False, None, f"$ {' '.join(cmd)}\n{e}", f"cannot run OpenSCAD: {e}")
     log = "$ " + " ".join(cmd) + "\n" + (proc.stdout or "") + (proc.stderr or "")
     err = first_error(log)
+    # OpenSCAD exits 0 with no geometry and only a WARNING when a library is not found, which reads as
+    # a part with a face missing; a recipe that loads nothing is a broken build
+    for ln in log.splitlines():
+        if "Can't open library" in ln:
+            err = _shorten(ln)
+            break
     if proc.returncode == 0 and out_off.is_file() and out_off.stat().st_size > 0:
         try:
             from .check import load_off
